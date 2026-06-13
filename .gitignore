@@ -1,0 +1,27 @@
+# 공통
+node_modules/
+dist/
+build/
+*.local
+.DS_Store
+
+# 로그
+*.log
+npm-debug.log*
+
+# 에디터
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.iml
+
+# Flutter (mobile)
+mobile/.dart_tool/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/build/
+
+# 환경 변수 — 절대 커밋 금지
+.env
+.env.*
+!.env.example
