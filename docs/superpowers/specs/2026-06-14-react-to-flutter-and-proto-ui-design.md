@@ -1,7 +1,8 @@
 # React → Flutter 전환 & web/admin/mobile 프로토 UI 설계
 
-> 작성일: 2026-06-14 · 대상: `devpath-frontend` 모노레포 · 상태: 설계 승인 완료(브레인스토밍)
+> 작성일: 2026-06-14 · 대상: `devpath-frontend` 모노레포 · 상태: 설계 승인 + 디자인 리뷰 반영(완성도 5/10→8/10)
 > 제품: **DevPath AI** — 한국 개발자 대상 AI 학습 플랫폼(AI-LMS)
+> 디자인 시스템 SSoT: [`DESIGN.md`](../../../DESIGN.md) · 디자인 리뷰 요약: [`2026-06-14-design-review-summary.md`](./2026-06-14-design-review-summary.md) · 디자인 결정(DD1~DD8)·상태 매트릭스·반응형·a11y는 본 문서 §9~§13.
 
 ## 0. 배경 & 확인된 사실
 
@@ -42,10 +43,10 @@ devpath-frontend/
 │  │   ├─ sse/                 #   SseClient(POST+stream): 경로생성/멘토/Sandbox 로그
 │  │   ├─ auth/                #   TokenStore(추상) + 401 큐잉 갱신 인터셉터
 │  │   └─ error/               #   ApiException{code,message,traceId} + HTTP→예외 매핑
-│  └─ dp_design/               # ❷ 디자인 시스템 (Material 3, 도메인 모름)
-│      ├─ theme/               #   토큰(색·타이포·8pt 간격·라운드), 라이트/다크, 반응형 breakpoint
-│      ├─ components/          #   버튼·입력·카드·상태위젯(Loading/Empty/Error)·차트 래퍼·마크다운/코드 렌더러
-│      └─ icons/
+│  └─ dp_design/               # ❷ 디자인 시스템 (Material 3, 도메인 모름) — 토큰 SSoT=DESIGN.md
+│      ├─ theme/               #   ThemeExtension 토큰(인디고 fill/text 분리·Pretendard/D2Coding·8pt·라운드), 라이트+다크 (DD1·DD2·DD6)
+│      ├─ components/          #   버튼·입력·카드·차트·마크다운/코드 렌더러 + 상태위젯(Loading/Empty/Error + KillSwitch/Quota/SandboxUnavailable/Offline/SSE단계)
+│      └─ icons/               #   Material Symbols 단일셋 (DD3)
 ├─ apps/
 │  ├─ web/                     # 사용자 Flutter Web (로그인 이후 전 화면)
 │  ├─ admin/                   # 관리자 Flutter Web (테이블·대시보드·모더레이션)
@@ -69,17 +70,20 @@ devpath-frontend/
 
 ### 앱별 구성 (feature-first, 화면 로직 앱별 소유)
 - 각 feature = `presentation`(위젯) + `application`(Riverpod ViewModel) + `state`(불변 상태). 데이터·모델은 `dp_core`.
-- **web**: 데스크톱=좌측 내비 레일+넓은 본문 / 모바일웹=하단탭 (반응형 breakpoint). 라우터 redirect 게이트. `MonacoView`는 web 전용.
+- **web**: 반응형 셸 — <840 하단탭 / ≥840 좌측 내비 레일(§9.3). 라우터 redirect 게이트. **SBX는 ≥1240 3-페인 / 840–1239 2-페인(로그 접이) / <1024 1-페인 세그먼트 탭**(DD5). `MonacoView`는 web 전용(터치 편집 제약 명시).
 - **admin**: 좌측 영구 내비 + 데이터테이블 중심. `ADMIN`/`OWNER` 역할 가드.
 - **mobile**: 하단 5탭 셸(StatefulShellRoute). 전용 화면 = 알림센터/오프라인/딥링크. drift 캐시 + FCM + `devpath://` 딥링크.
 - **landing**: Jaspr 정적 생성, SEO 메타·OG·데모영상, CTA→web 앱. 앱과 상태 공유 없음.
+
+> 디자인 토큰·타이포·아이콘·반응형·접근성·다크모드·상태 매트릭스의 단일 출처는 [`DESIGN.md`](../../../DESIGN.md)와 본 문서 §9. 본 절 컴포넌트는 그 토큰에 정렬한다. (Roboto 기본폰트 금지 → Pretendard/D2Coding, 이모지 → Material Symbols)
 
 ## 3. 데이터 흐름 & 에러 처리
 
 - **목 서버**: `ApiClient`에 dio `MockAdapter`(JSON 픽스처) 주입. **SSE 목**은 단계별 `Stream` emit(딜레이)으로 스트리밍 UX 재현. 목/실서버 토글 = 환경변수(`baseUrl`).
 - **인증**: OAuth(목) → JWT access 30분/refresh 14일 → 401 시 dio 인터셉터가 `/auth/refresh` 큐잉 재시도 → `TokenStore`(web=httpOnly 쿠키/메모리, mobile=`flutter_secure_storage`).
 - **게이트**: go_router `redirect` — 미인증→로그인, `ONBOARDING_INCOMPLETE(403)`→온보딩.
-- **에러**: 공통 포맷 `{error:{code,message,trace_id,timestamp}}` → `ApiException` 매핑 → `dp_design` Loading/Empty/Error 위젯. 특수 분기: `QUOTA_EXCEEDED(429)`/`Retry-After`, `AI_KILL_SWITCH_ACTIVE(503)`, `SANDBOX_UNAVAILABLE(503)`.
+- **에러**: 공통 포맷 `{error:{code,message,trace_id,timestamp}}` → `ApiException` 매핑 → `dp_design` 상태 위젯. 특수 분기는 **전용 상태 위젯으로 처리**(DD4, 상태 매트릭스 §9.2): `AI_KILL_SWITCH_ACTIVE(503)`→KillSwitch '점검 중' 배너 + 대체 행동(캐시 열람/커뮤니티/저장), `QUOTA_EXCEEDED(429)`→Quota + `Retry-After` 카운트다운, `SANDBOX_UNAVAILABLE(503)`→실행만 비활성·코드 편집 유지.
+- **SSE 중단 복구(DD8)**: 네트워크 끊김·60s 타임아웃 시 **완료 단계를 보존하고 끊긴 지점부터 재연결·이어하기**(전체 재시작 금지). `SseClient`가 단계 상태(connecting/streaming/partial/reconnecting/complete/failed)를 노출하고, 1st Aha 경로 생성·멘토 스트리밍이 이를 구독.
 - **페이지네이션**: 커서 기반 `Page<T>{data,nextCursor,limit}`(limit 20/최대 100). 비동기 결과(AI 리뷰/시드답변)는 폴링/알림 후 조회.
 
 ### 백엔드 의존 요약 (core 모델 설계 기준)
@@ -106,12 +110,14 @@ devpath-frontend/
 ### 승인된 와이어프레임 방향
 - **web 셸**: 데스크톱 좌측 내비 레일 + 카드형 대시보드(스트릭/진행률/다음과제 단일 CTA/배지).
 - **PATH-001**: SSE 4단계 생성 로딩 → 12주 타임라인 + 이번 주 과제 3개 + 멘토 rationale.
-- **SBX-001**: 3-페인(Monaco 에디터 | SSE 실행로그 | AI 리뷰: 신뢰도·잘한점·개선(라인·심각도)·보안 + 👍👎·멘토질문).
+- **SBX-001**: 반응형(≥1240 3-페인: Monaco 에디터 | SSE 실행로그 | AI 리뷰 / 840–1239 2-페인+로그 접이 / <1024 1-페인 세그먼트 탭 — DD5). AI 리뷰: 신뢰도·잘한점·개선(라인·심각도)·보안 + 피드백·멘토질문.
 - **admin**: 좌측 영구 내비 + 검색/필터 + 테이블 + 우측 상세·제재 패널(경고/7일/30일/밴).
 - **mobile**: 하단 5탭(홈/경로/멘토/커뮤니티/알림), 알림센터, 오프라인(drift 캐시·재연결 동기화).
 
 > 와이어프레임 원본: `.superpowers/brainstorm/sess1/content/web-wireframes.html`, `admin-mobile-wireframes.html`.
 > 전체 MVP 화면 목록은 부록 A 참조 — 동일 패턴으로 확장.
+>
+> **프로토는 전역 라이트/다크 토글 포함(DD6)**, 접근성 베이스라인 적용(DD7, §9.4). 화면별 상호작용 상태(Loading/Empty/Error/Success/Partial)는 §9.2 상태 매트릭스를 따른다.
 
 ## 5. 테스트 전략 (CLAUDE.md 절대조건 2: Test-First)
 
@@ -127,6 +133,13 @@ devpath-frontend/
 
 **워크플로**: 기능마다 실패 테스트 먼저 → 최소 구현 → `melos run test`로 통과 눈으로 확인(조건 2·3).
 
+**디자인 리뷰 반영 추가 테스트**
+- **다크 변형(DD6)**: 골든 화면·상태 위젯은 라이트/다크 2벌 golden 테스트 → **golden 수 약 2배**(구축 §6 일정 반영).
+- **신규 상태 위젯(DD4·§9.2)**: KillSwitch·Quota·SandboxUnavailable·Offline·SSE단계 각각 위젯 테스트(카피·1차행동·맥락 검증).
+- **SBX 반응형(DD5)**: 375 / 1024 / 1240px 위젯 테스트로 페인 전환 확인.
+- **SSE 중단(DD8)**: 목 SSE 중간 중단 주입 → 완료 단계 유지 + 재연결·이어하기 통합 테스트.
+- **a11y(DD7)**: 대비 토큰 단위 테스트, Monaco `Esc` 탈출 · SSE `aria-live` 수동 검증.
+
 ## 6. 구축 단계 (점진, 각 단계 테스트 동반)
 
 1. **모노레포 골격**: melos + workspace, 빈 `dp_core`/`dp_design`/`apps/*`/`landing`, CI(`melos analyze/test`). 기존 `web`/`admin` 스캐폴드 제거, `mobile/` → `apps/mobile/` 이전.
@@ -137,6 +150,9 @@ devpath-frontend/
 6. **mobile 셸 + 대표 3화면**: 하단탭 → 대시보드 → 알림 → 오프라인(drift).
 7. **landing(Jaspr)**: SEO 랜딩 → web 앱 연결.
 8. **통합 테스트 + 목/실서버 토글 정리**.
+
+> **디자인 리뷰 태스크 매핑(§12 T1~T7)**: 3단계(dp_design)에 **T1**(토큰 ThemeExtension 라이트+다크)·**T2**(신규 상태위젯)·**T6**(Material Symbols 교체); 4단계(web)에 **T3**(SBX 반응형)·**T5**(SSE 이어하기)·**T7**(빈상태 카피·1차행동); 전 단계 공통 **T4**(a11y 베이스라인). **다크모드(DD6)로 golden 테스트 약 2배** — 3단계 이후 일정에 반영.
+> **착수 전 게이트(필수)**: DD5(반응형)·DD6(다크 전역 토글)·DD8(SSE 재연결)은 아키텍처 영향 → 구현 착수 전 `/plan-eng-review` 실행 권장(리뷰 리포트 VERDICT, §13 하단).
 
 ## 7. 참고 샘플 코드 매핑
 
@@ -167,11 +183,115 @@ devpath-frontend/
 - 보안 샘플(`Certificate_Pinning`, `RSA_AES_GCM`, `구조화_로깅`): 프로토 범위 밖, 운영화 단계에서 검토.
 
 ## 8. 미해결/후속 결정 (문서에 명시 없음 — 구현 전 확정 필요)
-- 모바일 OAuth 콜백 흐름(외부 브라우저/딥링크) — 문서 미명시, 설계 결정 필요.
+- 모바일 OAuth 콜백 흐름 — 외부 브라우저(AppAuth/flutter_web_auth) + `devpath://` 콜백 딥링크가 유력안이나 문서 미명시 → Eng Review에서 확정.
 - 모바일 refresh 토큰 저장(웹 httpOnly 쿠키 패턴 적용 불가) → `flutter_secure_storage`로 결정(본 스펙 채택).
 - 결제(PAY) 화면: 명명 규칙엔 있으나 인벤토리 정의가 문서에 없음 → 프로토 범위 제외, 별도 확인.
+- **디자인 미해결: 0** — `/plan-design-review`로 DD1~DD8 확정(§9, DESIGN.md). 단 **Eng Review 미실행(필수 아키텍처 게이트)** → 구현 착수 전 `/plan-eng-review` 권장(§13 VERDICT).
 
 ## 부록 A — 전체 MVP 화면 목록 (확장 대상)
 - **web(18)**: LAND-001, AUTH-001, ONB-001/002/003, PATH-001/002, CNT-001, SBX-001, REV-001, MEN-001, COM-001~008, DASH-001. (COM-009/010=Phase 2)
 - **admin(7 + Should 3)**: A-001~006, A-COM-001 / Should: A-007(진단문항), A-008(Sandbox 악용로그), A-009(공지).
 - **mobile 전용(3)**: M-NTF-001, M-OFF-001, M-DEEP-001. (+ Web/Mobile 공용: AUTH/ONB-001/PATH-001·002/MEN-001/DASH-001)
+
+## 9. 디자인 결정 (plan-design-review 2026-06-14)
+
+> 디자인 시스템 단일 출처는 신규 [`DESIGN.md`](../../../DESIGN.md). 아래는 이 플랜에 직접 박는 결정.
+
+### 9.1 확정된 디자인 결정
+| # | 결정 | 선택 | 근거 |
+|---|------|------|------|
+| DD1 | 프라이머리 색 | **인디고 유지 + 텍스트용 어두운 변형 분리** | `#6366f1`은 흰 배경 대비 ≈3.9:1(AA 미달) → fill=indigo-500, 텍스트/링크=indigo-600/700(`primaryText`) |
+| DD2 | 타이포 | **본문 Pretendard + 코드 D2Coding** | 한글 우선·기본 Roboto 금지. Monaco/코드 렌더는 한글 고정폭 |
+| DD3 | 아이콘 | **Material Symbols 단일셋** | 이모지 디자인요소 제거(슬롭#7·렌더 불일치). 스트릭🔥·배지🏅만 의도적 예외 |
+| DD4 | AI_KILL_SWITCH UX | **전용 '점검 중' 상태 + 대체 행동** | 핵심 가치 다운 순간 → 캐시열람/커뮤니티/저장 유도로 goodwill 보존 |
+| DD5 | SBX 반응형 | **데스크톱 3-페인 / 모바일웹 1-페인 탭** | 375px에 3열 불가. 세그먼트 탭으로 전환, Monaco는 web 전용 |
+| DD6 | 다크모드 | **전역 라이트/다크 토글 프로토 포함** | 개발자 타겟층 다크 기대. 골든 화면·상태위젯 다크 변형 테스트 동반(범위 확대 채택) |
+| DD7 | 접근성 | **베이스라인 a11y 플랜 명문화** | 대비 4.5:1·터치 44px·키보드(Monaco Esc)·SSE `aria-live`·시맨틱 랜드마크 |
+| DD8 | SSE 중단 | **단계 보존 + 재연결/이어하기** | 1st Aha 중단 시 완료 단계 유지하고 끊긴 지점부터 이어 생성(전체 재시작 아님) |
+
+### 9.2 상호작용 상태 테이블 (사용자가 보는 것 기준)
+| 기능 | LOADING | EMPTY | ERROR | SUCCESS | PARTIAL |
+|---|---|---|---|---|---|
+| PATH 생성(SSE) | 4단계 체크인+진행바, 단계 카피 | (해당없음·항상 생성) | 끊김→완료단계 유지+"이어서 생성" 재연결 / `KILL_SWITCH`→점검배너+대체행동 | 12주 로드맵+이번주 과제3+멘토 rationale | 일부 단계만 완료, 나머지 스켈레톤 |
+| 콘텐츠 뷰어 | Shimmer 스켈레톤 | "아직 콘텐츠 없음"+추천 경로 CTA | 재시도 / 오프라인→캐시 배너 | 마크다운 렌더 | — |
+| Sandbox 실행 | 실행로그 스트리밍(connecting…) | 코드 미작성 안내 | `SANDBOX_UNAVAILABLE`→실행만 비활성, 편집 유지 | 테스트 통과/실패 요약 | 일부 테스트 결과 스트림 |
+| AI 코드리뷰 | "리뷰 생성 중"+신뢰도 placeholder | — | `KILL_SWITCH`→점검배너 / `QUOTA`(429)→한도+Retry-After 카운트 | 신뢰도·잘한점·개선(라인·심각도)·보안+👍👎 | 항목별 점진 노출 |
+| AI 멘토(SSE) | 타이핑 인디케이터 | "첫 질문을 해보세요" 예시질문 | 끊김→재연결 / `KILL_SWITCH`→점검배너 | 스트리밍 답변+후속질문 | 부분 답변+재개 |
+| 커뮤니티 Q&A | 리스트 스켈레톤 | "첫 질문을 남겨보세요"+작성 CTA | 재시도 | 목록/상세 | 커서 다음 페이지 로딩 |
+| 알림센터(mobile) | 스켈레톤 | "새 알림 없음"+따뜻한 일러스트 | 재시도 | 읽음/안읽음 구분 | — |
+| 오프라인(mobile) | — | "캐시된 콘텐츠 없음" | — | drift 캐시 목록 | 재연결 자동 동기화 |
+| admin 테이블 | 행 스켈레톤 | "조건에 맞는 사용자 없음"+필터 초기화 | 재시도 | 테이블+상세패널 | 커서 "더 보기" |
+
+> 빈 상태는 기능이다 — 따뜻한 카피 + 단일 1차 행동 + 맥락. "결과 없음" 단독 금지.
+
+### 9.3 반응형 명세 (값 확정)
+- **Breakpoint(M3 window class)**: Compact <600 / Medium 600–839 / Expanded 840–1239 / Large ≥1240.
+- **web 셸**: <840 하단탭 · ≥840 좌측 내비 레일.
+- **SBX**: <1024 1-페인 세그먼트 탭 · 1024–1239 2-페인(에디터|리뷰, 로그 접이식) · ≥1240 3-페인.
+- **admin**: 데스크톱 전용(≥1024) 가정, 좁은 폭은 가로 스크롤 테이블 + 상세 패널 모달 전환.
+
+### 9.4 접근성 베이스라인 (DESIGN.md §6 요약)
+대비 본문/링크 ≥4.5:1 · 터치 ≥44px · 키보드 포커스 순서+가시 링+Monaco `Esc` 탈출+skip-to-content · 시맨틱 랜드마크+`lang="ko"` · SSE `aria-live="polite"` · 색+텍스트 병행 · `prefers-reduced-motion` 존중.
+
+## 10. NOT in scope (디자인 — 명시적 보류)
+- **landing(Jaspr) 표현형 디자인 토큰**: MARKETING 규칙 별도, 본 리뷰는 앱 셸(APP UI)만. 랜딩 디자인은 별도 세션.
+- **차별화 브랜드 색 탐색**: 인디고 확정, distinctive seed 탐색은 /design-shotgun 후속(DD1).
+- **커스텀 아이콘셋**: Material Symbols 채택, 자체 아이콘 디자인은 프로덕션화 단계(DD3).
+- **고급 모션·마이크로인터랙션**: SSE/스켈레톤 핵심 모션만, 화면 전환 고급 모션은 후속.
+- **결제(PAY) 화면**: 인벤토리 문서 부재 → 프로토 제외(플랜 §8 유지).
+
+## 11. What already exists (재사용 대상)
+- **승인된 와이어프레임**: `.superpowers/brainstorm/sess1/content/web-wireframes.html`, `admin-mobile-wireframes.html` — 인디고/slate/카드 방향, 3-페인 SBX, 대시보드 위계(스트릭→진행률→단일 CTA→배지). 레이아웃 그대로 계승.
+- **`dp_design` 컴포넌트 목록**(플랜 §2): 상태위젯(Loading/Empty/Error)·폼·차트 래퍼·마크다운/코드 렌더러. 토큰만 DESIGN.md로 채움.
+- **Flutter 샘플 매핑**(플랜 §7): 토큰=`Material3_ThemeExtension_DesignToken`, 상태=`EmptyState`·`Shimmer_Skeleton`·`재사용_다이얼로그`.
+
+## 12. Implementation Tasks
+> 본 리뷰 findings에서 합성. Claude Code/Codex로 실행, 체크박스로 진행.
+
+- [ ] **T1 (P1, human: ~3h / CC: ~20min)** — dp_design/theme — DESIGN.md 토큰을 Material3 ThemeExtension으로 코드화(라이트+다크, Pretendard/D2Coding, 8pt 간격, 라운드)
+  - Surfaced by: Pass 5 — DESIGN.md 부재·토큰 미명세 (DD1·DD2·DD6)
+  - Files: `packages/dp_design/lib/theme/`, `pubspec`(폰트 에셋)
+  - Verify: golden 테스트로 라이트/다크 토큰 렌더 확인
+- [ ] **T2 (P1, human: ~2h / CC: ~15min)** — dp_design/components — KillSwitch·Quota·SandboxUnavailable·Offline·SSE단계 상태 위젯 추가
+  - Surfaced by: Pass 2 — 백엔드 503/429 상태 UX 무명세 (DD4·상태테이블 §9.2)
+  - Files: `packages/dp_design/lib/components/states/`
+  - Verify: 각 상태 위젯 위젯 테스트(카피·1차행동·맥락)
+- [ ] **T3 (P1, human: ~2h / CC: ~15min)** — apps/web/sandbox — SBX 반응형(데스크톱 3-페인 / 모바일웹 1-페인 세그먼트 탭) 구현
+  - Surfaced by: Pass 6 — SBX 3-페인 모바일 collapse 무명세 (DD5)
+  - Files: `apps/web/lib/features/sandbox/presentation/`
+  - Verify: 375px/1024px/1240px 위젯 테스트로 페인 전환 확인
+- [ ] **T4 (P1, human: ~3h / CC: ~25min)** — 공통 — a11y 베이스라인(대비·44px·키보드·Monaco Esc·SSE aria-live·랜드마크)
+  - Surfaced by: Pass 6 — 접근성 전무 (DD7)
+  - Files: `packages/dp_design/`, `apps/web/lib/features/{sandbox,mentor,path}/`
+  - Verify: Monaco Esc 탈출·SSE 영역 aria-live 수동 검증 + 대비 토큰 단위 테스트
+- [ ] **T5 (P1, human: ~2h / CC: ~15min)** — apps/web/path — SSE 중단 시 단계 보존 + 재연결/이어하기 UX
+  - Surfaced by: Pass 2·3 — SSE 중단 복구 무설계 (DD8)
+  - Files: `apps/web/lib/features/path/`, `packages/dp_core/lib/sse/`
+  - Verify: 목 SSE 중간 중단 주입 → 완료 단계 유지+재연결 통합 테스트
+- [ ] **T6 (P2, human: ~1h / CC: ~10min)** — 공통 — 이모지→Material Symbols 교체(하단탭·상태·배지)
+  - Surfaced by: Pass 4 — 이모지 디자인요소(슬롭#7) (DD3)
+  - Files: `packages/dp_design/lib/icons/`, mobile 셸·상태위젯
+  - Verify: 하단탭·상태 아이콘 렌더 위젯 테스트
+- [ ] **T7 (P2, human: ~1h / CC: ~10min)** — apps/web — 빈 상태 카피·1차행동 일괄 적용(상태테이블 §9.2)
+  - Surfaced by: Pass 2 — 빈 상태 미설계
+  - Files: 각 feature presentation
+  - Verify: 빈 상태 위젯 테스트(카피 존재·CTA)
+
+## 13. TODOS (후속 디자인 부채)
+- **차별화 브랜드 색 탐색** (/design-shotgun): 인디고 SaaS 인상 탈피. DD1 확정 후 선택.
+- **landing(Jaspr) MARKETING 디자인**: 별도 세션, 앱 토큰 공유.
+- **고급 모션·마이크로인터랙션**: 화면 전환·게이미피케이션 모션.
+- **커스텀 아이콘셋**: 브랜드 정체성, 프로덕션화 단계.
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | — |
+| Codex Review | `/codex review` | Independent 2nd opinion | 0 | — | — |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 0 | — | — |
+| Design Review | `/plan-design-review` | UI/UX gaps | 1 | ISSUES_OPEN | score: 5/10 → 8/10, 8 decisions |
+| DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | — |
+
+- **UNRESOLVED:** 0 (8개 디자인 결정 모두 사용자 승인·플랜 반영)
+- **VERDICT:** Design Review 완료(5/10 → 8/10). **Eng Review 미실행 — 필수 게이트, 구현 전 `/plan-eng-review` 필요** (DD5 반응형·DD8 SSE 재연결·다크모드 전역 토글은 아키텍처 영향 있음).
