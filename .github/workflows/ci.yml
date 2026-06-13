@@ -1,0 +1,149 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run build
+
+  build-admin:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: admin
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: admin/package-lock.json
+      - run: npm ci
+      - run: npm run build
+
+  web-image:
+    needs: build-web
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: web
+          push: true
+          tags: |
+            ghcr.io/devpathai/devpath-web:${{ github.sha }}
+            ghcr.io/devpathai/devpath-web:main
+
+  web-deploy:
+    needs: web-image
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ secrets.GITOPS_APP_ID }}
+          private-key: ${{ secrets.GITOPS_APP_PRIVATE_KEY }}
+          owner: DevPathAi
+          repositories: devpath-gitops
+      - uses: actions/checkout@v6
+        with:
+          repository: DevPathAi/devpath-gitops
+          token: ${{ steps.app-token.outputs.token }}
+          path: gitops
+      - name: Install kustomize
+        run: |
+          curl -sLo kustomize.tar.gz https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.4.3/kustomize_v5.4.3_linux_amd64.tar.gz
+          tar -xzf kustomize.tar.gz && sudo mv kustomize /usr/local/bin/
+      - name: set image to commit SHA
+        working-directory: gitops/apps/devpath-web/base
+        run: kustomize edit set image ghcr.io/devpathai/devpath-web=ghcr.io/devpathai/devpath-web:${{ github.sha }}
+      - name: commit & push
+        working-directory: gitops
+        run: |
+          git config user.name "devpath-gitops-bot[bot]"
+          git config user.email "devpath-gitops-bot[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && echo "no change" && exit 0
+          git commit -m "deploy(devpath-web): ${{ github.sha }}"
+          for i in 1 2 3; do git push && break || (git pull --rebase && sleep 2); done
+
+  admin-image:
+    needs: build-admin
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: admin
+          push: true
+          tags: |
+            ghcr.io/devpathai/devpath-admin:${{ github.sha }}
+            ghcr.io/devpathai/devpath-admin:main
+
+  admin-deploy:
+    needs: admin-image
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ secrets.GITOPS_APP_ID }}
+          private-key: ${{ secrets.GITOPS_APP_PRIVATE_KEY }}
+          owner: DevPathAi
+          repositories: devpath-gitops
+      - uses: actions/checkout@v6
+        with:
+          repository: DevPathAi/devpath-gitops
+          token: ${{ steps.app-token.outputs.token }}
+          path: gitops
+      - name: Install kustomize
+        run: |
+          curl -sLo kustomize.tar.gz https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.4.3/kustomize_v5.4.3_linux_amd64.tar.gz
+          tar -xzf kustomize.tar.gz && sudo mv kustomize /usr/local/bin/
+      - name: set image to commit SHA
+        working-directory: gitops/apps/devpath-admin/base
+        run: kustomize edit set image ghcr.io/devpathai/devpath-admin=ghcr.io/devpathai/devpath-admin:${{ github.sha }}
+      - name: commit & push
+        working-directory: gitops
+        run: |
+          git config user.name "devpath-gitops-bot[bot]"
+          git config user.email "devpath-gitops-bot[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && echo "no change" && exit 0
+          git commit -m "deploy(devpath-admin): ${{ github.sha }}"
+          for i in 1 2 3; do git push && break || (git pull --rebase && sleep 2); done
