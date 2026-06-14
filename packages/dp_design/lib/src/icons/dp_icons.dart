@@ -40,4 +40,8 @@ abstract final class DpIcons {
 
   // mobile(P6 — DD3 단일 Symbols 셋). offline은 위 상태 섹션 재사용.
   static const IconData downloadDone = Symbols.download_done_rounded;
+
+  // 테마 토글(P4a — DD3 단일 Symbols 셋 유지)
+  static const IconData lightMode = Symbols.light_mode_rounded;
+  static const IconData darkMode = Symbols.dark_mode_rounded;
 }

@@ -6,6 +6,7 @@ import 'package:dp_core/src/api/api_client.dart';
 import 'package:dp_core/src/api/api_config.dart';
 import 'package:dp_core/src/error/api_exception.dart';
 import 'package:dp_core/src/error/api_error_code.dart';
+import 'package:dp_core/src/mock/mock_http_adapter.dart';
 import 'package:test/test.dart';
 
 /// 테스트용 최소 어댑터: 지정 status/body를 그대로 돌려준다.
@@ -49,6 +50,41 @@ void main() {
     });
     expect(
       () => client.get('/ai-mentor/sessions'),
+      throwsA(
+        isA<ApiException>().having(
+          (e) => e.code,
+          'code',
+          ApiErrorCode.aiKillSwitchActive,
+        ),
+      ),
+    );
+  });
+
+  test('post는 성공 시 JSON map을 반환한다', () async {
+    final client = ApiClient.create(
+      const ApiConfig(baseUrl: 'https://api.test/api/v1'),
+    );
+    client.dio.httpClientAdapter = MockHttpAdapter({
+      'POST /auth/login': (200, {'accessToken': 'a', 'refreshToken': 'r'}),
+    });
+    final data = await client.post<Map<String, dynamic>>('/auth/login');
+    expect(data['accessToken'], 'a');
+  });
+
+  test('post 실패는 ApiException으로 변환된다', () async {
+    final client = ApiClient.create(
+      const ApiConfig(baseUrl: 'https://api.test/api/v1'),
+    );
+    client.dio.httpClientAdapter = MockHttpAdapter({
+      'POST /x': (
+        503,
+        {
+          'error': {'code': 'AI_KILL_SWITCH_ACTIVE', 'message': '점검'},
+        },
+      ),
+    });
+    expect(
+      () => client.post('/x'),
       throwsA(
         isA<ApiException>().having(
           (e) => e.code,

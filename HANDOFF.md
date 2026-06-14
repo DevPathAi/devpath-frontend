@@ -1,9 +1,21 @@
 # HANDOFF — React→Flutter 전환 & 프로토 UI
 
-> 최종 업데이트: 2026-06-14 · 브랜치: `docs/flutter-migration-proto-ui-spec` (⚠️ P2·P3 커밋 미푸시 — origin보다 앞섬)
-> **상태: 설계·계획 + 디자인/Eng 리뷰 완료 + P1·P2·P3 구현 완료(검증).** 다음은 **P4a(web 셸·인증·라우팅)**.
+> 최종 업데이트: 2026-06-14 · 브랜치 전략 도입: **main 보호 · develop 통합 · 작업브랜치→develop PR→머지→main 릴리스 PR**(CLAUDE.md "🔀 Git 브랜치 전략" + 전역 규칙).
+> **상태: 설계·계획 + 디자인/Eng 리뷰 완료 + P1·P2·P3 구현(main 머지 완료, PR#3) + P4a 구현 완료.** 다음은 **P4b(온보딩·진단 + 학습경로 SSE)**.
 
-## P3 구현 완료 (2026-06-14, 커밋 8079802~5c5a4d2 — 미푸시)
+## 브랜치/머지 현황 (2026-06-14)
+- **main**: P1·P2·P3 통합됨(PR#3 머지, merge commit `abf9056`). main 직접 푸시 금지.
+- **develop**: main에서 분기·생성. Git 브랜치 정책(PR#4) 머지됨. P4a는 `feat/p4a-web-shell-auth-routing`에서 develop으로 PR 예정.
+- **CI**: `analyze-test` job의 **Format check(`dart format --set-exit-if-changed`)** 가 게이트 — 커밋 전 항상 `dart format` 적용(P3 머지 때 format 미적용으로 1차 실패한 교훈). 골든은 `--exclude-tags golden`로 CI 제외.
+
+## P4a 구현 완료 (2026-06-14, feat/p4a-web-shell-auth-routing, 커밋 0ec62ac~974f5d6)
+`apps/web`(devpath_web) 인증된 반응형 셸 토대 TDD 완성(Task 1~10). **검증됨**: `melos analyze`(전 멤버 No issues)·`melos test`(web 19·dp_design 17·dp_core 25·admin 1·mobile 1 PASS).
+- 의존성(riverpod 3.3.2·go_router 14.8.1·dp_core·dp_design) · `AppConfig`(dart-define, 기본 목) · 목 픽스처(`/auth/login` PENDING 유저) · API providers(`apiClientProvider`+`MockHttpAdapter`·`tokenStoreProvider` InMemory) · `themeModeProvider`(DD6 토글) · `AuthState`(sealed)+`AuthController`(목 로그인/로그아웃) · `LoginPage` · 반응형 `AppShell`/`AppShellView`(<840 NavigationBar·≥840 NavigationRail) · `gateRedirect`(순수 게이트)+`routerProvider`(go_router refreshListenable) · 플레이스홀더(`PlaceholderPage`·`OnboardingPlaceholder`) · `DevPathWebApp`+main · 골든패스 스모크(로그인→온보딩).
+- **dp_core/dp_design 후속**: `ApiClient.post<T>` 추가(web 첫 POST 소비처), `DpIcons.lightMode/darkMode` 추가.
+- **P4a 교훈/플랜 보정**: ① 작업 브랜치 정책 도입(이번 세션 — main 직접 머지 금지, develop 경유). ② `melos test`/커밋 전 **dart format 필수**(CI format 게이트). ③ go_router 빌더 `(_, __)` → flutter_lints 6.0 `unnecessary_underscores` → `(_, _)` 와일드카드. ④ 공개 상수가 private typedef 노출 금지(`_Dest`→`ShellDestination`). ⑤ Task1 커밋 시 파일 삭제는 `git add`(또는 `git rm`)로 스테이징해야 누락 안 됨(rm만으론 커밋 안 됨 — 브랜치 전환 시 미커밋 삭제가 따라옴).
+- **후속(P4b 결선)**: `AuthInterceptor`(401 큐잉)·`GET /users/me`·토큰 영속화(`WebTokenStore`)는 인증 데이터 호출이 생기는 P4b에서. 셸 탭 상태보존(StatefulShellRoute)은 P4d.
+
+## P3 구현 완료 (2026-06-14, 커밋 8079802~5c5a4d2 — main 머지됨)
 `packages/dp_design` 디자인 시스템 TDD 완성(Task 1~9). **검증됨**: `melos run analyze`(전 멤버 SUCCESS)·`melos run test`(dp_design 16 PASS·web 2·admin 1·mobile 1·dp_core 23, golden 제외)·`flutter test --tags golden`(라이트/다크 2 PASS, 동일 플랫폼).
 - 색 토큰(`DpColors` ThemeExtension 라이트/다크, DESIGN §1 일치 검증) · 간격/라운드/모션(`DpSpacing`·`DpRadius`·`DpDurations`) · 타이포(`DpTypography` Pretendard/D2Coding, 한글 행간 1.6) · 아이콘(`DpIcons` Material Symbols Rounded, 이모지 0) · a11y(`DpTapTarget` ≥44px+시맨틱) · 기본 상태위젯(`DpStateScaffold`/`DpLoading`/`DpEmpty`/`DpError`) · 백엔드 상태위젯(`DpKillSwitch`/`DpQuota`/`DpSandboxUnavailable`/`DpOfflineBanner`/`DpSseStageView`, liveRegion) · `DpMarkdown`(markdown_widget 2.3.2) · barrel + 골든.
 - **P3 교훈/플랜 보정**(플랜 코드 결함을 근본 수정한 4건):
@@ -37,7 +49,7 @@ melos 7 + Dart pub workspaces 모노레포 골격: `packages/dp_core`(순수 Dar
 ## 다음 세션 (RESUME HERE) — 전체 리뷰 완료, 구현 시작
 
 1. **✅ Eng Review 완료(2026-06-14)**: P4(web)·P6(mobile) 심층 리뷰 → 결정 D1~D4 승인 → 7개 플랜(P2·P4b~f·P6) 반영 완료. 요약: `docs/superpowers/specs/2026-06-14-eng-review-summary.md`. 결정: D1(P2 단일 SSE 기반 — `ApiClient.sse()`·`SseStage` 단일출처·`fromStep`), D2(DD8 핵심+`MockSseSource.failAfter`+60s, 재개키는 백엔드 합의까지 fromStep 보류), D3(query-aware `MockHttpAdapter`), D4(P6 재연결 동기화 최소+ConnectivityService, OAuth·secure_storage 이관). 필수수정 F4·F5·F6·F9는 해당 플랜에 반영됨.
-2. **✅ P1·P2·P3 완료** — 위 절들. 다음은 **P4a(web 셸·인증·라우팅)**: `docs/superpowers/plans/2026-06-14-p4a-web-shell-auth-routing.md`. **순서 의존** P4a→…→P4f→P5→P6→P7. **착수 게이트 충족**: P2 Task 10(D1/D2/D3 — `apiClient.sse()`·`SseStage`·query-aware 목·`failAfter`/`fromStep`)·P3 dp_design(토큰·상태위젯·`DpMarkdown`·`DpTheme`). P4a는 dp_design `DpTheme.light()`+`context.dpColors`를 셸에 적용(P4a-A 교훈: context.dpColors 쓰는 위젯 테스트엔 `theme: DpTheme.light()` 필수). 서브에이전트 위임 시 **범위 강제**(CLAUDE.md 절대 조건 4) + **컨트롤러 직접 검증**(커밋 범위·analyze·test) 필수.
+2. **✅ P1·P2·P3·P4a 완료** — 위 절들. 다음은 **P4b(온보딩·진단 ONB-001/002 + 학습경로 SSE 생성 PATH-001, DD8 이어하기/재연결)**: `docs/superpowers/plans/2026-06-14-p4b-web-onboarding-path-sse.md`. **순서 의존** P4b→P4c→…→P4f→P5→P6→P7. **착수 게이트 충족**: P4a 인증 셸(`routerProvider`·`gateRedirect`·`apiClientProvider`·플레이스홀더)·P2 SSE(`apiClient.sse()`·`SseStage`·`MockSseSource failAfter/fromStep`)·P3 dp_design(`DpSseStageView` 등). P4b에서 `AuthInterceptor`(401 큐잉)·`GET /users/me`·토큰 영속화 결선. **브랜치 정책 준수**: feat 브랜치 → develop PR → 머지. 서브에이전트 위임 시 **범위 강제**(CLAUDE.md 절대 조건 4) + **컨트롤러 직접 검증** 필수.
 
 ## 구현 시 남은 결정/보강 (플랜에 노트로 명시됨)
 

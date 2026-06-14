@@ -11,4 +11,9 @@ void main() {
     expect(DpIcons.notifications, isA<IconData>());
     expect(DpIcons.killSwitch, isA<IconData>());
   });
+
+  test('테마 토글 아이콘이 IconData로 노출된다', () {
+    expect(DpIcons.lightMode, isA<IconData>());
+    expect(DpIcons.darkMode, isA<IconData>());
+  });
 }
