@@ -5,12 +5,18 @@ publish_to: none
 
 environment:
   sdk: ^3.12.1
+
 resolution: workspace
 
 dependencies:
-  # P2에서 추가: dio, freezed_annotation, json_annotation 등 (모두 순수 Dart)
+  dio: ^5.7.0
+  freezed_annotation: ^3.0.0
+  json_annotation: ^4.9.0
 
 dev_dependencies:
   test: ^1.25.6
   lints: ^6.0.0
-  # P2에서 추가: mocktail, build_runner, freezed, json_serializable
+  mocktail: ^1.0.4
+  build_runner: ^2.4.13
+  freezed: ^3.0.0
+  json_serializable: ^6.8.0
