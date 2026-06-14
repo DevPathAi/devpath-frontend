@@ -1,6 +1,6 @@
 import 'package:devpath_web/src/app/app.dart';
 import 'package:devpath_web/src/features/auth/presentation/login_page.dart';
-import 'package:devpath_web/src/features/onboarding/presentation/onboarding_placeholder.dart';
+import 'package:devpath_web/src/features/onboarding/presentation/onboarding_page.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -15,6 +15,6 @@ void main() {
     // 목 로그인(PENDING 유저) → 온보딩으로 redirect
     await tester.tap(find.text('GitHub로 계속하기 (목)'));
     await tester.pumpAndSettle();
-    expect(find.byType(OnboardingPlaceholder), findsOneWidget);
+    expect(find.byType(OnboardingPage), findsOneWidget);
   });
 }

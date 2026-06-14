@@ -8,7 +8,7 @@ import '../features/auth/application/auth_controller.dart';
 import '../features/auth/presentation/login_page.dart';
 import '../features/auth/state/auth_state.dart';
 import '../features/common/presentation/placeholder_page.dart';
-import '../features/onboarding/presentation/onboarding_placeholder.dart';
+import '../features/onboarding/presentation/onboarding_page.dart';
 import '../features/shell/presentation/app_shell.dart';
 
 /// 게이트 판정(순수): 미인증→/login, 인증·온보딩미완→/onboarding, 그 외 통과.
@@ -23,7 +23,10 @@ String? gateRedirect(AuthState auth, String location) {
   if (!onboardingDone) {
     return atOnboarding ? null : '/onboarding';
   }
-  if (atLogin || atOnboarding) return '/dashboard';
+  if (atLogin) return '/dashboard';
+  // ENG-REVIEW: 완료 유저의 /onboarding 재진입은 게이트에서 직접 /path로 —
+  // 진단 화면 재노출 회귀 차단(null 방치 대신).
+  if (atOnboarding) return '/path';
   return null;
 }
 
@@ -40,10 +43,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         gateRedirect(ref.read(authControllerProvider), state.matchedLocation),
     routes: [
       GoRoute(path: '/login', builder: (_, _) => const LoginPage()),
-      GoRoute(
-        path: '/onboarding',
-        builder: (_, _) => const OnboardingPlaceholder(),
-      ),
+      GoRoute(path: '/onboarding', builder: (_, _) => const OnboardingPage()),
       ShellRoute(
         builder: (_, _, child) => AppShell(child: child),
         routes: [

@@ -52,5 +52,14 @@ void main() {
         isNull,
       );
     });
+    test('인증 + 온보딩 완료 + /onboarding → /path(게이트가 직접 리다이렉트)', () {
+      expect(
+        gateRedirect(
+          AuthAuthenticated(_user(OnboardingStatus.done)),
+          '/onboarding',
+        ),
+        '/path',
+      );
+    });
   });
 }
