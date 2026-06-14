@@ -16,10 +16,13 @@ npm-debug.log*
 *.iml
 
 # Flutter (mobile)
-mobile/.dart_tool/
-mobile/.flutter-plugins
-mobile/.flutter-plugins-dependencies
-mobile/build/
+apps/mobile/.dart_tool/
+apps/mobile/.flutter-plugins
+apps/mobile/.flutter-plugins-dependencies
+apps/mobile/build/
+
+# Dart pub workspace 루트 산출물 (E2 — melos bootstrap이 루트에 생성)
+/.dart_tool/
 
 # 환경 변수 — 절대 커밋 금지
 .env
