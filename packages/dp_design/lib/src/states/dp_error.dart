@@ -18,11 +18,11 @@ class DpError extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => DpStateScaffold(
-        icon: DpIcons.error,
-        iconColor: context.dpColors.danger,
-        title: title,
-        message: message,
-        actionLabel: onRetry == null ? null : '다시 시도',
-        onAction: onRetry,
-      );
+    icon: DpIcons.error,
+    iconColor: context.dpColors.danger,
+    title: title,
+    message: message,
+    actionLabel: onRetry == null ? null : '다시 시도',
+    onAction: onRetry,
+  );
 }

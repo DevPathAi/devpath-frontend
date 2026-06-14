@@ -24,7 +24,10 @@ class MockSseSource {
   Stream<SseEvent> stream() async* {
     for (var i = fromStep; i < stages.length; i++) {
       if (failAfter != null && i >= fromStep + failAfter!) {
-        throw const ApiException(code: ApiErrorCode.network, message: '연결이 끊겼어요.');
+        throw const ApiException(
+          code: ApiErrorCode.network,
+          message: '연결이 끊겼어요.',
+        );
       }
       if (delay > Duration.zero) await Future<void>.delayed(delay);
       yield SseEvent(event: 'stage', data: '{"step":"${stages[i]}"}');

@@ -9,12 +9,14 @@ class DpMarkdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final config = isDark ? MarkdownConfig.darkConfig : MarkdownConfig.defaultConfig;
+    final config = isDark
+        ? MarkdownConfig.darkConfig
+        : MarkdownConfig.defaultConfig;
     return MarkdownBlock(
       data: data,
-      config: config.copy(configs: [
-        isDark ? PreConfig.darkConfig : const PreConfig(),
-      ]),
+      config: config.copy(
+        configs: [isDark ? PreConfig.darkConfig : const PreConfig()],
+      ),
     );
   }
 }

@@ -15,24 +15,28 @@ class ApiClient {
     ApiConfig config, {
     List<Interceptor> interceptors = const [],
   }) {
-    final dio = Dio(BaseOptions(
-      baseUrl: config.baseUrl,
-      connectTimeout: config.connectTimeout,
-      receiveTimeout: config.receiveTimeout,
-      headers: {Headers.acceptHeader: Headers.jsonContentType},
-    ));
+    final dio = Dio(
+      BaseOptions(
+        baseUrl: config.baseUrl,
+        connectTimeout: config.connectTimeout,
+        receiveTimeout: config.receiveTimeout,
+        headers: {Headers.acceptHeader: Headers.jsonContentType},
+      ),
+    );
     dio.interceptors.addAll(interceptors);
     // 에러 정규화는 가장 바깥(마지막)에 둔다.
-    dio.interceptors.add(InterceptorsWrapper(
-      onError: (e, handler) => handler.reject(
-        DioException(
-          requestOptions: e.requestOptions,
-          error: ApiException.fromDio(e),
-          response: e.response,
-          type: e.type,
+    dio.interceptors.add(
+      InterceptorsWrapper(
+        onError: (e, handler) => handler.reject(
+          DioException(
+            requestOptions: e.requestOptions,
+            error: ApiException.fromDio(e),
+            response: e.response,
+            type: e.type,
+          ),
         ),
       ),
-    ));
+    );
     return ApiClient(dio);
   }
 
@@ -42,7 +46,9 @@ class ApiClient {
       final res = await dio.get<T>(path, queryParameters: query);
       return res.data as T;
     } on DioException catch (e) {
-      throw (e.error is ApiException) ? e.error as ApiException : ApiException.fromDio(e);
+      throw (e.error is ApiException)
+          ? e.error as ApiException
+          : ApiException.fromDio(e);
     }
   }
 

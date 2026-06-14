@@ -17,15 +17,19 @@ class DpOfflineBanner extends StatelessWidget {
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(
-            horizontal: DpSpacing.lg, vertical: DpSpacing.md),
+          horizontal: DpSpacing.lg,
+          vertical: DpSpacing.md,
+        ),
         color: c.warning.withValues(alpha: 0.12),
         child: Row(
           children: [
             Icon(DpIcons.offline, size: 18, color: c.warning),
             const SizedBox(width: DpSpacing.sm),
             Expanded(
-              child: Text(message,
-                  style: Theme.of(context).textTheme.bodySmall),
+              child: Text(
+                message,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
             ),
           ],
         ),

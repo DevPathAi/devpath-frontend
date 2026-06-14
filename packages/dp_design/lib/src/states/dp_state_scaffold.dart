@@ -33,17 +33,20 @@ class DpStateScaffold extends StatelessWidget {
           children: [
             Icon(icon, size: 40, color: iconColor ?? c.textSecondary),
             const SizedBox(height: DpSpacing.md),
-            Text(title,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             if (message != null) ...[
               const SizedBox(height: DpSpacing.sm),
-              Text(message!,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(color: c.textSecondary)),
+              Text(
+                message!,
+                textAlign: TextAlign.center,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: c.textSecondary),
+              ),
             ],
             if (actionLabel != null && onAction != null) ...[
               const SizedBox(height: DpSpacing.lg),

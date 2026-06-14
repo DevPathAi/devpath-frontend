@@ -34,7 +34,9 @@ void main() {
     final got = <String>[];
     await expectLater(
       source.stream().map((e) => e.data).forEach(got.add),
-      throwsA(isA<ApiException>().having((e) => e.code, 'code', ApiErrorCode.network)),
+      throwsA(
+        isA<ApiException>().having((e) => e.code, 'code', ApiErrorCode.network),
+      ),
     );
     expect(got.length, 2); // 2단계까지 보존
   });

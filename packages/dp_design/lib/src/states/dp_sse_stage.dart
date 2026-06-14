@@ -34,8 +34,8 @@ class DpSseStageView extends StatelessWidget {
                     i < currentIndex
                         ? DpIcons.stepDone
                         : (i == currentIndex
-                            ? DpIcons.stepCurrent
-                            : DpIcons.stepPending),
+                              ? DpIcons.stepCurrent
+                              : DpIcons.stepPending),
                     size: 18,
                     color: i <= currentIndex ? c.primaryText : c.textSecondary,
                   ),
@@ -43,8 +43,10 @@ class DpSseStageView extends StatelessWidget {
                   Text(
                     stages[i],
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: i <= currentIndex ? c.textPrimary : c.textSecondary,
-                        ),
+                      color: i <= currentIndex
+                          ? c.textPrimary
+                          : c.textSecondary,
+                    ),
                   ),
                 ],
               ),

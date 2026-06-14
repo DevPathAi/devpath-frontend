@@ -6,16 +6,22 @@ import 'package:dp_design/src/theme/dp_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-Widget _host(Widget child) =>
-    MaterialApp(theme: DpTheme.light(), home: Scaffold(body: child));
+Widget _host(Widget child) => MaterialApp(
+  theme: DpTheme.light(),
+  home: Scaffold(body: child),
+);
 
 void main() {
   testWidgets('KillSwitch는 점검 안내 + 대체 행동을 제공한다', (tester) async {
     var alt = false;
-    await tester.pumpWidget(_host(DpKillSwitch(
-      altActionLabel: '커뮤니티 둘러보기',
-      onAltAction: () => alt = true,
-    )));
+    await tester.pumpWidget(
+      _host(
+        DpKillSwitch(
+          altActionLabel: '커뮤니티 둘러보기',
+          onAltAction: () => alt = true,
+        ),
+      ),
+    );
     expect(find.textContaining('점검'), findsOneWidget);
     await tester.tap(find.text('커뮤니티 둘러보기'));
     expect(alt, isTrue);
@@ -32,10 +38,14 @@ void main() {
   });
 
   testWidgets('SseStage는 단계 라벨과 진행을 렌더한다', (tester) async {
-    await tester.pumpWidget(_host(const DpSseStageView(
-      stages: ['GitHub 분석', '약점 매핑', '주차 배치'],
-      currentIndex: 1,
-    )));
+    await tester.pumpWidget(
+      _host(
+        const DpSseStageView(
+          stages: ['GitHub 분석', '약점 매핑', '주차 배치'],
+          currentIndex: 1,
+        ),
+      ),
+    );
     expect(find.text('약점 매핑'), findsOneWidget);
   });
 }

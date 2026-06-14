@@ -12,11 +12,26 @@ abstract final class DpTypography {
     const f = family;
     return const TextTheme(
       displaySmall: TextStyle(fontFamily: f, fontSize: 36, height: 44 / 36),
-      headlineSmall: TextStyle(fontFamily: f, fontSize: 24, height: 32 / 24, fontWeight: FontWeight.w600),
-      titleMedium: TextStyle(fontFamily: f, fontSize: 16, height: 24 / 16, fontWeight: FontWeight.w600),
+      headlineSmall: TextStyle(
+        fontFamily: f,
+        fontSize: 24,
+        height: 32 / 24,
+        fontWeight: FontWeight.w600,
+      ),
+      titleMedium: TextStyle(
+        fontFamily: f,
+        fontSize: 16,
+        height: 24 / 16,
+        fontWeight: FontWeight.w600,
+      ),
       bodyMedium: TextStyle(fontFamily: f, fontSize: 14, height: 1.6),
       bodySmall: TextStyle(fontFamily: f, fontSize: 13, height: 20 / 13),
-      labelLarge: TextStyle(fontFamily: f, fontSize: 14, height: 20 / 14, fontWeight: FontWeight.w600),
+      labelLarge: TextStyle(
+        fontFamily: f,
+        fontSize: 14,
+        height: 20 / 14,
+        fontWeight: FontWeight.w600,
+      ),
     );
   }
 }

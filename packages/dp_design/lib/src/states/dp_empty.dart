@@ -21,10 +21,10 @@ class DpEmpty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => DpStateScaffold(
-        icon: icon,
-        title: title,
-        message: message,
-        actionLabel: actionLabel,
-        onAction: onAction,
-      );
+    icon: icon,
+    title: title,
+    message: message,
+    actionLabel: actionLabel,
+    onAction: onAction,
+  );
 }

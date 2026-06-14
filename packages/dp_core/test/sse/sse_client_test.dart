@@ -10,14 +10,23 @@ class _SseAdapter implements HttpClientAdapter {
   _SseAdapter(this.chunks);
   final List<String> chunks;
   @override
-  Future<ResponseBody> fetch(RequestOptions options, Stream<Uint8List>? rs,
-      Future? cancelFuture) async {
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? rs,
+    Future? cancelFuture,
+  ) async {
     final stream = Stream.fromIterable(
-        chunks.map((c) => Uint8List.fromList(utf8.encode(c))));
-    return ResponseBody(stream, 200, headers: {
-      Headers.contentTypeHeader: ['text/event-stream'],
-    });
+      chunks.map((c) => Uint8List.fromList(utf8.encode(c))),
+    );
+    return ResponseBody(
+      stream,
+      200,
+      headers: {
+        Headers.contentTypeHeader: ['text/event-stream'],
+      },
+    );
   }
+
   @override
   void close({bool force = false}) {}
 }

@@ -91,24 +91,23 @@ class DpColors extends ThemeExtension<DpColors> {
     Color? codeEditorBg,
     Color? codeLogBg,
     Color? codeText,
-  }) =>
-      DpColors(
-        primary: primary ?? this.primary,
-        primaryText: primaryText ?? this.primaryText,
-        primaryTextStrong: primaryTextStrong ?? this.primaryTextStrong,
-        onPrimary: onPrimary ?? this.onPrimary,
-        bg: bg ?? this.bg,
-        surface: surface ?? this.surface,
-        border: border ?? this.border,
-        textPrimary: textPrimary ?? this.textPrimary,
-        textSecondary: textSecondary ?? this.textSecondary,
-        success: success ?? this.success,
-        warning: warning ?? this.warning,
-        danger: danger ?? this.danger,
-        codeEditorBg: codeEditorBg ?? this.codeEditorBg,
-        codeLogBg: codeLogBg ?? this.codeLogBg,
-        codeText: codeText ?? this.codeText,
-      );
+  }) => DpColors(
+    primary: primary ?? this.primary,
+    primaryText: primaryText ?? this.primaryText,
+    primaryTextStrong: primaryTextStrong ?? this.primaryTextStrong,
+    onPrimary: onPrimary ?? this.onPrimary,
+    bg: bg ?? this.bg,
+    surface: surface ?? this.surface,
+    border: border ?? this.border,
+    textPrimary: textPrimary ?? this.textPrimary,
+    textSecondary: textSecondary ?? this.textSecondary,
+    success: success ?? this.success,
+    warning: warning ?? this.warning,
+    danger: danger ?? this.danger,
+    codeEditorBg: codeEditorBg ?? this.codeEditorBg,
+    codeLogBg: codeLogBg ?? this.codeLogBg,
+    codeText: codeText ?? this.codeText,
+  );
 
   @override
   DpColors lerp(ThemeExtension<DpColors>? other, double t) {
@@ -116,7 +115,11 @@ class DpColors extends ThemeExtension<DpColors> {
     return DpColors(
       primary: Color.lerp(primary, other.primary, t)!,
       primaryText: Color.lerp(primaryText, other.primaryText, t)!,
-      primaryTextStrong: Color.lerp(primaryTextStrong, other.primaryTextStrong, t)!,
+      primaryTextStrong: Color.lerp(
+        primaryTextStrong,
+        other.primaryTextStrong,
+        t,
+      )!,
       onPrimary: Color.lerp(onPrimary, other.onPrimary, t)!,
       bg: Color.lerp(bg, other.bg, t)!,
       surface: Color.lerp(surface, other.surface, t)!,

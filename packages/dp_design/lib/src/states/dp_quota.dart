@@ -12,11 +12,11 @@ class DpQuota extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => DpStateScaffold(
-        icon: DpIcons.quota,
-        iconColor: context.dpColors.warning,
-        title: '오늘 사용 한도에 도달했어요',
-        message: '약 $retryAfterSeconds초 후 다시 시도할 수 있어요.',
-        actionLabel: onUpgrade == null ? null : '플랜 업그레이드',
-        onAction: onUpgrade,
-      );
+    icon: DpIcons.quota,
+    iconColor: context.dpColors.warning,
+    title: '오늘 사용 한도에 도달했어요',
+    message: '약 $retryAfterSeconds초 후 다시 시도할 수 있어요.',
+    actionLabel: onUpgrade == null ? null : '플랜 업그레이드',
+    onAction: onUpgrade,
+  );
 }

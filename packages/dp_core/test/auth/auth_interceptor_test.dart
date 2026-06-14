@@ -15,22 +15,32 @@ class _MockRetrier extends Mock {
 /// access=='Bearer NEW'면 200, 아니면 401 반환하는 최소 어댑터.
 class _AuthFlowAdapter implements HttpClientAdapter {
   @override
-  Future<ResponseBody> fetch(RequestOptions options, Stream<Uint8List>? rs,
-      Future? cancelFuture) async {
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? rs,
+    Future? cancelFuture,
+  ) async {
     final auth = options.headers['Authorization'];
     if (auth == 'Bearer NEW') {
       return ResponseBody.fromString(
         jsonEncode({'ok': true}),
         200,
-        headers: {Headers.contentTypeHeader: [Headers.jsonContentType]},
+        headers: {
+          Headers.contentTypeHeader: [Headers.jsonContentType],
+        },
       );
     }
     return ResponseBody.fromString(
-      jsonEncode({'error': {'code': 'UNAUTHORIZED', 'message': '401'}}),
+      jsonEncode({
+        'error': {'code': 'UNAUTHORIZED', 'message': '401'},
+      }),
       401,
-      headers: {Headers.contentTypeHeader: [Headers.jsonContentType]},
+      headers: {
+        Headers.contentTypeHeader: [Headers.jsonContentType],
+      },
     );
   }
+
   @override
   void close({bool force = false}) {}
 }
@@ -54,10 +64,13 @@ void main() {
   test('401이면 refresh 후 새 토큰으로 재시도한다', () async {
     final store = InMemoryTokenStore()..save(access: 'old', refresh: 'RRR');
     final retrier = _MockRetrier();
-    when(() => retrier.call(any())).thenAnswer((_) async => Response(
+    when(() => retrier.call(any())).thenAnswer(
+      (_) async => Response(
         requestOptions: RequestOptions(path: '/users/me'),
         statusCode: 200,
-        data: {'ok': true}));
+        data: {'ok': true},
+      ),
+    );
 
     final interceptor = AuthInterceptor(
       store: store,
@@ -79,7 +92,8 @@ void main() {
 
     expect(await store.readAccess(), 'NEW'); // 갱신됨
     final captured =
-        verify(() => retrier.call(captureAny())).captured.single as RequestOptions;
+        verify(() => retrier.call(captureAny())).captured.single
+            as RequestOptions;
     expect(captured.headers['Authorization'], 'Bearer NEW'); // 새 토큰으로 재시도
   });
 
@@ -117,19 +131,23 @@ void main() {
     final retryDio = Dio(BaseOptions(baseUrl: 'https://api.test'))
       ..httpClientAdapter = adapter;
 
-    dio.interceptors.add(AuthInterceptor(
-      store: store,
-      refresh: (_) async {
-        refreshCalls++;
-        await Future<void>.delayed(const Duration(milliseconds: 10));
-        return const TokenPair(access: 'NEW', refresh: 'NEWR');
-      },
-      retry: (req) => retryDio.fetch(req),
-    ));
+    dio.interceptors.add(
+      AuthInterceptor(
+        store: store,
+        refresh: (_) async {
+          refreshCalls++;
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+          return const TokenPair(access: 'NEW', refresh: 'NEWR');
+        },
+        retry: (req) => retryDio.fetch(req),
+      ),
+    );
 
     // 동시 3건 발사.
     final results = await Future.wait([
-      dio.get('/a'), dio.get('/b'), dio.get('/c'),
+      dio.get('/a'),
+      dio.get('/b'),
+      dio.get('/c'),
     ]);
 
     expect(refreshCalls, 1, reason: '동시 401이어도 refresh는 1회');

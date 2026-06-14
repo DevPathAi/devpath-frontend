@@ -7,15 +7,15 @@ class DpLoading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const CircularProgressIndicator(),
-            if (label != null) ...[
-              const SizedBox(height: 12),
-              Text(label!, style: Theme.of(context).textTheme.bodySmall),
-            ],
-          ],
-        ),
-      );
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const CircularProgressIndicator(),
+        if (label != null) ...[
+          const SizedBox(height: 12),
+          Text(label!, style: Theme.of(context).textTheme.bodySmall),
+        ],
+      ],
+    ),
+  );
 }

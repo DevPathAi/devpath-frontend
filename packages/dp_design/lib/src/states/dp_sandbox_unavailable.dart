@@ -11,11 +11,11 @@ class DpSandboxUnavailable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => DpStateScaffold(
-        icon: DpIcons.sandboxOff,
-        iconColor: context.dpColors.warning,
-        title: '지금은 코드를 실행할 수 없어요',
-        message: '편집은 계속할 수 있어요. 잠시 후 실행을 다시 시도해 주세요.',
-        actionLabel: onDismiss == null ? null : '확인',
-        onAction: onDismiss,
-      );
+    icon: DpIcons.sandboxOff,
+    iconColor: context.dpColors.warning,
+    title: '지금은 코드를 실행할 수 없어요',
+    message: '편집은 계속할 수 있어요. 잠시 후 실행을 다시 시도해 주세요.',
+    actionLabel: onDismiss == null ? null : '확인',
+    onAction: onDismiss,
+  );
 }

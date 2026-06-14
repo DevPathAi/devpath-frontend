@@ -24,7 +24,9 @@ class SseClient {
       res = r.data!;
     } on DioException catch (e) {
       // get/post 헬퍼와 동일하게 실패를 ApiException으로 정규화.
-      throw (e.error is ApiException) ? e.error as ApiException : ApiException.fromDio(e);
+      throw (e.error is ApiException)
+          ? e.error as ApiException
+          : ApiException.fromDio(e);
     }
 
     final lines = res.stream

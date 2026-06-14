@@ -10,10 +10,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Widget _frame(ThemeData theme) => MaterialApp(
-      theme: theme,
-      debugShowCheckedModeBanner: false,
-      home: const Scaffold(body: DpKillSwitch()),
-    );
+  theme: theme,
+  debugShowCheckedModeBanner: false,
+  home: const Scaffold(body: DpKillSwitch()),
+);
 
 Future<void> _loadFonts() async {
   // P3-D: 위젯테스트는 번들 폰트를 자동 로드하지 않으므로 명시 로드.
@@ -25,16 +25,22 @@ Future<void> _loadFonts() async {
     final file = File(entry.value);
     if (!file.existsSync()) continue; // 미배치 시 fallback로 baseline
     final loader = FontLoader(entry.key)
-      ..addFont(Future.value(file.readAsBytes().then((b) => b.buffer.asByteData())));
+      ..addFont(
+        Future.value(file.readAsBytes().then((b) => b.buffer.asByteData())),
+      );
     await loader.load();
   }
   // Material Symbols(Rounded) 번들 폰트 — 미로드 시 아이콘이 box로 degrade.
   // Symbols.*_rounded는 family 'packages/material_symbols_icons/MaterialSymbolsRounded' 사용.
   try {
-    final loader = FontLoader(
-        'packages/material_symbols_icons/MaterialSymbolsRounded')
-      ..addFont(rootBundle.load(
-          'packages/material_symbols_icons/lib/fonts/MaterialSymbolsRounded.ttf'));
+    final loader =
+        FontLoader(
+          'packages/material_symbols_icons/MaterialSymbolsRounded',
+        )..addFont(
+          rootBundle.load(
+            'packages/material_symbols_icons/lib/fonts/MaterialSymbolsRounded.ttf',
+          ),
+        );
     await loader.load();
   } catch (_) {
     // 번들 에셋 미존재 시 fallback(box)로 baseline 생성.

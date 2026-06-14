@@ -13,8 +13,8 @@ abstract final class DpIcons {
   static const IconData content = Symbols.menu_book_rounded;
 
   // 상태
-  static const IconData killSwitch = Symbols.build_rounded;     // 점검 중
-  static const IconData quota = Symbols.hourglass_top_rounded;  // 한도
+  static const IconData killSwitch = Symbols.build_rounded; // 점검 중
+  static const IconData quota = Symbols.hourglass_top_rounded; // 한도
   static const IconData offline = Symbols.cloud_off_rounded;
   static const IconData sandboxOff = Symbols.code_off_rounded;
   static const IconData empty = Symbols.inbox_rounded;
