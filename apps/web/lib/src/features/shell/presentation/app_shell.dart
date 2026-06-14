@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 /// 셸 목적지(경로·아이콘·라벨).
-typedef _Dest = ({String path, IconData icon, String label});
+typedef ShellDestination = ({String path, IconData icon, String label});
 
-const List<_Dest> kShellDestinations = [
+const List<ShellDestination> kShellDestinations = [
   (path: '/dashboard', icon: DpIcons.dashboard, label: '대시보드'),
   (path: '/path', icon: DpIcons.path, label: '경로'),
   (path: '/mentor', icon: DpIcons.mentor, label: '멘토'),
