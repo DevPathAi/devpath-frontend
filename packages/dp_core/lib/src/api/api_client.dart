@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 
 import '../error/api_exception.dart';
+import '../sse/sse_client.dart';
+import '../sse/sse_event.dart';
 import 'api_config.dart';
 
 /// dio 래퍼. 모든 응답 에러를 [ApiException]으로 정규화한다.
@@ -43,4 +45,10 @@ class ApiClient {
       throw (e.error is ApiException) ? e.error as ApiException : ApiException.fromDio(e);
     }
   }
+
+  /// SSE 스트림 연결(D1). 앱은 dio를 직접 만지지 않고 이 헬퍼만 사용.
+  /// 실패는 SseClient.connect 규약대로 [ApiException]으로 정규화된다.
+  /// feature의 `*ConnectProvider`는 `apiClient.sse(path, body: ...)`를 호출한다.
+  Stream<SseEvent> sse(String path, {Object? body}) =>
+      SseClient(dio).connect(path, body: body);
 }
