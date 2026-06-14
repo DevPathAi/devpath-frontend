@@ -26,3 +26,11 @@
 - **What:** CI `subosito/flutter-action@v2`의 `channel: stable`을 Dart 3.12.1 호환 `flutter-version`으로 핀할지 최초 CI 실행 결과로 확정.
 - **Why:** stable이 Dart 3.12.1 미만으로 드리프트하면 빌드 깨짐. (melos는 F2로 7.0.0 핀 완료.)
 - **Effort:** S (human) → S (CC) · **Priority:** P2 · **Depends on:** 최초 CI green 확인.
+
+## P2·P3 리뷰에서 도출 (2026-06-14)
+
+### T-GOLDEN-CI-EXCLUDE — melos `test` 스크립트에 골든 제외 (P3-A)
+- **What:** P1 Task 7의 melos `test` 스크립트를 `melos exec --dir-exists="test" -- flutter test --exclude-tags golden`로 갱신. 골든은 `dart_test.yaml`에 `tags: {golden: {}}` 선언 + 동일 플랫폼(ubuntu) 전용 job에서 `flutter test --tags golden`으로만 검증.
+- **Why:** 픽셀 골든은 OS/폰트 렌더러 종속 → Windows 로컬 생성 골든이 ubuntu CI(`melos run test`)에서 깨짐. P3 Task 8이 골든을 도입하므로 P3 착수 전(또는 동시) P1 스크립트 1줄 갱신 필요.
+- **Context:** P1은 이미 리뷰·커밋(브랜치). main 머지 전이면 P1 커밋에 직접 반영, 머지 후면 별도 커밋. P3 Task 8 Step 1에 태그·dart_test.yaml·FontLoader 반영 완료.
+- **Effort:** S (human) → S (CC) · **Priority:** P1(P3 골든 게이트) · **Depends on:** P3 Task 8.
