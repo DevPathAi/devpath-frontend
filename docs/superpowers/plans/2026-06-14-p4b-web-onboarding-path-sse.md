@@ -51,6 +51,81 @@ apps/web/
 
 ---
 
+## Task 0: AuthInterceptor 결선 (ENG-REVIEW D1)
+
+> P4a가 "P4b에서 결선"으로 미룬 **401 큐잉 AuthInterceptor(P2)** 를 `apiClientProvider`에 결선한다. 인증 데이터 호출(PATH 생성·`GET /learning-paths/me` 등)이 P4b부터 생기므로 여기가 결선 지점. **미결선 시 목→실서버(스펙 D5) 전환에서 로그인 이후 전 화면이 토큰 없이 호출돼 401**(eng-review 발견 — P2가 만들고 테스트한 인터셉터가 死코드 되는 것 방지).
+
+**Files:**
+- Modify: `apps/web/lib/src/providers/api_providers.dart`(P4a) — `apiClientProvider`에 AuthInterceptor 추가
+- Test: `apps/web/test/providers/auth_interceptor_wire_test.dart`
+
+- [ ] **Step 1: 실패 테스트(결선 확인)**
+
+Create `apps/web/test/providers/auth_interceptor_wire_test.dart`:
+```dart
+import 'package:devpath_web/src/providers/api_providers.dart';
+import 'package:dp_core/dp_core.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  test('apiClientProvider에 AuthInterceptor가 결선된다', () {
+    final c = ProviderContainer();
+    addTearDown(c.dispose);
+    final client = c.read(apiClientProvider);
+    expect(client.dio.interceptors.whereType<AuthInterceptor>(), isNotEmpty);
+  });
+}
+```
+> 401→refresh→재시도 **동작**은 P2 Task 6(동시 401 큐잉 통합 테스트)에서 이미 검증됨. 여기선 **결선 여부**만 스모크(이중 검증 회피).
+
+- [ ] **Step 2: 실패 확인** — Run: `cd apps/web && flutter test test/providers/auth_interceptor_wire_test.dart ; cd ../..` → FAIL
+
+- [ ] **Step 3: 구현 — `apiClientProvider`에 AuthInterceptor 결선**
+
+`apps/web/lib/src/providers/api_providers.dart`의 `apiClientProvider`를 교체:
+```dart
+final apiClientProvider = Provider<ApiClient>((ref) {
+  final config = ref.watch(appConfigProvider);
+  final store = ref.watch(tokenStoreProvider);
+  final client = ApiClient.create(
+      ApiConfig(baseUrl: config.baseUrl, useMock: config.useMock));
+
+  // ENG-REVIEW D1: 401 큐잉 AuthInterceptor(P2) 결선 — onRequest Bearer 주입 + onError refresh/retry.
+  // ApiClient.create가 에러 정규화 인터셉터를 마지막에 추가하므로, 그 앞(index 0)에 삽입한다.
+  client.dio.interceptors.insert(0, AuthInterceptor(
+    store: store,
+    refresh: (refreshToken) async {
+      final data = await client.post<Map<String, dynamic>>(
+        '/auth/refresh',
+        body: {'refreshToken': refreshToken},
+      );
+      return TokenPair(
+        access: data['accessToken'] as String,
+        refresh: data['refreshToken'] as String,
+      );
+    },
+    retry: (options) => client.dio.fetch(options),
+  ));
+
+  if (config.useMock) {
+    client.dio.httpClientAdapter = MockHttpAdapter(webMockFixtures);
+  }
+  return client;
+});
+```
+> `'POST /auth/refresh'` 목 픽스처는 P4a `webMockFixtures`에 이미 존재. `client`는 인터셉터 추가 전에 생성되므로 refresh/retry 클로저에서 참조 가능.
+
+- [ ] **Step 4: 통과 확인** — Run: `cd apps/web && flutter test test/providers/auth_interceptor_wire_test.dart ; cd ../..` → PASS
+
+- [ ] **Step 5: 커밋**
+```bash
+git add apps/web/lib/src/providers/api_providers.dart apps/web/test/providers/auth_interceptor_wire_test.dart
+git commit -m "fix(web): apiClientProvider에 AuthInterceptor 결선(401 큐잉, ENG-REVIEW D1)"
+```
+
+---
+
 ## Task 1: dp_core — PATH 도메인 모델 (`LearningPath`·`PathWeek`·`WeeklyTask`)
 
 > P2 User와 동일한 freezed+json 패턴. 골든패스 렌더 최소 필드.

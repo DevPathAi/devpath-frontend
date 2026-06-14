@@ -922,6 +922,83 @@ git commit -m "feat(web): Q&A 상세(COM-003) + 라우트 결선"
 
 ---
 
+## Task 6: 골든패스 integration_test E2E (ENG-REVIEW D3)
+
+> 스펙 §5가 명시한 **골든패스 통합 테스트**. 각 플랜의 widget smoke와 별개로 `integration_test`로 목 모드 전체 흐름을 실 렌더 파이프라인에서 검증. Monaco/SBX 시각부는 `flutter drive -d chrome`에서 가치가 크므로, 본 태스크는 headless로 가능한 핵심 흐름(인증→온보딩→PATH→대시보드→커뮤니티)을 커버하고 SBX는 노트로 남긴다. **선행: P4a~f 구현 완료.**
+
+**Files:**
+- Modify: `apps/web/pubspec.yaml`(dev: `integration_test`)
+- Create: `apps/web/integration_test/golden_path_test.dart`
+
+- [ ] **Step 1: 의존성**
+
+`apps/web/pubspec.yaml`의 `dev_dependencies:`에 추가:
+```yaml
+  integration_test:
+    sdk: flutter
+```
+Run: `melos bootstrap`
+
+- [ ] **Step 2: E2E 테스트**
+
+Create `apps/web/integration_test/golden_path_test.dart`:
+```dart
+import 'package:devpath_web/src/app/app.dart';
+import 'package:devpath_web/src/features/auth/presentation/login_page.dart';
+import 'package:devpath_web/src/features/community/presentation/community_home_page.dart';
+import 'package:devpath_web/src/features/dashboard/presentation/dashboard_page.dart';
+import 'package:devpath_web/src/features/onboarding/presentation/onboarding_page.dart';
+import 'package:devpath_web/src/features/path/presentation/path_page.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:integration_test/integration_test.dart';
+
+void main() {
+  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets('골든패스 E2E: 로그인→온보딩→PATH→대시보드→커뮤니티(목)', (tester) async {
+    await tester.pumpWidget(const ProviderScope(child: DevPathWebApp()));
+    await tester.pumpAndSettle();
+
+    // 1) 미인증 → 로그인
+    expect(find.byType(LoginPage), findsOneWidget);
+    await tester.tap(find.text('GitHub로 계속하기 (목)'));
+    await tester.pumpAndSettle();
+
+    // 2) 온보딩 진단 제출 → PATH
+    expect(find.byType(OnboardingPage), findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'jisoo-dev');
+    await tester.tap(find.text('진단 시작하기'));
+    await tester.pumpAndSettle(const Duration(seconds: 3)); // 목 SSE 4단계(250ms×4)
+
+    // 3) PATH 생성 완료(12주 타임라인)
+    expect(find.byType(PathPage), findsOneWidget);
+    expect(find.textContaining('비동기 기초'), findsWidgets);
+
+    // 4) 셸 내비 → 대시보드 (PathPage는 ShellRoute 내부라 하단탭/레일 존재)
+    await tester.tap(find.text('대시보드').last);
+    await tester.pumpAndSettle();
+    expect(find.byType(DashboardPage), findsOneWidget);
+
+    // 5) 셸 내비 → 커뮤니티
+    await tester.tap(find.text('커뮤니티').last);
+    await tester.pumpAndSettle();
+    expect(find.byType(CommunityHomePage), findsOneWidget);
+  });
+}
+```
+> SBX(Monaco)·콘텐츠·리뷰·멘토는 시각/플랫폼 의존이 커 headless integration_test에서 부분만 검증 가능 → 본 E2E는 인증·온보딩·PATH·셸내비·커뮤니티 핵심 전이를 커버. Monaco 실 렌더·SSE 실스트리밍은 `flutter drive -d chrome` 또는 실서버 단계에서 확장(리스크 참조).
+
+- [ ] **Step 3: 실행 + 커밋**
+```bash
+cd apps/web && flutter test integration_test/golden_path_test.dart ; cd ../..
+git add apps/web/pubspec.yaml apps/web/integration_test pubspec.lock
+git commit -m "test(web): 골든패스 integration_test E2E(스펙 §5, ENG-REVIEW D3)"
+```
+
+---
+
 ## 검증 기준 (Definition of Done)
 
 - [ ] `melos run analyze`/`test` — dp_core(2모델) + web(dashboard·community·qna) PASS
