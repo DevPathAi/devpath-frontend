@@ -1,0 +1,8 @@
+targets:
+  $default:
+    builders:
+      json_serializable:
+        options:
+          field_rename: none        # 백엔드 JSON 키(camelCase/nextCursor 등)를 그대로 매핑
+          create_to_json: true
+          explicit_to_json: true
