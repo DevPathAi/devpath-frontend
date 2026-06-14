@@ -3,7 +3,6 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:dp_core/src/sse/sse_client.dart';
-import 'package:dp_core/src/sse/sse_event.dart';
 import 'package:test/test.dart';
 
 /// `text/event-stream` 바이트를 흘려주는 스텁 어댑터.
