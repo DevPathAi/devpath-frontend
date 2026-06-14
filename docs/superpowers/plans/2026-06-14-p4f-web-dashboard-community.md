@@ -674,7 +674,7 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
       appBar: AppBar(title: const Text('커뮤니티')),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {}, // 작성(후속)
-        icon: const Icon(Icons.edit),
+        icon: const Icon(DpIcons.edit),
         label: const Text('질문하기'),
       ),
       body: switch (s.phase) {
@@ -718,7 +718,7 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
   }
 }
 ```
-> `Icons.edit`는 임시 → `DpIcons` 이관(DD3). 작성(FAB)은 프로토 no-op.
+> P4f 아이콘: `DpIcons.edit`(Symbols, P3 추가) 사용 — DD3 준수. 작성(FAB)은 프로토 no-op.
 
 `apps/web/lib/src/app/router.dart` ShellRoute `/community` builder 교체:
 ```dart
@@ -756,10 +756,10 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   testWidgets('상세: 제목·본문 렌더(목)', (tester) async {
+    // P4f-A: QnaDetailPage가 context.dpColors(테마 확장)을 쓰므로 theme 필수.
     await tester.pumpWidget(ProviderScope(
-      child: const MaterialApp(home: QnaDetailPage(postId: 'q1')),
+      child: MaterialApp(theme: DpTheme.light(), home: const QnaDetailPage(postId: 'q1')),
     ));
-    // theme 필요 시 MaterialApp(theme: DpTheme.light())로 감싼다.
     await tester.pumpAndSettle();
     expect(find.textContaining('async'), findsWidgets); // 목 제목/본문
   });
@@ -801,14 +801,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../providers/api_providers.dart';
 import '../state/qna_detail_state.dart';
 
-class QnaDetailController extends FamilyNotifier<QnaDetailState, String> {
+/// P4f-B: 다른 컨트롤러(Content·Dashboard·Path)와 동일한 plain Notifier + load(id) 패턴.
+/// (riverpod 3.x family 베이스 클래스 불확실성 회피 + P4 일관성)
+class QnaDetailController extends Notifier<QnaDetailState> {
   @override
-  QnaDetailState build(String postId) {
-    _load(postId);
-    return const QnaLoading();
-  }
+  QnaDetailState build() => const QnaLoading();
 
-  Future<void> _load(String postId) async {
+  Future<void> load(String postId) async {
+    state = const QnaLoading();
     try {
       final json = await ref
           .read(apiClientProvider)
@@ -821,10 +821,9 @@ class QnaDetailController extends FamilyNotifier<QnaDetailState, String> {
 }
 
 final qnaDetailControllerProvider =
-    NotifierProvider.family<QnaDetailController, QnaDetailState, String>(
-        QnaDetailController.new);
+    NotifierProvider<QnaDetailController, QnaDetailState>(QnaDetailController.new);
 ```
-> `FamilyNotifier`/`NotifierProvider.family`로 postId별 인스턴스(Riverpod 3). `build`에서 비동기 로드 트리거(초기 `QnaLoading` 반환 후 state 갱신).
+> P4f-B: postId는 페이지가 보유(widget 파라미터)하고 `load(postId)`를 initState에서 호출 — Content/Dashboard와 동일. 한 화면에 한 상세만 떠 있으므로 family 인스턴스 분리 불필요(프로토 범위).
 
 - [ ] **Step 4: 목 픽스처 + 페이지**
 
@@ -851,13 +850,25 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../application/qna_detail_controller.dart';
 import '../state/qna_detail_state.dart';
 
-class QnaDetailPage extends ConsumerWidget {
+class QnaDetailPage extends ConsumerStatefulWidget {
   const QnaDetailPage({super.key, required this.postId});
   final String postId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final s = ref.watch(qnaDetailControllerProvider(postId));
+  ConsumerState<QnaDetailPage> createState() => _QnaDetailPageState();
+}
+
+class _QnaDetailPageState extends ConsumerState<QnaDetailPage> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback(
+        (_) => ref.read(qnaDetailControllerProvider.notifier).load(widget.postId));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = ref.watch(qnaDetailControllerProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Q&A')),
       body: switch (s) {
@@ -924,6 +935,6 @@ git commit -m "feat(web): Q&A 상세(COM-003) + 라우트 결선"
 
 - **다중 페이지 목 한계**: `MockHttpAdapter`는 query(`cursor`)를 무시(path만 매칭) → 앱 기본 목은 단일 페이지(`nextCursor: null`). 커서 페이지네이션 **코드/누적은 컨트롤러 테스트로 검증**. 실다중페이지 목은 `MockHttpAdapter` query-aware 매칭 보강(dp_core 후속, T 후보).
 - **작성/답변/투표 미구현**: 질문 작성(FAB)·답변 스레드·평판 게이트는 프로토 범위 밖(자리만).
-- **임시 아이콘**: `Icons.edit` → `DpIcons` 이관(DD3, dp_design 추가).
+- **아이콘**: ✅ 반영 — `DpIcons.edit`(Symbols, P3 추가)로 교체. DD3 준수.
 - **대시보드 차트 단순화**: 진행바만. 상세 통계/그래프는 후속.
 - **이모지 예외**: 🔥(스트릭)·🏅(배지)는 DD3가 명시 허용한 게이미피케이션 예외(스펙 §9.1).

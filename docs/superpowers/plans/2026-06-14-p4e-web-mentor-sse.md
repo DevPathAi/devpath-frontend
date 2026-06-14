@@ -469,14 +469,14 @@ class _Composer extends StatelessWidget {
             IconButton.filled(
               tooltip: '전송',
               onPressed: () => onSend(controller.text),
-              icon: const Icon(Icons.send),
+              icon: const Icon(DpIcons.send),
             ),
           ],
         ),
       );
 }
 ```
-> `Icons.send`는 임시 → `DpIcons` 이관 후속(DD3). 타이핑 인디케이터는 간소(LinearProgressIndicator).
+> P4e 아이콘: `DpIcons.send`(Symbols, P3 추가) 사용 — DD3 준수. 타이핑 인디케이터는 간소(LinearProgressIndicator).
 
 - [ ] **Step 4: 통과 확인** — Run: `cd apps/web && flutter test test/features/mentor/mentor_page_test.dart ; cd ../..` → PASS
 
@@ -532,5 +532,5 @@ git commit -m "feat(web): /mentor 라우트를 MentorPage로 결선"
 - **중간 재개 단순화**: 끊김 시 "이어서"는 재요청(resend)로 단순화. SSE `id:`/`Last-Event-ID` 기반 토큰 재개는 dp_core `SseClient` 표준화 후속(P4b 리스크와 공통).
 - **후속질문·세션 영속 미구현**: SUCCESS의 "후속질문" 추천, 멘토 세션 히스토리 저장은 후속(필요 시 dp_core 모델).
 - **REV→멘토 연결**: P4d 리뷰의 "멘토에게 질문"으로 이 화면에 prefill 전달은 후속 결선.
-- **임시 아이콘**: `Icons.send` → `DpIcons` 이관(DD3, dp_design 추가).
+- **아이콘**: ✅ 반영 — `DpIcons.send`(Symbols, P3 추가)로 교체. DD3 준수.
 - **타이핑 인디케이터**: 간소(LinearProgressIndicator). DESIGN §7 정교화는 후속.
