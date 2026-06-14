@@ -94,6 +94,13 @@ git commit -m "build(landing): Jaspr SSG 독립 프로젝트 골격(T-LANDING-WO
 
 - [ ] **Step 1: 엔트리포인트(SEO·OG·lang=ko)**
 
+Create `landing/lib/config.dart` (P7-C — 서버 엔트리와 분리해 컴포넌트가 main.dart를 import하지 않도록):
+```dart
+/// web 앱 진입 URL(CTA 대상). 배포 시 실제 도메인으로 주입.
+const String kWebAppUrl =
+    String.fromEnvironment('WEB_APP_URL', defaultValue: 'https://app.devpath.ai');
+```
+
 Create `landing/lib/main.dart`:
 ```dart
 import 'package:jaspr/server.dart';
@@ -101,16 +108,11 @@ import 'package:jaspr/server.dart';
 import 'components/app.dart';
 import 'jaspr_options.dart';
 
-/// web 앱 진입 URL(CTA 대상). 배포 시 실제 도메인으로 주입.
-const String kWebAppUrl =
-    String.fromEnvironment('WEB_APP_URL', defaultValue: 'https://app.devpath.ai');
-
 void main() {
   Jaspr.initializeApp(options: defaultJasprOptions);
 
   runApp(Document(
     title: 'DevPath AI — 개발자를 위한 AI 학습 플랫폼',
-    lang: 'ko',
     charset: 'utf-8',
     viewport: 'width=device-width, initial-scale=1.0',
     meta: {
@@ -126,12 +128,14 @@ void main() {
   ));
 }
 ```
-> `defaultJasprOptions`는 Task 1 codegen 산출(`jaspr_options.dart`). `Document`의 `title`/`lang`/`meta`가 SEO·OG를 박는다.
+> **P7-A(검증됨, Context7)**: Jaspr 0.22 `Document`는 `lang` 파라미터가 **없다**(params: title·base·charset·viewport·meta·styles·head·body). 따라서 위 코드에서 `lang:`을 제거했다. `<html lang="ko">`(DoD·SEO)는 다음 중 설치본이 지원하는 수단으로 보장한다: (a) 설치된 0.22.x `Document`에 `htmlAttributes`(또는 동급) 파라미터가 있으면 `{'lang': 'ko'}` 주입, (b) 없으면 **Task 5 빌드 후 `index.html`의 `<html>`에 `lang="ko"` 주입**(post-build). 구현 시 설치본 API로 (a) 우선 확인.
+> `defaultJasprOptions`는 Task 1 codegen 산출(`jaspr_options.dart`). `Document`의 `title`/`meta`가 SEO·OG를 박는다.
+> **P7-B(API 드리프트)**: `Jaspr.initializeApp`·`text()` vs `.text()`·`runApp(Document)`는 설치된 0.22.x 예제로 정렬(Context7 0.22.1 기준 작성). `jaspr_test` 테스트 함수명(`testComponents` vs `testClient`/`testServer`)도 Task 4에서 설치본 확인.
 
 - [ ] **Step 2: 커밋(컴포넌트 Task 3 후 함께 green)**
 ```bash
-git add landing/lib/main.dart
-git commit -m "feat(landing): 서버 엔트리 + SEO/OG Document(lang=ko)"
+git add landing/lib/main.dart landing/lib/config.dart
+git commit -m "feat(landing): 서버 엔트리 + SEO/OG Document + config(kWebAppUrl 분리)"
 ```
 
 ---
@@ -147,7 +151,7 @@ Create `landing/lib/components/hero.dart`:
 ```dart
 import 'package:jaspr/jaspr.dart';
 
-import '../main.dart' show kWebAppUrl;
+import '../config.dart' show kWebAppUrl;
 
 class Hero extends StatelessComponent {
   const Hero({super.key});
@@ -242,7 +246,7 @@ Create `landing/web/styles.css`:
 ```css
 :root { --indigo: #4f46e5; --ink: #0f172a; --muted: #64748b; --bg: #f8fafc; }
 * { box-sizing: border-box; }
-body { margin: 0; font-family: system-ui, 'Pretendard', sans-serif; color: var(--ink); background: var(--bg); }
+body { margin: 0; font-family: 'Pretendard', system-ui, sans-serif; color: var(--ink); background: var(--bg); }
 .hero { text-align: center; padding: 96px 24px 48px; }
 .hero h1 { font-size: 40px; line-height: 1.3; margin: 0 0 16px; }
 .hero .sub { color: var(--muted); font-size: 18px; }
@@ -320,7 +324,9 @@ Run:
 cd landing && dart pub global activate jaspr_cli && jaspr build ; cd ..
 ```
 (또는 전역설치 없이: `cd landing && dart run jaspr_cli:jaspr build ; cd ..`)
-Expected: `landing/build/jaspr/`에 정적 HTML(`index.html`) + `styles.css` 생성. `index.html`에 `<html lang="ko">`·`<meta name="description">`·`<meta property="og:title">`·CTA `<a href=".../app...">` 포함.
+Expected: `landing/build/jaspr/`에 정적 HTML(`index.html`) + `styles.css` 생성. `index.html`에 `<meta name="description">`·`<meta property="og:title">`·CTA `<a href=".../app...">` 포함.
+
+> **P7-A — `<html lang="ko">` 보장**: 설치된 0.22.x `Document`가 `htmlAttributes`(또는 동급)를 지원하면 `main.dart`에서 `{'lang':'ko'}` 주입(가장 깔끔). 미지원이면 이 빌드 스텝에서 산출 `index.html`의 `<html>`에 `lang="ko"`를 post-build 주입한다(예: Dart 스크립트로 `<html>`→`<html lang="ko">` 치환). 둘 중 하나로 아래 grep 게이트를 통과시킨다.
 
 - [ ] **Step 2: 산출물 점검(SEO 핵심)**
 
