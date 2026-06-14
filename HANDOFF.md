@@ -1,7 +1,7 @@
 # HANDOFF — React→Flutter 전환 & 프로토 UI
 
-> 최종 업데이트: 2026-06-14 · 브랜치: `docs/flutter-migration-proto-ui-spec` (main 앞 26커밋, **미푸시**)
-> **상태: 설계·계획 + 플랜 리뷰 전체 완료(P1~P7).** 구현 코드는 아직 없음 — 다음은 eng-review → 구현.
+> 최종 업데이트: 2026-06-14 · 브랜치: `docs/flutter-migration-proto-ui-spec` (main 앞 27+커밋, **미푸시**)
+> **상태: 설계·계획 + 디자인 리뷰 + Eng Review 전체 완료(P1~P7).** 구현 코드는 아직 없음 — 다음은 **구현**.
 
 ## 지금까지 (DONE) — 플랜 작성 + 외부 리뷰 전부 완료
 
@@ -14,10 +14,10 @@
   - P5·P6·P7: 73cfe23(4건 — P7-A Document.lang 제거·P7-C config 분리·P7-D CSS·P6 아이콘)
 - **TODOS** (`TODOS.md`): 활성 `T-DEPLOY-REINTRO`·`T-CI-FLUTTER-PIN` / 부분 `T-GOLDEN-CI-EXCLUDE`·`T-LANDING-CI` / 반영 `T-SSE-ERR-NORMALIZE`·`T-LANDING-WORKSPACE`(standalone)
 
-## 다음 세션 (RESUME HERE) — 리뷰 완료, eng-review→구현
+## 다음 세션 (RESUME HERE) — 전체 리뷰 완료, 구현 시작
 
-1. **eng-review 게이트**: 아키텍처 영향 큰 **P4(web)·P6(mobile)** 는 구현 착수 전 `/plan-eng-review`(스펙 VERDICT). 작성·리뷰된 플랜이 입력.
-2. **구현 시작**: `superpowers:subagent-driven-development`(권장). **순서 의존** P1→P2→P3→P4a→…→P4f→P5→P6→P7. 첫 레포 변경(구 React 제거·Flutter 앱 생성·`mobile/`→`apps/mobile/`·CI melos 교체)은 P1.
+1. **✅ Eng Review 완료(2026-06-14)**: P4(web)·P6(mobile) 심층 리뷰 → 결정 D1~D4 승인 → 7개 플랜(P2·P4b~f·P6) 반영 완료. 요약: `docs/superpowers/specs/2026-06-14-eng-review-summary.md`. 결정: D1(P2 단일 SSE 기반 — `ApiClient.sse()`·`SseStage` 단일출처·`fromStep`), D2(DD8 핵심+`MockSseSource.failAfter`+60s, 재개키는 백엔드 합의까지 fromStep 보류), D3(query-aware `MockHttpAdapter`), D4(P6 재연결 동기화 최소+ConnectivityService, OAuth·secure_storage 이관). 필수수정 F4·F5·F6·F9는 해당 플랜에 반영됨.
+2. **구현 시작**: `superpowers:subagent-driven-development`(권장). **순서 의존** P1→P2→P3→P4a→…→P4f→P5→P6→P7. 첫 레포 변경(구 React 제거·Flutter 앱 생성·`mobile/`→`apps/mobile/`·CI melos 교체)은 P1. **P2는 Task 10(SSE 기반·목 보강)이 P4b/c/e/f 착수 게이트** — P2 완료 시 반드시 포함.
 
 ## 구현 시 남은 결정/보강 (플랜에 노트로 명시됨)
 

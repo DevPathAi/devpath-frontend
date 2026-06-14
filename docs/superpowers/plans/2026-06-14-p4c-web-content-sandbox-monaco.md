@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> 🔶 **Eng Review 반영(2026-06-14, F5 / D1)** — F5-a Monaco 생명주기(StatefulWidget·viewType 1회·dispose), F5-b 1페인 IndexedStack 상태보존, F5-c DD7 Esc 포커스 탈출(계약), `apiClient.sse(...)` 경유 SSE, 반응형 경계 4값, RunController 재진입 가드 반영. 근거·결정: [eng-review-summary](../specs/2026-06-14-eng-review-summary.md).
+
 **Goal:** `apps/web`에 **콘텐츠 뷰어(CNT-001)** 와 **Sandbox(SBX-001)** 를 TDD로 구현한다 — 마크다운 콘텐츠 렌더, 그리고 **DD5 반응형 3/2/1 페인**(≥1240 에디터|실행로그|리뷰 / 1024–1239 2페인+로그접이 / <1024 세그먼트 탭) 안에 **Monaco 에디터(web 전용 임베드)** 와 **실행 로그 SSE 스트리밍**, `SANDBOX_UNAVAILABLE` 상태(편집 유지·실행만 비활성)를 얹는다.
 
 **Architecture:** P4a 토대 위. Monaco는 `HtmlElementView`+`dart:ui_web` `registerViewFactory`로 임베드하되, web 전용 API가 VM 테스트(`flutter test`)를 깨지 않도록 **conditional import**(`stub`/`web`)로 격리 — 반응형 레이아웃·실행 컨트롤러는 Monaco 없이 결정적 테스트. 실행 로그는 `sandboxRunConnectProvider`(목=지연 emit / 실서버=`SseClient`)로 주입. AI 리뷰 패널은 P4c에서 **자리(placeholder)** 만, P4d에서 채운다.
@@ -209,6 +211,7 @@ class _ContentPageState extends ConsumerState<ContentPage> {
 }
 ```
 > P4c-B 반영: `DpIcons.code`(Symbols, P3에 추가) 사용 — DD3 단일 Symbols 셋 준수.
+> P3/D1 콘텐츠 상태매트릭스: LOADING=Shimmer(`DpLoading`이 P3에서 Shimmer 구현인지 확인 — 아니면 P3 보강 선행), ERROR=`DpError`+재시도. **오프라인→캐시 배너**(stale-while-error)는 본 플랜 범위 밖 → 후속(P4 캐시 도입 시) 명시.
 
 `apps/web/lib/src/app/router.dart` ShellRoute에 라우트 추가(import 포함):
 ```dart
@@ -341,6 +344,94 @@ void main() {
     expect(find.text('EDITOR'), findsOneWidget);
     expect(find.text('REVIEW'), findsNothing); // 다른 탭은 미표시
   });
+
+  // F5/D1 반영: 경계 4값 off-by-one 고정(<1024 / [1024,1240) / ≥1240).
+  // IndexedStack(F5-b)은 전 페인을 트리에 유지하므로 가시 탭 판별은 find.text가 아닌
+  // 세그먼트(1페인) 대 다중 페인(Row) 구조로 한다.
+  testWidgets('경계 1023: 세그먼트 탭(1페인)', (tester) async {
+    tester.view.physicalSize = const Size(1023, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(_host(const Size(1023, 900)));
+    expect(find.byType(SegmentedButton<int>), findsOneWidget);
+  });
+
+  testWidgets('경계 1024: 2페인(에디터|리뷰)+로그접이 — 세그먼트 없음', (tester) async {
+    tester.view.physicalSize = const Size(1024, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(_host(const Size(1024, 900)));
+    expect(find.byType(SegmentedButton<int>), findsNothing);
+    expect(find.text('실행 로그 접기'), findsOneWidget); // 로그 접이 토글
+  });
+
+  testWidgets('경계 1239: 2페인(에디터|리뷰)+로그접이', (tester) async {
+    tester.view.physicalSize = const Size(1239, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(_host(const Size(1239, 900)));
+    expect(find.byType(SegmentedButton<int>), findsNothing);
+    expect(find.text('실행 로그 접기'), findsOneWidget);
+  });
+
+  testWidgets('경계 1240: 3페인 동시 표시 — 로그접이 토글 없음', (tester) async {
+    tester.view.physicalSize = const Size(1240, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(_host(const Size(1240, 900)));
+    expect(find.text('EDITOR'), findsOneWidget);
+    expect(find.text('LOG'), findsOneWidget);
+    expect(find.text('REVIEW'), findsOneWidget);
+    expect(find.text('실행 로그 접기'), findsNothing); // 3페인은 접이 없음
+  });
+
+  // F5-b 반영: <1024 탭 왕복 후 에디터 입력 코드 유지(IndexedStack=전 페인 트리 유지).
+  // panes[_tab]로 현재 탭만 트리에 넣으면 탭 전환 시 에디터 State가 폐기되어 입력이 소실된다.
+  testWidgets('<1024: 탭 왕복(에디터→실행→에디터) 후 입력 코드 유지', (tester) async {
+    tester.view.physicalSize = const Size(800, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    // 입력 상태를 가지는 stateful 에디터 더미(TextField)로 IndexedStack 보존을 검증.
+    await tester.pumpWidget(MediaQuery(
+      data: const MediaQueryData(size: Size(800, 900)),
+      child: MaterialApp(
+        theme: DpTheme.light(),
+        home: const Scaffold(
+          body: SandboxLayout(
+            editor: TextField(key: Key('ed')),
+            log: Text('LOG'),
+            review: Text('REVIEW'),
+          ),
+        ),
+      ),
+    ));
+
+    await tester.enterText(find.byKey(const Key('ed')), 'final x = 1;');
+    await tester.pump();
+
+    // 실행 탭으로 → 다시 에디터 탭으로 왕복
+    await tester.tap(find.text('실행'));
+    await tester.pump();
+    await tester.tap(find.text('에디터'));
+    await tester.pump();
+
+    expect(find.text('final x = 1;'), findsOneWidget); // 입력 유지
+  });
+
+  // P3/D1 반영: 1024–1239 2페인 로그 접이 토글 — 접으면 LOG 페인 트리에서 제거.
+  testWidgets('1024–1239: 로그 접이 토글로 LOG 페인 표시/숨김', (tester) async {
+    tester.view.physicalSize = const Size(1100, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(_host(const Size(1100, 900)));
+
+    expect(find.text('LOG'), findsOneWidget); // 기본 펼침
+    await tester.tap(find.text('실행 로그 접기'));
+    await tester.pump();
+    expect(find.text('LOG'), findsNothing); // 접힘
+    expect(find.text('실행 로그 펼치기'), findsOneWidget);
+  });
 }
 ```
 
@@ -360,11 +451,15 @@ class SandboxLayout extends StatefulWidget {
     required this.editor,
     required this.log,
     required this.review,
+    this.onEditorVisible,
   });
 
   final Widget editor;
   final Widget log;
   final Widget review;
+
+  /// F5-b: 에디터 페인이 (재)가시화될 때 호출 — Monaco `editor.layout()` 보정용.
+  final VoidCallback? onEditorVisible;
 
   @override
   State<SandboxLayout> createState() => _SandboxLayoutState();
@@ -412,7 +507,8 @@ class _SandboxLayoutState extends State<SandboxLayout> {
     }
 
     // <1024: 세그먼트 탭 1페인
-    final panes = [widget.editor, widget.log, widget.review];
+    // F5-b 반영: panes[_tab]로 현재 탭만 트리에 넣으면 탭 전환 시 에디터 State(입력)가
+    // 폐기되어 코드가 소실된다 → IndexedStack으로 전 페인을 트리에 유지하고 하나만 visible.
     return Column(children: [
       Padding(
         padding: const EdgeInsets.all(DpSpacing.sm),
@@ -423,14 +519,26 @@ class _SandboxLayoutState extends State<SandboxLayout> {
             ButtonSegment(value: 2, label: Text('리뷰')),
           ],
           selected: {_tab},
-          onSelectionChanged: (s) => setState(() => _tab = s.first),
+          onSelectionChanged: (s) => setState(() {
+            _tab = s.first;
+            // 에디터 가시화 시 Monaco 재레이아웃(숨김 동안 0px였던 레이아웃 보정).
+            if (_tab == 0) widget.onEditorVisible?.call();
+          }),
         ),
       ),
-      Expanded(child: pane(panes[_tab])),
+      Expanded(
+        child: pane(
+          IndexedStack(
+            index: _tab,
+            children: [widget.editor, widget.log, widget.review],
+          ),
+        ),
+      ),
     ]);
   }
 }
 ```
+> F5-b 반영: `IndexedStack`은 visible 페인의 크기만 차지하되 모든 child를 트리에 유지하므로, 탭 전환에도 에디터 State(입력 코드)가 보존된다. 가시성 토글 시 `onEditorVisible`로 `editor.layout()`을 트리거(숨김 상태 0px 레이아웃 방지). `SandboxLayout` 생성자에 `ValueChanged?`/`VoidCallback? onEditorVisible`를 추가하고 `SandboxPage`(Task 6)에서 Monaco 핸들의 `layout()`에 연결한다.
 > P4c-B 반영: 접이 토글에 `DpIcons.expandMore/expandLess`(Symbols, P3에 추가) 사용 — DD3 준수.
 
 - [ ] **Step 4: 통과 확인** — Run: `cd apps/web && flutter test test/features/sandbox/sandbox_layout_test.dart ; cd ../..` → PASS
@@ -471,8 +579,22 @@ void main() {
     ));
     expect(find.textContaining('void main()'), findsOneWidget);
   });
+
+  // F5-c DD7 반영(dart Focus 부분): MonacoEditorView는 외곽 Focus/FocusNode로
+  // 에디터(또는 sentinel)에서 넘어온 포커스를 수신할 수 있어야 한다 — VM에서 검증 가능한
+  // dart측 계약. (JS Esc→sentinel 핸들러는 web 구현에서, 수동 `flutter run -d chrome`로 검증.)
+  testWidgets('a11y: Focus 트리에 에디터 컨테이너가 노드를 가진다', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      theme: DpTheme.light(),
+      home: const Scaffold(
+        body: MonacoEditorView(initialCode: 'void main() {}'),
+      ),
+    ));
+    expect(find.byType(Focus), findsWidgets); // 공개 위젯이 Focus를 노출
+  });
 }
 ```
+> F5-c 반영: 공개 위젯(`MonacoEditorView`)이 외곽 `Focus`(`FocusNode`)로 에디터를 감싸, web 구현이 Esc 시 dart로 포커스를 돌려보낼 sentinel 수신지를 제공한다. stub도 동일 `Focus`를 노출해 VM 테스트가 통과하도록 한다.
 
 - [ ] **Step 2: 실패 확인** — Run: `cd apps/web && flutter test test/features/sandbox/monaco_editor_view_test.dart ; cd ../..` → FAIL
 
@@ -493,17 +615,59 @@ import 'package:flutter/widgets.dart';
 import 'monaco_editor_view_stub.dart'
     if (dart.library.js_interop) 'monaco_editor_view_web.dart' as impl;
 
+/// web 구현이 반환하는 핸들 — viewType 위젯 + 생명주기(dispose)/layout 제어.
+/// stub도 동일 인터페이스를 만족(아래 stub 참조).
+abstract class MonacoHandle {
+  Widget get view;
+  void layout(); // F5-b: 가시화 시 재레이아웃
+  void dispose(); // F5-a: JS editor.dispose()
+}
+
 /// 코드 에디터. web=Monaco 임베드, 그 외(테스트 포함)=stub.
-class MonacoEditorView extends StatelessWidget {
+///
+/// F5-a 반영: viewType은 **State에서 1회**(initState) 생성·보관한다. 함수형 build에서
+/// 매 rebuild마다 `_seq++`로 viewType을 만들면 viewFactory가 무한 증식·메모리 누수가 난다.
+class MonacoEditorView extends StatefulWidget {
   const MonacoEditorView({super.key, required this.initialCode, this.onChanged});
   final String initialCode;
   final ValueChanged<String>? onChanged;
 
   @override
-  Widget build(BuildContext context) =>
-      impl.buildMonacoEditor(initialCode: initialCode, onChanged: onChanged);
+  State<MonacoEditorView> createState() => MonacoEditorViewState();
+}
+
+class MonacoEditorViewState extends State<MonacoEditorView> {
+  late final MonacoHandle _handle; // F5-a: viewType/에디터 1회 생성·보관
+  final FocusNode _focusNode = FocusNode(debugLabel: 'monaco-sentinel'); // F5-c DD7
+
+  @override
+  void initState() {
+    super.initState();
+    _handle = impl.createMonacoHandle(
+      initialCode: widget.initialCode,
+      onChanged: widget.onChanged,
+      onEscape: () => _focusNode.requestFocus(), // Esc→컨테이너 밖 sentinel로 탈출
+    );
+  }
+
+  /// F5-b: SandboxLayout이 에디터 가시화 시 호출(IndexedStack 토글 보정).
+  void layout() => _handle.layout();
+
+  @override
+  void dispose() {
+    _handle.dispose(); // F5-a: JS editor.dispose()
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // F5-c: 외곽 Focus(sentinel) — Esc 시 web 구현이 이리로 포커스를 넘긴다.
+    return Focus(focusNode: _focusNode, child: _handle.view);
+  }
 }
 ```
+> F5-a 반영: `_handle`(viewType·JS 에디터)을 `initState`에서 **1회** 만들고 `dispose`에서 JS `editor.dispose()`를 호출한다. 함수형 build의 `_seq++` viewType 증식을 제거. F5-c 반영: 외곽 `Focus`(`FocusNode` sentinel)가 Esc 탈출 수신지. web 구현의 `onEscape` 콜백이 이 노드로 포커스를 돌려준다.
 
 - [ ] **Step 5: 스텁 — `monaco_editor_view_stub.dart`**
 
@@ -512,21 +676,38 @@ Create `apps/web/lib/src/features/sandbox/presentation/monaco_editor_view_stub.d
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 
-/// 비웹/테스트: 읽기전용 코드 미리보기(Monaco 미로드).
-Widget buildMonacoEditor({
+import 'monaco_editor_view.dart' show MonacoHandle;
+
+/// 비웹/테스트: 읽기전용 코드 미리보기(Monaco 미로드). web과 동일 핸들 인터페이스.
+MonacoHandle createMonacoHandle({
   required String initialCode,
   ValueChanged<String>? onChanged,
+  VoidCallback? onEscape,
 }) =>
-    Container(
-      color: const Color(0xFF1E1E1E), // DESIGN codeEditorBg
-      padding: const EdgeInsets.all(DpSpacing.md),
-      child: SingleChildScrollView(
-        child: Text(
-          initialCode,
-          style: DpTypography.code.copyWith(color: const Color(0xFFD4D4D4)),
+    _StubHandle(initialCode);
+
+class _StubHandle implements MonacoHandle {
+  _StubHandle(this._code);
+  final String _code;
+
+  @override
+  Widget get view => Container(
+        color: const Color(0xFF1E1E1E), // DESIGN codeEditorBg
+        padding: const EdgeInsets.all(DpSpacing.md),
+        child: SingleChildScrollView(
+          child: Text(
+            _code,
+            style: DpTypography.code.copyWith(color: const Color(0xFFD4D4D4)),
+          ),
         ),
-      ),
-    );
+      );
+
+  @override
+  void layout() {} // no-op (stub)
+
+  @override
+  void dispose() {} // no-op (stub)
+}
 ```
 
 - [ ] **Step 6: 웹 구현 — `monaco_editor_view_web.dart`**
@@ -539,30 +720,62 @@ import 'dart:ui_web' as ui_web;
 import 'package:flutter/widgets.dart';
 import 'package:web/web.dart' as web;
 
-/// index.html이 정의하는 셈: createDevpathEditor(container, code, onChange).
+import 'monaco_editor_view.dart' show MonacoHandle;
+
+/// index.html 셈이 반환하는 JS 핸들: { dispose(), layout() }.
+extension type _JsEditorHandle._(JSObject _) implements JSObject {
+  external void dispose();
+  external void layout();
+}
+
+/// index.html이 정의하는 셈: createDevpathEditor(container, code, onChange, onEscape)
+/// → { dispose, layout } 반환.
 @JS('createDevpathEditor')
-external void _createDevpathEditor(
+external _JsEditorHandle _createDevpathEditor(
   web.HTMLElement container,
   String initialCode,
   JSFunction onChange,
+  JSFunction onEscape,
 );
 
 int _seq = 0;
 
-Widget buildMonacoEditor({
+/// F5-a 반영: viewType은 핸들 생성 시(=State.initState 경유) **1회** 만들고 보관.
+/// 함수형 build에서 매 rebuild마다 만들면 viewFactory 무한 증식.
+MonacoHandle createMonacoHandle({
   required String initialCode,
   ValueChanged<String>? onChanged,
+  VoidCallback? onEscape,
 }) {
   final viewType = 'monaco-${_seq++}';
+  _JsEditorHandle? jsHandle;
+
   ui_web.platformViewRegistry.registerViewFactory(viewType, (int _) {
     final container = (web.document.createElement('div') as web.HTMLDivElement)
       ..style.width = '100%'
       ..style.height = '100%';
     final cb = ((JSString v) => onChanged?.call(v.toDart)).toJS;
-    _createDevpathEditor(container, initialCode, cb);
+    final esc = (() => onEscape?.call()).toJS; // F5-c: Esc→dart sentinel
+    jsHandle = _createDevpathEditor(container, initialCode, cb, esc);
     return container;
   });
-  return HtmlElementView(viewType: viewType);
+
+  return _WebHandle(viewType, () => jsHandle);
+}
+
+class _WebHandle implements MonacoHandle {
+  _WebHandle(this._viewType, this._jsHandle);
+  final String _viewType;
+  final _JsEditorHandle? Function() _jsHandle;
+
+  @override
+  Widget get view => HtmlElementView(viewType: _viewType);
+
+  @override
+  void layout() => _jsHandle()?.layout(); // F5-b
+
+  @override
+  void dispose() => _jsHandle()?.dispose(); // F5-a: JS editor.dispose()
 }
 ```
 
@@ -573,18 +786,27 @@ Widget buildMonacoEditor({
 <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs/loader.min.js"></script>
 <script>
   require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs' }});
-  window.createDevpathEditor = function (container, code, onChange) {
+  // F5-a/F5-c 반영: { dispose, layout } 핸들 반환 + Esc 포커스 탈출.
+  // require가 비동기라 editor가 즉시 없을 수 있으므로 핸들은 클로저로 editor를 지연 참조.
+  window.createDevpathEditor = function (container, code, onChange, onEscape) {
+    var editor = null;
     require(['vs/editor/editor.main'], function () {
-      var editor = monaco.editor.create(container, {
+      editor = monaco.editor.create(container, {
         value: code, language: 'dart', theme: 'vs-dark',
         automaticLayout: true, minimap: { enabled: false }, fontSize: 14,
       });
       editor.onDidChangeModelContent(function () { onChange(editor.getValue()); });
+      // F5-c DD7: Esc 시 Monaco 밖(dart sentinel)으로 포커스를 넘긴다.
+      editor.addCommand(monaco.KeyCode.Escape, function () { onEscape(); });
     });
+    return {
+      dispose: function () { if (editor) editor.dispose(); }, // F5-a
+      layout:  function () { if (editor) editor.layout(); },  // F5-b
+    };
   };
 </script>
 ```
-> 버전·CDN은 가이드. 오프라인/CSP 환경이면 Monaco를 `web/`에 번들. AMD 로더는 셈 안에서만 다루고 Dart는 `createDevpathEditor`만 호출.
+> 버전·CDN은 가이드. 오프라인/CSP 환경이면 Monaco를 `web/`에 번들. AMD 로더는 셈 안에서만 다루고 Dart는 `createDevpathEditor`만 호출. F5-a: 셈이 `{ dispose, layout }`를 반환하고 dart `State.dispose`가 `dispose()`를 호출한다. F5-c: `KeyCode.Escape` 핸들러가 `onEscape`로 포커스를 dart sentinel에 돌려준다.
 
 - [ ] **Step 8: 통과 확인(VM=stub)** — Run: `cd apps/web && flutter test test/features/sandbox/monaco_editor_view_test.dart ; cd ../..` → PASS
 - [ ] **Step 8b: web 분석 확인** — Run: `cd apps/web && flutter analyze ; cd ../..` → 이슈 없음(conditional import 해석)
@@ -624,7 +846,7 @@ void main() {
   test('실행: 로그를 누적하고 done', () async {
     final c = ProviderContainer(overrides: [
       sandboxRunConnectProvider
-          .overrideWithValue(() => _logs(['컴파일 중…', '테스트 통과'])),
+          .overrideWithValue((_) => _logs(['컴파일 중…', '테스트 통과'])),
     ]);
     addTearDown(c.dispose);
 
@@ -637,7 +859,7 @@ void main() {
 
   test('SANDBOX_UNAVAILABLE이면 RunUnavailable', () async {
     final c = ProviderContainer(overrides: [
-      sandboxRunConnectProvider.overrideWithValue(() =>
+      sandboxRunConnectProvider.overrideWithValue((_) =>
           Stream<SseEvent>.error(const ApiException(
               code: ApiErrorCode.sandboxUnavailable, message: '점검'))),
     ]);
@@ -645,6 +867,25 @@ void main() {
 
     await c.read(runControllerProvider.notifier).run('print(1);');
     expect(c.read(runControllerProvider), isA<RunUnavailable>());
+  });
+
+  // F5/D1 반영: 재진입 가드 — 실행 중 재호출은 이전 Completer를 hang시키지 않는다.
+  test('실행 중 재호출은 무시(재진입 가드)', () async {
+    var connects = 0;
+    final c = ProviderContainer(overrides: [
+      sandboxRunConnectProvider.overrideWithValue((_) {
+        connects++;
+        return _logs(['1회차']);
+      }),
+    ]);
+    addTearDown(c.dispose);
+
+    final notifier = c.read(runControllerProvider.notifier);
+    final first = notifier.run('print(1);');
+    final second = notifier.run('print(2);'); // 진행 중 재호출 → 무시
+    await Future.wait([first, second]);
+
+    expect(connects, 1); // 두 번째 호출은 새 스트림을 만들지 않음
   });
 }
 ```
@@ -661,7 +902,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../providers/api_providers.dart';
 
 /// 실행 로그 SSE 스트림 생성기.
-typedef SandboxRunConnect = Stream<SseEvent> Function();
+/// F5/D1 반영: 실행할 코드를 전달받아 실서버 분기에서 body로 보낼 수 있게 `code`를 받는다.
+/// (목 분기는 code를 무시.) 테스트 override는 `(_) => stream` 형태.
+typedef SandboxRunConnect = Stream<SseEvent> Function(String code);
 
 const List<String> _kMockRunLog = [
   '> dart run main.dart',
@@ -674,17 +917,19 @@ const List<String> _kMockRunLog = [
 final sandboxRunConnectProvider = Provider<SandboxRunConnect>((ref) {
   final config = ref.watch(appConfigProvider);
   if (config.useMock) {
-    return () async* {
+    return (String code) async* {
       for (final line in _kMockRunLog) {
         await Future<void>.delayed(const Duration(milliseconds: 200));
         yield SseEvent(event: 'log', data: line);
       }
     };
   }
+  // F5/D1 반영: `client.dio` 직접 접근 금지 → P2 Task 10 `apiClient.sse(path,{body})`만 사용.
   final client = ref.watch(apiClientProvider);
-  return () => SseClient(client.dio).connect('/sandbox/run');
+  return (String code) => client.sse('/sandbox/run', body: {'code': code});
 });
 ```
+> F5/D1 반영: `SseClient(client.dio)` 직접 생성 제거. 앱은 P2 `apiClient.sse(path,{body}) → Stream<SseEvent>` 헬퍼만 쓴다(dio 비노출 규약). 실행 코드는 `body:{'code':code}`로 전달.
 
 - [ ] **Step 4: 구현 — `run_controller.dart`**
 
@@ -707,12 +952,18 @@ class RunController extends Notifier<RunState> {
     return const RunIdle();
   }
 
+  Completer<void>? _inFlight; // F5/D1: 재진입 가드
+
   Future<void> run(String code) {
+    // F5/D1 반영: 진행 중이면 무시 — 연속 호출로 이전 Completer가 미완료 hang되는 것을 방지.
+    if (_inFlight != null && !_inFlight!.isCompleted) return _inFlight!.future;
+
     _sub?.cancel();
     final done = Completer<void>();
+    _inFlight = done;
     state = const RunRunning();
 
-    _sub = ref.read(sandboxRunConnectProvider)().listen(
+    _sub = ref.read(sandboxRunConnectProvider)(code).listen(
       (e) {
         final s = state;
         if (s is RunRunning) state = s.appended(e.data);
@@ -744,7 +995,7 @@ class RunController extends Notifier<RunState> {
 final runControllerProvider =
     NotifierProvider<RunController, RunState>(RunController.new);
 ```
-> web은 `dio` 직접 의존 금지(P4a 결정) → `RunController`는 `ApiException`만 해제. **P4c-A 해소**: dp_core `SseClient.connect`(P2)가 실패를 `ApiException`으로 정규화하도록 보강됨 → 실서버 경로의 `SANDBOX_UNAVAILABLE`/`KILL_SWITCH`/`QUOTA`가 `onError`에 `ApiException`으로 도달한다(get/post 헬퍼와 동일 규약). 목 테스트는 `ApiException` 직접 emit이라 OK.
+> web은 `dio` 직접 의존 금지(P4a 결정) → `RunController`는 `ApiException`만 해제. **P4c-A 해소**: dp_core `SseClient.connect`(P2)가 실패를 `ApiException`으로 정규화하도록 보강됨 → 실서버 경로의 `SANDBOX_UNAVAILABLE`/`KILL_SWITCH`/`QUOTA`가 `onError`에 `ApiException`으로 도달한다(get/post 헬퍼와 동일 규약). 목 테스트는 `ApiException` 직접 emit이라 OK. **F5/D1 반영**: 실서버 스트림은 `apiClient.sse('/sandbox/run', body:{'code':code})`(P2 Task 10 단일 출처)로 생성 — `client.dio` 비노출. 재진입 가드(`_inFlight`)로 실행 중 재호출은 진행 중 future를 반환(이전 Completer hang 방지).
 
 - [ ] **Step 5: 통과 확인** — Run: `cd apps/web && flutter test test/features/sandbox/run_controller_test.dart ; cd ../..` → PASS
 
@@ -791,7 +1042,7 @@ void main() {
     addTearDown(tester.view.reset);
 
     final c = ProviderContainer(overrides: [
-      sandboxRunConnectProvider.overrideWithValue(() => _logs(['실행 결과: OK'])),
+      sandboxRunConnectProvider.overrideWithValue((_) => _logs(['실행 결과: OK'])),
     ]);
     addTearDown(c.dispose);
 
@@ -836,6 +1087,9 @@ class SandboxPage extends ConsumerStatefulWidget {
 
 class _SandboxPageState extends ConsumerState<SandboxPage> {
   String _code = _kInitialCode;
+  // F5-b: 에디터 가시화 시 Monaco 재레이아웃 트리거용 핸들.
+  final GlobalKey<MonacoEditorViewState> _editorKey =
+      GlobalKey<MonacoEditorViewState>();
 
   @override
   Widget build(BuildContext context) {
@@ -855,7 +1109,10 @@ class _SandboxPageState extends ConsumerState<SandboxPage> {
         ],
       ),
       body: SandboxLayout(
+        // F5-b: <1024 세그먼트 탭에서 에디터 재가시화 시 layout() 보정.
+        onEditorVisible: () => _editorKey.currentState?.layout(),
         editor: MonacoEditorView(
+          key: _editorKey,
           initialCode: _kInitialCode,
           onChanged: (v) => _code = v,
         ),
@@ -962,7 +1219,7 @@ void main() {
     addTearDown(tester.view.reset);
 
     final c = ProviderContainer(overrides: [
-      sandboxRunConnectProvider.overrideWithValue(() => _logs(['OK'])),
+      sandboxRunConnectProvider.overrideWithValue((_) => _logs(['OK'])),
     ]);
     addTearDown(c.dispose);
 
@@ -1015,8 +1272,14 @@ git commit -m "test(web): 콘텐츠→Sandbox 실행 통합 스모크"
 - [ ] `melos run test` — content·run-state·sandbox-layout·monaco(stub)·run-controller·sandbox-page·smoke PASS
 - [ ] CNT: 마크다운+코드블록 렌더(DpMarkdown), 로딩/에러 상태
 - [ ] SBX 반응형(DD5): ≥1240 3페인 / 1024–1239 2페인+로그접이 / <1024 세그먼트 탭 — 위젯 테스트로 폭별 검증
+- [ ] **경계 4값(F5/D1)**: 1023·1024·1239·1240 off-by-one 위젯 테스트 통과
+- [ ] **1페인 상태보존(F5-b)**: <1024 세그먼트 탭 왕복 후 에디터 입력 코드 유지(IndexedStack) — 위젯 테스트
+- [ ] **Monaco 생명주기(F5-a)**: viewType은 State에서 1회 생성(rebuild 시 증식 없음), `dispose()`에서 JS `editor.dispose()` 호출
+- [ ] **DD7 Esc 포커스 탈출(F5-c)**: Esc 시 에디터 밖 dart sentinel(`Focus`)로 포커스 이동 — dart측 위젯 테스트 + 수동 `flutter run -d chrome`
 - [ ] Monaco: web 빌드에서 실제 에디터 임베드(`flutter run -d chrome` 수동), VM 테스트는 stub로 통과(conditional import)
 - [ ] 실행: SSE 로그 누적 표시(codeLogBg), `SANDBOX_UNAVAILABLE`→`DpSandboxUnavailable`(편집 유지·실행만 비활성)
+- [ ] **SSE 단일 출처(F5/D1)**: 실서버 스트림은 `apiClient.sse(path,{body})` 경유(`client.dio` 비노출)
+- [ ] **재진입 가드(F5/D1)**: 실행 중 `run` 재호출이 이전 Completer를 hang시키지 않음 — 테스트 통과
 
 ## 리스크 / 후속 (명시)
 

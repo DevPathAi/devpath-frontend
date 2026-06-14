@@ -289,9 +289,9 @@ devpath-frontend/
 |--------|---------|-----|------|--------|----------|
 | CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | — |
 | Codex Review | `/codex review` | Independent 2nd opinion | 0 | — | — |
-| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 0 | — | — |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | REVIEWED | 결정 4(D1~D4) + 필수수정 F4·F5·F6·F9. 요약: [eng-review-summary](./2026-06-14-eng-review-summary.md) |
 | Design Review | `/plan-design-review` | UI/UX gaps | 1 | ISSUES_OPEN | score: 5/10 → 8/10, 8 decisions |
 | DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | — |
 
-- **UNRESOLVED:** 0 (8개 디자인 결정 모두 사용자 승인·플랜 반영)
-- **VERDICT:** Design Review 완료(5/10 → 8/10). **Eng Review 미실행 — 필수 게이트, 구현 전 `/plan-eng-review` 필요** (DD5 반응형·DD8 SSE 재연결·다크모드 전역 토글은 아키텍처 영향 있음).
+- **UNRESOLVED:** 0 (디자인 8건 + Eng D1~D4 모두 사용자 승인). 단 실서버 SSE 재개키(Last-Event-ID)·온보딩 문항·OAuth 콜백은 백엔드/외부문서 합의 대기(추측 금지 보류, TODOS 등록).
+- **VERDICT:** Design Review 완료(5/10 → 8/10). **Eng Review 완료(2026-06-14)** — 조건부 착수 승인. D1(P2 단일 SSE 기반)·D2(DD8 핵심+재개키 보류)·D3(query-aware 목)·D4(P6 동기화 최소+OAuth 이관) 결정. 구현 전 §3 플랜별 체크리스트 반영 필요. 상세: [eng-review-summary](./2026-06-14-eng-review-summary.md).

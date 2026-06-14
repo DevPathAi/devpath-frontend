@@ -8,6 +8,12 @@
 
 **Tech Stack:** Flutter Web · flutter_riverpod 3.3 · go_router · dp_core(SseClient·freezed 모델) · dp_design(DpSseStageView·상태위젯) · flutter_test.
 
+> 🔶 **Eng Review 반영(2026-06-14, D1·D2 / F4)** — 결정 근거: [`../specs/2026-06-14-eng-review-summary.md`](../specs/2026-06-14-eng-review-summary.md)
+> - **D1**: SSE 단계의 단일 출처는 P2 `SseStage`(connecting/streaming/partial/reconnecting/complete/failed). feature는 자체 단계 enum을 재정의하지 않고 이를 **구독·매핑**한다. `PathPhase`에 `reconnecting`을 추가해 `resume()` 진입을 표현(Task 4).
+> - **D1**: `pathSseConnectProvider`는 `client.dio`를 직접 만지지 않고 P2 `apiClient.sse(path, {body})` 헬퍼만 경유한다(Task 3).
+> - **F4**: PATH 생성 중 503(`AI_KILL_SWITCH_ACTIVE`)/429(`QUOTA_EXCEEDED`)는 partial(이어하기)이 **아니라** killSwitch/failed로 분기 — 무한 "이어서 생성" 루프 차단(Task 4).
+> - **D2**: 60s 무이벤트 타임아웃 → partial 전환, 중단주입(`MockSseSource(failAfter:2)`) 통합 테스트 추가(Task 4·6).
+
 ---
 
 > **선행:** P4a(셸·인증·라우팅) 구현 완료. P1~P3·P4a 모두 구현된 상태에서 실행.
@@ -501,11 +507,15 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
 ```
 
 `apps/web/lib/src/app/router.dart` 수정:
-- `gateRedirect`의 마지막 분기에서 `atOnboarding` 바운스를 제거(온보딩 완료 후 페이지가 `/path`로 안내하도록):
+- `gateRedirect` 마지막 분기: 온보딩 완료(`done`) 유저가 `/onboarding`에 진입하면 **null로 방치하지 말고 `/path`로 보낸다**(완료 유저가 진단 화면에 재진입해 게이트가 헛도는 회귀 차단). `/login`은 종전대로 `/dashboard`로:
 ```dart
-  if (atLogin) return '/dashboard'; // 기존: if (atLogin || atOnboarding)
+  if (atLogin) return '/dashboard';
+  // ENG-REVIEW: 완료 유저의 /onboarding 재진입은 null 방치(페이지-레벨 안내) 대신
+  // 게이트에서 직접 /path로 — 진단 화면 재노출 회귀 차단.
+  if (atOnboarding && status == OnboardingStatus.done) return '/path';
   return null;
 ```
+> `status`/`atOnboarding`은 이 분기 상위에서 이미 계산된 변수명에 맞춘다(구현 시 `gateRedirect` 기존 지역변수 읽어 정렬 — 추측 금지).
 - import에서 `onboarding_placeholder.dart`를 `onboarding_page.dart`로 교체하고 `/onboarding` 라우트 builder를 `const OnboardingPage()`로 변경.
 
 플레이스홀더 삭제:
@@ -515,12 +525,12 @@ rm apps/web/lib/src/features/onboarding/presentation/onboarding_placeholder.dart
 
 - [ ] **Step 9: 게이트 테스트 보강**
 
-`apps/web/test/app/gate_redirect_test.dart`의 `group`에 추가(완료 유저가 `/onboarding`에서 막히지 않음):
+`apps/web/test/app/gate_redirect_test.dart`의 `group`에 추가(완료 유저가 `/onboarding` 재진입 시 게이트가 `/path`로 보냄 — 진단 화면 재노출 회귀 차단):
 ```dart
-    test('인증 + 온보딩 완료 + /onboarding → 그대로(null, 페이지가 /path로 안내)', () {
+    test('인증 + 온보딩 완료 + /onboarding → /path(게이트가 직접 리다이렉트)', () {
       expect(
         gateRedirect(AuthAuthenticated(_user(OnboardingStatus.done)), '/onboarding'),
-        isNull,
+        '/path',
       );
     });
 ```
@@ -582,6 +592,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../providers/api_providers.dart';
 
 /// SSE 와이어 단계(목 emit 순서). 마지막 DONE은 완료 신호.
+/// 카피 정합: 제목/DoD의 "4단계 SSE"는 이 와이어 4단계(ANALYZE·MAP·BUILD·DONE)를 가리키며,
+/// DONE은 작업 단계가 아니라 완료 신호다 — 따라서 사용자에게 보이는 진행 라벨은 3개다.
 const List<String> kSseSteps = ['ANALYZE', 'MAP', 'BUILD', 'DONE'];
 
 /// 사용자에게 보이는 단계 라벨(DONE 제외 3단계, DESIGN §8 / 스펙 §4).
@@ -590,17 +602,20 @@ const List<String> kPathStageLabels = ['GitHub 분석', '약점 매핑', '주차
 /// `fromStep`(kSseSteps 인덱스)부터 SSE 이벤트를 흘리는 함수.
 typedef PathSseConnect = Stream<SseEvent> Function({int fromStep});
 
-/// 목=MockSseSource, 실서버=SseClient. useMock로 교체.
+/// 목=MockSseSource, 실서버=P2 `apiClient.sse(...)` 헬퍼. useMock로 교체.
+/// ENG-REVIEW D1: 앱은 `client.dio`를 직접 만지지 않는다 — `SseClient(client.dio)` 직접
+/// 인스턴스화 금지. P2가 제공하는 `apiClient.sse(path, {body})`만 경유한다.
 final pathSseConnectProvider = Provider<PathSseConnect>((ref) {
   final config = ref.watch(appConfigProvider);
   if (config.useMock) {
     return ({int fromStep = 0}) => MockSseSource(
           stages: kSseSteps.sublist(fromStep),
           delay: const Duration(milliseconds: 250),
+          fromStep: fromStep,
         ).stream();
   }
-  final client = ref.watch(apiClientProvider);
-  return ({int fromStep = 0}) => SseClient(client.dio).connect(
+  final apiClient = ref.watch(apiClientProvider);
+  return ({int fromStep = 0}) => apiClient.sse(
         '/learning-paths/me/generate',
         body: {'fromStep': fromStep},
       );
@@ -657,6 +672,8 @@ git commit -m "feat(web): PATH SSE 소스 주입(목/실서버 교체 + fromStep
 
 Create `apps/web/test/features/path/path_controller_test.dart`:
 ```dart
+import 'dart:async';
+
 import 'package:devpath_web/src/features/path/application/path_controller.dart';
 import 'package:devpath_web/src/features/path/data/path_sse_source.dart';
 import 'package:dp_core/dp_core.dart';
@@ -720,10 +737,46 @@ void main() {
     expect(s.completed, kPathStageLabels);
     expect(s.result, isNotNull);
   });
+
+  test('F4: 중간 503(KILL_SWITCH)은 partial이 아니라 killSwitch로 종료(이어하기 루프 차단)', () async {
+    final container = ProviderContainer(overrides: [
+      pathSseConnectProvider.overrideWithValue(({int fromStep = 0}) async* {
+        yield SseEvent(event: 'stage', data: '{"step":"ANALYZE"}');
+        throw const ApiException('AI 처리 일시 중단', code: 'AI_KILL_SWITCH_ACTIVE');
+      }),
+    ]);
+    addTearDown(container.dispose);
+
+    await container.read(pathControllerProvider.notifier).start();
+
+    final s = container.read(pathControllerProvider);
+    expect(s.phase, PathPhase.killSwitch); // partial 아님 → "이어서 생성" 미노출
+    expect(s.completed, ['GitHub 분석']); // 503 직전까지는 보존
+  });
+
+  test('D2: 60s 무이벤트 → partial 전환', () async {
+    // sseTimeout을 짧게 오버라이드하고, 첫 단계 후 영원히 멈추는 스트림을 주입.
+    final container = ProviderContainer(overrides: [
+      appConfigProvider.overrideWith(
+          (ref) => testAppConfig(sseTimeout: const Duration(milliseconds: 50))),
+      pathSseConnectProvider.overrideWithValue(({int fromStep = 0}) async* {
+        yield SseEvent(event: 'stage', data: '{"step":"ANALYZE"}');
+        await Completer<void>().future; // 무이벤트로 hang
+      }),
+    ]);
+    addTearDown(container.dispose);
+
+    await container.read(pathControllerProvider.notifier).start();
+
+    final s = container.read(pathControllerProvider);
+    expect(s.phase, PathPhase.partial); // 타임아웃 → 이어하기 가능
+    expect(s.completed, ['GitHub 분석']); // 무이벤트 직전 단계 보존
+  });
 }
 ```
+> `testAppConfig`는 P4a 테스트 헬퍼(`appConfigProvider` 오버라이드용). 없으면 본 Step에서 최소 헬퍼를 같은 파일에 정의(추측 금지 — P4a 테스트의 기존 패턴을 읽어 정렬).
 
-- [ ] **Step 2: 실패 확인** — Run: `cd apps/web && flutter test test/features/path/path_controller_test.dart ; cd ../..` → FAIL
+- [ ] **Step 2: 실패 확인** — Run: `cd apps/web && flutter test test/features/path/path_controller_test.dart ; cd ../..` → FAIL(정상·DD8·F4·60s 4개 모두)
 
 - [ ] **Step 3: 구현**
 
@@ -738,7 +791,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../providers/api_providers.dart';
 import '../data/path_sse_source.dart';
 
-enum PathPhase { idle, streaming, partial, complete, failed }
+/// PATH 생성 phase. ENG-REVIEW D1: P2 `SseStage`(connecting/streaming/partial/
+/// reconnecting/complete/failed)가 **단일 출처**다. 이 enum은 그것을 재정의한 게
+/// 아니라 feature 관점으로 **매핑**한 것 — PathController가 `SseStage`를 구독해
+/// 여기로 변환한다(SseStage.streaming→streaming, .partial→partial,
+/// .reconnecting→reconnecting, .failed→failed/killSwitch). [killSwitch]는 §9.2의
+/// 503/429를 partial과 구분하기 위한 전용 phase(F4).
+enum PathPhase { idle, streaming, reconnecting, partial, complete, failed, killSwitch }
 
 /// PATH 생성 상태. [completed]=완료 단계 라벨(중단 시 보존), [current]=진행 라벨.
 class PathState {
@@ -785,21 +844,35 @@ class PathController extends Notifier<PathState> {
   Future<void> start() => _run(fromStep: 0);
 
   /// 중단 지점(완료 단계 수)부터 이어하기 — 전체 재시작 아님(DD8).
-  Future<void> resume() => _run(fromStep: state.completed.length);
+  /// ENG-REVIEW D1: resume 진입은 §9.2 "재연결" 표현 — 잠깐 reconnecting을 거쳐
+  /// 스트림 첫 이벤트에서 streaming으로 전이한다(SseStage.reconnecting→streaming 매핑).
+  Future<void> resume() => _run(fromStep: state.completed.length, reconnect: true);
 
-  Future<void> _run({required int fromStep}) {
+  Future<void> _run({required int fromStep, bool reconnect = false}) {
     _sub?.cancel();
     final done = Completer<void>();
 
     state = PathState(
-      phase: PathPhase.streaming,
+      // 재연결은 reconnecting으로 시작, 신규 생성은 streaming.
+      phase: reconnect ? PathPhase.reconnecting : PathPhase.streaming,
       completed: kPathStageLabels.take(fromStep).toList(),
       current: fromStep < kPathStageLabels.length
           ? kPathStageLabels[fromStep]
           : null,
     );
 
-    _sub = ref.read(pathSseConnectProvider)(fromStep: fromStep).listen(
+    // ENG-REVIEW D2: 60s 무이벤트 → partial 전환(서버 응답 없는 행을 영구 streaming으로
+    // 두지 않음). config.sseTimeout(기본 60s)을 초과하면 timeout이 스트림에 에러를 주입하고,
+    // ApiException(network)가 아니므로 onError에서 partial로 처리된다.
+    final stream = ref
+        .read(pathSseConnectProvider)(fromStep: fromStep)
+        .timeout(
+          ref.read(appConfigProvider).sseTimeout,
+          onTimeout: (sink) =>
+              sink.addError(const ApiException('생성이 지연돼요', kind: ApiErrorKind.network)),
+        );
+
+    _sub = stream.listen(
       (event) async {
         final step = _stepOf(event.data);
         if (step == 'DONE') {
@@ -811,15 +884,26 @@ class PathController extends Notifier<PathState> {
         final idx = kSseSteps.indexOf(step ?? '');
         if (idx < 0 || idx >= kPathStageLabels.length) return;
         state = state.copyWith(
+          // 첫 이벤트 수신 → reconnecting을 벗어나 streaming으로(D1 재연결 표현).
+          phase: PathPhase.streaming,
           completed: kPathStageLabels.take(idx + 1).toList(),
           current: idx + 1 < kPathStageLabels.length
               ? kPathStageLabels[idx + 1]
               : null,
         );
       },
-      onError: (Object _) {
-        // 중단 — 완료 단계 보존, 이어하기 가능.
-        state = state.copyWith(phase: PathPhase.partial, error: 'SSE 연결이 끊겼어요');
+      onError: (Object e) {
+        // ENG-REVIEW F4: 503(KILL_SWITCH)/429(Quota)는 partial이 아니라 종료 분기로 —
+        // "이어서 생성" 무한 루프 차단. 그 외 네트워크 끊김만 partial(이어하기 가능).
+        if (e is ApiException && (e.isKillSwitch || e.isQuota)) {
+          state = state.copyWith(
+            phase: e.isKillSwitch ? PathPhase.killSwitch : PathPhase.failed,
+            error: e.message,
+          );
+        } else {
+          // 중단 — 완료 단계 보존, 이어하기 가능.
+          state = state.copyWith(phase: PathPhase.partial, error: 'SSE 연결이 끊겼어요');
+        }
         if (!done.isCompleted) done.complete();
       },
       onDone: () {
@@ -863,9 +947,9 @@ class PathController extends Notifier<PathState> {
 final pathControllerProvider =
     NotifierProvider<PathController, PathState>(PathController.new);
 ```
-> `copyWith`의 `current`/`error`는 의도적으로 null 전달 가능(진행 라벨·에러 해제). `result`는 nullable이나 누적 보존을 위해 `??` 유지(완료 시 한 번만 세팅).
+> **copyWith 혼합 null 시맨틱(의도)** — 비대칭이 의도적이다: `phase`/`completed`/`result`는 `??` 보존(미전달 시 기존 유지 — 특히 `result`는 완료 시 한 번 세팅 후 누적 보존), 반면 `current`/`error`는 null=클리어(미전달이 곧 "진행 라벨 없음/에러 해제"). 호출부는 이 비대칭을 전제로 작성됨 — `current`/`error`를 보존하려면 명시적으로 다시 넘겨야 한다.
 
-- [ ] **Step 4: 통과 확인** — Run: `cd apps/web && flutter test test/features/path/path_controller_test.dart ; cd ../..` → PASS(정상 + DD8 둘 다)
+- [ ] **Step 4: 통과 확인** — Run: `cd apps/web && flutter test test/features/path/path_controller_test.dart ; cd ../..` → PASS(정상·DD8·F4·60s 4개)
 
 - [ ] **Step 5: 커밋**
 ```bash
@@ -941,6 +1025,12 @@ void main() {
     expect(c.read(pathControllerProvider).phase, PathPhase.partial);
     expect(find.text('이어서 생성'), findsOneWidget);
     expect(find.byType(DpSseStageView), findsOneWidget); // 완료 단계 보존 표시
+
+    // §9.2 PARTIAL: 완료 단계만이 아니라 kPathStageLabels 전체(미완 스켈레톤 포함)를 표시.
+    final stageView =
+        tester.widget<DpSseStageView>(find.byType(DpSseStageView));
+    expect(stageView.stages, kPathStageLabels); // 3단계 전부(미완 단계도 노출)
+    expect(stageView.currentIndex, 2); // ANALYZE·MAP 완료 → 남은 1단계가 스켈레톤
   });
 }
 ```
@@ -1061,7 +1151,8 @@ class _PathPageState extends ConsumerState<PathPage> {
 
     final body = switch (s.phase) {
       PathPhase.complete when s.result != null => PathPlanView(plan: s.result!),
-      PathPhase.failed => DpError(
+      // F4: killSwitch/failed는 이어하기 불가 → DpError로(전용 DpKillSwitch/DpQuota 렌더는 P4c).
+      PathPhase.failed || PathPhase.killSwitch => DpError(
           message: s.error ?? '경로 생성에 실패했어요',
           onRetry: notifier.start,
         ),
@@ -1098,11 +1189,10 @@ class _Progress extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.dpColors;
-    // 완료+현재 라벨을 합쳐 단계 리스트 구성, currentIndex=완료 수.
-    final stages = [
-      ...completed,
-      if (current != null && !completed.contains(current)) current!,
-    ];
+    // ENG-REVIEW(§9.2 PARTIAL): 완료 단계만 그리지 않고 kPathStageLabels 전체를 항상
+    // 표시한다 — 완료 단계는 채우고, 남은(미완) 단계는 스켈레톤으로 보여줘 "무엇이 남았는지"를
+    // 드러낸다. currentIndex=완료 수가 곧 미완 단계의 시작 경계.
+    final stages = List<String>.from(kPathStageLabels);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(DpSpacing.xl),
@@ -1163,7 +1253,9 @@ Create `apps/web/test/golden_path_onboarding_test.dart`:
 ```dart
 import 'package:devpath_web/src/app/app.dart';
 import 'package:devpath_web/src/features/onboarding/presentation/onboarding_page.dart';
+import 'package:devpath_web/src/features/path/data/path_sse_source.dart';
 import 'package:devpath_web/src/features/path/presentation/path_page.dart';
+import 'package:dp_core/dp_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -1185,6 +1277,39 @@ void main() {
 
     expect(find.byType(PathPage), findsOneWidget);
     expect(find.textContaining('비동기 기초'), findsWidgets); // 생성 완료된 타임라인
+  });
+
+  testWidgets('D2: SSE 중단 주입 → "이어서 생성"(resume, fromStep:2) → 완료', (tester) async {
+    // failAfter:2 → 2단계(ANALYZE·MAP) 후 ApiException(network) 중단.
+    // pathSseConnectProvider를 MockSseSource(failAfter:2)로 오버라이드해 결정적 중단 주입.
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        pathSseConnectProvider.overrideWithValue(({int fromStep = 0}) =>
+            MockSseSource(
+              stages: kSseSteps.sublist(fromStep),
+              delay: const Duration(milliseconds: 10),
+              failAfter: fromStep == 0 ? 2 : null, // 1회차만 중단, 이어하기는 정상
+              fromStep: fromStep,
+            ).stream()),
+      ],
+      child: const DevPathWebApp(),
+    ));
+    await tester.pumpAndSettle();
+
+    // 로그인 → 온보딩 → 진단 제출 → PATH 생성(중단)
+    await tester.tap(find.text('GitHub로 계속하기 (목)'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'jisoo-dev');
+    await tester.tap(find.text('진단 시작하기'));
+    await tester.pumpAndSettle();
+
+    // 중단 → 완료 단계 보존 + "이어서 생성" 노출
+    expect(find.text('이어서 생성'), findsOneWidget);
+
+    // 이어서 생성(fromStep:2) → 완료(타임라인)
+    await tester.tap(find.text('이어서 생성'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('비동기 기초'), findsWidgets);
   });
 }
 ```
@@ -1214,13 +1339,18 @@ git commit -m "feat(web): PATH 라우트 결선 + 온보딩→PATH 골든패스 
 - [ ] 진단 제출 → `onboardingStatus=DONE` 반영 → 게이트 해제 → `/path` 이동
 - [ ] PATH 생성: 4단계 SSE 진행 표시(DpSseStageView) → 완료 시 12주 타임라인 + 이번 주 과제 3 + 멘토 rationale
 - [ ] **DD8**: SSE 중단 시 완료 단계 보존(`partial`) + "이어서 생성"으로 끊긴 지점부터 재연결(전체 재시작 아님) — 단위·위젯 테스트로 실증
+- [ ] **F4(503/429 분기)**: SSE 중 `AI_KILL_SWITCH_ACTIVE`(503)/`QUOTA_EXCEEDED`(429)는 partial이 아니라 killSwitch/failed로 종료 — "이어서 생성" 무한 루프 차단(단위 테스트로 실증)
+- [ ] **60s 타임아웃(D2)**: 60s 무이벤트 시 partial 전환(단위 테스트로 실증)
+- [ ] **중단→이어하기 통합**: `MockSseSource(failAfter:2)` 주입으로 중단→"이어서 생성"(resume, fromStep:2)→완료 골든 스모크 1케이스 PASS
+- [ ] **PARTIAL 스켈레톤(§9.2)**: 부분 상태에서 `kPathStageLabels` 전체를 표시(완료 단계 + 미완 스켈레톤) — 위젯 테스트로 실증
 - [ ] PATH 결과는 SSE `DONE` 후 `GET /learning-paths/me`로 조회(스펙 §3 비동기 결과 조회 패턴)
 
 ## 리스크 / 후속 (명시)
 
 - **온보딩 문항 미명세**: 실제 ONB-001/002 진단 항목은 외부 `06_화면_기능_정의서`에 있음 → 본 플랜은 GitHub 핸들 1개로 최소화. 구현 시 실제 문항으로 확장(추측 금지).
 - **실서버 SSE 미검증**: `pathSseConnectProvider`의 실서버 분기(`SseClient.connect`)는 목 프로토에선 미실행. 실서버 연동 시 `/learning-paths/me/generate`의 `fromStep` 재개 프로토콜을 백엔드와 합의(현재 목만 `fromStep` 지원).
-- **PATH 중 KILL_SWITCH/Quota 미처리(§9.2)**: 본 플랜은 SSE 끊김(partial/이어하기 — DD8)과 결과 조회 실패(failed)만 처리. `AI_KILL_SWITCH_ACTIVE`(503)→`DpKillSwitch`·`QUOTA_EXCEEDED`(429)→`DpQuota` 분기(위젯은 P3에 존재)는 **AI 리뷰·멘토와 동일 패턴이라 P4c에서 일괄 적용**한다. 통합 지점: `PathController._run`의 `onError`/`_loadResult` `catch`에서 `ApiException.isKillSwitch`/`isQuota`를 분기해 전용 phase로 매핑.
+- **PATH 중 KILL_SWITCH/Quota — 분기는 F4로 처리, 전용 위젯은 P4c**: ENG-REVIEW F4 반영으로 SSE 중 503(`AI_KILL_SWITCH_ACTIVE`)/429(`QUOTA_EXCEEDED`)는 `PathController._run`의 `onError`에서 `ApiException.isKillSwitch`/`isQuota`로 분기해 **partial이 아닌 killSwitch/failed phase로 종료**(무한 이어하기 루프 차단)한다. 다만 그 phase를 P3의 `DpKillSwitch`/`DpQuota` 전용 위젯으로 **렌더**하는 것은 AI 리뷰·멘토와 동일 패턴이라 **P4c에서 일괄 적용**(현재 path_page는 killSwitch/failed를 `DpError`로 표시). 결과 조회 실패(`_loadResult` `catch`)의 503/429 분기도 같은 시점에 정렬.
 - **DD8 재연결 정책**: 본 구현은 "완료 단계 수 = 재개 인덱스"의 단순 모델. 실제 SSE `id:`/`Last-Event-ID` 기반 재개(스펙 §3 표준)는 dp_core `SseClient` 확장 시 정렬(P2 "id:/retry: 범위 밖" 후속).
+- **실서버 `Last-Event-ID` 재개 보류**: 실서버 표준 `Last-Event-ID` 재개는 백엔드와 프로토콜 합의 전까지 도입하지 않고 `fromStep` 바디 파라미터 방식을 유지한다(TODOS `T-DD8-CORE` 참조). 합의 완료 시 dp_core 코어에서 일괄 전환.
 - **이번 주 과제 = weeks.first**: 현재 주차 계산(진행률 기반)은 대시보드(P4d)에서. P4b는 첫 주를 "이번 주"로 표시.
 - **eng-review 게이트**: DD8 재연결은 아키텍처 영향 → 구현 착수 전 `/plan-eng-review` 권장.

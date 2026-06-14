@@ -50,3 +50,33 @@
 - **Why:** 미정규화 시 실서버 SSE 경로의 `SANDBOX_UNAVAILABLE`/`AI_KILL_SWITCH_ACTIVE`/`QUOTA_EXCEEDED`가 일반 오류로 처리됨 → P4c RunController·P4b PathController·P4d 멘토가 코드 분기 불가. 목 프로토는 영향 없으나 실서버 전환 시 필수.
 - **잔여:** P2 SSE 테스트에 에러 정규화 케이스 1개 추가 권장(현재 200 스텁만). 실서버 SSE 단계별 에러(스트림 중간 503)는 전송 시작 후 발생 가능 — 스트림 내부 에러 정규화는 P4d 멘토 구현 시 재확인.
 - **Effort:** S (human) → S (CC) · **Priority:** P2(실서버 전환 게이트) · **Depends on:** —
+
+## Eng Review에서 도출 (2026-06-14, D1~D4 승인)
+
+> 출처: [eng-review-summary](docs/superpowers/specs/2026-06-14-eng-review-summary.md). 구현 전 플랜 반영 대상.
+
+### T-SSE-FOUNDATION — P2 단일 SSE 스트리밍 기반 (D1)
+- **What:** P2에 ① `SseStage` 6상태 단일 출처(feature가 자체 enum 금지) ② `ApiClient.sse(path,{body})` 팩토리(앱이 `client.dio` 미접촉) ③ 공유 resume/단계상태 모델. P4b·P4c·P4e가 구독·재사용.
+- **Why:** enum 3중분기(P4b PathPhase·P4e MentorStatus·P2 SseStage 死값)·SSE 보일러플레이트 3벌·앱 dio 직접접근(F1·F2). 3 feature 출시 후 통합은 3배 비쌈 → 구현 전 중앙 결정.
+- **Effort:** M (human) → S (CC) · **Priority:** P1(P4b 착수 게이트) · **Depends on:** P2 보강.
+
+### T-DD8-CORE — DD8 SSE 중단복구 핵심 구현 (D2)
+- **What:** `MockSseSource.failAfter:int?`(중단 주입) + 골든패스 중단→이어하기→완료 통합테스트(스펙 §5) + onError `isKillSwitch/isQuota` 분기(중간 503/429를 partial로 오분류 금지, F4) + 60s 무이벤트→partial 타임아웃.
+- **보류(추측 금지):** 실서버 `id:`/`Last-Event-ID` 재개 프로토콜 → 백엔드 합의 전까지 `fromStep` 유지. 합의 후 전환.
+- **Effort:** M (human) → S (CC) · **Priority:** P1(DD8 게이트) · **Depends on:** T-SSE-FOUNDATION.
+
+### T-MOCK-QUERY-AWARE — MockHttpAdapter query 인지 (D3, 기존 P4f 후속 승급)
+- **What:** dp_core `MockHttpAdapter` 키 매칭이 query(cursor/필터) 인지. → P4f 페이지네이션 다중페이지(F8)·D2 SSE 중단 데모가 앱 목 모드에서 실제 동작(눈 확인).
+- **Why:** 현재 path-only 매칭(P2 L1114)이라 다중페이지가 컨트롤러 override로만 검증 → 데모/통합 비가시.
+- **Effort:** S (human) → S (CC) · **Priority:** P1(D2·P4f 공통 게이트) · **Depends on:** P2 보강.
+
+### T-P6-SYNC-CONNECTIVITY — P6 재연결 동기화 최소구현 + 연결성 인터페이스 (D4)
+- **What:** `watchContents` 기반 StreamProvider로 재연결 자동동기화 최소 구현 + `isOfflineProvider` off 전이 재동기화 1케이스(§9.2 PARTIAL). `ConnectivityService` 인터페이스화(FCM `PushService`와 동일 교체 경계, F3).
+- **Why:** P6 헤드라인 가치 "오프라인+재연결 동기화"가 데모 하드코딩으로 공동화(L849·L752). connectivity가 bool 토글이라 실 교체 시 호출부 전면 수정.
+- **Effort:** M (human) → S (CC) · **Priority:** P2(P6 구현) · **Depends on:** P6.
+
+### T-MOBILE-AUTH — 모바일 OAuth 콜백 딥링크 + secure_storage TokenStore (D4 이관, 스펙 §8)
+- **What:** 외부브라우저(AppAuth/flutter_web_auth)+`devpath://callback?code=...` 콜백 흐름 + `flutter_secure_storage` refresh 토큰 저장. P6 스코프 밖, 후속 인증 Task.
+- **Why:** 스펙 §8 미해결 항목 — P6가 언급조차 안 함(거버넌스 갭). 5탭 딥링크 라우트와 콜백 딥링크 경계 충돌 없음 확인 필요.
+- **보류 사유:** OAuth 콜백 흐름 백엔드 문서 미명시 → 추측 금지, 합의 후 착수.
+- **Effort:** M (human) → M (CC) · **Priority:** P2(인증 실데이터 전환) · **Depends on:** 백엔드 OAuth 콜백 합의.
