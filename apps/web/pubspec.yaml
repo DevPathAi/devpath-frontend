@@ -20,6 +20,7 @@ version: 1.0.0+1
 
 environment:
   sdk: ^3.12.1
+resolution: workspace
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -34,6 +35,10 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
+
+  # workspace 멤버 cross-import 스모크(F4): apps/web가 dp_design을 참조.
+  dp_design:
+    path: ../../packages/dp_design
 
 dev_dependencies:
   flutter_test:
