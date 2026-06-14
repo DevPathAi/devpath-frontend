@@ -125,8 +125,8 @@ devpath-frontend/
 
 | 레이어 | 테스트 | 도구 |
 |--------|--------|------|
-| `dp_core` 모델/매핑/에러 | 유닛(JSON 직렬화, enum unknown 방어, 에러 매핑) | `flutter_test`, `mocktail` |
-| `dp_core` api/sse/auth | 유닛(목 어댑터: 인터셉터·SSE 파싱·토큰 갱신) | `mocktail`, dio MockAdapter |
+| `dp_core` 모델/매핑/에러 | 유닛(JSON 직렬화, enum unknown 방어, 에러 매핑) | `test`(순수 Dart), `mocktail` |
+| `dp_core` api/sse/auth | 유닛(목 어댑터: 인터셉터·SSE 파싱·토큰 갱신) | `test`, `mocktail`, dio MockAdapter |
 | `dp_design` 위젯 | 위젯 + golden 테스트(상태위젯·폼·버튼) | `flutter_test` |
 | 앱 feature | ViewModel 유닛 + 화면 위젯 테스트(Riverpod override) | `ProviderContainer` override |
 | 골든 패스 | 통합 테스트(목 서버 Aha 플로우 E2E) | `integration_test` |

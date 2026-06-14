@@ -54,36 +54,38 @@ Expected: `7.x.x`. `command not found`이면 `dart pub global run melos --versio
 
 ---
 
-## Task 2: `packages/dp_core` 골격 + 스모크 테스트 (TDD, standalone)
+## Task 2: `packages/dp_core` 골격 + 스모크 테스트 (TDD, standalone, **순수 Dart**)
+
+> **결정 갱신(2026-06-14): T-DPCORE-PURE-DART 해소 → 순수 Dart 확정.** dp_core는 `flutter` 의존 없이 `package:test`/`dart test`로 둔다(스펙 §2 준수, 빠른 테스트, 백엔드/CLI 재사용성). dio·freezed·json_serializable은 Flutter 불필요. `flutter_lints` 대신 `lints` 사용 → 앱들의 `flutter_lints`와 충돌하지 않아 E1 정렬 부담도 감소. melos `test`/`analyze`는 `--no-flutter`(dart) / `--flutter`(flutter) 필터로 분기(Task 7).
 
 **Files:**
-- Create: `packages/dp_core/` (via `flutter create`)
+- Create: `packages/dp_core/` (via `dart create --template=package` — 순수 Dart)
 - Modify: `packages/dp_core/pubspec.yaml`
 - Create: `packages/dp_core/lib/dp_core.dart`
 - Test: `packages/dp_core/test/dp_core_smoke_test.dart`
 
-- [ ] **Step 1: 패키지 생성**
+- [ ] **Step 1: 순수 Dart 패키지 생성**
 
 Run:
 ```bash
-flutter create --template=package packages/dp_core
+dart create --template=package packages/dp_core
 ```
-Expected: `packages/dp_core` 생성(`lib/dp_core.dart`, `test/`, `pubspec.yaml`).
+Expected: `packages/dp_core` 생성(`lib/dp_core.dart`, `test/dp_core_test.dart`, `pubspec.yaml` — `test`·`lints` dev_dependency, flutter 의존 없음).
 
 - [ ] **Step 1b: 자동 생성 예제·테스트 제거 (F8 — 고아 테스트 방지)**
 
-`flutter create --template=package`는 `lib/dp_core.dart`에 예제(`Calculator` 등)와 `test/dp_core_test.dart`(그 예제를 검증)를 함께 만든다. Step 5에서 `lib/dp_core.dart`를 전면 교체하므로 자동 생성 테스트는 **고아가 되어 컴파일 실패**한다. 먼저 제거:
+`dart create --template=package`는 `lib/dp_core.dart`에 예제(`calculate()` 등)와 `test/dp_core_test.dart`(그 예제를 검증)를 함께 만든다. Step 5에서 `lib/dp_core.dart`를 전면 교체하므로 자동 생성 테스트는 **고아가 되어 컴파일 실패**한다. 먼저 제거:
 ```bash
 rm packages/dp_core/test/dp_core_test.dart
 ```
 Expected: 자동 생성 테스트 삭제(이후 우리가 작성하는 `dp_core_smoke_test.dart`만 남도록).
 
-- [ ] **Step 2: pubspec 정리 (아직 `resolution: workspace` 미부여 — Task 7에서 추가)**
+- [ ] **Step 2: pubspec 정리 (순수 Dart, 아직 `resolution: workspace` 미부여 — Task 7에서 추가)**
 
 Replace `packages/dp_core/pubspec.yaml`:
 ```yaml
 name: dp_core
-description: DevPath AI 도메인·데이터 계층(모델·API·SSE·Auth·Error). UI 없음.
+description: DevPath AI 도메인·데이터 계층(모델·API·SSE·Auth·Error). UI 없음, 순수 Dart.
 version: 0.0.1
 publish_to: none
 
@@ -91,23 +93,21 @@ environment:
   sdk: ^3.12.1   # F3: 전 멤버 SDK 하한 통일(mobile=^3.12.1 기준)
 
 dependencies:
-  flutter:
-    sdk: flutter
-  # P2에서 추가: dio, freezed_annotation, json_annotation 등
+  # P2에서 추가: dio, freezed_annotation, json_annotation 등 (모두 순수 Dart)
 
 dev_dependencies:
-  flutter_test:
-    sdk: flutter
-  flutter_lints: ^6.0.0
+  test: ^1.25.0
+  lints: ^5.0.0
   # P2에서 추가: mocktail, build_runner, freezed, json_serializable
 ```
+> `dart create`가 생성한 기본 `lints`/`test` 버전을 그대로 두어도 무방하다(위는 참고값). 핵심은 **flutter·flutter_test·flutter_lints 미사용**.
 
-- [ ] **Step 3: 실패하는 스모크 테스트 작성**
+- [ ] **Step 3: 실패하는 스모크 테스트 작성 (`package:test`)**
 
 Create `packages/dp_core/test/dp_core_smoke_test.dart`:
 ```dart
 import 'package:dp_core/dp_core.dart';
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 
 void main() {
   test('dp_core 패키지 버전 상수가 노출된다', () {
@@ -116,11 +116,11 @@ void main() {
 }
 ```
 
-- [ ] **Step 4: 테스트 실패 확인 (standalone)**
+- [ ] **Step 4: 테스트 실패 확인 (standalone, `dart test`)**
 
 Run:
 ```bash
-cd packages/dp_core && flutter pub get && flutter test ; cd ../..
+cd packages/dp_core && dart pub get && dart test ; cd ../..
 ```
 Expected: FAIL — `dpCoreVersion` 미정의(컴파일 에러).
 
@@ -128,7 +128,7 @@ Expected: FAIL — `dpCoreVersion` 미정의(컴파일 에러).
 
 Replace `packages/dp_core/lib/dp_core.dart`:
 ```dart
-/// DevPath AI 도메인·데이터 계층.
+/// DevPath AI 도메인·데이터 계층(순수 Dart).
 ///
 /// P2에서 models / api / sse / auth / error 를 채운다.
 library dp_core;
@@ -141,7 +141,7 @@ const String dpCoreVersion = '0.0.1';
 
 Run:
 ```bash
-cd packages/dp_core && flutter test ; cd ../..
+cd packages/dp_core && dart test ; cd ../..
 ```
 Expected: PASS (`All tests passed!`)
 
@@ -149,7 +149,7 @@ Expected: PASS (`All tests passed!`)
 
 ```bash
 git add packages/dp_core
-git commit -m "feat(dp_core): 패키지 골격 + 스모크 테스트"
+git commit -m "feat(dp_core): 순수 Dart 패키지 골격 + 스모크 테스트"
 ```
 
 ---
@@ -407,14 +407,15 @@ dev_dependencies:
   melos: ^7.0.0
 
 # melos 7.x: 설정이 pubspec.yaml의 melos: 키로 통합됨(과거 melos.yaml 대체)
+# dp_core는 순수 Dart(dart analyze/test), 나머지는 Flutter(flutter analyze/test) → --flutter/--no-flutter로 분기.
 melos:
   scripts:
     analyze:
-      description: 전 패키지 정적 분석
-      run: melos exec -- flutter analyze
+      description: 전 패키지 정적 분석(Flutter=flutter analyze, 순수 Dart=dart analyze)
+      run: melos exec --flutter -- flutter analyze && melos exec --no-flutter -- dart analyze
     test:
-      description: test/ 있는 패키지 테스트
-      run: melos exec --dir-exists="test" -- flutter test
+      description: test/ 있는 패키지 테스트(Flutter=flutter test, 순수 Dart=dart test)
+      run: melos exec --flutter --dir-exists="test" -- flutter test && melos exec --no-flutter --dir-exists="test" -- dart test
     format:
       description: 포맷 검사(CI용)
       run: dart format --set-exit-if-changed .
@@ -433,7 +434,7 @@ resolution: workspace
 
 > **F3 동시 처리**: `flutter create`로 만든 `apps/web`·`apps/admin`은 자체 `sdk:` 제약을 갖는다. 이 멤버들의 `environment.sdk`도 `^3.12.1`로 맞춰 전 멤버 하한을 통일한다.
 >
-> **E1 동시 처리(공유 의존성 버전 정렬 — bootstrap 충돌 예방)**: pub workspace는 전 멤버를 **단일 해석**하므로 같은 패키지가 멤버마다 다른 버전 제약을 가지면 `melos bootstrap`이 실패한다. 가장 유력한 충돌은 `flutter_lints`(dp_core·dp_design은 `^6.0.0` 하드코딩 vs `flutter create` 앱이 생성하는 버전)와 `cupertino_icons`다. **bootstrap 전에 5개 멤버의 `flutter_lints`(및 공유되는 dev/일반 의존성) 버전 제약을 동일하게 정렬**한다(설치된 `flutter create` 기본값을 기준으로 dp_core·dp_design을 맞추는 쪽이 안전). 충돌 시 `melos bootstrap` 출력의 버전 메시지로 정렬 대상 확인.
+> **E1 동시 처리(공유 의존성 버전 정렬 — bootstrap 충돌 예방)**: pub workspace는 전 멤버를 **단일 해석**하므로 같은 패키지가 멤버마다 다른 버전 제약을 가지면 `melos bootstrap`이 실패한다. 가장 유력한 충돌은 **Flutter 멤버 4개(dp_design·apps/web·apps/admin·apps/mobile)** 간 `flutter_lints`(dp_design `^6.0.0` 하드코딩 vs `flutter create` 앱 생성 버전)와 `cupertino_icons`다. **bootstrap 전에 이 4개 멤버의 `flutter_lints`(및 공유 dev/일반 의존성) 버전 제약을 동일하게 정렬**한다(`flutter create` 기본값 기준으로 dp_design을 맞추는 쪽이 안전). (dp_core는 순수 Dart라 `lints`만 쓰며 이 정렬 대상이 아니다.) 충돌 시 `melos bootstrap` 출력의 버전 메시지로 정렬 대상 확인.
 
 - [ ] **Step 3: 워크스페이스 bootstrap**
 

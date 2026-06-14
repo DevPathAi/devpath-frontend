@@ -5,12 +5,11 @@
 
 ## P1 (모노레포 골격) 리뷰에서 도출
 
-### T-DPCORE-PURE-DART — dp_core를 순수 Dart 패키지로 재검토
-- **What:** dp_core를 Flutter 의존(`flutter_test`) 대신 순수 Dart(`package:test`, `dart test`)로 전환할지 P2 착수 전 재검토.
-- **Why:** 스펙 §2가 dp_core를 "순수 Dart, UI 없음"으로 규정. P1은 툴링 균일(전멤버 `flutter test`)을 위해 Flutter 패키지로 둠(스펙 §5 결정). 그러나 도메인/데이터 계층이 Flutter에 결합되면 서버·CLI·백엔드 공유 등 순수 Dart 재사용이 막힘. dp_core에 들어갈 dio·freezed·json_serializable은 Flutter 불필요.
-- **Cons(전환 시):** 테스트 명령이 멤버별 이질(`dart test` vs `flutter test`) → `melos exec` 필터 필요. 스펙 §5 갱신.
-- **Context:** P1은 빈 골격뿐이라 지금이 가장 싼 전환 시점. 코드가 쌓이는 P2 이후엔 one-way door에 가까워짐.
-- **Effort:** S (human) → S (CC) · **Priority:** P2 · **Depends on:** P2 착수 전 결정.
+### ✅ T-DPCORE-PURE-DART — dp_core 순수 Dart 전환 [RESOLVED 2026-06-14]
+- **결정:** **순수 Dart로 전환 확정**(사용자 승인). dp_core는 `flutter` 의존 없이 `package:test`/`dart test`, `lints` 사용. 스펙 §2 "순수 Dart" 준수.
+- **반영:** P1 플랜 Task 2(`dart create --template=package`, 순수 Dart pubspec, `dart test`), Task 7 melos `analyze`/`test` 스크립트 `--flutter`/`--no-flutter` 분기, 스펙 §5(dp_core `flutter_test`→`test`).
+- **부수효과(긍정):** dp_core가 `flutter_lints` 미사용 → E1(공유 의존성 정렬)은 Flutter 멤버 4개로 한정, 정렬 부담 감소.
+- **Original Why:** 스펙 §2가 dp_core를 "순수 Dart, UI 없음"으로 규정. dio·freezed·json_serializable은 Flutter 불필요. P1 빈 골격일 때가 가장 싼 전환 시점이라 P2 전 결정함.
 
 ### T-DEPLOY-REINTRO — Flutter Web nginx 이미지·배포 P4/P5 재도입
 - **What:** P1에서 제거된 web/admin Docker 이미지 빌드 + gitops 배포를 Flutter Web 산출물 기준으로 재도입.
