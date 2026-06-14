@@ -10,7 +10,8 @@ resolution: workspace
 dependencies:
   flutter:
     sdk: flutter
-  # P3에서 추가: 폰트(Pretendard/D2Coding) 에셋, 마크다운/코드 하이라이트, 차트 래퍼
+  material_symbols_icons: ^4.2815.0   # 하한 가이드 — 설치 결과로 확정
+  markdown_widget: ^2.3.2+8
 
 dev_dependencies:
   flutter_test:
