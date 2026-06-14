@@ -187,7 +187,7 @@ class _ContentPageState extends ConsumerState<ContentPage> {
         actions: [
           TextButton.icon(
             onPressed: () => context.go('/sandbox'),
-            icon: const Icon(Icons.code),
+            icon: const Icon(DpIcons.code),
             label: const Text('실습'),
           ),
         ],
@@ -208,7 +208,7 @@ class _ContentPageState extends ConsumerState<ContentPage> {
   }
 }
 ```
-> `Icons.code`는 임시 — DD3 준수 위해 `DpIcons`에 `code` 추가가 이상적이나, '실습' 라벨 동반이라 P4c는 텍스트 우선. (후속 정리)
+> P4c-B 반영: `DpIcons.code`(Symbols, P3에 추가) 사용 — DD3 단일 Symbols 셋 준수.
 
 `apps/web/lib/src/app/router.dart` ShellRoute에 라우트 추가(import 포함):
 ```dart
@@ -403,7 +403,7 @@ class _SandboxLayoutState extends State<SandboxLayout> {
           alignment: Alignment.centerLeft,
           child: TextButton.icon(
             onPressed: () => setState(() => _logOpen = !_logOpen),
-            icon: Icon(_logOpen ? Icons.expand_more : Icons.expand_less),
+            icon: Icon(_logOpen ? DpIcons.expandMore : DpIcons.expandLess),
             label: Text(_logOpen ? '실행 로그 접기' : '실행 로그 펼치기'),
           ),
         ),
@@ -431,7 +431,7 @@ class _SandboxLayoutState extends State<SandboxLayout> {
   }
 }
 ```
-> `Icons.expand_more/less`는 임시(접이 토글). DD3 엄격 적용 시 `DpIcons`로 이관(후속).
+> P4c-B 반영: 접이 토글에 `DpIcons.expandMore/expandLess`(Symbols, P3에 추가) 사용 — DD3 준수.
 
 - [ ] **Step 4: 통과 확인** — Run: `cd apps/web && flutter test test/features/sandbox/sandbox_layout_test.dart ; cd ../..` → PASS
 
@@ -744,7 +744,7 @@ class RunController extends Notifier<RunState> {
 final runControllerProvider =
     NotifierProvider<RunController, RunState>(RunController.new);
 ```
-> web은 `dio` 직접 의존 금지(P4a 결정) → `RunController`는 `ApiException`만 해제. 실서버 `SseClient` 에러가 `DioException(error: ApiException)`로 오면 `sandboxUnavailable` 판정이 누락되므로, **dp_core `SseClient.connect`가 실패를 `ApiException`으로 정규화**하도록 보강해야 한다(get/post 헬퍼와 동일 규약 — 리스크/후속 참조). 목 테스트는 `ApiException` 직접 emit이라 OK.
+> web은 `dio` 직접 의존 금지(P4a 결정) → `RunController`는 `ApiException`만 해제. **P4c-A 해소**: dp_core `SseClient.connect`(P2)가 실패를 `ApiException`으로 정규화하도록 보강됨 → 실서버 경로의 `SANDBOX_UNAVAILABLE`/`KILL_SWITCH`/`QUOTA`가 `onError`에 `ApiException`으로 도달한다(get/post 헬퍼와 동일 규약). 목 테스트는 `ApiException` 직접 emit이라 OK.
 
 - [ ] **Step 5: 통과 확인** — Run: `cd apps/web && flutter test test/features/sandbox/run_controller_test.dart ; cd ../..` → PASS
 
@@ -1023,7 +1023,7 @@ git commit -m "test(web): 콘텐츠→Sandbox 실행 통합 스모크"
 - **REV-001 미포함**: AI 코드리뷰는 P4d(리뷰 칸 채움 + KILL_SWITCH/Quota). P4c 3페인의 리뷰 칸은 `_ReviewPlaceholder`.
 - **Monaco 런타임 의존**: CDN 로드(`createDevpathEditor` 셈) 전제 → 오프라인/CSP 환경은 Monaco를 `web/`에 번들. 빌드만으론 에디터 동작 미검증(수동 `flutter run -d chrome`). 실패 시 stub와 동일 폴백 고려(후속).
 - **터치 편집 제약**: Monaco는 web 전용(스펙 §2). 모바일웹(<1024)은 세그먼트 탭으로 에디터 노출하나 터치 편집 한계 — 안내 문구 후속.
-- **임시 아이콘**: `Icons.code`/`expand_more` 등 일부 Material Icons 사용 → DD3 단일 Symbols 준수 위해 `DpIcons` 이관(후속, dp_design 추가).
-- **dp_core SseClient 에러 정규화 필요**: web dio-free 유지를 위해 `SseClient.connect`가 실패 시 `ApiException`을 throw하도록 dp_core 보강 필요(현재 P2는 미정규화). 미보강 시 실서버 경로의 `SANDBOX_UNAVAILABLE`/`KILL_SWITCH`가 일반 오류로 처리됨(목은 영향 없음). P2 후속(T 후보).
+- **임시 아이콘**: ✅ **P4c-B 반영** — `DpIcons.code`/`expandMore`/`expandLess`(Symbols, P3 추가)로 교체. DD3 단일 Symbols 셋 준수.
+- **dp_core SseClient 에러 정규화**: ✅ **P4c-A 반영** — P2 `SseClient.connect`가 실패 시 `ApiException`을 throw하도록 보강됨(get/post 헬퍼 동일 규약). 실서버 SSE 경로의 `SANDBOX_UNAVAILABLE`/`KILL_SWITCH`/`QUOTA`가 코드로 분기 가능. (TODOS T-SSE-ERR-NORMALIZE 추적)
 - **실행 의미는 목**: `_kMockRunLog`는 고정 로그. 실제 컴파일/테스트 실행·결과 파싱은 백엔드 `/sandbox/run` 연동 시(스펙 §3 SSE 실행로그).
 - **eng-review 게이트**: DD5 반응형은 아키텍처 영향 → 구현 전 `/plan-eng-review` 권장.

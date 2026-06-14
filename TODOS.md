@@ -36,3 +36,12 @@
 - **Why:** 픽셀 골든은 OS/폰트 렌더러 종속 → Windows 로컬 생성 골든이 ubuntu CI(`melos run test`)에서 깨짐. P3 Task 8이 골든을 도입.
 - **Context:** P3 Task 8 Step 1에 `@Tags(['golden'])`·`dart_test.yaml`·FontLoader 반영 완료, melos `test`도 골든 제외로 갱신됨. 남은 건 골든을 **검증하는** 별도 job(현재 `melos run test`가 골든을 건너뛰므로 골든이 CI에서 한 번도 안 돌게 됨 → P3 구현 시 job 추가 필수).
 - **Effort:** S (human) → S (CC) · **Priority:** P1(P3 골든 게이트) · **Depends on:** P3 Task 8 구현.
+
+## P4 리뷰에서 도출 (2026-06-14)
+
+### ✅ T-SSE-ERR-NORMALIZE — SseClient 에러 ApiException 정규화 (P4c-A) [반영 2026-06-14]
+- **What:** dp_core `SseClient.connect`가 실패 시 `ApiException`을 throw하도록 보강(get/post 헬퍼 동일 규약).
+- **반영:** P2 Task 7 sse_client.dart에 try/catch + `ApiException.fromDio` 정규화 추가(2026-06-14).
+- **Why:** 미정규화 시 실서버 SSE 경로의 `SANDBOX_UNAVAILABLE`/`AI_KILL_SWITCH_ACTIVE`/`QUOTA_EXCEEDED`가 일반 오류로 처리됨 → P4c RunController·P4b PathController·P4d 멘토가 코드 분기 불가. 목 프로토는 영향 없으나 실서버 전환 시 필수.
+- **잔여:** P2 SSE 테스트에 에러 정규화 케이스 1개 추가 권장(현재 200 스텁만). 실서버 SSE 단계별 에러(스트림 중간 503)는 전송 시작 후 발생 가능 — 스트림 내부 에러 정규화는 P4d 멘토 구현 시 재확인.
+- **Effort:** S (human) → S (CC) · **Priority:** P2(실서버 전환 게이트) · **Depends on:** —

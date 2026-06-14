@@ -674,40 +674,40 @@ import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-Widget _host(Size size, Widget child) => MediaQuery(
-      data: MediaQueryData(size: size),
-      child: MaterialApp(theme: DpTheme.light(), home: child),
-    );
+// P4a-A: MediaQuery를 MaterialApp 바깥에 두면 MaterialApp의 MediaQuery.fromView가
+// 가려 폭이 무시된다(기본 800×600). 반드시 tester.view.physicalSize로 설정한다.
+Widget _host(Widget child) =>
+    MaterialApp(theme: DpTheme.light(), home: child);
+
+void _setWidth(WidgetTester tester, double w) {
+  tester.view.physicalSize = Size(w, 800);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.reset);
+}
 
 void main() {
   testWidgets('좁은 폭(<840)은 NavigationBar', (tester) async {
+    _setWidth(tester, 390);
     await tester.pumpWidget(_host(
-      const Size(390, 800),
-      const AppShellView(
-        location: '/dashboard',
-        child: Text('본문'),
-      ),
+      const AppShellView(location: '/dashboard', child: Text('본문')),
     ));
     expect(find.byType(NavigationBar), findsOneWidget);
     expect(find.byType(NavigationRail), findsNothing);
   });
 
   testWidgets('넓은 폭(≥840)은 NavigationRail', (tester) async {
+    _setWidth(tester, 1200);
     await tester.pumpWidget(_host(
-      const Size(1200, 800),
-      const AppShellView(
-        location: '/dashboard',
-        child: Text('본문'),
-      ),
+      const AppShellView(location: '/dashboard', child: Text('본문')),
     ));
     expect(find.byType(NavigationRail), findsOneWidget);
     expect(find.byType(NavigationBar), findsNothing);
   });
 
   testWidgets('목적지 선택 시 해당 경로로 콜백', (tester) async {
+    _setWidth(tester, 390);
     String? picked;
     await tester.pumpWidget(_host(
-      const Size(390, 800),
       AppShellView(
         location: '/dashboard',
         onSelect: (p) => picked = p,
@@ -719,6 +719,7 @@ void main() {
   });
 }
 ```
+> **P4a-A 수정**: `MediaQuery`를 MaterialApp 바깥에 두면 MaterialApp이 `MediaQuery.fromView`로 테스트 뷰(기본 800×600) 기반 MediaQuery를 삽입해 가린다 → `AppShellView`가 의도한 폭(390/1200) 대신 800을 읽어 "≥840 NavigationRail" 테스트가 실패한다. `tester.view.physicalSize`로 뷰 자체를 설정해야 한다(P4c sandbox_layout_test와 동일 패턴).
 
 - [ ] **Step 2: 실패 확인** — Run: `cd apps/web && flutter test test/features/shell/app_shell_view_test.dart ; cd ../..` → FAIL
 
