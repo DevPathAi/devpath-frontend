@@ -414,8 +414,8 @@ melos:
       description: 전 패키지 정적 분석(Flutter=flutter analyze, 순수 Dart=dart analyze)
       run: melos exec --flutter -- flutter analyze && melos exec --no-flutter -- dart analyze
     test:
-      description: test/ 있는 패키지 테스트(Flutter=flutter test, 순수 Dart=dart test)
-      run: melos exec --flutter --dir-exists="test" -- flutter test && melos exec --no-flutter --dir-exists="test" -- dart test
+      description: test/ 있는 패키지 테스트(Flutter=flutter test, 순수 Dart=dart test). 골든 제외(P3-A·T-GOLDEN-CI-EXCLUDE — 픽셀 골든은 OS/폰트 렌더러 종속이라 동일 플랫폼 전용 job에서만 검증).
+      run: melos exec --flutter --dir-exists="test" -- flutter test --exclude-tags golden && melos exec --no-flutter --dir-exists="test" -- dart test
     format:
       description: 포맷 검사(CI용)
       run: dart format --set-exit-if-changed .

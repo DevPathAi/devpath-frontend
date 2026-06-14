@@ -29,8 +29,10 @@
 
 ## P2·P3 리뷰에서 도출 (2026-06-14)
 
-### T-GOLDEN-CI-EXCLUDE — melos `test` 스크립트에 골든 제외 (P3-A)
-- **What:** P1 Task 7의 melos `test` 스크립트를 `melos exec --dir-exists="test" -- flutter test --exclude-tags golden`로 갱신. 골든은 `dart_test.yaml`에 `tags: {golden: {}}` 선언 + 동일 플랫폼(ubuntu) 전용 job에서 `flutter test --tags golden`으로만 검증.
-- **Why:** 픽셀 골든은 OS/폰트 렌더러 종속 → Windows 로컬 생성 골든이 ubuntu CI(`melos run test`)에서 깨짐. P3 Task 8이 골든을 도입하므로 P3 착수 전(또는 동시) P1 스크립트 1줄 갱신 필요.
-- **Context:** P1은 이미 리뷰·커밋(브랜치). main 머지 전이면 P1 커밋에 직접 반영, 머지 후면 별도 커밋. P3 Task 8 Step 1에 태그·dart_test.yaml·FontLoader 반영 완료.
-- **Effort:** S (human) → S (CC) · **Priority:** P1(P3 골든 게이트) · **Depends on:** P3 Task 8.
+### 🔶 T-GOLDEN-CI-EXCLUDE — melos `test` 골든 제외 + 골든 전용 job (P3-A) [부분반영 2026-06-14]
+- **What:**
+  - ① P1 Task 7 melos `test` 스크립트를 `flutter test --exclude-tags golden`로 갱신 — **✅ 플랜 반영 완료**(P1 plan L418, 2026-06-14).
+  - ② 골든을 실제 검증하는 동일-플랫폼(ubuntu) 전용 job(`flutter test --tags golden`)을 CI에 추가 — **⬜ 미반영**(P3 Task 8 구현 시 P1 `ci.yml`의 `analyze-test` 옆에 golden job 추가).
+- **Why:** 픽셀 골든은 OS/폰트 렌더러 종속 → Windows 로컬 생성 골든이 ubuntu CI(`melos run test`)에서 깨짐. P3 Task 8이 골든을 도입.
+- **Context:** P3 Task 8 Step 1에 `@Tags(['golden'])`·`dart_test.yaml`·FontLoader 반영 완료, melos `test`도 골든 제외로 갱신됨. 남은 건 골든을 **검증하는** 별도 job(현재 `melos run test`가 골든을 건너뛰므로 골든이 CI에서 한 번도 안 돌게 됨 → P3 구현 시 job 추가 필수).
+- **Effort:** S (human) → S (CC) · **Priority:** P1(P3 골든 게이트) · **Depends on:** P3 Task 8 구현.
