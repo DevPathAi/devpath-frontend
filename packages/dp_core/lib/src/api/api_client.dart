@@ -52,6 +52,22 @@ class ApiClient {
     }
   }
 
+  /// POST 후 JSON 반환. 실패 시 [ApiException] throw. (get 헬퍼와 동일 규약)
+  Future<T> post<T>(
+    String path, {
+    Object? body,
+    Map<String, dynamic>? query,
+  }) async {
+    try {
+      final res = await dio.post<T>(path, data: body, queryParameters: query);
+      return res.data as T;
+    } on DioException catch (e) {
+      throw (e.error is ApiException)
+          ? e.error as ApiException
+          : ApiException.fromDio(e);
+    }
+  }
+
   /// SSE 스트림 연결(D1). 앱은 dio를 직접 만지지 않고 이 헬퍼만 사용.
   /// 실패는 SseClient.connect 규약대로 [ApiException]으로 정규화된다.
   /// feature의 `*ConnectProvider`는 `apiClient.sse(path, body: ...)`를 호출한다.
