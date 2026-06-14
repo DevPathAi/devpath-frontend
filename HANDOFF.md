@@ -1,7 +1,10 @@
 # HANDOFF — React→Flutter 전환 & 프로토 UI
 
-> 최종 업데이트: 2026-06-14 · 브랜치: `docs/flutter-migration-proto-ui-spec` (main 앞 27+커밋, **미푸시**)
-> **상태: 설계·계획 + 디자인 리뷰 + Eng Review 전체 완료(P1~P7).** 구현 코드는 아직 없음 — 다음은 **구현**.
+> 최종 업데이트: 2026-06-14 · 브랜치: `docs/flutter-migration-proto-ui-spec` (origin 푸시·동기화됨)
+> **상태: 설계·계획 + 디자인/Eng 리뷰 완료 + P1 구현 완료(검증·푸시).** 다음은 **P2(dp_core) 구현**.
+
+## P1 구현 완료 (2026-06-14, 커밋 b513eee~12cd1a9)
+melos 7 + Dart pub workspaces 모노레포 골격: `packages/dp_core`(순수 Dart)·`dp_design`(Flutter) + `apps/{web,admin,mobile}` 5멤버 단일 해석. 구 React `web/`·`admin/` 제거, `mobile/`→`apps/mobile/`(이력 보존), CI를 melos analyze/test로 교체. **검증됨**: `melos run format`(0 changed)·`analyze`(No issues)·`test`(전 멤버 PASS, web은 cross-import 포함). 전 멤버 sdk `^3.12.1`·flutter_lints `^6.0.0` 정렬. melos 호출은 PATH 미설정 시 `dart pub global run melos <cmd>`.
 
 ## 지금까지 (DONE) — 플랜 작성 + 외부 리뷰 전부 완료
 
@@ -17,7 +20,7 @@
 ## 다음 세션 (RESUME HERE) — 전체 리뷰 완료, 구현 시작
 
 1. **✅ Eng Review 완료(2026-06-14)**: P4(web)·P6(mobile) 심층 리뷰 → 결정 D1~D4 승인 → 7개 플랜(P2·P4b~f·P6) 반영 완료. 요약: `docs/superpowers/specs/2026-06-14-eng-review-summary.md`. 결정: D1(P2 단일 SSE 기반 — `ApiClient.sse()`·`SseStage` 단일출처·`fromStep`), D2(DD8 핵심+`MockSseSource.failAfter`+60s, 재개키는 백엔드 합의까지 fromStep 보류), D3(query-aware `MockHttpAdapter`), D4(P6 재연결 동기화 최소+ConnectivityService, OAuth·secure_storage 이관). 필수수정 F4·F5·F6·F9는 해당 플랜에 반영됨.
-2. **구현 시작**: `superpowers:subagent-driven-development`(권장). **순서 의존** P1→P2→P3→P4a→…→P4f→P5→P6→P7. 첫 레포 변경(구 React 제거·Flutter 앱 생성·`mobile/`→`apps/mobile/`·CI melos 교체)은 P1. **P2는 Task 10(SSE 기반·목 보강)이 P4b/c/e/f 착수 게이트** — P2 완료 시 반드시 포함.
+2. **✅ P1 완료** — 위 "P1 구현 완료" 절. 다음은 **P2(dp_core)**: `docs/superpowers/plans/2026-06-14-p2-dp-core.md`. `superpowers:subagent-driven-development`(권장). **순서 의존** P2→P3→P4a→…→P4f→P5→P6→P7. **P2는 Task 10(SSE 기반·목 보강)이 P4b/c/e/f 착수 게이트** — P2 완료 시 반드시 포함. P1 교훈: melos=`dart pub global run melos`, barrel은 `library;`(이름 없는), dart-create 잔존(example/src) 정리.
 
 ## 구현 시 남은 결정/보강 (플랜에 노트로 명시됨)
 
