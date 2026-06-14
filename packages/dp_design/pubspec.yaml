@@ -1,0 +1,17 @@
+name: dp_design
+description: DevPath AI 디자인 시스템(Material 3). 도메인 모름. 토큰 SSoT=DESIGN.md.
+version: 0.0.1
+publish_to: none
+
+environment:
+  sdk: ^3.12.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # P3에서 추가: 폰트(Pretendard/D2Coding) 에셋, 마크다운/코드 하이라이트, 차트 래퍼
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
