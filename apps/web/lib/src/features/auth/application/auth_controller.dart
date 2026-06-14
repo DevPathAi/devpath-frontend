@@ -31,6 +31,11 @@ class AuthController extends Notifier<AuthState> {
     await _store.clear();
     state = const AuthUnauthenticated();
   }
+
+  /// 온보딩 완료로 갱신된 유저 반영(게이트 재평가 트리거).
+  void onboardingCompleted(User user) {
+    if (state is AuthAuthenticated) state = AuthAuthenticated(user);
+  }
 }
 
 final authControllerProvider = NotifierProvider<AuthController, AuthState>(

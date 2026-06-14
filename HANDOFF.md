@@ -1,12 +1,18 @@
 # HANDOFF — React→Flutter 전환 & 프로토 UI
 
 > 최종 업데이트: 2026-06-14 · 브랜치 전략 도입: **main 보호 · develop 통합 · 작업브랜치→develop PR→머지→main 릴리스 PR**(CLAUDE.md "🔀 Git 브랜치 전략" + 전역 규칙).
-> **상태: 설계·계획 + 디자인/Eng 리뷰 완료 + P1·P2·P3 구현(main 머지 완료, PR#3) + P4a 구현 완료.** 다음은 **P4b(온보딩·진단 + 학습경로 SSE)**.
+> **상태: 설계·계획 + 디자인/Eng 리뷰 완료 + P1·P2·P3(main, PR#3) + P4a(develop, PR#5) + P4b 구현 완료.** 다음은 **P4c(콘텐츠 뷰어 + Sandbox/Monaco + AI 리뷰)**.
 
 ## 브랜치/머지 현황 (2026-06-14)
 - **main**: P1·P2·P3 통합됨(PR#3 머지, merge commit `abf9056`). main 직접 푸시 금지.
-- **develop**: main에서 분기·생성. Git 브랜치 정책(PR#4) 머지됨. P4a는 `feat/p4a-web-shell-auth-routing`에서 develop으로 PR 예정.
+- **develop**: 통합 브랜치. Git 정책(PR#4)·P4a(PR#5) 머지됨. P4b는 `feat/p4b-web-onboarding-path-sse`에서 develop으로 PR 예정.
 - **CI**: `analyze-test` job의 **Format check(`dart format --set-exit-if-changed`)** 가 게이트 — 커밋 전 항상 `dart format` 적용(P3 머지 때 format 미적용으로 1차 실패한 교훈). 골든은 `--exclude-tags golden`로 CI 제외.
+
+## P4b 구현 완료 (2026-06-14, feat/p4b-web-onboarding-path-sse, 커밋 a0deb0a~88e8c34)
+온보딩·진단 → 학습경로 SSE 생성(PATH-001) 골든패스 TDD 완성(Task 0~6). **검증됨**: `melos analyze`(전 멤버 No issues)·`melos test`(web 31·dp_design 17·dp_core 26·admin 1·mobile 1 PASS).
+- Task0: `apiClientProvider`에 `AuthInterceptor`(401 큐잉) 결선(ENG-REVIEW D1). Task1: dp_core `LearningPath`/`PathWeek`/`WeeklyTask` freezed 모델. Task2: 온보딩 진단(목 `POST /onboarding`→DONE 유저)+게이트 해제(완료 유저 `/onboarding`→`/path`). Task3: `pathSseConnectProvider`(목=`MockSseSource`/실서버=`apiClient.sse`, fromStep 이어하기). Task4: `PathController`(DD8 중단보존·resume·F4 503/429 분기·D2 60s 타임아웃). Task5: `PathPage`/`PathPlanView`(진행=DpSseStageView·부분=이어서생성·완료=12주+과제+rationale). Task6: 라우터 `/path` 결선 + 온보딩→PATH 골든 스모크(정상 + failAfter:2 중단→resume).
+- **P4b 교훈/플랜 보정(플랜 코드를 실제 API로 교정한 4건)**: ① **`ApiException` 시그니처** — 플랜 테스트/구현이 쓴 `ApiException('msg', code:'STR')`·`kind: ApiErrorKind.x`는 미존재. 실제는 `ApiException({required code: ApiErrorCode, required message})` + `isKillSwitch`/`isQuota` 게터. ② **`MockSseSource` fromStep 이중적용** — 플랜의 `MockSseSource(stages: kSseSteps.sublist(fromStep), fromStep: fromStep)`는 sublist+fromStep 동시 적용으로 resume(fromStep>0) 시 0건 emit. 실제 API는 `stages` 전체 위에서 fromStep을 루프 시작 인덱스로 씀 → **전체 `kSseSteps` + `fromStep`** 으로 교정. ③ **`AppConfig.sseTimeout` 부재** — P4a AppConfig엔 baseUrl/useMock만 → `sseTimeout`(기본 60s) 필드 신설 + `testAppConfig` 헬퍼(테스트 파일 정의). ④ **무이벤트 타임아웃 테스트의 hang** — `async*`+`await Completer().future`는 구독 취소가 hang → 취소 가능한 `StreamController`로 무이벤트 재현.
+- **후속**: PATH 중 killSwitch/quota를 `DpKillSwitch`/`DpQuota` 전용 위젯으로 렌더하는 것은 P4c(현재 `DpError`). 실서버 `Last-Event-ID` 재개는 백엔드 합의까지 `fromStep` 유지. `GET /users/me`·토큰 영속화는 세션 복원 필요 시점.
 
 ## P4a 구현 완료 (2026-06-14, feat/p4a-web-shell-auth-routing, 커밋 0ec62ac~974f5d6)
 `apps/web`(devpath_web) 인증된 반응형 셸 토대 TDD 완성(Task 1~10). **검증됨**: `melos analyze`(전 멤버 No issues)·`melos test`(web 19·dp_design 17·dp_core 25·admin 1·mobile 1 PASS).
@@ -49,7 +55,7 @@ melos 7 + Dart pub workspaces 모노레포 골격: `packages/dp_core`(순수 Dar
 ## 다음 세션 (RESUME HERE) — 전체 리뷰 완료, 구현 시작
 
 1. **✅ Eng Review 완료(2026-06-14)**: P4(web)·P6(mobile) 심층 리뷰 → 결정 D1~D4 승인 → 7개 플랜(P2·P4b~f·P6) 반영 완료. 요약: `docs/superpowers/specs/2026-06-14-eng-review-summary.md`. 결정: D1(P2 단일 SSE 기반 — `ApiClient.sse()`·`SseStage` 단일출처·`fromStep`), D2(DD8 핵심+`MockSseSource.failAfter`+60s, 재개키는 백엔드 합의까지 fromStep 보류), D3(query-aware `MockHttpAdapter`), D4(P6 재연결 동기화 최소+ConnectivityService, OAuth·secure_storage 이관). 필수수정 F4·F5·F6·F9는 해당 플랜에 반영됨.
-2. **✅ P1·P2·P3·P4a 완료** — 위 절들. 다음은 **P4b(온보딩·진단 ONB-001/002 + 학습경로 SSE 생성 PATH-001, DD8 이어하기/재연결)**: `docs/superpowers/plans/2026-06-14-p4b-web-onboarding-path-sse.md`. **순서 의존** P4b→P4c→…→P4f→P5→P6→P7. **착수 게이트 충족**: P4a 인증 셸(`routerProvider`·`gateRedirect`·`apiClientProvider`·플레이스홀더)·P2 SSE(`apiClient.sse()`·`SseStage`·`MockSseSource failAfter/fromStep`)·P3 dp_design(`DpSseStageView` 등). P4b에서 `AuthInterceptor`(401 큐잉)·`GET /users/me`·토큰 영속화 결선. **브랜치 정책 준수**: feat 브랜치 → develop PR → 머지. 서브에이전트 위임 시 **범위 강제**(CLAUDE.md 절대 조건 4) + **컨트롤러 직접 검증** 필수.
+2. **✅ P1·P2·P3·P4a·P4b 완료** — 위 절들. 다음은 **P4c(콘텐츠 뷰어 CNT-001 + Sandbox/Monaco SBX-001 DD5 + AI 리뷰 REV-001)**: `docs/superpowers/plans/2026-06-14-p4c-web-content-sandbox-monaco.md`. **순서 의존** P4c→…→P4f→P5→P6→P7. **착수 게이트 충족**: P4a 셸·P4b PATH(`pathSseConnectProvider`·`PathController` 패턴)·P2 SSE·P3 dp_design(`DpMarkdown`·`DpKillSwitch`/`DpQuota`). P4c에서 PATH의 killSwitch/quota를 전용 위젯으로 렌더 일괄 적용 + Monaco conditional import(web 전용). **브랜치 정책 준수**: feat 브랜치 → develop PR → 머지, 커밋 전 `dart format`. 서브에이전트 위임 시 **범위 강제**(CLAUDE.md 절대 조건 4) + **컨트롤러 직접 검증** 필수. **플랜 코드의 API 가정은 항상 dp_core 실제 시그니처로 검증**(P4b에서 ApiException·MockSseSource 등 4건 교정 필요했음).
 
 ## 구현 시 남은 결정/보강 (플랜에 노트로 명시됨)
 
