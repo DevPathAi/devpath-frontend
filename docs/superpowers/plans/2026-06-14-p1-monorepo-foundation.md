@@ -286,14 +286,18 @@ Expected: `mobile/`의 모든 파일이 `apps/mobile/`로 이동(스테이징됨
 
 - [ ] **Step 2: `.gitignore`의 mobile 경로 갱신**
 
-`.gitignore`에서 `mobile/` 접두 4줄을 다음으로 변경:
+`.gitignore`에서 `mobile/` 접두 4줄을 다음으로 변경하고, **워크스페이스 루트 산출물(E2)**도 추가:
 ```
 # Flutter (mobile)
 apps/mobile/.dart_tool/
 apps/mobile/.flutter-plugins
 apps/mobile/.flutter-plugins-dependencies
 apps/mobile/build/
+
+# Dart pub workspace 루트 산출물 (E2 — melos bootstrap이 루트에 생성)
+/.dart_tool/
 ```
+> 멤버별 `.dart_tool/`은 `flutter create`가 만드는 패키지별 `.gitignore`로 커버됨. 루트 `pubspec.lock`은 **커밋**(워크스페이스 단일 락).
 
 - [ ] **Step 3: 이동 후 테스트 통과 확인 (standalone)**
 
@@ -428,6 +432,8 @@ resolution: workspace
 대상 파일: `packages/dp_core/pubspec.yaml`, `packages/dp_design/pubspec.yaml`, `apps/web/pubspec.yaml`, `apps/admin/pubspec.yaml`, `apps/mobile/pubspec.yaml`.
 
 > **F3 동시 처리**: `flutter create`로 만든 `apps/web`·`apps/admin`은 자체 `sdk:` 제약을 갖는다. 이 멤버들의 `environment.sdk`도 `^3.12.1`로 맞춰 전 멤버 하한을 통일한다.
+>
+> **E1 동시 처리(공유 의존성 버전 정렬 — bootstrap 충돌 예방)**: pub workspace는 전 멤버를 **단일 해석**하므로 같은 패키지가 멤버마다 다른 버전 제약을 가지면 `melos bootstrap`이 실패한다. 가장 유력한 충돌은 `flutter_lints`(dp_core·dp_design은 `^6.0.0` 하드코딩 vs `flutter create` 앱이 생성하는 버전)와 `cupertino_icons`다. **bootstrap 전에 5개 멤버의 `flutter_lints`(및 공유되는 dev/일반 의존성) 버전 제약을 동일하게 정렬**한다(설치된 `flutter create` 기본값을 기준으로 dp_core·dp_design을 맞추는 쪽이 안전). 충돌 시 `melos bootstrap` 출력의 버전 메시지로 정렬 대상 확인.
 
 - [ ] **Step 3: 워크스페이스 bootstrap**
 
@@ -680,6 +686,17 @@ P1 종료 = 5멤버 단일 해석 모노레포 + CI(analyze/test) 통과 + cross
   - Surfaced by: Section 10/F7 — 보류 미기록
   - Files: `TODOS.md`
   - Verify: 4개 보류 항목 추적 가능
+- [ ] **E1 (P1, human: ~10min / CC: ~3min)** — pubspec(전 멤버) — 공유 의존성(flutter_lints·cupertino_icons) 버전 정렬해 bootstrap 충돌 예방
+  - Surfaced by: Eng/Architecture E1 — pub workspace 단일해석 충돌(confidence 8/10)
+  - Files: dp_core·dp_design·apps/web·apps/admin pubspec
+  - Verify: Task 7 `melos bootstrap` 단일 해석 성공
+- [ ] **E2 (P2, human: ~3min / CC: ~1min)** — .gitignore — 루트 `/.dart_tool/` 추가
+  - Surfaced by: Eng/Code Quality E2 — 루트 워크스페이스 산출물 미무시(confidence 9/10)
+  - Files: `.gitignore`
+  - Verify: bootstrap 후 `git status` 청결
+
+### Parallelization
+순차 구현, 병렬화 기회 없음 — Task 7(workspace 결선)이 5개 멤버 전부에 의존하는 단일 배리어. Task 2~6은 멤버별 독립이나 모두 Task 7에서 합류하므로 worktree 분리 이득 미미.
 
 ## GSTACK REVIEW REPORT
 
@@ -687,10 +704,11 @@ P1 종료 = 5멤버 단일 해석 모노레포 + CI(analyze/test) 통과 + cross
 |--------|---------|-----|------|--------|----------|
 | CEO Review | `/plan-ceo-review` | Scope & strategy | 1 | ISSUES_OPEN | mode: HOLD_SCOPE, 0 critical gaps, 7 findings 반영 |
 | Codex Review | `/codex review` | Independent 2nd opinion | 0 | — | — |
-| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 0 | — | — |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR | 2 issues(E1·E2) 반영, 0 critical gaps, 커버리지 6/6 |
 | Design Review | `/plan-design-review` | UI/UX gaps | 1 | (스펙 대상) | score 5/10→8/10 (상위 스펙, 본 P1과 무관) |
-| Outside Voice | `/plan-ceo-review` | Independent challenge | 1 | ISSUES_FOUND | Claude 서브에이전트(2회 무응답)→직접 검증, F8 구현차단 1건 |
+| Outside Voice | `/plan-ceo-review` | Independent challenge | 1 | ISSUES_FOUND | Claude 서브에이전트(무응답)→직접 검증, F8 구현차단 1건 |
 
-- **OUTSIDE VOICE:** 서브에이전트가 사용 가능한 findings를 반환하지 않아, 동일 probe를 직접 재검증 → **F8(flutter create 고아 테스트, 구현 차단)** 발견·반영.
-- **UNRESOLVED:** 0 (7개 발견 모두 승인·반영)
-- **VERDICT:** CEO Review 완료(HOLD SCOPE, critical gap 0). **Eng Review 미실행 — 필수 게이트.** 구현 착수 전 `/plan-eng-review` 권장(melos workspace 결선·CI 교체의 아키텍처 검증).
+- **OUTSIDE VOICE:** CEO 리뷰에서 동일 플랜 검증 → **F8(flutter create 고아 테스트)** 발견·반영. Eng 리뷰는 서브에이전트 불안정으로 생략.
+- **CROSS-MODEL:** 단일 모델(Claude). Codex 미설치.
+- **UNRESOLVED:** 0 (CEO 7 + Eng 2 = 9개 발견 모두 승인·반영)
+- **VERDICT:** **CEO + ENG CLEARED — 구현 준비 완료.** Eng Review(필수 게이트) clean, critical gap 0. `/ship` 또는 구현 착수 가능.
