@@ -1,0 +1,15 @@
+name: dp_core
+description: DevPath AI 도메인·데이터 계층(모델·API·SSE·Auth·Error). UI 없음, 순수 Dart.
+version: 0.0.1
+publish_to: none
+
+environment:
+  sdk: ^3.12.1
+
+dependencies:
+  # P2에서 추가: dio, freezed_annotation, json_annotation 등 (모두 순수 Dart)
+
+dev_dependencies:
+  test: ^1.25.6
+  lints: ^6.0.0
+  # P2에서 추가: mocktail, build_runner, freezed, json_serializable
