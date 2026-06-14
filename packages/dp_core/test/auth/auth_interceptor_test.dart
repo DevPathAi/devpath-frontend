@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -95,7 +96,13 @@ void main() {
       response: Response(requestOptions: req, statusCode: 401),
       type: DioExceptionType.badResponse,
     );
-    await interceptor.onError(err, ErrorInterceptorHandler());
+    // onError를 파이프라인 밖에서 직접 호출하므로, handler.next(err)가 완료하는
+    // completer 에러를 구독할 곳이 없어 존으로 누출된다(실 파이프라인에선 Dio가
+    // 소비). 테스트 한정 아티팩트이므로 runZonedGuarded로 격리한다.
+    await runZonedGuarded(
+      () => interceptor.onError(err, ErrorInterceptorHandler()),
+      (_, _) {},
+    );
     expect(await store.readAccess(), isNull);
   });
 

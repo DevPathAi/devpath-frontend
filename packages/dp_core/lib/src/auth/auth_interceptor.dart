@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:dio/dio.dart';
 
 import 'token_store.dart';
@@ -74,12 +72,7 @@ class AuthInterceptor extends QueuedInterceptor {
       handler.resolve(res); // 재시도 성공 → 원 요청을 해당 응답으로 해결
     } catch (_) {
       await store.clear();
-      // 갱신 실패 → 원 에러 전파(상위에서 로그인 유도).
-      // handler.future(@protected)에 미리 에러 구독을 달아 completer 에러가
-      // 존으로 누출되는 것을 방지; 실 파이프라인에서는 Dio가 future를 await하므로 무해.
-      // ignore: invalid_use_of_protected_member
-      handler.future.ignore();
-      handler.next(err);
+      handler.next(err); // 갱신 실패 → 원 에러 전파(상위에서 로그인 유도)
     }
   }
 }
