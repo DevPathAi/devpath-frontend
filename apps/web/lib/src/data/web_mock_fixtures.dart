@@ -34,4 +34,24 @@ final Map<String, MockFixture> webMockFixtures = {
       },
     },
   ),
+  // PATH 생성 완료 후 결과 조회(스펙 §3 비동기 결과 조회 패턴)
+  'GET /learning-paths/me': (200, mockLearningPath()),
+};
+
+/// 12주 경로 목 데이터(week1만 과제 3개, 나머지는 제목만).
+Map<String, dynamic> mockLearningPath() => {
+  'rationale': 'GitHub 분석 결과 비동기·테스트 역량 보강이 필요해 12주 경로를 구성했어요.',
+  'weeks': [
+    {
+      'week': 1,
+      'title': '비동기 기초',
+      'tasks': [
+        {'title': 'Future/async-await 정리', 'done': false},
+        {'title': 'Stream 구독 실습', 'done': false},
+        {'title': '에러 처리 패턴 적용', 'done': false},
+      ],
+    },
+    for (var w = 2; w <= 12; w++)
+      {'week': w, 'title': '주차 $w 학습', 'tasks': <Map<String, dynamic>>[]},
+  ],
 };
