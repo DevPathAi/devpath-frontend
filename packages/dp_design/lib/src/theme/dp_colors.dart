@@ -132,3 +132,10 @@ class DpColors extends ThemeExtension<DpColors> {
     );
   }
 }
+
+/// 토큰 접근 단축: `context.dpColors.primaryText`.
+/// 확장은 노출 타입(DpColors)과 같은 파일에 두어, DpColors를 쓰는 위젯이
+/// 별도 import 없이 토큰에 접근하도록 한다.
+extension DpColorsX on BuildContext {
+  DpColors get dpColors => Theme.of(this).extension<DpColors>()!;
+}

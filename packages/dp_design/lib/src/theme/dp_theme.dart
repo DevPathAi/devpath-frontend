@@ -36,8 +36,3 @@ abstract final class DpTheme {
     );
   }
 }
-
-/// 토큰 접근 단축: `context.dpColors.primaryText`.
-extension DpColorsX on BuildContext {
-  DpColors get dpColors => Theme.of(this).extension<DpColors>()!;
-}
