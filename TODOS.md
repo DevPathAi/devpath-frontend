@@ -17,10 +17,15 @@
 - **Context:** 빌드 산출물이 생기는 P4(web)/P5(admin) 시점. nginx 이미지 + kustomize gitops(기존 `DevPathAi/devpath-gitops`) 패턴 재사용.
 - **Effort:** M (human) → S (CC) · **Priority:** P1(블로킹 — P4/P5 게이트) · **Depends on:** P4/P5 앱 빌드.
 
-### T-LANDING-WORKSPACE — landing(Jaspr) workspace 편입 결정
-- **What:** Jaspr 랜딩을 (a) 별도 resolution으로 workspace 편입 vs (b) workspace 밖 독립 프로젝트로 둘지 P7에서 결정.
+### ✅ T-LANDING-WORKSPACE — landing(Jaspr) workspace 편입 결정 [RESOLVED 2026-06-14]
+- **결정:** (b) **워크스페이스 밖 독립 프로젝트(standalone)** — P7 플랜 채택. Jaspr↔Flutter 해석 충돌 회피 + 앱과 코드/상태 무공유(스펙 §10). `landing/`은 자체 pubspec·`dart pub get`, 루트 workspace members 비편입, 연결은 CTA URL뿐.
 - **Why:** Jaspr↔Flutter 의존성 해석 충돌 위험으로 P1 workspace에서 제외됨.
 - **Effort:** M (human) → S (CC) · **Priority:** P3 · **Depends on:** P7.
+
+### 🔶 T-LANDING-CI — landing 전용 CI job (T-LANDING-WORKSPACE 부수)
+- **What:** landing이 melos 밖 → `melos run test`에 미포함. P1 `ci.yml`에 landing 전용 job(`cd landing && dart pub get && dart test` + `jaspr build`) 추가.
+- **Why:** standalone 결정의 필연 — 별도 해석이라 melos 일괄 검증 대상 아님. 미추가 시 landing이 CI에서 미검증.
+- **Effort:** S (human) → S (CC) · **Priority:** P3 · **Depends on:** P7 구현 + 최초 CI.
 
 ### T-CI-FLUTTER-PIN — CI flutter-action 버전 핀
 - **What:** CI `subosito/flutter-action@v2`의 `channel: stable`을 Dart 3.12.1 호환 `flutter-version`으로 핀할지 최초 CI 실행 결과로 확정.
