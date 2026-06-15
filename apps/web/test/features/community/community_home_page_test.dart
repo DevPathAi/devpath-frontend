@@ -1,4 +1,3 @@
-import 'package:devpath_web/src/features/community/application/community_controller.dart';
 import 'package:devpath_web/src/features/community/data/community_source.dart';
 import 'package:devpath_web/src/features/community/presentation/community_home_page.dart';
 import 'package:dp_core/dp_core.dart';

@@ -1,5 +1,4 @@
 import 'package:dp_core/dp_core.dart';
-import 'package:dp_design/dp_design.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
@@ -7,9 +6,9 @@ import 'package:go_router/go_router.dart';
 import '../features/auth/application/auth_controller.dart';
 import '../features/auth/presentation/login_page.dart';
 import '../features/auth/state/auth_state.dart';
-import '../features/common/presentation/placeholder_page.dart';
 import '../features/content/presentation/content_page.dart';
 import '../features/community/presentation/community_home_page.dart';
+import '../features/community/presentation/qna_detail_page.dart';
 import '../features/dashboard/presentation/dashboard_page.dart';
 import '../features/mentor/presentation/mentor_page.dart';
 import '../features/onboarding/presentation/onboarding_page.dart';
@@ -65,6 +64,11 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/community',
             builder: (_, _) => const CommunityHomePage(),
+          ),
+          GoRoute(
+            path: '/community/:id',
+            builder: (_, state) =>
+                QnaDetailPage(postId: state.pathParameters['id']!),
           ),
         ],
       ),

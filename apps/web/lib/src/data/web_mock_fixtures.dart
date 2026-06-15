@@ -94,6 +94,18 @@ final Map<String, MockFixture> webMockFixtures = {
       'limit': 20,
     },
   ),
+  // 커뮤니티 Q&A 상세(COM-003)
+  'GET /community/posts/q1': (
+    200,
+    {
+      'id': 'q1',
+      'title': 'async/await가 헷갈려요',
+      'author': '지수',
+      'answerCount': 2,
+      'body':
+          '# 질문\n\n`async/await`에서 예외는 어디서 잡나요?\n\n```dart\ntry { await f(); } catch (e) {}\n```',
+    },
+  ),
   // 대시보드(DASH-001)
   'GET /dashboard': (
     200,
