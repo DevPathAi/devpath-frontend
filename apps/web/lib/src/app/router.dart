@@ -11,6 +11,7 @@ import '../features/common/presentation/placeholder_page.dart';
 import '../features/content/presentation/content_page.dart';
 import '../features/onboarding/presentation/onboarding_page.dart';
 import '../features/path/presentation/path_page.dart';
+import '../features/sandbox/presentation/sandbox_page.dart';
 import '../features/shell/presentation/app_shell.dart';
 
 /// 게이트 판정(순수): 미인증→/login, 인증·온보딩미완→/onboarding, 그 외 통과.
@@ -60,6 +61,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (_, state) =>
                 ContentPage(contentId: state.pathParameters['id']!),
           ),
+          GoRoute(path: '/sandbox', builder: (_, _) => const SandboxPage()),
           GoRoute(
             path: '/mentor',
             builder: (_, _) =>
