@@ -42,5 +42,29 @@
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
   <script src="flutter_bootstrap.js" async></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs/loader.min.js"
+          integrity="sha512-ZG31AN9z/CQD1YDDAK4RUAvogwbJHv6bHrumrnMLzdCrVu4HeAqrUX7Jsal/cbUwXGfaMUNmQU04tQ8XXl5Znw=="
+          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script>
+    require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs' }});
+    // F5-a/F5-c 반영: { dispose, layout } 핸들 반환 + Esc 포커스 탈출.
+    // require가 비동기라 editor가 즉시 없을 수 있으므로 핸들은 클로저로 editor를 지연 참조.
+    window.createDevpathEditor = function (container, code, onChange, onEscape) {
+      var editor = null;
+      require(['vs/editor/editor.main'], function () {
+        editor = monaco.editor.create(container, {
+          value: code, language: 'dart', theme: 'vs-dark',
+          automaticLayout: true, minimap: { enabled: false }, fontSize: 14,
+        });
+        editor.onDidChangeModelContent(function () { onChange(editor.getValue()); });
+        // F5-c DD7: Esc 시 Monaco 밖(dart sentinel)으로 포커스를 넘긴다.
+        editor.addCommand(monaco.KeyCode.Escape, function () { onEscape(); });
+      });
+      return {
+        dispose: function () { if (editor) editor.dispose(); }, // F5-a
+        layout:  function () { if (editor) editor.layout(); },  // F5-b
+      };
+    };
+  </script>
 </body>
 </html>

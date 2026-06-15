@@ -1,0 +1,63 @@
+import 'dart:async';
+
+import 'package:dp_core/dp_core.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../data/sandbox_run_source.dart';
+import '../state/run_state.dart';
+
+class RunController extends Notifier<RunState> {
+  StreamSubscription<SseEvent>? _sub;
+
+  @override
+  RunState build() {
+    ref.onDispose(() => _sub?.cancel());
+    return const RunIdle();
+  }
+
+  Completer<void>? _inFlight; // F5/D1: 재진입 가드
+
+  Future<void> run(String code) {
+    // F5/D1 반영: 진행 중이면 무시 — 연속 호출로 이전 Completer가 미완료 hang되는 것을 방지.
+    if (_inFlight != null && !_inFlight!.isCompleted) return _inFlight!.future;
+
+    _sub?.cancel();
+    final done = Completer<void>();
+    _inFlight = done;
+    state = const RunRunning();
+
+    _sub = ref
+        .read(sandboxRunConnectProvider)(code)
+        .listen(
+          (e) {
+            final s = state;
+            if (s is RunRunning) state = s.appended(e.data);
+          },
+          onError: (Object err) {
+            if (err is ApiException &&
+                err.code == ApiErrorCode.sandboxUnavailable) {
+              state = const RunUnavailable();
+            } else {
+              final msg = err is ApiException ? err.message : err.toString();
+              state = RunDone(logs: [..._logsOf(state), '실행 오류: $msg']);
+            }
+            if (!done.isCompleted) done.complete();
+          },
+          onDone: () {
+            final s = state;
+            if (s is RunRunning) state = RunDone(logs: s.logs);
+            if (!done.isCompleted) done.complete();
+          },
+          cancelOnError: true,
+        );
+
+    return done.future;
+  }
+
+  List<String> _logsOf(RunState s) =>
+      s is RunRunning ? [...s.logs] : (s is RunDone ? [...s.logs] : <String>[]);
+}
+
+final runControllerProvider = NotifierProvider<RunController, RunState>(
+  RunController.new,
+);

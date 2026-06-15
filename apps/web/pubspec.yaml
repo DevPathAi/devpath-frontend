@@ -43,6 +43,7 @@ dependencies:
     path: ../../packages/dp_design
   flutter_riverpod: ^3.3.0
   go_router: ^14.6.0          # 하한 가이드 — bootstrap 결과로 확정
+  web: ^1.1.0                 # Monaco 임베드(DOM) 용. bootstrap 결과로 확정
 
 dev_dependencies:
   flutter_test:
