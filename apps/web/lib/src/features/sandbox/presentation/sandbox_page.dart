@@ -2,6 +2,8 @@ import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../review/application/review_controller.dart';
+import '../../review/presentation/review_panel.dart';
 import '../application/run_controller.dart';
 import '../state/run_state.dart';
 import 'monaco_editor_view.dart';
@@ -48,7 +50,10 @@ class _SandboxPageState extends ConsumerState<SandboxPage> {
           onChanged: (v) => _code = v,
         ),
         log: _LogPane(run: run),
-        review: const _ReviewPlaceholder(),
+        review: ReviewPanel(
+          onRequest: () =>
+              ref.read(reviewControllerProvider.notifier).request(_code),
+        ),
       ),
     );
   }
@@ -93,16 +98,4 @@ class _LogPane extends StatelessWidget {
             ),
     );
   }
-}
-
-/// AI 리뷰 칸 — P4d에서 REV-001로 채움.
-class _ReviewPlaceholder extends StatelessWidget {
-  const _ReviewPlaceholder();
-
-  @override
-  Widget build(BuildContext context) => const DpEmpty(
-    icon: DpIcons.content,
-    title: 'AI 리뷰',
-    message: '코드를 실행하면 리뷰가 제공됩니다. (P4d)',
-  );
 }
