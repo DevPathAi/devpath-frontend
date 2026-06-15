@@ -44,6 +44,21 @@ final Map<String, MockFixture> webMockFixtures = {
           '# 비동기 기초\n\nDart의 `Future`와 `async`/`await`로 비동기 흐름을 다룹니다.\n\n```dart\nFuture<int> answer() async => 42;\n```\n',
     },
   ),
+  // AI 코드리뷰(REV-001)
+  'POST /reviews': (
+    200,
+    {
+      'confidence': 78,
+      'strengths': ['main 함수가 간결합니다.', 'print 사용이 적절합니다.'],
+      'improvements': [
+        {'line': 2, 'severity': 'warning', 'message': '예외 처리를 추가하세요.'},
+        {'line': 1, 'severity': 'info', 'message': '함수에 문서 주석을 권장합니다.'},
+      ],
+      'security': [
+        {'severity': 'info', 'message': '외부 입력이 없어 위험이 낮습니다.'},
+      ],
+    },
+  ),
 };
 
 /// 12주 경로 목 데이터(week1만 과제 3개, 나머지는 제목만).
