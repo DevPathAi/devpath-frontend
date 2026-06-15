@@ -32,6 +32,20 @@ void main() {
     expect(find.textContaining('30'), findsOneWidget);
   });
 
+  // F6-b: Retry-After null(헤더 미제공)이면 0초 오안내 없이 무기한 문구로 분기.
+  testWidgets('Quota는 retryAfter=null이면 무기한 문구(0초 미표시)', (tester) async {
+    await tester.pumpWidget(_host(const DpQuota(retryAfterSeconds: null)));
+    expect(find.textContaining('0초'), findsNothing);
+    expect(find.textContaining('잠시 후 다시 시도'), findsOneWidget);
+  });
+
+  // F6-b: 음수(시계 오차 등)도 음수 표시 없이 무기한 문구로 안전 처리.
+  testWidgets('Quota는 retryAfter=음수면 음수 표시 없이 무기한 문구', (tester) async {
+    await tester.pumpWidget(_host(const DpQuota(retryAfterSeconds: -5)));
+    expect(find.textContaining('-5'), findsNothing);
+    expect(find.textContaining('잠시 후 다시 시도'), findsOneWidget);
+  });
+
   testWidgets('OfflineBanner는 캐시 안내를 보인다', (tester) async {
     await tester.pumpWidget(_host(const DpOfflineBanner()));
     expect(find.textContaining('오프라인'), findsOneWidget);
