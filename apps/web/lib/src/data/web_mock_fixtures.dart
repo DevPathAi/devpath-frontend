@@ -36,6 +36,14 @@ final Map<String, MockFixture> webMockFixtures = {
   ),
   // PATH 생성 완료 후 결과 조회(스펙 §3 비동기 결과 조회 패턴)
   'GET /learning-paths/me': (200, mockLearningPath()),
+  // 학습 콘텐츠 조회(CNT-001)
+  'GET /contents/c1': (
+    200,
+    {
+      'markdown':
+          '# 비동기 기초\n\nDart의 `Future`와 `async`/`await`로 비동기 흐름을 다룹니다.\n\n```dart\nFuture<int> answer() async => 42;\n```\n',
+    },
+  ),
 };
 
 /// 12주 경로 목 데이터(week1만 과제 3개, 나머지는 제목만).

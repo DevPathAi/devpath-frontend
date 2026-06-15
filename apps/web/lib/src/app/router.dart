@@ -8,6 +8,7 @@ import '../features/auth/application/auth_controller.dart';
 import '../features/auth/presentation/login_page.dart';
 import '../features/auth/state/auth_state.dart';
 import '../features/common/presentation/placeholder_page.dart';
+import '../features/content/presentation/content_page.dart';
 import '../features/onboarding/presentation/onboarding_page.dart';
 import '../features/path/presentation/path_page.dart';
 import '../features/shell/presentation/app_shell.dart';
@@ -54,6 +55,11 @@ final routerProvider = Provider<GoRouter>((ref) {
                 const PlaceholderPage(title: '대시보드', icon: DpIcons.dashboard),
           ),
           GoRoute(path: '/path', builder: (_, _) => const PathPage()),
+          GoRoute(
+            path: '/content/:id',
+            builder: (_, state) =>
+                ContentPage(contentId: state.pathParameters['id']!),
+          ),
           GoRoute(
             path: '/mentor',
             builder: (_, _) =>
