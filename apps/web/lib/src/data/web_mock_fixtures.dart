@@ -44,6 +44,78 @@ final Map<String, MockFixture> webMockFixtures = {
           '# 비동기 기초\n\nDart의 `Future`와 `async`/`await`로 비동기 흐름을 다룹니다.\n\n```dart\nFuture<int> answer() async => 42;\n```\n',
     },
   ),
+  // 커뮤니티(COM-001) 1페이지 — nextCursor: 'c2'로 "더 보기" 노출
+  'GET /community/posts': (
+    200,
+    {
+      'data': [
+        {
+          'id': 'q1',
+          'title': 'async/await가 헷갈려요',
+          'author': '지수',
+          'answerCount': 2,
+        },
+        {
+          'id': 'q2',
+          'title': 'Stream 구독 해제는?',
+          'author': '민준',
+          'answerCount': 1,
+        },
+        {
+          'id': 'q3',
+          'title': 'Riverpod Notifier 패턴',
+          'author': '서연',
+          'answerCount': 5,
+        },
+      ],
+      'nextCursor': 'c2', // 다음 페이지 있음 → 더 보기 활성
+      'limit': 20,
+    },
+  ),
+  // 2페이지 — query-aware 키(P2 Task 10). nextCursor: null로 마지막
+  'GET /community/posts?cursor=c2': (
+    200,
+    {
+      'data': [
+        {
+          'id': 'q4',
+          'title': 'FutureProvider vs Notifier',
+          'author': '도윤',
+          'answerCount': 0,
+        },
+        {
+          'id': 'q5',
+          'title': 'go_router 가드 적용',
+          'author': '하은',
+          'answerCount': 3,
+        },
+      ],
+      'nextCursor': null, // 마지막 페이지
+      'limit': 20,
+    },
+  ),
+  // 커뮤니티 Q&A 상세(COM-003)
+  'GET /community/posts/q1': (
+    200,
+    {
+      'id': 'q1',
+      'title': 'async/await가 헷갈려요',
+      'author': '지수',
+      'answerCount': 2,
+      'body':
+          '# 질문\n\n`async/await`에서 예외는 어디서 잡나요?\n\n```dart\ntry { await f(); } catch (e) {}\n```',
+    },
+  ),
+  // 대시보드(DASH-001)
+  'GET /dashboard': (
+    200,
+    {
+      'streakDays': 7,
+      'progressPercent': 62,
+      'nextTaskTitle': '비동기 기초',
+      'badges': ['첫 경로', '7일 연속'],
+    },
+  ),
   // AI 코드리뷰(REV-001)
   'POST /reviews': (
     200,
