@@ -9,6 +9,7 @@ import '../features/auth/presentation/login_page.dart';
 import '../features/auth/state/auth_state.dart';
 import '../features/common/presentation/placeholder_page.dart';
 import '../features/content/presentation/content_page.dart';
+import '../features/community/presentation/community_home_page.dart';
 import '../features/dashboard/presentation/dashboard_page.dart';
 import '../features/mentor/presentation/mentor_page.dart';
 import '../features/onboarding/presentation/onboarding_page.dart';
@@ -63,8 +64,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(path: '/mentor', builder: (_, _) => const MentorPage()),
           GoRoute(
             path: '/community',
-            builder: (_, _) =>
-                const PlaceholderPage(title: '커뮤니티', icon: DpIcons.community),
+            builder: (_, _) => const CommunityHomePage(),
           ),
         ],
       ),
