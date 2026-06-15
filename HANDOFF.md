@@ -1,12 +1,18 @@
 # HANDOFF — React→Flutter 전환 & 프로토 UI
 
 > 최종 업데이트: 2026-06-15 · 브랜치 전략: **main 보호 · develop 통합 · 작업브랜치→develop PR→머지→main 릴리스 PR**(CLAUDE.md "🔀 Git 브랜치 전략" + 전역 규칙).
-> **상태: 설계·계획 + 디자인/Eng 리뷰 완료 + P1·P2·P3(main, PR#3) + P4a(PR#5) + P4b(PR#6) + P4c 구현 완료.** 다음은 **P4d(AI 코드리뷰 REV-001 + KILL_SWITCH/Quota)**.
+> **상태: 설계·계획 + 디자인/Eng 리뷰 완료 + P1·P2·P3(main, PR#3) + P4a(PR#5) + P4b(PR#6) + P4c(PR#7) + P4d 구현 완료.** 다음은 **P4e(AI 멘토 SSE 채팅, MEN)**.
 
 ## 브랜치/머지 현황 (2026-06-15)
 - **main**: P1·P2·P3 통합됨(PR#3 머지, merge commit `abf9056`). main 직접 푸시 금지.
-- **develop**: 통합 브랜치. Git 정책(PR#4)·P4a(PR#5)·P4b(PR#6) 머지됨. P4c는 `feat/p4c-web-content-sandbox-monaco`에서 develop으로 PR(진행).
+- **develop**: 통합 브랜치. Git 정책(PR#4)·P4a(PR#5)·P4b(PR#6)·P4c(PR#7) 머지됨. P4d는 `feat/p4d-web-ai-review`에서 develop으로 PR(진행).
 - **CI**: `analyze-test` job의 **Format check(`dart format --set-exit-if-changed`)** 가 게이트 — 커밋 전 항상 `dart format` 적용(P3 머지 때 format 미적용으로 1차 실패한 교훈). 골든은 `--exclude-tags golden`로 CI 제외.
+
+## P4d 구현 완료 (2026-06-15, feat/p4d-web-ai-review, 커밋 1ac80c1~da3df39)
+P4c Sandbox 리뷰 칸(`_ReviewPlaceholder`)을 **AI 코드리뷰(REV-001)**로 채움 + KILL_SWITCH/Quota 종결(P4b·P4c 이월 §9.2) TDD(Task 0~4). **검증됨**: `melos analyze`(전 멤버 No issues)·`melos test`(web 60·dp_design 19·dp_core 28·admin 1·mobile 1 PASS).
+- Task0(P3 보강): `DpQuota.retryAfterSeconds`를 `int?`로 + null/음수 → "잠시 후 다시 시도해 주세요" 무기한 문구(F6-b, 0초·음수 오안내 차단). Task1: dp_core `CodeReview`/`ReviewIssue` freezed(`id`/`status` 폴링 자리 선확보 F6-e). Task2: `ReviewState`(sealed 6종)+`ReviewController`(`ApiClient.post` `/reviews`→`isKillSwitch`/`isQuota` 분기)+`POST /reviews` 픽스처. Task3: `ReviewPanel`(idle/loading/loaded[신뢰도 진행바·잘한점·개선·보안 라인·심각도색·👍👎 no-op]/killSwitch[대체행동 "커뮤니티 둘러보기"→`/community` 배선 F6-a]/quota/failed 6분기 전수 위젯테스트). Task4: `SandboxPage` 리뷰칸 `_ReviewPlaceholder`→`ReviewPanel` 결선 + 통합 스모크.
+- **P4d 교훈/플랜 보정**: ① **사전 API 검증이 또 결정적** — 플랜은 `DpQuota(retryAfterSeconds: int?)`+null 무기한 문구를 전제했으나 실제 P3 `DpQuota`는 `required int`(non-nullable)+"약 N초" 고정 → 컴파일 실패. 플랜 F6-b가 예견한 "P3 보강 선행"을 Task0으로 실행(추측 금지). ② go_router 테스트 빌더 `(_, __)`→`(_, _)`(flutter_lints 6.0). ③ DpKillSwitch(altActionLabel/onAltAction)·DpSpacing.xs·DpIcons.thumbUp/thumbDown/dotSmall/stepDone·context.dpColors.success/warning/danger/primaryText/textSecondary 모두 일치 확인.
+- **후속**: REV "멘토에게 질문" 연결은 P4e. 👍👎 피드백 전송(`POST /reviews/:id/feedback`)·Retry-After 카운트다운(P3 `DpQuota` Stateful 전환)·동기→비동기 폴링 전환은 후속 이월.
 
 ## P4c 구현 완료 (2026-06-15, feat/p4c-web-content-sandbox-monaco, 커밋 3aa6a13~e10cc6a)
 콘텐츠 뷰어(CNT-001) + Sandbox(SBX-001: Monaco·실행 SSE·DD5 반응형) 골든패스 TDD 완성(Task 1~7). **검증됨**: `melos analyze`(전 멤버 No issues)·`melos test`(web 48·dp_design 17·dp_core 26·admin 1·mobile 1 PASS)·`flutter build web` 성공(conditional import web 구현 dart2js 컴파일 확인).
@@ -61,7 +67,7 @@ melos 7 + Dart pub workspaces 모노레포 골격: `packages/dp_core`(순수 Dar
 ## 다음 세션 (RESUME HERE) — 전체 리뷰 완료, 구현 시작
 
 1. **✅ Eng Review 완료(2026-06-14)**: P4(web)·P6(mobile) 심층 리뷰 → 결정 D1~D4 승인 → 7개 플랜(P2·P4b~f·P6) 반영 완료. 요약: `docs/superpowers/specs/2026-06-14-eng-review-summary.md`. 결정: D1(P2 단일 SSE 기반 — `ApiClient.sse()`·`SseStage` 단일출처·`fromStep`), D2(DD8 핵심+`MockSseSource.failAfter`+60s, 재개키는 백엔드 합의까지 fromStep 보류), D3(query-aware `MockHttpAdapter`), D4(P6 재연결 동기화 최소+ConnectivityService, OAuth·secure_storage 이관). 필수수정 F4·F5·F6·F9는 해당 플랜에 반영됨.
-2. **✅ P1·P2·P3·P4a·P4b·P4c 완료** — 위 절들. 다음은 **P4d(AI 코드리뷰 REV-001 + KILL_SWITCH/Quota)**: `docs/superpowers/plans/2026-06-14-p4d-web-ai-review.md`. **순서 의존** P4d→P4e→P4f→P5→P6→P7. **착수 게이트 충족**: P4c Sandbox(`SandboxPage`·`_ReviewPlaceholder`·`RunController`)·P2 SSE·P3 dp_design(`DpKillSwitch`/`DpQuota`). P4d에서 P4c의 `_ReviewPlaceholder`를 REV-001로 채우고 Sandbox의 killSwitch/quota를 `DpKillSwitch`/`DpQuota` 전용 위젯으로 렌더. **브랜치 정책 준수**: feat 브랜치 → develop PR → 머지, 커밋 전 `dart format`. 서브에이전트 위임 시 **범위 강제**(CLAUDE.md 절대 조건 4) + **컨트롤러 직접 검증** 필수. **플랜 코드의 API 가정은 항상 dp_core/dp_design 실제 시그니처로 사전 검증**(P4c는 사전 검증으로 0건 교정 — P4b 4건 대비 효과 확인).
+2. **✅ P1·P2·P3·P4a·P4b·P4c·P4d 완료** — 위 절들. 다음은 **P4e(AI 멘토 SSE 채팅, MEN)**: `docs/superpowers/plans/2026-06-14-p4e-web-mentor-sse.md`. **순서 의존** P4e→P4f→P5→P6→P7. **착수 게이트 충족**: P2 SSE(`ApiClient.sse`·`SseClient`·`MockSseSource`)·P4b PATH SSE 패턴(`*ConnectProvider`·DD8)·P4d REV(멘토 질문 연결 지점). **브랜치 정책 준수**: feat 브랜치 → develop PR → 머지, 커밋 전 `dart format`. 서브에이전트 위임 시 **범위 강제**(CLAUDE.md 절대 조건 4) + **컨트롤러 직접 검증** 필수. **플랜 코드의 API 가정은 항상 dp_core/dp_design 실제 시그니처로 사전 검증**(P4c 0건·P4d 1건[DpQuota nullable 보강 선행] 교정 — 사전 검증이 컴파일 실패를 선제 차단).
 
 ## 구현 시 남은 결정/보강 (플랜에 노트로 명시됨)
 
