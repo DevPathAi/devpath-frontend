@@ -9,6 +9,7 @@ import '../features/auth/presentation/login_page.dart';
 import '../features/auth/state/auth_state.dart';
 import '../features/common/presentation/placeholder_page.dart';
 import '../features/content/presentation/content_page.dart';
+import '../features/dashboard/presentation/dashboard_page.dart';
 import '../features/mentor/presentation/mentor_page.dart';
 import '../features/onboarding/presentation/onboarding_page.dart';
 import '../features/path/presentation/path_page.dart';
@@ -51,11 +52,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       ShellRoute(
         builder: (_, _, child) => AppShell(child: child),
         routes: [
-          GoRoute(
-            path: '/dashboard',
-            builder: (_, _) =>
-                const PlaceholderPage(title: '대시보드', icon: DpIcons.dashboard),
-          ),
+          GoRoute(path: '/dashboard', builder: (_, _) => const DashboardPage()),
           GoRoute(path: '/path', builder: (_, _) => const PathPage()),
           GoRoute(
             path: '/content/:id',

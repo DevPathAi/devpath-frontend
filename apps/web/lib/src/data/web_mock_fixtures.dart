@@ -44,6 +44,16 @@ final Map<String, MockFixture> webMockFixtures = {
           '# 비동기 기초\n\nDart의 `Future`와 `async`/`await`로 비동기 흐름을 다룹니다.\n\n```dart\nFuture<int> answer() async => 42;\n```\n',
     },
   ),
+  // 대시보드(DASH-001)
+  'GET /dashboard': (
+    200,
+    {
+      'streakDays': 7,
+      'progressPercent': 62,
+      'nextTaskTitle': '비동기 기초',
+      'badges': ['첫 경로', '7일 연속'],
+    },
+  ),
   // AI 코드리뷰(REV-001)
   'POST /reviews': (
     200,
