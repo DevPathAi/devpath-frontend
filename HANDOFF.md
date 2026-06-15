@@ -1,12 +1,18 @@
 # HANDOFF — React→Flutter 전환 & 프로토 UI
 
-> 최종 업데이트: 2026-06-14 · 브랜치 전략 도입: **main 보호 · develop 통합 · 작업브랜치→develop PR→머지→main 릴리스 PR**(CLAUDE.md "🔀 Git 브랜치 전략" + 전역 규칙).
-> **상태: 설계·계획 + 디자인/Eng 리뷰 완료 + P1·P2·P3(main, PR#3) + P4a(develop, PR#5) + P4b 구현 완료.** 다음은 **P4c(콘텐츠 뷰어 + Sandbox/Monaco + AI 리뷰)**.
+> 최종 업데이트: 2026-06-15 · 브랜치 전략: **main 보호 · develop 통합 · 작업브랜치→develop PR→머지→main 릴리스 PR**(CLAUDE.md "🔀 Git 브랜치 전략" + 전역 규칙).
+> **상태: 설계·계획 + 디자인/Eng 리뷰 완료 + P1·P2·P3(main, PR#3) + P4a(PR#5) + P4b(PR#6) + P4c 구현 완료.** 다음은 **P4d(AI 코드리뷰 REV-001 + KILL_SWITCH/Quota)**.
 
-## 브랜치/머지 현황 (2026-06-14)
+## 브랜치/머지 현황 (2026-06-15)
 - **main**: P1·P2·P3 통합됨(PR#3 머지, merge commit `abf9056`). main 직접 푸시 금지.
-- **develop**: 통합 브랜치. Git 정책(PR#4)·P4a(PR#5) 머지됨. P4b는 `feat/p4b-web-onboarding-path-sse`에서 develop으로 PR 예정.
+- **develop**: 통합 브랜치. Git 정책(PR#4)·P4a(PR#5)·P4b(PR#6) 머지됨. P4c는 `feat/p4c-web-content-sandbox-monaco`에서 develop으로 PR(진행).
 - **CI**: `analyze-test` job의 **Format check(`dart format --set-exit-if-changed`)** 가 게이트 — 커밋 전 항상 `dart format` 적용(P3 머지 때 format 미적용으로 1차 실패한 교훈). 골든은 `--exclude-tags golden`로 CI 제외.
+
+## P4c 구현 완료 (2026-06-15, feat/p4c-web-content-sandbox-monaco, 커밋 3aa6a13~e10cc6a)
+콘텐츠 뷰어(CNT-001) + Sandbox(SBX-001: Monaco·실행 SSE·DD5 반응형) 골든패스 TDD 완성(Task 1~7). **검증됨**: `melos analyze`(전 멤버 No issues)·`melos test`(web 48·dp_design 17·dp_core 26·admin 1·mobile 1 PASS)·`flutter build web` 성공(conditional import web 구현 dart2js 컴파일 확인).
+- Task1: `ContentController`/`ContentState`(sealed)+`ContentPage`(DpMarkdown)+`GET /contents/c1` 픽스처+`/content/:id` 라우트. Task2: `RunState`(idle/running/done/unavailable+appended). Task3: `SandboxLayout`(DD5 3/2/1페인, 경계 4값 1023/1024/1239/1240 off-by-one, IndexedStack 상태보존, 1024–1239 로그접이). Task4: `MonacoEditorView`(conditional import: 공개+stub+web / `dart:ui_web`·`package:web`·`js_interop` / F5-a viewType 1회·dispose, F5-b layout(), F5-c Esc sentinel Focus) + `web:^1.1.0` + index.html `createDevpathEditor` 셈. Task5: `sandboxRunConnectProvider`(목 지연emit/실서버 `apiClient.sse`)+`RunController`(503→RunUnavailable, 재진입 가드 `_inFlight`). Task6: `SandboxPage` 조립(에디터|실행로그 codeLogBg|리뷰 placeholder)+`/sandbox` 라우트. Task7: 콘텐츠→Sandbox 통합 스모크.
+- **P4c 교훈/플랜 보정**: ① **플랜 API 가정이 이번엔 전부 실제 시그니처와 일치**(P4b의 4건 교정 대비 0건) — 사전 검증으로 확인(ApiClient.get/sse·ApiException{code,message}·ApiErrorCode.sandboxUnavailable·SseEvent{event,data}·DpMarkdown/DpError/DpSandboxUnavailable/DpEmpty·DpIcons.code/expandMore/expandLess/content·context.dpColors.codeLogBg/codeText/border 모두 OK). ② **index.html CDN SRI**: Semgrep가 Monaco loader CDN의 `integrity` 누락 경고 → cdnjs API에서 실제 sha512 받아 `integrity`+`crossorigin` 적용(추측 금지). ③ **Task6 라우트 빌더**: 플랜의 `(_, __)`는 flutter_lints 6.0 `unnecessary_underscores` 위반 → `(_, _)` 와일드카드로 교정. ④ **통합 스모크 테마 전환**: 무테마 ContentPage→DpTheme SandboxPage로 `pumpWidget` 전환 시 `AnimatedTheme` 전환 중 `context.dpColors` null → 콘텐츠 MaterialApp에도 `theme: DpTheme.light()` 제공(실제 앱 DevPathWebApp은 항상 DpTheme 보유와 동일).
+- **후속**: AI 리뷰 칸은 `_ReviewPlaceholder` → P4d에서 REV-001로 채움. Sandbox의 killSwitch/quota 전용 위젯 렌더도 P4d. Monaco 실동작은 수동 `flutter run -d chrome` 확인 필요(빌드만으론 런타임 CDN 미검증).
 
 ## P4b 구현 완료 (2026-06-14, feat/p4b-web-onboarding-path-sse, 커밋 a0deb0a~88e8c34)
 온보딩·진단 → 학습경로 SSE 생성(PATH-001) 골든패스 TDD 완성(Task 0~6). **검증됨**: `melos analyze`(전 멤버 No issues)·`melos test`(web 31·dp_design 17·dp_core 26·admin 1·mobile 1 PASS).
@@ -55,7 +61,7 @@ melos 7 + Dart pub workspaces 모노레포 골격: `packages/dp_core`(순수 Dar
 ## 다음 세션 (RESUME HERE) — 전체 리뷰 완료, 구현 시작
 
 1. **✅ Eng Review 완료(2026-06-14)**: P4(web)·P6(mobile) 심층 리뷰 → 결정 D1~D4 승인 → 7개 플랜(P2·P4b~f·P6) 반영 완료. 요약: `docs/superpowers/specs/2026-06-14-eng-review-summary.md`. 결정: D1(P2 단일 SSE 기반 — `ApiClient.sse()`·`SseStage` 단일출처·`fromStep`), D2(DD8 핵심+`MockSseSource.failAfter`+60s, 재개키는 백엔드 합의까지 fromStep 보류), D3(query-aware `MockHttpAdapter`), D4(P6 재연결 동기화 최소+ConnectivityService, OAuth·secure_storage 이관). 필수수정 F4·F5·F6·F9는 해당 플랜에 반영됨.
-2. **✅ P1·P2·P3·P4a·P4b 완료** — 위 절들. 다음은 **P4c(콘텐츠 뷰어 CNT-001 + Sandbox/Monaco SBX-001 DD5 + AI 리뷰 REV-001)**: `docs/superpowers/plans/2026-06-14-p4c-web-content-sandbox-monaco.md`. **순서 의존** P4c→…→P4f→P5→P6→P7. **착수 게이트 충족**: P4a 셸·P4b PATH(`pathSseConnectProvider`·`PathController` 패턴)·P2 SSE·P3 dp_design(`DpMarkdown`·`DpKillSwitch`/`DpQuota`). P4c에서 PATH의 killSwitch/quota를 전용 위젯으로 렌더 일괄 적용 + Monaco conditional import(web 전용). **브랜치 정책 준수**: feat 브랜치 → develop PR → 머지, 커밋 전 `dart format`. 서브에이전트 위임 시 **범위 강제**(CLAUDE.md 절대 조건 4) + **컨트롤러 직접 검증** 필수. **플랜 코드의 API 가정은 항상 dp_core 실제 시그니처로 검증**(P4b에서 ApiException·MockSseSource 등 4건 교정 필요했음).
+2. **✅ P1·P2·P3·P4a·P4b·P4c 완료** — 위 절들. 다음은 **P4d(AI 코드리뷰 REV-001 + KILL_SWITCH/Quota)**: `docs/superpowers/plans/2026-06-14-p4d-web-ai-review.md`. **순서 의존** P4d→P4e→P4f→P5→P6→P7. **착수 게이트 충족**: P4c Sandbox(`SandboxPage`·`_ReviewPlaceholder`·`RunController`)·P2 SSE·P3 dp_design(`DpKillSwitch`/`DpQuota`). P4d에서 P4c의 `_ReviewPlaceholder`를 REV-001로 채우고 Sandbox의 killSwitch/quota를 `DpKillSwitch`/`DpQuota` 전용 위젯으로 렌더. **브랜치 정책 준수**: feat 브랜치 → develop PR → 머지, 커밋 전 `dart format`. 서브에이전트 위임 시 **범위 강제**(CLAUDE.md 절대 조건 4) + **컨트롤러 직접 검증** 필수. **플랜 코드의 API 가정은 항상 dp_core/dp_design 실제 시그니처로 사전 검증**(P4c는 사전 검증으로 0건 교정 — P4b 4건 대비 효과 확인).
 
 ## 구현 시 남은 결정/보강 (플랜에 노트로 명시됨)
 
