@@ -1,12 +1,18 @@
 # HANDOFF — React→Flutter 전환 & 프로토 UI
 
 > 최종 업데이트: 2026-06-15 · 브랜치 전략: **main 보호 · develop 통합 · 작업브랜치→develop PR→머지→main 릴리스 PR**(CLAUDE.md "🔀 Git 브랜치 전략" + 전역 규칙).
-> **상태: 설계·계획 + 디자인/Eng 리뷰 완료 + P1·P2·P3(main, PR#3) + P4a(PR#5) + P4b(PR#6) + P4c(PR#7) + P4d 구현 완료.** 다음은 **P4e(AI 멘토 SSE 채팅, MEN)**.
+> **상태: 설계·계획 + 디자인/Eng 리뷰 완료 + P1·P2·P3(main, PR#3) + P4a(PR#5) + P4b(PR#6) + P4c(PR#7) + P4d(PR#8) + P4e 구현 완료.** 다음은 **P4f(대시보드 + 커뮤니티)**.
 
 ## 브랜치/머지 현황 (2026-06-15)
 - **main**: P1·P2·P3 통합됨(PR#3 머지, merge commit `abf9056`). main 직접 푸시 금지.
-- **develop**: 통합 브랜치. Git 정책(PR#4)·P4a(PR#5)·P4b(PR#6)·P4c(PR#7) 머지됨. P4d는 `feat/p4d-web-ai-review`에서 develop으로 PR(진행).
+- **develop**: 통합 브랜치. Git 정책(PR#4)·P4a(PR#5)·P4b(PR#6)·P4c(PR#7)·P4d(PR#8) 머지됨. P4e는 `feat/p4e-web-mentor-sse`에서 develop으로 PR(진행).
 - **CI**: `analyze-test` job의 **Format check(`dart format --set-exit-if-changed`)** 가 게이트 — 커밋 전 항상 `dart format` 적용(P3 머지 때 format 미적용으로 1차 실패한 교훈). 골든은 `--exclude-tags golden`로 CI 제외.
+
+## P4e 구현 완료 (2026-06-15, feat/p4e-web-mentor-sse, 커밋 d289230~95eb961)
+AI 멘토(MEN-001, SSE 토큰 스트리밍 채팅) TDD(Task 1~4). **검증됨**: `melos analyze`(전 멤버 No issues)·`melos test`(web 68·dp_design 19·dp_core 28·admin 1·mobile 1 PASS).
+- Task1: `mentorSseConnectProvider`(목=토큰 지연emit/실서버=`apiClient.sse('/ai-mentor/sessions')`, D1 dio-free, `fromStep` 선확보 D2). Task2: `MentorState`(ChatMessage·MentorStatus[idle/streaming/partial/killSwitch/failed])+`MentorController`(토큰 append, KILL_SWITCH 분기, 끊김→partial 부분답변 보존 D2, 빈 버블 prune, 취소 경쟁조건 targetIndex 캡처). Task3: `MentorPage`(빈상태 예시질문 칩·버블 ValueKey F9·타이핑 인디케이터·partial "다시 시도" 재전송·composer). Task4: `/mentor` `PlaceholderPage`→`MentorPage` 결선.
+- **P4e 교훈/플랜 보정**: ① **플랜 컨트롤러 hang 버그를 사전 진단·수정** — 플랜의 "연속 send" 테스트는 `await f1`(첫 send future)로 끝나는데, 두 번째 send가 첫 구독을 `_sub.cancel()`하면 취소된 구독은 onDone/onError를 부르지 않아 첫 Completer가 영원히 미완료(테스트 타임아웃). 근본 원인 규명 후 **새 send 시 이전 in-flight Completer 완료**(P4c RunController의 `_inFlight` 패턴) 추가로 해소(추측 아닌 원인 수정). ② Task4 라우트 빌더 `(_, __)`→`(_, _)`(flutter_lints 6.0). ③ dp_* API(apiClient.sse·SseEvent·ApiException.isKillSwitch·DpEmpty·DpKillSwitch·DpIcons.mentor/send·DpRadius.card·context.dpColors.onPrimary 등) 전부 일치 — 0건 시그니처 교정.
+- **후속(리스크)**: 실서버 SSE 와이어(토큰 event명·DONE 마커·후속질문 payload) 백엔드 미합의 → 목만 동작, 실서버 분기는 합의 후. 중간 재개는 resend로 단순화(`fromStep` 자리만). 후속질문 추천·세션 영속·REV→멘토 prefill 연결은 후속.
 
 ## P4d 구현 완료 (2026-06-15, feat/p4d-web-ai-review, 커밋 1ac80c1~da3df39)
 P4c Sandbox 리뷰 칸(`_ReviewPlaceholder`)을 **AI 코드리뷰(REV-001)**로 채움 + KILL_SWITCH/Quota 종결(P4b·P4c 이월 §9.2) TDD(Task 0~4). **검증됨**: `melos analyze`(전 멤버 No issues)·`melos test`(web 60·dp_design 19·dp_core 28·admin 1·mobile 1 PASS).
@@ -67,7 +73,7 @@ melos 7 + Dart pub workspaces 모노레포 골격: `packages/dp_core`(순수 Dar
 ## 다음 세션 (RESUME HERE) — 전체 리뷰 완료, 구현 시작
 
 1. **✅ Eng Review 완료(2026-06-14)**: P4(web)·P6(mobile) 심층 리뷰 → 결정 D1~D4 승인 → 7개 플랜(P2·P4b~f·P6) 반영 완료. 요약: `docs/superpowers/specs/2026-06-14-eng-review-summary.md`. 결정: D1(P2 단일 SSE 기반 — `ApiClient.sse()`·`SseStage` 단일출처·`fromStep`), D2(DD8 핵심+`MockSseSource.failAfter`+60s, 재개키는 백엔드 합의까지 fromStep 보류), D3(query-aware `MockHttpAdapter`), D4(P6 재연결 동기화 최소+ConnectivityService, OAuth·secure_storage 이관). 필수수정 F4·F5·F6·F9는 해당 플랜에 반영됨.
-2. **✅ P1·P2·P3·P4a·P4b·P4c·P4d 완료** — 위 절들. 다음은 **P4e(AI 멘토 SSE 채팅, MEN)**: `docs/superpowers/plans/2026-06-14-p4e-web-mentor-sse.md`. **순서 의존** P4e→P4f→P5→P6→P7. **착수 게이트 충족**: P2 SSE(`ApiClient.sse`·`SseClient`·`MockSseSource`)·P4b PATH SSE 패턴(`*ConnectProvider`·DD8)·P4d REV(멘토 질문 연결 지점). **브랜치 정책 준수**: feat 브랜치 → develop PR → 머지, 커밋 전 `dart format`. 서브에이전트 위임 시 **범위 강제**(CLAUDE.md 절대 조건 4) + **컨트롤러 직접 검증** 필수. **플랜 코드의 API 가정은 항상 dp_core/dp_design 실제 시그니처로 사전 검증**(P4c 0건·P4d 1건[DpQuota nullable 보강 선행] 교정 — 사전 검증이 컴파일 실패를 선제 차단).
+2. **✅ P1·P2·P3·P4a·P4b·P4c·P4d·P4e 완료** — 위 절들. 다음은 **P4f(대시보드 + 커뮤니티)**: `docs/superpowers/plans/2026-06-14-p4f-web-dashboard-community.md`. **순서 의존** P4f→P5→P6→P7. **착수 게이트 충족**: P4a 셸·P2 데이터(`ApiClient.get`·`Page<T>` 커서·query-aware `MockHttpAdapter`)·P3 dp_design 상태위젯. **브랜치 정책 준수**: feat 브랜치 → develop PR → 머지, 커밋 전 `dart format`. 서브에이전트 위임 시 **범위 강제**(CLAUDE.md 절대 조건 4) + **컨트롤러 직접 검증** 필수. **플랜 코드의 API 가정은 항상 dp_core/dp_design 실제 시그니처로 사전 검증**(P4c 0건·P4d 1건[DpQuota 보강 선행]·P4e 1건[컨트롤러 hang 사전 진단·수정] — 사전 검증이 컴파일 실패·런타임 hang을 선제 차단).
 
 ## 구현 시 남은 결정/보강 (플랜에 노트로 명시됨)
 
