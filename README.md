@@ -4,40 +4,50 @@
 
 ## 구조
 
+**Dart pub workspaces + melos 7** 기반 Flutter 모노레포입니다(과거 React `web`/`admin`은 Flutter로 전환 완료).
+
 ```
 devpath-frontend/
-├── web/        # 사용자 React SPA (Vite + TS)
-├── admin/      # 관리자 React SPA (콘텐츠·FinOps)
-└── mobile/     # Flutter 앱 (모바일 대시·퀵 캡처)
+├── apps/
+│   ├── web/      # 사용자 앱 (Flutter Web)
+│   ├── admin/    # 관리자 콘솔 (Flutter Web · 콘텐츠·FinOps)
+│   └── mobile/   # 모바일 앱 (Flutter · 대시·퀵 캡처)
+└── packages/
+    ├── dp_core/    # 도메인·데이터 계층 (순수 Dart · API·SSE·모델·목)
+    └── dp_design/  # 디자인 시스템 (Flutter · Material 3 토큰, SSoT=DESIGN.md)
 ```
 
 | 영역 | 스택 |
 |------|------|
-| web | React 18+ · TypeScript · Vite · (예정: Zustand, TanStack Query, Monaco Editor) |
-| admin | React 18+ · TypeScript · Vite |
-| mobile | Flutter 3.x · Dart · (예정: Riverpod, go_router, dio) |
+| web / admin | Flutter Web · Dart · Riverpod 3 · go_router · (Sandbox: Monaco Editor) |
+| mobile | Flutter · Dart · Riverpod 3 · go_router · (캐시: drift) |
+| 공용 | dp_core(dio·SSE·freezed 모델·목 어댑터) · dp_design(테마·상태 위젯) |
 
 ## 실행
 
-### web / admin
+루트에서 **melos**로 워크스페이스를 다룹니다(설정은 루트 `pubspec.yaml`의 `workspace:`+`melos:`, 요약은 `melos_README.md`).
 
 ```bash
-cd web        # 또는 admin
-npm install
-npm run dev
+# 최초 1회
+dart pub global activate melos 7.0.0
+
+# 의존성 동기화 / 분석 / 테스트 / 포맷
+melos bootstrap
+melos run analyze
+melos run test
+melos run format   # 적용: melos run fix
 ```
 
-### mobile
+### 단일 앱 실행
 
 ```bash
-cd mobile
-flutter pub get
-flutter run
+cd apps/web && flutter run -d chrome    # admin 동일
+cd apps/mobile && flutter run
 ```
 
 ## 환경 변수
 
-API 엔드포인트·키 등은 `.env`로 주입하며 **절대 커밋하지 않습니다**. 예시는 각 앱의 `.env.example`을 따릅니다 ([documents/10_환경_설정_템플릿](https://github.com/DevPathAi/documents/blob/main/10_환경_설정_템플릿.md)).
+런타임 설정(API 엔드포인트·`useMock` 등)은 **`--dart-define`**(또는 `--dart-define-from-file`)로 주입하고 `AppConfig.fromEnvironment`로 읽습니다. 기본값은 목 프로토라 별도 주입 없이도 실행됩니다. 비밀값(키·토큰)은 **절대 커밋하지 않습니다** ([documents/10_환경_설정_템플릿](https://github.com/DevPathAi/documents/blob/main/10_환경_설정_템플릿.md)).
 
 ## 개발 규칙
 
