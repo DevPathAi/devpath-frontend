@@ -1,4 +1,3 @@
-import 'package:devpath_admin/src/features/users/application/users_controller.dart';
 import 'package:devpath_admin/src/features/users/data/admin_user_row.dart';
 import 'package:devpath_admin/src/features/users/data/users_source.dart';
 import 'package:devpath_admin/src/features/users/presentation/users_page.dart';
@@ -14,18 +13,35 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
-    final c = ProviderContainer(overrides: [
-      adminUsersFetchProvider.overrideWithValue(({String? cursor, String? status}) async =>
-          Page(data: [
-            AdminUserRow(id: 'u1', nickname: '지수', email: 'a@x', role: UserRole.learner, status: 'ACTIVE'),
-          ], limit: 20)),
-    ]);
+    final c = ProviderContainer(
+      overrides: [
+        adminUsersFetchProvider.overrideWithValue(
+          ({String? cursor, String? status}) async => Page(
+            data: [
+              AdminUserRow(
+                id: 'u1',
+                nickname: '지수',
+                email: 'a@x',
+                role: UserRole.learner,
+                status: 'ACTIVE',
+              ),
+            ],
+            limit: 20,
+          ),
+        ),
+      ],
+    );
     addTearDown(c.dispose);
 
-    await tester.pumpWidget(UncontrolledProviderScope(
-      container: c,
-      child: MaterialApp(theme: DpTheme.light(), home: const AdminUsersPage()),
-    ));
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: c,
+        child: MaterialApp(
+          theme: DpTheme.light(),
+          home: const AdminUsersPage(),
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('지수'), findsOneWidget);

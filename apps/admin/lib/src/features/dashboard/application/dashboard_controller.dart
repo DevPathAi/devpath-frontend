@@ -11,14 +11,18 @@ class AdminDashController extends Notifier<AdminDashState> {
   Future<void> load() async {
     state = const AdminDashLoading();
     try {
-      final json =
-          await ref.read(apiClientProvider).get<Map<String, dynamic>>('/admin/stats');
-      state = AdminDashLoaded(json.map((k, v) => MapEntry(k, (v as num).toInt())));
+      final json = await ref
+          .read(apiClientProvider)
+          .get<Map<String, dynamic>>('/admin/stats');
+      state = AdminDashLoaded(
+        json.map((k, v) => MapEntry(k, (v as num).toInt())),
+      );
     } on ApiException catch (e) {
       state = AdminDashFailed(e.message);
     }
   }
 }
 
-final adminDashProvider =
-    NotifierProvider<AdminDashController, AdminDashState>(AdminDashController.new);
+final adminDashProvider = NotifierProvider<AdminDashController, AdminDashState>(
+  AdminDashController.new,
+);

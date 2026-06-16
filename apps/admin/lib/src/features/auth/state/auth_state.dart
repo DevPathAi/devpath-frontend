@@ -12,5 +12,6 @@ class AdminUnauthed extends AdminAuthState {
 class AdminAuthed extends AdminAuthState {
   const AdminAuthed(this.user);
   final User user;
-  bool get isAdmin => user.role == UserRole.admin || user.role == UserRole.owner;
+  bool get isAdmin =>
+      user.role == UserRole.admin || user.role == UserRole.owner;
 }

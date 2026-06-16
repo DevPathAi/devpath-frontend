@@ -13,12 +13,15 @@ class AdminAuthController extends Notifier<AdminAuthState> {
       final data = await ref
           .read(apiClientProvider)
           .post<Map<String, dynamic>>('/admin/auth/login');
-      await ref.read(tokenStoreProvider).save(
+      await ref
+          .read(tokenStoreProvider)
+          .save(
             access: data['accessToken'] as String,
             refresh: data['refreshToken'] as String,
           );
       state = AdminAuthed(
-          User.fromJson((data['user'] as Map).cast<String, dynamic>()));
+        User.fromJson((data['user'] as Map).cast<String, dynamic>()),
+      );
     } on ApiException catch (e) {
       state = AdminUnauthed(error: e.message);
     }
@@ -30,5 +33,6 @@ class AdminAuthController extends Notifier<AdminAuthState> {
   }
 }
 
-final adminAuthProvider =
-    NotifierProvider<AdminAuthController, AdminAuthState>(AdminAuthController.new);
+final adminAuthProvider = NotifierProvider<AdminAuthController, AdminAuthState>(
+  AdminAuthController.new,
+);

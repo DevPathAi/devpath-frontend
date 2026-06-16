@@ -10,20 +10,28 @@ import 'package:flutter_test/flutter_test.dart';
 class _Fake extends ReportsController {
   @override
   build() => ReportsLoaded([
-        const Report(id: 'r1', type: 'POST', targetTitle: '스팸 글', reason: '광고', status: 'OPEN'),
-      ]);
+    const Report(
+      id: 'r1',
+      type: 'POST',
+      targetTitle: '스팸 글',
+      reason: '광고',
+      status: 'OPEN',
+    ),
+  ]);
 }
 
 void main() {
   testWidgets('신고 목록 렌더 + 처리 버튼', (tester) async {
-    final c = ProviderContainer(overrides: [
-      reportsProvider.overrideWith(() => _Fake()),
-    ]);
+    final c = ProviderContainer(
+      overrides: [reportsProvider.overrideWith(() => _Fake())],
+    );
     addTearDown(c.dispose);
-    await tester.pumpWidget(UncontrolledProviderScope(
-      container: c,
-      child: MaterialApp(theme: DpTheme.light(), home: const ReportsPage()),
-    ));
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: c,
+        child: MaterialApp(theme: DpTheme.light(), home: const ReportsPage()),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(find.text('스팸 글'), findsOneWidget);
     expect(find.text('처리'), findsWidgets);

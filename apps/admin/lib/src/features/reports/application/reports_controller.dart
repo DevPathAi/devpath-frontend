@@ -14,8 +14,9 @@ class ReportsController extends Notifier<ReportsState> {
 
   Future<void> _load() async {
     try {
-      final json =
-          await ref.read(apiClientProvider).get<Map<String, dynamic>>('/admin/reports');
+      final json = await ref
+          .read(apiClientProvider)
+          .get<Map<String, dynamic>>('/admin/reports');
       final list = (json['data'] as List)
           .map((o) => Report.fromJson((o as Map).cast<String, dynamic>()))
           .toList();
@@ -26,7 +27,8 @@ class ReportsController extends Notifier<ReportsState> {
   }
 
   Future<void> resolve(String id) async {
-    await ref.read(apiClientProvider)
+    await ref
+        .read(apiClientProvider)
         .post<Map<String, dynamic>>('/admin/reports/$id/resolve');
     final s = state;
     if (s is ReportsLoaded) {
@@ -35,5 +37,6 @@ class ReportsController extends Notifier<ReportsState> {
   }
 }
 
-final reportsProvider =
-    NotifierProvider<ReportsController, ReportsState>(ReportsController.new);
+final reportsProvider = NotifierProvider<ReportsController, ReportsState>(
+  ReportsController.new,
+);

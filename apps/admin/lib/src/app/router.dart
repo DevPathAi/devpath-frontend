@@ -30,17 +30,22 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) =>
         adminGuard(ref.read(adminAuthProvider), state.matchedLocation),
     routes: [
-      GoRoute(path: '/login', builder: (_, __) => const AdminLoginPage()),
+      GoRoute(path: '/login', builder: (_, _) => const AdminLoginPage()),
       GoRoute(
-          path: '/forbidden',
-          builder: (_, __) => const Scaffold(
-              body: Center(child: Text('권한이 없습니다 (ADMIN/OWNER 전용)')))),
+        path: '/forbidden',
+        builder: (_, _) => const Scaffold(
+          body: Center(child: Text('권한이 없습니다 (ADMIN/OWNER 전용)')),
+        ),
+      ),
       ShellRoute(
-        builder: (_, __, child) => AdminShell(child: child),
+        builder: (_, _, child) => AdminShell(child: child),
         routes: [
-          GoRoute(path: '/dashboard', builder: (_, __) => const AdminDashboardPage()),
-          GoRoute(path: '/users', builder: (_, __) => const AdminUsersPage()),
-          GoRoute(path: '/reports', builder: (_, __) => const ReportsPage()),
+          GoRoute(
+            path: '/dashboard',
+            builder: (_, _) => const AdminDashboardPage(),
+          ),
+          GoRoute(path: '/users', builder: (_, _) => const AdminUsersPage()),
+          GoRoute(path: '/reports', builder: (_, _) => const ReportsPage()),
         ],
       ),
     ],

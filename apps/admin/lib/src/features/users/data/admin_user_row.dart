@@ -17,13 +17,13 @@ class AdminUserRow {
   final String status;
 
   factory AdminUserRow.fromJson(Map<String, dynamic> json) => AdminUserRow(
-        id: json['id'] as String,
-        nickname: json['nickname'] as String,
-        email: json['email'] as String,
-        role: UserRole.values.firstWhere(
-          (r) => r.name.toUpperCase() == (json['role'] as String?),
-          orElse: () => UserRole.unknown,
-        ),
-        status: (json['status'] as String?) ?? 'ACTIVE',
-      );
+    id: json['id'] as String,
+    nickname: json['nickname'] as String,
+    email: json['email'] as String,
+    role: UserRole.values.firstWhere(
+      (r) => r.name.toUpperCase() == (json['role'] as String?),
+      orElse: () => UserRole.unknown,
+    ),
+    status: (json['status'] as String?) ?? 'ACTIVE',
+  );
 }

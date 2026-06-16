@@ -11,9 +11,14 @@ class UsersController extends Notifier<UsersState> {
   UsersState build() => const UsersState();
 
   Future<void> load() async {
-    state = UsersState(phase: UsersPhase.loading, statusFilter: state.statusFilter);
+    state = UsersState(
+      phase: UsersPhase.loading,
+      statusFilter: state.statusFilter,
+    );
     try {
-      final page = await ref.read(adminUsersFetchProvider)(status: state.statusFilter);
+      final page = await ref.read(adminUsersFetchProvider)(
+        status: state.statusFilter,
+      );
       state = UsersState(
         rows: page.data,
         nextCursor: page.nextCursor,
@@ -21,7 +26,11 @@ class UsersController extends Notifier<UsersState> {
         phase: UsersPhase.loaded,
       );
     } on ApiException catch (e) {
-      state = state.copyWith(phase: UsersPhase.failed, nextCursor: state.nextCursor, error: e.message);
+      state = state.copyWith(
+        phase: UsersPhase.failed,
+        nextCursor: state.nextCursor,
+        error: e.message,
+      );
     }
   }
 
@@ -32,22 +41,30 @@ class UsersController extends Notifier<UsersState> {
 
   Future<void> loadMore() async {
     if (!state.hasMore) return;
-    final page = await ref
-        .read(adminUsersFetchProvider)(cursor: state.nextCursor, status: state.statusFilter);
+    final page = await ref.read(adminUsersFetchProvider)(
+      cursor: state.nextCursor,
+      status: state.statusFilter,
+    );
     state = state.copyWith(
       rows: [...state.rows, ...page.data],
       nextCursor: page.nextCursor,
     );
   }
 
-  void select(AdminUserRow row) => state = state.copyWith(selected: row, nextCursor: state.nextCursor);
+  void select(AdminUserRow row) =>
+      state = state.copyWith(selected: row, nextCursor: state.nextCursor);
 
   /// 제재(경고/7일/30일/밴) — 목 호출.
   Future<void> sanction(String userId, String action) async {
-    await ref.read(apiClientProvider)
-        .post<Map<String, dynamic>>('/admin/users/$userId/sanction', body: {'action': action});
+    await ref
+        .read(apiClientProvider)
+        .post<Map<String, dynamic>>(
+          '/admin/users/$userId/sanction',
+          body: {'action': action},
+        );
   }
 }
 
-final adminUsersProvider =
-    NotifierProvider<UsersController, UsersState>(UsersController.new);
+final adminUsersProvider = NotifierProvider<UsersController, UsersState>(
+  UsersController.new,
+);

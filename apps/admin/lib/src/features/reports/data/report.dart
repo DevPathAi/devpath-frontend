@@ -13,10 +13,10 @@ class Report {
   final String status;
 
   factory Report.fromJson(Map<String, dynamic> json) => Report(
-        id: json['id'] as String,
-        type: json['type'] as String,
-        targetTitle: json['targetTitle'] as String,
-        reason: json['reason'] as String,
-        status: (json['status'] as String?) ?? 'OPEN',
-      );
+    id: json['id'] as String,
+    type: json['type'] as String,
+    targetTitle: json['targetTitle'] as String,
+    reason: json['reason'] as String,
+    status: (json['status'] as String?) ?? 'OPEN',
+  );
 }

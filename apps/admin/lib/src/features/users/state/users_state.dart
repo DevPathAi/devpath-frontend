@@ -28,13 +28,12 @@ class UsersState {
     UsersPhase? phase,
     AdminUserRow? selected,
     String? error,
-  }) =>
-      UsersState(
-        rows: rows ?? this.rows,
-        nextCursor: nextCursor,
-        statusFilter: statusFilter ?? this.statusFilter,
-        phase: phase ?? this.phase,
-        selected: selected ?? this.selected,
-        error: error,
-      );
+  }) => UsersState(
+    rows: rows ?? this.rows,
+    nextCursor: nextCursor,
+    statusFilter: statusFilter ?? this.statusFilter,
+    phase: phase ?? this.phase,
+    selected: selected ?? this.selected,
+    error: error,
+  );
 }

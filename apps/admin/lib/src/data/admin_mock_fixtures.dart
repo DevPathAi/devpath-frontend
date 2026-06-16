@@ -20,9 +20,27 @@ final Map<String, MockFixture> adminMockFixtures = {
     200,
     {
       'data': [
-        {'id': 'u1', 'nickname': '지수', 'email': 'a@x.com', 'role': 'LEARNER', 'status': 'ACTIVE'},
-        {'id': 'u2', 'nickname': '민준', 'email': 'b@x.com', 'role': 'PRO', 'status': 'WARNED'},
-        {'id': 'u3', 'nickname': '서연', 'email': 'c@x.com', 'role': 'LEARNER', 'status': 'SUSPENDED'},
+        {
+          'id': 'u1',
+          'nickname': '지수',
+          'email': 'a@x.com',
+          'role': 'LEARNER',
+          'status': 'ACTIVE',
+        },
+        {
+          'id': 'u2',
+          'nickname': '민준',
+          'email': 'b@x.com',
+          'role': 'PRO',
+          'status': 'WARNED',
+        },
+        {
+          'id': 'u3',
+          'nickname': '서연',
+          'email': 'c@x.com',
+          'role': 'LEARNER',
+          'status': 'SUSPENDED',
+        },
       ],
       'nextCursor': null,
       'limit': 20,
@@ -34,8 +52,20 @@ final Map<String, MockFixture> adminMockFixtures = {
     200,
     {
       'data': [
-        {'id': 'r1', 'type': 'POST', 'targetTitle': '스팸 의심 글', 'reason': '광고', 'status': 'OPEN'},
-        {'id': 'r2', 'type': 'COMMENT', 'targetTitle': '욕설 댓글', 'reason': '비방', 'status': 'OPEN'},
+        {
+          'id': 'r1',
+          'type': 'POST',
+          'targetTitle': '스팸 의심 글',
+          'reason': '광고',
+          'status': 'OPEN',
+        },
+        {
+          'id': 'r2',
+          'type': 'COMMENT',
+          'targetTitle': '욕설 댓글',
+          'reason': '비방',
+          'status': 'OPEN',
+        },
       ],
       'nextCursor': null,
       'limit': 20,
