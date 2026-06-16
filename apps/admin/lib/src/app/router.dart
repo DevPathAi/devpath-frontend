@@ -6,6 +6,7 @@ import '../features/auth/application/auth_controller.dart';
 import '../features/auth/presentation/login_page.dart';
 import '../features/auth/state/auth_state.dart';
 import '../features/dashboard/presentation/dashboard_page.dart';
+import '../features/reports/presentation/reports_page.dart';
 import '../features/shell/presentation/admin_shell.dart';
 import '../features/users/presentation/users_page.dart';
 
@@ -39,7 +40,7 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(path: '/dashboard', builder: (_, __) => const AdminDashboardPage()),
           GoRoute(path: '/users', builder: (_, __) => const AdminUsersPage()),
-          // /reports는 Task 6에서 추가
+          GoRoute(path: '/reports', builder: (_, __) => const ReportsPage()),
         ],
       ),
     ],
