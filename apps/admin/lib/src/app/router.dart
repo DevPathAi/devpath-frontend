@@ -7,6 +7,7 @@ import '../features/auth/presentation/login_page.dart';
 import '../features/auth/state/auth_state.dart';
 import '../features/dashboard/presentation/dashboard_page.dart';
 import '../features/shell/presentation/admin_shell.dart';
+import '../features/users/presentation/users_page.dart';
 
 /// 가드: 미인증→/login, 비관리자→/forbidden, 관리자가 /login이면→/dashboard.
 String? adminGuard(AdminAuthState auth, String location) {
@@ -37,7 +38,8 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
         builder: (_, __, child) => AdminShell(child: child),
         routes: [
           GoRoute(path: '/dashboard', builder: (_, __) => const AdminDashboardPage()),
-          // /users·/reports는 Task 5~6에서 추가
+          GoRoute(path: '/users', builder: (_, __) => const AdminUsersPage()),
+          // /reports는 Task 6에서 추가
         ],
       ),
     ],
