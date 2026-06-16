@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../features/auth/application/auth_controller.dart';
 import '../features/auth/presentation/login_page.dart';
 import '../features/auth/state/auth_state.dart';
+import '../features/dashboard/presentation/dashboard_page.dart';
 import '../features/shell/presentation/admin_shell.dart';
 
 /// 가드: 미인증→/login, 비관리자→/forbidden, 관리자가 /login이면→/dashboard.
@@ -35,7 +36,8 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
       ShellRoute(
         builder: (_, __, child) => AdminShell(child: child),
         routes: [
-          // 각 화면은 Task 4~6에서 추가
+          GoRoute(path: '/dashboard', builder: (_, __) => const AdminDashboardPage()),
+          // /users·/reports는 Task 5~6에서 추가
         ],
       ),
     ],
