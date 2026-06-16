@@ -1,6 +1,6 @@
 # CLAUDE.md — devpath-frontend
 
-> 프론트엔드 모노레포: `web`(React) + `admin`(React) + `mobile`(Flutter)
+> 프론트엔드 모노레포(Flutter): `apps/web`·`apps/admin`(Flutter Web) + `apps/mobile`(Flutter 앱) + 공용 패키지 `packages/dp_core`(순수 Dart)·`packages/dp_design`(디자인 시스템). **Dart pub workspaces + melos 7**로 단일 해석.
 
 ## 🚫 절대 조건 — 모든 작업에 예외 없이 적용
 
@@ -26,24 +26,42 @@
 - 위임 결과는 **항상 컨트롤러가 직접 검증**한다(커밋 로그·파일 구조·테스트). 서브에이전트의 완료 보고를 그대로 신뢰하지 않는다.
 - 범위를 벗어난 산출물이 발견되면 수용하지 말고, 미푸시 상태라면 정상 지점으로 reset 후 플랜대로 재구현한다.
 
-## 빌드·테스트 (디렉터리별로 실행)
+## 🔀 Git 브랜치 전략 — 모든 작업에 예외 없이 적용
 
-### web / admin — React + Vite + TypeScript
-- 설치: `npm install`  / 빌드: `npm run build`  / 린트: `npm run lint`
-- ⚠️ 현재 테스트 러너 미설정. **코드 작업 전 Vitest + React Testing Library를 먼저 설정하고, 실패 테스트부터 작성한다** (절대 조건 2).
+`main`은 **보호 브랜치**다. 직접 커밋·푸시·force-push를 **금지**한다(GitHub 브랜치 보호 설정 여부와 무관하게 규칙으로 강제한다). `develop`이 통합 브랜치다.
 
-### mobile — Flutter
-- 의존성: `flutter pub get`  / 테스트: `flutter test`  / 실행: `flutter run`
-- 위젯·유닛 테스트를 먼저 작성한다 (`test/widget_test.dart` 참고).
+**흐름(2단계 PR):**
+1. **작업 브랜치 분기**: `develop`에서 `feat/*`·`fix/*`·`chore/*`·`docs/*` 브랜치를 만든다.
+2. **develop으로 PR → 머지**: 작업 브랜치 → `develop` PR을 올리고 CI 통과 후 머지한다.
+3. **main으로 PR → 머지(릴리스)**: 릴리스 시점에 `develop` → `main` PR을 올려 머지한다. main에는 오직 이 경로로만 들어간다.
+
+**규칙:**
+- 작업 브랜치는 항상 `develop`에서 분기하고 `develop`으로 PR한다. `main`을 직접 base로 PR하지 않는다(릴리스 PR 제외).
+- `main`·`develop`에 직접 push 금지. 모든 변경은 PR을 거친다.
+- 머지 전 CI(`melos run analyze`·`melos run test`)가 **녹색**임을 확인한다(실패 시 머지 금지).
+- 이력 보존을 위해 머지는 기본 **merge commit**(스쿼시·리베이스 머지는 명시 요청 시에만).
+
+## 빌드·테스트 (모노레포 루트에서 melos로 실행)
+
+> 구조: **Dart pub workspaces + melos 7**. 멤버 = `packages/dp_core`(순수 Dart)·`packages/dp_design`(Flutter 디자인 시스템) + `apps/{web,admin,mobile}`(Flutter). `web`·`admin`은 **Flutter Web**. 설정은 루트 `pubspec.yaml`의 `workspace:`+`melos:` 키(과거 `melos.yaml` 대체). 사용법 요약은 `melos_README.md`.
+
+- 의존성 동기화: `melos bootstrap` (별칭 `melos bs`)
+- 정적 분석: `melos run analyze` (Flutter=`flutter analyze`, 순수 Dart=`dart analyze`)
+- 테스트: `melos run test` (Flutter=`flutter test --exclude-tags golden`, 순수 Dart=`dart test`)
+- 포맷: `melos run format`(CI 게이트, `dart format --set-exit-if-changed .`) / 적용 `melos run fix`
+- 단일 앱 실행: `cd apps/web && flutter run -d chrome`(admin 동일) · `cd apps/mobile && flutter run`
+- melos 호출: 최초 1회 `dart pub global activate melos 7.0.0`; PATH 미설정 환경에선 `dart pub global run melos <cmd>`.
+
+테스트는 **Flutter 테스트 스택**으로 작성한다(`flutter_test` + `flutter_riverpod`의 `ProviderContainer`/위젯 테스트). 실패 테스트를 먼저 쓰고 `melos run test`로 통과를 눈으로 확인한다(절대 조건 2). 위젯 테스트의 폭 의존은 `tester.view.physicalSize`, `context.dpColors`를 쓰는 위젯엔 `theme: DpTheme.light()`를 준다.
 
 ## 환경 변수
 
-- API 엔드포인트·키는 `.env`로 주입하며 절대 커밋하지 않는다. 예시는 각 앱의 `.env.example`.
+- 런타임 설정(API 엔드포인트·`useMock` 등)은 **`--dart-define`(또는 `--dart-define-from-file`)** 로 주입하고 `AppConfig.fromEnvironment`(`String.fromEnvironment`/`bool.fromEnvironment`)로 읽는다. 기본값은 목 프로토. 비밀값(키·토큰)은 절대 커밋하지 않는다.
 - 화면 설계: [storyboard](https://github.com/DevPathAi/storyboard) · [documents/06_화면_기능_정의서](https://github.com/DevPathAi/documents/blob/main/06_화면_기능_정의서.md)
 
 ## 공통 규칙
 
-- Git: Conventional Commits — [documents/09_Git_규칙_정의서](https://github.com/DevPathAi/documents/blob/main/09_Git_규칙_정의서.md)
+- Git: Conventional Commits — [documents/09_Git_규칙_정의서](https://github.com/DevPathAi/documents/blob/main/09_Git_규칙_정의서.md). 브랜치 전략은 위 "🔀 Git 브랜치 전략" 절을 따른다(main 직접 금지, develop 경유 2단계 PR).
 - 코드 리뷰: [documents/12_코드_리뷰_규칙](https://github.com/DevPathAi/documents/blob/main/12_코드_리뷰_규칙.md)
 - 비밀값(Claude API 키·OAuth·결제 키)은 절대 커밋하지 않는다.
 

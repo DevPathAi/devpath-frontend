@@ -36,9 +36,14 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
 
-  # workspace 멤버 cross-import 스모크(F4): apps/web가 dp_design을 참조.
+  # workspace 멤버(path 결선, resolution: workspace)
+  dp_core:
+    path: ../../packages/dp_core
   dp_design:
     path: ../../packages/dp_design
+  flutter_riverpod: ^3.3.0
+  go_router: ^14.6.0          # 하한 가이드 — bootstrap 결과로 확정
+  web: ^1.1.0                 # Monaco 임베드(DOM) 용. bootstrap 결과로 확정
 
 dev_dependencies:
   flutter_test:
