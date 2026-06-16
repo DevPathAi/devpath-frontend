@@ -1,12 +1,18 @@
 # HANDOFF — React→Flutter 전환 & 프로토 UI
 
-> 최종 업데이트: 2026-06-15 · 브랜치 전략: **main 보호 · develop 통합 · 작업브랜치→develop PR→머지→main 릴리스 PR**(CLAUDE.md "🔀 Git 브랜치 전략" + 전역 규칙).
-> **상태: 설계·계획 + 디자인/Eng 리뷰 완료 + P1·P2·P3(main, PR#3) + P4a~P4f(web 골든패스 전체) 구현 완료.** 다음은 **P5(admin)**.
+> 최종 업데이트: 2026-06-16 · 브랜치 전략: **main 보호 · develop 통합 · 작업브랜치→develop PR→머지→main 릴리스 PR**(CLAUDE.md "🔀 Git 브랜치 전략" + 전역 규칙).
+> **상태: 설계·계획 + 디자인/Eng 리뷰 완료 + P1·P2·P3(main, PR#3) + P4a~P4f(web 골든패스 전체) + P5(admin 대표 3화면) 구현 완료.** 다음은 **P6(mobile)**.
 
-## 브랜치/머지 현황 (2026-06-15)
-- **main**: P1·P2·P3 통합됨(PR#3 머지, merge commit `abf9056`). main 직접 푸시 금지.
-- **develop**: 통합 브랜치. Git 정책(PR#4)·P4a(PR#5)·P4b(PR#6)·P4c(PR#7)·P4d(PR#8)·P4e(PR#9) 머지됨. P4f는 `feat/p4f-web-dashboard-community`에서 develop으로 PR(진행).
+## 브랜치/머지 현황 (2026-06-16)
+- **main**: P1·P2·P3 통합됨(PR#3 머지, merge commit `abf9056`). main 직접 푸시 금지. **P4a~P4f를 develop→main으로 올리는 릴리스 PR#11 열림(머지 대기)**.
+- **develop**: 통합 브랜치. Git 정책(PR#4)·P4a(PR#5)·P4b(PR#6)·P4c(PR#7)·P4d(PR#8)·P4e(PR#9)·P4f(PR#10) 머지됨. **P5(admin)는 `feat/p5-admin`에서 develop으로 PR(진행)**.
 - **CI**: `analyze-test` job의 **Format check(`dart format --set-exit-if-changed`)** 가 게이트 — 커밋 전 항상 `dart format` 적용(P3 머지 때 format 미적용으로 1차 실패한 교훈). 골든은 `--exclude-tags golden`로 CI 제외.
+
+## P5 구현 완료 (2026-06-16, feat/p5-admin)
+`apps/admin`(devpath_admin) 관리자 셸 + 대표 3화면 TDD(Task 1~7). **검증됨**: `melos analyze`(전 멤버 No issues)·`melos test`(web 77·dp_design 19·dp_core 30·**admin 11**·mobile 1 PASS)·format 게이트 통과.
+- 역할 가드(`adminGuard` 순수 함수: 미인증→/login·비관리자→/forbidden·ADMIN/OWNER 통과·로그인됨+/login→/dashboard, 결정적 테스트 5건) · 좌측 영구 NavigationRail(대시보드·사용자·신고) · A-004 운영 대시보드(KPI 카드 DAU·신규·미처리신고·AI호출) · A-002 사용자 관리(DataTable+상태 ChoiceChip 필터+커서 페이지네이션 컨트롤러+행선택→제재 패널) · A-006 신고 처리(목록+처리=목록제거) · 앱 루트+main+골든패스 스모크.
+- **P5 교훈(플랜 코드 결함 3건, 사전 검증의 정당성 재확인)**: ① `users_controller.dart`가 `apiClientProvider`(sanction)용 `api_providers.dart` import 누락 → 추가. ② `reports_page_test.dart`가 `ReportsLoaded`용 `reports_state.dart` import 누락 → 추가. ③ `Page` 심볼충돌(dp_core vs flutter widgets)으로 `users_page_test.dart`에서 `import 'package:flutter/material.dart' hide Page`(P4f 동일 교훈). 추가로 lint 정렬(`(_, _)` 와일드카드·private typedef→public `AdminDestination`·query 맵 명령형·미사용 import 제거)로 analyze 게이트 통과.
+- **후속/리스크**(플랜 명시): 필터 해제는 기본값('ACTIVE')로 약속(nullable copyWith 보강 후속) · 목 단일 페이지(query 무시) · admin DTO(`AdminUserRow`·`Report`) plain(백엔드 계약 확정 시 dp_core freezed 승격) · 제재/처리 효력 없음(목 호출까지) · admin ≥1024 가정.
 
 ## P4f 구현 완료 (2026-06-15, feat/p4f-web-dashboard-community, 커밋 75de499~6d3d25c)
 대시보드(DASH-001) + 커뮤니티(COM-001 홈 / COM-003 Q&A 상세) TDD(Task 1~5; Task6 E2E는 플랜이 P4f 범위 밖으로 명시 → P4 종료 후 별도). **web 골든패스 완성**. **검증됨**: `melos analyze`(전 멤버 No issues)·`melos test`(web 77·dp_design 19·dp_core 30·admin 1·mobile 1 PASS).
@@ -79,7 +85,7 @@ melos 7 + Dart pub workspaces 모노레포 골격: `packages/dp_core`(순수 Dar
 ## 다음 세션 (RESUME HERE) — 전체 리뷰 완료, 구현 시작
 
 1. **✅ Eng Review 완료(2026-06-14)**: P4(web)·P6(mobile) 심층 리뷰 → 결정 D1~D4 승인 → 7개 플랜(P2·P4b~f·P6) 반영 완료. 요약: `docs/superpowers/specs/2026-06-14-eng-review-summary.md`. 결정: D1(P2 단일 SSE 기반 — `ApiClient.sse()`·`SseStage` 단일출처·`fromStep`), D2(DD8 핵심+`MockSseSource.failAfter`+60s, 재개키는 백엔드 합의까지 fromStep 보류), D3(query-aware `MockHttpAdapter`), D4(P6 재연결 동기화 최소+ConnectivityService, OAuth·secure_storage 이관). 필수수정 F4·F5·F6·F9는 해당 플랜에 반영됨.
-2. **✅ P1·P2·P3·P4a~P4f 완료(web 골든패스 전체)** — 위 절들. 다음은 **P5(admin)**: `docs/superpowers/plans/2026-06-14-p5-admin.md`. **순서 의존** P5→P6→P7. **착수 게이트 충족**: P2 데이터(`ApiClient`·`Page<T>`·query-aware `MockHttpAdapter`)·P3 dp_design·P4 web 패턴(컨트롤러·픽스처·라우트). admin은 별도 앱(`apps/admin`/devpath_admin, 현재 스모크 1테스트만). **브랜치 정책 준수**: feat 브랜치 → develop PR → 머지, 커밋 전 `dart format`. 서브에이전트 위임 시 **범위 강제**(CLAUDE.md 절대 조건 4) + **컨트롤러 직접 검증** 필수. **플랜 코드의 API 가정은 항상 dp_core/dp_design 실제 시그니처로 사전 검증**(P4c 0건·P4d 1건·P4e 1건·P4f 3건[ApiException 위치인자·Page 심볼충돌·미사용 import] — 사전 검증이 컴파일 실패·런타임 hang을 반복 선제 차단). **P4-E2E(골든패스 integration_test)는 P5~P7과 별개로 P4 종료 후 별도 통합 태스크로 분리됨**(P4f 플랜 Task6 참조).
+2. **✅ P1·P2·P3·P4a~P4f·P5 완료(web 골든패스 전체 + admin 대표 3화면)** — 위 절들. 다음은 **P6(mobile)**: `docs/superpowers/plans/2026-06-14-p6-mobile.md`. **순서 의존** P6→P7. **착수 게이트 충족**: P2 데이터·P3 dp_design·P4 web 패턴·P5 admin 패턴(역할 가드·페이지네이션). P6은 `apps/mobile`(StatefulShellRoute·drift 캐시 테스트=`NativeDatabase.memory`·FCM 스텁·딥링크, D4: 재연결 동기화 최소+ConnectivityService·OAuth·secure_storage). **브랜치 정책 준수**: feat 브랜치 → develop PR → 머지, 커밋 전 `dart format`. 서브에이전트 위임 시 **범위 강제**(CLAUDE.md 절대 조건 4) + **컨트롤러 직접 검증** 필수. **플랜 코드의 API 가정은 항상 dp_core/dp_design 실제 시그니처로 사전 검증**(P4c 0건·P4d 1건·P4e 1건·P4f 3건·**P5 3건**[import 누락 2·Page 심볼충돌 1] — 사전 검증이 컴파일 실패를 반복 선제 차단). **P4-E2E(골든패스 integration_test)는 P5~P7과 별개로 P4 종료 후 별도 통합 태스크로 분리됨**(P4f 플랜 Task6 참조).
 
 ## 구현 시 남은 결정/보강 (플랜에 노트로 명시됨)
 
