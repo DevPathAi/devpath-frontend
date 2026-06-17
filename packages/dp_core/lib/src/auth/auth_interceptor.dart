@@ -72,6 +72,9 @@ class AuthInterceptor extends QueuedInterceptor {
         handler.next(err);
         return;
       }
+      // 쿠키 기반 시 pair.refresh==''(실 refresh 토큰은 HttpOnly 쿠키가 보유).
+      // TokenStore.save는 refresh=''를 저장하지만 웹 구현체는 이를 무시한다
+      // (readRefresh()는 항상 null을 반환해 쿠키 경로를 유지한다).
       await store.save(access: pair.access, refresh: pair.refresh);
       final req = err.requestOptions
         ..headers['Authorization'] = 'Bearer ${pair.access}';

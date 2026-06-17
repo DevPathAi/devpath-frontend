@@ -187,6 +187,43 @@ void main() {
     expect(captured.headers['Authorization'], 'Bearer COOKIE_NEW');
   });
 
+  test('쿠키 store + 동시 401 N건 → refresh 1회·모든 요청 재시도 성공', () async {
+    // rotation-guard가 _CookieOnlyTokenStore 조합에서도 동작함을 검증한다.
+    // readRefresh()==null 이므로 refresh 콜백에는 null이 전달되며,
+    // 첫 요청이 refresh를 완료하면 나머지는 rotation-guard 경로로 처리된다.
+    var refreshCalls = 0;
+    final store = _CookieOnlyTokenStore(access: 'old');
+
+    final adapter = _AuthFlowAdapter();
+    final dio = Dio(BaseOptions(baseUrl: 'https://api.test'))
+      ..httpClientAdapter = adapter;
+    final retryDio = Dio(BaseOptions(baseUrl: 'https://api.test'))
+      ..httpClientAdapter = adapter;
+
+    dio.interceptors.add(
+      AuthInterceptor(
+        store: store,
+        refresh: (r) async {
+          expect(r, isNull, reason: '쿠키 기반이므로 refreshToken 인자는 null이어야 함');
+          refreshCalls++;
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+          // 쿠키 기반: refresh는 ''(쿠키가 실 토큰 보유)
+          return const TokenPair(access: 'NEW', refresh: '');
+        },
+        retry: (req) => retryDio.fetch(req),
+      ),
+    );
+
+    final results = await Future.wait([
+      dio.get('/a'),
+      dio.get('/b'),
+      dio.get('/c'),
+    ]);
+
+    expect(refreshCalls, 1, reason: '쿠키 store + 동시 401이어도 refresh는 1회');
+    expect(results.every((r) => r.statusCode == 200), isTrue);
+  });
+
   test('동시 401 N건이 단일 refresh로 직렬화된다(큐잉)', () async {
     var refreshCalls = 0;
     final store = InMemoryTokenStore()..save(access: 'old', refresh: 'RRR');
