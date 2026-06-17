@@ -49,6 +49,10 @@ class AuthController extends Notifier<AuthState> {
     } on ApiException {
       if (!ref.mounted) return;
       state = const AuthUnauthenticated(); // 쿠키 없음/만료 → 미인증
+    } catch (_) {
+      if (!ref.mounted) return;
+      state =
+          const AuthUnauthenticated(); // 네트워크/타임아웃/파싱 등 비-ApiException → 미인증
     }
   }
 
@@ -63,6 +67,9 @@ class AuthController extends Notifier<AuthState> {
       );
     } on ApiException catch (e) {
       state = AuthUnauthenticated(error: e.message);
+    } catch (_) {
+      state =
+          const AuthUnauthenticated(); // 네트워크/타임아웃/파싱 등 비-ApiException → 미인증
     }
   }
 

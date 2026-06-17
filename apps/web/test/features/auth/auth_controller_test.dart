@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:devpath_web/src/features/auth/application/auth_controller.dart';
@@ -20,6 +21,27 @@ class _FakeOAuthLauncher implements OAuthLauncher {
   void launch(String url) {
     launchedUrl = url;
   }
+}
+
+// ---------------------------------------------------------------------------
+// 비-ApiException 어댑터 — 네트워크/타임아웃 등 generic Exception을 던진다.
+// ---------------------------------------------------------------------------
+class _ThrowingAdapter implements HttpClientAdapter {
+  final Object error;
+
+  _ThrowingAdapter({this.error = const SocketException('network error')});
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    throw error;
+  }
+
+  @override
+  void close({bool force = false}) {}
 }
 
 // ---------------------------------------------------------------------------
@@ -207,6 +229,73 @@ void main() {
         isA<AuthUnauthenticated>(),
       );
     });
+
+    test(
+      '비-ApiException(generic Exception) 발생 시 AuthUnauthenticated로 전이 — AuthLoading 고착 방지',
+      () async {
+        final container = _containerWithAdapter(
+          _ThrowingAdapter(error: Exception('network timeout')),
+        );
+        addTearDown(container.dispose);
+
+        await container
+            .read(authControllerProvider.notifier)
+            .bootstrapSession();
+
+        expect(
+          container.read(authControllerProvider),
+          isA<AuthUnauthenticated>(),
+          reason:
+              'bootstrapSession은 비-ApiException에도 AuthUnauthenticated로 종결돼야 한다',
+        );
+      },
+    );
+
+    test(
+      '비-ApiException(SocketException) 발생 시 AuthUnauthenticated로 전이 — AuthLoading 고착 방지',
+      () async {
+        final container = _containerWithAdapter(
+          _ThrowingAdapter(error: const SocketException('no network')),
+        );
+        addTearDown(container.dispose);
+
+        await container
+            .read(authControllerProvider.notifier)
+            .bootstrapSession();
+
+        expect(
+          container.read(authControllerProvider),
+          isA<AuthUnauthenticated>(),
+          reason: 'SocketException도 AuthUnauthenticated로 종결돼야 한다',
+        );
+      },
+    );
+  });
+
+  // -------------------------------------------------------------------------
+  // bootstrapFromCallback() — 비-ApiException 폴백
+  // -------------------------------------------------------------------------
+  group('bootstrapFromCallback() 비-ApiException 폴백', () {
+    test(
+      '비-ApiException(generic Exception) 발생 시 AuthUnauthenticated로 전이',
+      () async {
+        final container = _containerWithAdapter(
+          _ThrowingAdapter(error: Exception('parse error')),
+        );
+        addTearDown(container.dispose);
+
+        await container
+            .read(authControllerProvider.notifier)
+            .bootstrapFromCallback();
+
+        expect(
+          container.read(authControllerProvider),
+          isA<AuthUnauthenticated>(),
+          reason:
+              'bootstrapFromCallback도 비-ApiException 시 AuthUnauthenticated로 종결돼야 한다',
+        );
+      },
+    );
   });
 
   // -------------------------------------------------------------------------
