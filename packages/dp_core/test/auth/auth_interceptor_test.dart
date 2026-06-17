@@ -12,6 +12,28 @@ class _MockRetrier extends Mock {
   Future<Response<dynamic>> call(RequestOptions options);
 }
 
+/// 웹 HttpOnly 쿠키 시나리오: access만 메모리, refresh는 항상 null(쿠키에 있음).
+class _CookieOnlyTokenStore implements TokenStore {
+  // ignore: prefer_initializing_formals
+  _CookieOnlyTokenStore({required String access}) : _access = access;
+  String? _access;
+
+  @override
+  Future<String?> readAccess() async => _access;
+
+  @override
+  Future<String?> readRefresh() async => null; // 쿠키라 JS에서 읽을 수 없음
+
+  @override
+  Future<void> save({required String access, required String refresh}) async {
+    _access = access;
+    // refresh는 쿠키로 관리되므로 저장 안 함
+  }
+
+  @override
+  Future<void> clear() async => _access = null;
+}
+
 /// access=='Bearer NEW'면 200, 아니면 401 반환하는 최소 어댑터.
 class _AuthFlowAdapter implements HttpClientAdapter {
   @override
@@ -118,6 +140,88 @@ void main() {
       (_, _) {},
     );
     expect(await store.readAccess(), isNull);
+  });
+
+  test('readRefresh==null이어도 refresh(null)을 시도하여 재시도한다(쿠키 기반)', () async {
+    // 웹 HttpOnly 쿠키 시나리오: store에 refresh 토큰 없음(null), 서버는 쿠키로 인식.
+    // InMemoryTokenStore는 save 시 refresh가 항상 저장되므로,
+    // readRefresh()가 null을 반환하는 쿠키 전용 store를 인라인으로 구현한다.
+    final store = _CookieOnlyTokenStore(access: 'old');
+
+    final retrier = _MockRetrier();
+    when(() => retrier.call(any())).thenAnswer(
+      (_) async => Response(
+        requestOptions: RequestOptions(path: '/users/me'),
+        statusCode: 200,
+        data: {'ok': true},
+      ),
+    );
+
+    String? capturedRefreshArg;
+    final interceptor = AuthInterceptor(
+      store: store,
+      refresh: (r) async {
+        capturedRefreshArg = r;
+        return const TokenPair(access: 'COOKIE_NEW', refresh: '');
+      },
+      retry: retrier.call,
+    );
+
+    final req = RequestOptions(path: '/users/me');
+    final err = DioException(
+      requestOptions: req,
+      response: Response(requestOptions: req, statusCode: 401),
+      type: DioExceptionType.badResponse,
+    );
+    final handler = ErrorInterceptorHandler();
+    await interceptor.onError(err, handler);
+
+    // refresh(null)이 호출되어야 한다(쿠키 기반이므로 인자는 null).
+    expect(capturedRefreshArg, isNull, reason: 'readRefresh==null이므로 null로 호출');
+    // 새 access 토큰이 저장되어야 한다.
+    expect(await store.readAccess(), 'COOKIE_NEW');
+    // retry가 새 토큰 헤더로 호출되어야 한다.
+    final captured =
+        verify(() => retrier.call(captureAny())).captured.single
+            as RequestOptions;
+    expect(captured.headers['Authorization'], 'Bearer COOKIE_NEW');
+  });
+
+  test('쿠키 store + 동시 401 N건 → refresh 1회·모든 요청 재시도 성공', () async {
+    // rotation-guard가 _CookieOnlyTokenStore 조합에서도 동작함을 검증한다.
+    // readRefresh()==null 이므로 refresh 콜백에는 null이 전달되며,
+    // 첫 요청이 refresh를 완료하면 나머지는 rotation-guard 경로로 처리된다.
+    var refreshCalls = 0;
+    final store = _CookieOnlyTokenStore(access: 'old');
+
+    final adapter = _AuthFlowAdapter();
+    final dio = Dio(BaseOptions(baseUrl: 'https://api.test'))
+      ..httpClientAdapter = adapter;
+    final retryDio = Dio(BaseOptions(baseUrl: 'https://api.test'))
+      ..httpClientAdapter = adapter;
+
+    dio.interceptors.add(
+      AuthInterceptor(
+        store: store,
+        refresh: (r) async {
+          expect(r, isNull, reason: '쿠키 기반이므로 refreshToken 인자는 null이어야 함');
+          refreshCalls++;
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+          // 쿠키 기반: refresh는 ''(쿠키가 실 토큰 보유)
+          return const TokenPair(access: 'NEW', refresh: '');
+        },
+        retry: (req) => retryDio.fetch(req),
+      ),
+    );
+
+    final results = await Future.wait([
+      dio.get('/a'),
+      dio.get('/b'),
+      dio.get('/c'),
+    ]);
+
+    expect(refreshCalls, 1, reason: '쿠키 store + 동시 401이어도 refresh는 1회');
+    expect(results.every((r) => r.statusCode == 200), isTrue);
   });
 
   test('동시 401 N건이 단일 refresh로 직렬화된다(큐잉)', () async {

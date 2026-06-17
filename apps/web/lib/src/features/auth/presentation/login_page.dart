@@ -2,11 +2,14 @@ import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../providers/api_providers.dart';
 import '../../../providers/theme_provider.dart';
 import '../application/auth_controller.dart';
 import '../state/auth_state.dart';
 
 /// OAuth(목) 로그인. 우상단 테마 토글, 실패 시 인라인 에러.
+/// 목 모드(useMock=true)에서는 버튼 레이블에 "(목)" 접미사를 추가하고
+/// 브라우저 리다이렉트 대신 bootstrapFromCallback()으로 즉시 인증한다.
 class LoginPage extends ConsumerWidget {
   const LoginPage({super.key});
 
@@ -14,6 +17,7 @@ class LoginPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authControllerProvider);
     final mode = ref.watch(themeModeProvider);
+    final useMock = ref.watch(appConfigProvider).useMock;
     final c = context.dpColors;
     final error = auth is AuthUnauthenticated ? auth.error : null;
 
@@ -61,9 +65,12 @@ class LoginPage extends ConsumerWidget {
                 ],
                 const SizedBox(height: DpSpacing.xl),
                 FilledButton(
-                  onPressed: () =>
-                      ref.read(authControllerProvider.notifier).login(),
-                  child: const Text('GitHub로 계속하기 (목)'),
+                  onPressed: () => useMock
+                      ? ref
+                            .read(authControllerProvider.notifier)
+                            .bootstrapFromCallback()
+                      : ref.read(authControllerProvider.notifier).login(),
+                  child: Text(useMock ? 'GitHub로 계속하기 (목)' : 'GitHub로 계속하기'),
                 ),
               ],
             ),

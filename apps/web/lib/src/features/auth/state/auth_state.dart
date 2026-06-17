@@ -5,6 +5,11 @@ sealed class AuthState {
   const AuthState();
 }
 
+/// 초기/세션 복원 중. 게이트는 이 동안 redirect를 보류한다(null 반환).
+class AuthLoading extends AuthState {
+  const AuthLoading();
+}
+
 /// 미인증(토큰 없음). [error]는 직전 로그인 실패 메시지(옵션).
 class AuthUnauthenticated extends AuthState {
   const AuthUnauthenticated({this.error});

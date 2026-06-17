@@ -1,13 +1,18 @@
 import 'package:dp_core/dp_core.dart';
 
 /// web 프로토 목 REST 픽스처: `'METHOD /path'` → (status, jsonBody).
-/// 로그인 user.onboardingStatus=PENDING → 게이트가 로그인 후 온보딩으로 보냄(시연).
+/// 실흐름: OAuth 리다이렉트(login()) → 콜백 → POST /auth/refresh → 세션 복원.
+/// user.onboardingStatus=PENDING → 게이트가 콜백 부트스트랩 후 온보딩으로 보냄(시연).
+/// ※ POST /auth/login은 실흐름에 없으므로 픽스처에서 제거됨(Task 4).
 final Map<String, MockFixture> webMockFixtures = {
-  'POST /auth/login': (
+  // OAuth 콜백 후 세션 복원 엔드포인트.
+  // 최상위 필드: snake_case(access_token, refresh_token_cookie_set).
+  // user 객체: camelCase(dp_core User.fromJson 기준).
+  'POST /auth/refresh': (
     200,
     {
-      'accessToken': 'mock-access',
-      'refreshToken': 'mock-refresh',
+      'access_token': 'mock-access-2',
+      'refresh_token_cookie_set': true,
       'user': {
         'id': 'u-mock',
         'email': 'learner@devpath.ai',
@@ -16,10 +21,6 @@ final Map<String, MockFixture> webMockFixtures = {
         'onboardingStatus': 'PENDING',
       },
     },
-  ),
-  'POST /auth/refresh': (
-    200,
-    {'accessToken': 'mock-access-2', 'refreshToken': 'mock-refresh-2'},
   ),
   // 진단 제출 → DONE 유저 반환(게이트 해제)
   'POST /onboarding': (

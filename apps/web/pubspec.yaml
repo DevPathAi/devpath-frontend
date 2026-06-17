@@ -55,6 +55,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  dio: ^5.0.0  # 테스트에서 HttpClientAdapter 직접 구현에 필요(dp_core 전이 의존 명시화)
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
