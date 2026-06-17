@@ -8,7 +8,7 @@ part of 'user.dart';
 
 _User _$UserFromJson(Map<String, dynamic> json) => _User(
   id: json['id'] as String,
-  email: json['email'] as String,
+  email: json['email'] as String?,
   nickname: json['nickname'] as String,
   role: $enumDecode(
     _$UserRoleEnumMap,

@@ -9,7 +9,7 @@ part 'user.g.dart';
 abstract class User with _$User {
   const factory User({
     required String id,
-    required String email,
+    required String? email,
     required String nickname,
     @JsonKey(unknownEnumValue: UserRole.unknown) required UserRole role,
     @JsonKey(unknownEnumValue: OnboardingStatus.unknown)
