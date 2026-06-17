@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$User {
 
- String get id; String get email; String get nickname;@JsonKey(unknownEnumValue: UserRole.unknown) UserRole get role;@JsonKey(unknownEnumValue: OnboardingStatus.unknown) OnboardingStatus get onboardingStatus;
+ String get id; String? get email; String get nickname;@JsonKey(unknownEnumValue: UserRole.unknown) UserRole get role;@JsonKey(unknownEnumValue: OnboardingStatus.unknown) OnboardingStatus get onboardingStatus;
 /// Create a copy of User
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -48,7 +48,7 @@ abstract mixin class $UserCopyWith<$Res>  {
   factory $UserCopyWith(User value, $Res Function(User) _then) = _$UserCopyWithImpl;
 @useResult
 $Res call({
- String id, String email, String nickname,@JsonKey(unknownEnumValue: UserRole.unknown) UserRole role,@JsonKey(unknownEnumValue: OnboardingStatus.unknown) OnboardingStatus onboardingStatus
+ String id, String? email, String nickname,@JsonKey(unknownEnumValue: UserRole.unknown) UserRole role,@JsonKey(unknownEnumValue: OnboardingStatus.unknown) OnboardingStatus onboardingStatus
 });
 
 
@@ -65,11 +65,11 @@ class _$UserCopyWithImpl<$Res>
 
 /// Create a copy of User
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? email = null,Object? nickname = null,Object? role = null,Object? onboardingStatus = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? email = freezed,Object? nickname = null,Object? role = null,Object? onboardingStatus = null,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
-as String,email: null == email ? _self.email : email // ignore: cast_nullable_to_non_nullable
-as String,nickname: null == nickname ? _self.nickname : nickname // ignore: cast_nullable_to_non_nullable
+as String,email: freezed == email ? _self.email : email // ignore: cast_nullable_to_non_nullable
+as String?,nickname: null == nickname ? _self.nickname : nickname // ignore: cast_nullable_to_non_nullable
 as String,role: null == role ? _self.role : role // ignore: cast_nullable_to_non_nullable
 as UserRole,onboardingStatus: null == onboardingStatus ? _self.onboardingStatus : onboardingStatus // ignore: cast_nullable_to_non_nullable
 as OnboardingStatus,
@@ -157,7 +157,7 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String email,  String nickname, @JsonKey(unknownEnumValue: UserRole.unknown)  UserRole role, @JsonKey(unknownEnumValue: OnboardingStatus.unknown)  OnboardingStatus onboardingStatus)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String? email,  String nickname, @JsonKey(unknownEnumValue: UserRole.unknown)  UserRole role, @JsonKey(unknownEnumValue: OnboardingStatus.unknown)  OnboardingStatus onboardingStatus)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _User() when $default != null:
 return $default(_that.id,_that.email,_that.nickname,_that.role,_that.onboardingStatus);case _:
@@ -178,7 +178,7 @@ return $default(_that.id,_that.email,_that.nickname,_that.role,_that.onboardingS
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String email,  String nickname, @JsonKey(unknownEnumValue: UserRole.unknown)  UserRole role, @JsonKey(unknownEnumValue: OnboardingStatus.unknown)  OnboardingStatus onboardingStatus)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String? email,  String nickname, @JsonKey(unknownEnumValue: UserRole.unknown)  UserRole role, @JsonKey(unknownEnumValue: OnboardingStatus.unknown)  OnboardingStatus onboardingStatus)  $default,) {final _that = this;
 switch (_that) {
 case _User():
 return $default(_that.id,_that.email,_that.nickname,_that.role,_that.onboardingStatus);case _:
@@ -198,7 +198,7 @@ return $default(_that.id,_that.email,_that.nickname,_that.role,_that.onboardingS
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String email,  String nickname, @JsonKey(unknownEnumValue: UserRole.unknown)  UserRole role, @JsonKey(unknownEnumValue: OnboardingStatus.unknown)  OnboardingStatus onboardingStatus)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String? email,  String nickname, @JsonKey(unknownEnumValue: UserRole.unknown)  UserRole role, @JsonKey(unknownEnumValue: OnboardingStatus.unknown)  OnboardingStatus onboardingStatus)?  $default,) {final _that = this;
 switch (_that) {
 case _User() when $default != null:
 return $default(_that.id,_that.email,_that.nickname,_that.role,_that.onboardingStatus);case _:
@@ -217,7 +217,7 @@ class _User implements User {
   factory _User.fromJson(Map<String, dynamic> json) => _$UserFromJson(json);
 
 @override final  String id;
-@override final  String email;
+@override final  String? email;
 @override final  String nickname;
 @override@JsonKey(unknownEnumValue: UserRole.unknown) final  UserRole role;
 @override@JsonKey(unknownEnumValue: OnboardingStatus.unknown) final  OnboardingStatus onboardingStatus;
@@ -255,7 +255,7 @@ abstract mixin class _$UserCopyWith<$Res> implements $UserCopyWith<$Res> {
   factory _$UserCopyWith(_User value, $Res Function(_User) _then) = __$UserCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String email, String nickname,@JsonKey(unknownEnumValue: UserRole.unknown) UserRole role,@JsonKey(unknownEnumValue: OnboardingStatus.unknown) OnboardingStatus onboardingStatus
+ String id, String? email, String nickname,@JsonKey(unknownEnumValue: UserRole.unknown) UserRole role,@JsonKey(unknownEnumValue: OnboardingStatus.unknown) OnboardingStatus onboardingStatus
 });
 
 
@@ -272,11 +272,11 @@ class __$UserCopyWithImpl<$Res>
 
 /// Create a copy of User
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? email = null,Object? nickname = null,Object? role = null,Object? onboardingStatus = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? email = freezed,Object? nickname = null,Object? role = null,Object? onboardingStatus = null,}) {
   return _then(_User(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
-as String,email: null == email ? _self.email : email // ignore: cast_nullable_to_non_nullable
-as String,nickname: null == nickname ? _self.nickname : nickname // ignore: cast_nullable_to_non_nullable
+as String,email: freezed == email ? _self.email : email // ignore: cast_nullable_to_non_nullable
+as String?,nickname: null == nickname ? _self.nickname : nickname // ignore: cast_nullable_to_non_nullable
 as String,role: null == role ? _self.role : role // ignore: cast_nullable_to_non_nullable
 as UserRole,onboardingStatus: null == onboardingStatus ? _self.onboardingStatus : onboardingStatus // ignore: cast_nullable_to_non_nullable
 as OnboardingStatus,
