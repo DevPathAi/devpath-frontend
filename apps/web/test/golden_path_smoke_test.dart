@@ -7,10 +7,16 @@ import 'package:dp_core/dp_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// 테스트 전용 AuthController: bootstrapFromCallback()이 목 AuthAuthenticated(pending 유저)를
-/// 직접 설정한다. 목 모드에서 LoginPage는 bootstrapFromCallback()을 호출하므로,
-/// 실 HTTP 호출 없이 게이트 흐름을 검증한다.
+/// 테스트 전용 AuthController:
+/// - build()는 AuthUnauthenticated를 즉시 반환(bootstrapSession microtask 없음).
+///   → 위젯 테스트가 항상 로그인 화면에서 시작한다.
+/// - bootstrapFromCallback()은 목 AuthAuthenticated(pending 유저)를 직접 설정.
+///   목 모드에서 LoginPage는 bootstrapFromCallback()을 호출하므로,
+///   실 HTTP 호출 없이 게이트 흐름을 검증한다.
 class _MockAuthController extends AuthController {
+  @override
+  AuthState build() => const AuthUnauthenticated();
+
   @override
   Future<void> bootstrapFromCallback() async {
     state = AuthAuthenticated(

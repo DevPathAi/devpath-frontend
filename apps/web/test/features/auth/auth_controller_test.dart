@@ -117,11 +117,8 @@ void main() {
 
       await container.read(authControllerProvider.notifier).login();
 
-      // 리다이렉트이므로 상태는 그대로 미인증
-      expect(
-        container.read(authControllerProvider),
-        isA<AuthUnauthenticated>(),
-      );
+      // 리다이렉트이므로 상태는 그대로 AuthLoading(build() 초기값, bootstrapSession 진행 중)
+      expect(container.read(authControllerProvider), isA<AuthLoading>());
     });
   });
 
@@ -179,12 +176,48 @@ void main() {
   });
 
   // -------------------------------------------------------------------------
+  // Task 3.5: bootstrapSession() — 앱 시작 세션 복원
+  // -------------------------------------------------------------------------
+  group('bootstrapSession()', () {
+    test('POST /auth/refresh 200 → AuthAuthenticated로 전이', () async {
+      final container = _containerWithAdapter(
+        _MockRefreshAdapter(statusCode: 200),
+      );
+      addTearDown(container.dispose);
+
+      await container.read(authControllerProvider.notifier).bootstrapSession();
+
+      final state = container.read(authControllerProvider);
+      expect(state, isA<AuthAuthenticated>());
+      final auth = state as AuthAuthenticated;
+      expect(auth.user.id, 'u-1');
+      expect(auth.user.nickname, '테스터');
+    });
+
+    test('POST /auth/refresh 401 → AuthUnauthenticated로 전이', () async {
+      final container = _containerWithAdapter(
+        _MockRefreshAdapter(statusCode: 401),
+      );
+      addTearDown(container.dispose);
+
+      await container.read(authControllerProvider.notifier).bootstrapSession();
+
+      expect(
+        container.read(authControllerProvider),
+        isA<AuthUnauthenticated>(),
+      );
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // 기존 유지: 초기 상태·logout
   // -------------------------------------------------------------------------
-  test('초기 상태는 미인증', () {
+  test('초기 상태는 AuthLoading (Task 3.5: build()가 복원 시작)', () {
     final container = ProviderContainer();
     addTearDown(container.dispose);
-    expect(container.read(authControllerProvider), isA<AuthUnauthenticated>());
+    // build()는 AuthLoading을 반환하고 bootstrapSession을 비동기 호출한다.
+    // ProviderContainer 생성 직후(microtask 실행 전)에는 AuthLoading이어야 한다.
+    expect(container.read(authControllerProvider), isA<AuthLoading>());
   });
 
   test('logout은 토큰을 비우고 미인증으로 전환', () async {

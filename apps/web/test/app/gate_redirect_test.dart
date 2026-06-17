@@ -76,5 +76,19 @@ void main() {
         isNull,
       );
     });
+
+    // --- Task 3.5: AuthLoading 보류 케이스 ---
+    test('AuthLoading + 보호경로 → null(보류) — 세션 복원 판정 중', () {
+      expect(gateRedirect(const AuthLoading(), '/dashboard'), isNull);
+    });
+    test('AuthLoading + /login → null(보류)', () {
+      expect(gateRedirect(const AuthLoading(), '/login'), isNull);
+    });
+    test('AuthLoading + /auth/callback → null(보류)', () {
+      expect(gateRedirect(const AuthLoading(), '/auth/callback'), isNull);
+    });
+    test('AuthLoading + /onboarding → null(보류)', () {
+      expect(gateRedirect(const AuthLoading(), '/onboarding'), isNull);
+    });
   });
 }
