@@ -66,39 +66,39 @@ void main() {
     );
   });
 
-  test('refresh 콜백은 본문 없이 POST /auth/refresh를 호출하고 access_token을 매핑한다', () async {
-    final adapter = _RefreshCaptureAdapter();
-    // refresh 콜백을 직접 추출하기 위해 apiClientProvider에서 사용하는 것과
-    // 동일한 방식으로 ApiClient를 구성한다.
-    final client = ApiClient.create(
-      const ApiConfig(baseUrl: 'http://test.local'),
-    );
-    client.dio.httpClientAdapter = adapter;
-
-    // 콜백 정의 — api_providers.dart의 실제 구현과 동일해야 한다.
-    Future<TokenPair?> refreshCallback(String? refreshToken) async {
-      final data = await client.post<Map<String, dynamic>>('/auth/refresh');
-      return TokenPair(
-        access: data['access_token'] as String,
-        refresh: '',
+  test(
+    'refresh 콜백은 본문 없이 POST /auth/refresh를 호출하고 access_token을 매핑한다',
+    () async {
+      final adapter = _RefreshCaptureAdapter();
+      // refresh 콜백을 직접 추출하기 위해 apiClientProvider에서 사용하는 것과
+      // 동일한 방식으로 ApiClient를 구성한다.
+      final client = ApiClient.create(
+        const ApiConfig(baseUrl: 'http://test.local'),
       );
-    }
+      client.dio.httpClientAdapter = adapter;
 
-    final result = await refreshCallback(null);
+      // 콜백 정의 — api_providers.dart의 실제 구현과 동일해야 한다.
+      Future<TokenPair?> refreshCallback(String? refreshToken) async {
+        final data = await client.post<Map<String, dynamic>>('/auth/refresh');
+        return TokenPair(access: data['access_token'] as String, refresh: '');
+      }
 
-    // 1. 본문 없음 검증
-    expect(
-      adapter.capturedBody,
-      isNull,
-      reason: 'refresh 요청은 본문 없이 전송되어야 한다(쿠키 기반)',
-    );
+      final result = await refreshCallback(null);
 
-    // 2. 메서드/경로 검증
-    expect(adapter.capturedOptions?.method, equals('POST'));
-    expect(adapter.capturedOptions?.path, equals('/auth/refresh'));
+      // 1. 본문 없음 검증
+      expect(
+        adapter.capturedBody,
+        isNull,
+        reason: 'refresh 요청은 본문 없이 전송되어야 한다(쿠키 기반)',
+      );
 
-    // 3. access_token 매핑 검증
-    expect(result?.access, equals('refreshed-access'));
-    expect(result?.refresh, equals(''));
-  });
+      // 2. 메서드/경로 검증
+      expect(adapter.capturedOptions?.method, equals('POST'));
+      expect(adapter.capturedOptions?.path, equals('/auth/refresh'));
+
+      // 3. access_token 매핑 검증
+      expect(result?.access, equals('refreshed-access'));
+      expect(result?.refresh, equals(''));
+    },
+  );
 }

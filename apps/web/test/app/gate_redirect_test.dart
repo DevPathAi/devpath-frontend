@@ -61,5 +61,20 @@ void main() {
         '/path',
       );
     });
+    test('미인증 + /auth/callback → 통과(null) — bootstrapFromCallback 진행 중', () {
+      expect(
+        gateRedirect(const AuthUnauthenticated(), '/auth/callback'),
+        isNull,
+      );
+    });
+    test('인증 + /auth/callback → 통과(null)', () {
+      expect(
+        gateRedirect(
+          AuthAuthenticated(_user(OnboardingStatus.done)),
+          '/auth/callback',
+        ),
+        isNull,
+      );
+    });
   });
 }

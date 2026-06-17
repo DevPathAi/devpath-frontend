@@ -35,10 +35,7 @@ final apiClientProvider = Provider<ApiClient>((ref) {
       // TokenPair.refresh는 빈 문자열로 반환한다(InMemoryTokenStore에 저장되지만 무시됨).
       refresh: (refreshToken) async {
         final data = await client.post<Map<String, dynamic>>('/auth/refresh');
-        return TokenPair(
-          access: data['access_token'] as String,
-          refresh: '',
-        );
+        return TokenPair(access: data['access_token'] as String, refresh: '');
       },
       retry: (options) => client.dio.fetch(options),
     ),

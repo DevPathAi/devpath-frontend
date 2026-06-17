@@ -19,7 +19,16 @@ final Map<String, MockFixture> webMockFixtures = {
   ),
   'POST /auth/refresh': (
     200,
-    {'accessToken': 'mock-access-2', 'refreshToken': 'mock-refresh-2'},
+    {
+      'access_token': 'mock-access-2',
+      'user': {
+        'id': 'u-mock',
+        'email': 'learner@devpath.ai',
+        'nickname': '지수',
+        'role': 'LEARNER',
+        'onboardingStatus': 'PENDING',
+      },
+    },
   ),
   // 진단 제출 → DONE 유저 반환(게이트 해제)
   'POST /onboarding': (

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/auth/application/auth_controller.dart';
+import '../features/auth/presentation/auth_callback_page.dart';
 import '../features/auth/presentation/login_page.dart';
 import '../features/auth/state/auth_state.dart';
 import '../features/content/presentation/content_page.dart';
@@ -17,7 +18,11 @@ import '../features/sandbox/presentation/sandbox_page.dart';
 import '../features/shell/presentation/app_shell.dart';
 
 /// 게이트 판정(순수): 미인증→/login, 인증·온보딩미완→/onboarding, 그 외 통과.
+/// /auth/callback은 미인증이어도 통과(bootstrapFromCallback 진행 중이므로).
 String? gateRedirect(AuthState auth, String location) {
+  // OAuth 콜백 경로는 세션 복원 전이므로 게이트를 통과시킨다.
+  if (location == '/auth/callback') return null;
+
   final atLogin = location == '/login';
   final atOnboarding = location == '/onboarding';
 
@@ -49,6 +54,12 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(path: '/login', builder: (_, _) => const LoginPage()),
       GoRoute(path: '/onboarding', builder: (_, _) => const OnboardingPage()),
+      // OAuth 콜백: platform이 이 URL로 리다이렉트. bootstrapFromCallback() 호출 후
+      // 게이트가 인증 상태에 따라 분기한다.
+      GoRoute(
+        path: '/auth/callback',
+        builder: (_, _) => const AuthCallbackPage(),
+      ),
       ShellRoute(
         builder: (_, _, child) => AppShell(child: child),
         routes: [
