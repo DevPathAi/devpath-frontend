@@ -1,11 +1,11 @@
 import 'package:devpath_web/src/app/app.dart';
 import 'package:devpath_web/src/features/auth/application/auth_controller.dart';
 import 'package:devpath_web/src/features/auth/state/auth_state.dart';
-import 'package:devpath_web/src/features/onboarding/presentation/onboarding_page.dart';
+import 'package:devpath_web/src/features/diagnostic/application/diagnostic_controller.dart';
+import 'package:devpath_web/src/features/diagnostic/presentation/diagnostic_page.dart';
 import 'package:devpath_web/src/features/path/data/path_sse_source.dart';
 import 'package:devpath_web/src/features/path/presentation/path_page.dart';
 import 'package:dp_core/dp_core.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -17,25 +17,41 @@ class _NoBootstrapAuthController extends AuthController {
   AuthState build() => const AuthUnauthenticated();
 }
 
+/// 즉시 완료되는 진단 API: next()가 null을 반환해 바로 complete()로 진행.
+class _FastCompleteAssessmentApi implements AssessmentApi {
+  @override
+  dynamic noSuchMethod(Invocation i) => super.noSuchMethod(i);
+
+  @override
+  Future<int> startMember(String track) async => 1;
+
+  @override
+  Future<NextQuestion?> next({int? assessmentId, String? guestId}) async => null;
+
+  @override
+  Future<AssessmentResult> complete({int? assessmentId, String? guestId}) async =>
+      const AssessmentResult(diagnosedLevel: 'MID', confidenceWeight: 0.8);
+}
+
 void main() {
   testWidgets('로그인 → 온보딩 진단 → PATH 생성까지 게이트 흐름', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           authControllerProvider.overrideWith(_NoBootstrapAuthController.new),
+          assessmentApiProvider.overrideWithValue(_FastCompleteAssessmentApi()),
         ],
         child: const DevPathWebApp(),
       ),
     );
     await tester.pumpAndSettle();
 
-    // 로그인(PENDING) → 온보딩
+    // 로그인(PENDING) → 진단
     await tester.tap(find.text('GitHub로 계속하기 (목)'));
     await tester.pumpAndSettle();
-    expect(find.byType(OnboardingPage), findsOneWidget);
+    expect(find.byType(DiagnosticPage), findsOneWidget);
 
-    // 진단 제출 → PATH 생성 화면
-    await tester.enterText(find.byType(TextField), 'jisoo-dev');
+    // 진단 시작 → 즉시 완료(next=null) → DiagnosticResultState → PATH 생성 화면
     await tester.tap(find.text('진단 시작하기'));
     await tester.pumpAndSettle();
     expect(find.byType(PathPage), findsOneWidget);
@@ -56,6 +72,7 @@ void main() {
         overrides: [
           // Task 3.5: bootstrapSession microtask 없이 로그인 화면에서 시작.
           authControllerProvider.overrideWith(_NoBootstrapAuthController.new),
+          assessmentApiProvider.overrideWithValue(_FastCompleteAssessmentApi()),
           pathSseConnectProvider.overrideWithValue(
             ({int fromStep = 0}) => MockSseSource(
               stages: kSseSteps,
@@ -70,10 +87,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // 로그인 → 온보딩 → 진단 제출 → PATH 생성(중단)
+    // 로그인 → 진단 → 진단 시작 → 즉시 완료 → PATH 생성(중단)
     await tester.tap(find.text('GitHub로 계속하기 (목)'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'jisoo-dev');
     await tester.tap(find.text('진단 시작하기'));
     await tester.pumpAndSettle();
 

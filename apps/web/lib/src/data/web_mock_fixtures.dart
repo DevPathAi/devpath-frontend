@@ -117,6 +117,24 @@ final Map<String, MockFixture> webMockFixtures = {
       'badges': ['첫 경로', '7일 연속'],
     },
   ),
+  // 진단 API(비회원 guest 흐름)
+  'POST /onboarding/assessments/guest': (200, {'guestAssessmentId': 'g-mock'}),
+  'GET /onboarding/assessments/guest/g-mock/next': (200, {
+    'question': {'id': 1, 'type': 'MCQ', 'content': '샘플 진단 문항',
+        'options': '["A","B"]', 'bloomLevel': 'UNDERSTAND', 'difficulty': 0.3},
+    'index': 1, 'total': 15,
+  }),
+  'POST /onboarding/assessments/guest/g-mock/answer': (200, <String, dynamic>{}),
+  'POST /onboarding/assessments/guest/g-mock/complete': (200, {'diagnosedLevel': 'MID', 'confidenceWeight': 0.8}),
+  // 진단 API(회원 흐름)
+  'POST /onboarding/assessments': (200, {'assessmentId': 1}),
+  'GET /onboarding/assessments/1/next': (200, {
+    'question': {'id': 1, 'type': 'MCQ', 'content': '샘플 진단 문항',
+        'options': '["A","B"]', 'bloomLevel': 'UNDERSTAND', 'difficulty': 0.3},
+    'index': 1, 'total': 15,
+  }),
+  'POST /onboarding/assessments/1/answer': (200, <String, dynamic>{}),
+  'POST /onboarding/assessments/1/complete': (200, {'diagnosedLevel': 'MID', 'confidenceWeight': 0.8}),
   // AI 코드리뷰(REV-001)
   'POST /reviews': (
     200,

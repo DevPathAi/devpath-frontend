@@ -12,6 +12,7 @@ import '../features/community/presentation/community_home_page.dart';
 import '../features/community/presentation/qna_detail_page.dart';
 import '../features/dashboard/presentation/dashboard_page.dart';
 import '../features/mentor/presentation/mentor_page.dart';
+import '../features/diagnostic/presentation/diagnostic_page.dart';
 import '../features/onboarding/presentation/onboarding_page.dart';
 import '../features/path/presentation/path_page.dart';
 import '../features/sandbox/presentation/sandbox_page.dart';
@@ -35,19 +36,18 @@ String? gateRedirect(AuthState auth, String location) {
   if (location == '/auth/callback') return null;
 
   final atLogin = location == '/login';
-  final atOnboarding = location == '/onboarding';
+  final atDiagnostic = location == '/diagnostic';
 
   if (auth is! AuthAuthenticated) {
-    return atLogin ? null : '/login';
+    if (atLogin || atDiagnostic) return null; // 비회원 guest 진단 진입 허용
+    return '/login';
   }
   final onboardingDone = auth.user.onboardingStatus == OnboardingStatus.done;
   if (!onboardingDone) {
-    return atOnboarding ? null : '/onboarding';
+    return atDiagnostic ? null : '/diagnostic'; // 온보딩 게이트 = 진단
   }
   if (atLogin) return '/dashboard';
-  // ENG-REVIEW: 완료 유저의 /onboarding 재진입은 게이트에서 직접 /path로 —
-  // 진단 화면 재노출 회귀 차단(null 방치 대신).
-  if (atOnboarding) return '/path';
+  if (atDiagnostic) return '/path';
   return null;
 }
 
@@ -64,6 +64,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         gateRedirect(ref.read(authControllerProvider), state.matchedLocation),
     routes: [
       GoRoute(path: '/login', builder: (_, _) => const LoginPage()),
+      GoRoute(path: '/diagnostic', builder: (_, _) => const DiagnosticPage()),
       GoRoute(path: '/onboarding', builder: (_, _) => const OnboardingPage()),
       // OAuth 콜백: platform이 이 URL로 리다이렉트. bootstrapFromCallback() 호출 후
       // 게이트가 인증 상태에 따라 분기한다.
