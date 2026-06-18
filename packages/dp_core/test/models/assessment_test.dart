@@ -21,8 +21,10 @@ void main() {
   });
 
   test('AssessmentResult 역직렬화', () {
-    final r = AssessmentResult.fromJson(
-        {'diagnosedLevel': 'MID', 'confidenceWeight': 0.8});
+    final r = AssessmentResult.fromJson({
+      'diagnosedLevel': 'MID',
+      'confidenceWeight': 0.8,
+    });
     expect(r.diagnosedLevel, 'MID');
     expect(r.confidenceWeight, 0.8);
   });

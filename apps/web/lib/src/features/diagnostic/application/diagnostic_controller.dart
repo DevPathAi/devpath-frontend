@@ -50,16 +50,29 @@ class DiagnosticController extends Notifier<DiagnosticState> {
     }
   }
 
-  Future<void> submitAnswer(int questionId, String answer, {int? timeSpentSec}) =>
-      _answer(questionId, answer, false, timeSpentSec);
+  Future<void> submitAnswer(
+    int questionId,
+    String answer, {
+    int? timeSpentSec,
+  }) => _answer(questionId, answer, false, timeSpentSec);
 
   Future<void> skip(int questionId) => _answer(questionId, null, true, null);
 
-  Future<void> _answer(int questionId, String? answer, bool skipped, int? timeSpentSec) async {
+  Future<void> _answer(
+    int questionId,
+    String? answer,
+    bool skipped,
+    int? timeSpentSec,
+  ) async {
     try {
       await _api.answer(
-        assessmentId: _assessmentId, guestId: _guestId,
-        questionId: questionId, answer: answer, skipped: skipped, timeSpentSec: timeSpentSec);
+        assessmentId: _assessmentId,
+        guestId: _guestId,
+        questionId: questionId,
+        answer: answer,
+        skipped: skipped,
+        timeSpentSec: timeSpentSec,
+      );
       await _advance();
     } on ApiException catch (e) {
       state = DiagnosticError(e.message);
@@ -67,12 +80,18 @@ class DiagnosticController extends Notifier<DiagnosticState> {
   }
 
   Future<void> _advance() async {
-    final next = await _api.next(assessmentId: _assessmentId, guestId: _guestId);
+    final next = await _api.next(
+      assessmentId: _assessmentId,
+      guestId: _guestId,
+    );
     if (next != null) {
       state = DiagnosticQuestion(next);
       return;
     }
-    final result = await _api.complete(assessmentId: _assessmentId, guestId: _guestId);
+    final result = await _api.complete(
+      assessmentId: _assessmentId,
+      guestId: _guestId,
+    );
     final authState = ref.read(authControllerProvider);
     final loggedIn = authState is AuthAuthenticated;
     if (_guestId != null && !loggedIn) {
@@ -81,9 +100,12 @@ class DiagnosticController extends Notifier<DiagnosticState> {
       _storage.clear();
       // 인증 회원 완료 시 onboardingStatus를 DONE으로 갱신 → 게이트 해제.
       if (authState is AuthAuthenticated) {
-        final updatedUser = authState.user
-            .copyWith(onboardingStatus: OnboardingStatus.done);
-        ref.read(authControllerProvider.notifier).onboardingCompleted(updatedUser);
+        final updatedUser = authState.user.copyWith(
+          onboardingStatus: OnboardingStatus.done,
+        );
+        ref
+            .read(authControllerProvider.notifier)
+            .onboardingCompleted(updatedUser);
       }
       state = DiagnosticResultState(result);
     }
@@ -96,7 +118,9 @@ class DiagnosticController extends Notifier<DiagnosticState> {
     state = const DiagnosticLoading();
     try {
       _assessmentId = await _api.claim(guestId);
-      final result = await _api.result(_assessmentId!); // complete() 아님(이미 COMPLETED)
+      final result = await _api.result(
+        _assessmentId!,
+      ); // complete() 아님(이미 COMPLETED)
       _guestId = null;
       _storage.clear();
       state = DiagnosticResultState(result);
@@ -107,4 +131,6 @@ class DiagnosticController extends Notifier<DiagnosticState> {
 }
 
 final diagnosticControllerProvider =
-    NotifierProvider<DiagnosticController, DiagnosticState>(DiagnosticController.new);
+    NotifierProvider<DiagnosticController, DiagnosticState>(
+      DiagnosticController.new,
+    );

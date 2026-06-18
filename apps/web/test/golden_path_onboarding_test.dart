@@ -26,10 +26,14 @@ class _FastCompleteAssessmentApi implements AssessmentApi {
   Future<int> startMember(String track) async => 1;
 
   @override
-  Future<NextQuestion?> next({int? assessmentId, String? guestId}) async => null;
+  Future<NextQuestion?> next({int? assessmentId, String? guestId}) async =>
+      null;
 
   @override
-  Future<AssessmentResult> complete({int? assessmentId, String? guestId}) async =>
+  Future<AssessmentResult> complete({
+    int? assessmentId,
+    String? guestId,
+  }) async =>
       const AssessmentResult(diagnosedLevel: 'MID', confidenceWeight: 0.8);
 }
 

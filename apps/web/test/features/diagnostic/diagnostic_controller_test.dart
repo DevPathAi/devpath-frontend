@@ -16,31 +16,54 @@ class _FakeApi implements AssessmentApi {
     if (_served >= 15) return null;
     _served++;
     return NextQuestion(
-        question: const AssessmentQuestion(id: 1, type: 'MCQ', content: 'Q',
-            options: null, bloomLevel: 'REMEMBER', difficulty: 0.3),
-        index: _served, total: 15);
+      question: const AssessmentQuestion(
+        id: 1,
+        type: 'MCQ',
+        content: 'Q',
+        options: null,
+        bloomLevel: 'REMEMBER',
+        difficulty: 0.3,
+      ),
+      index: _served,
+      total: 15,
+    );
   }
+
   @override
-  Future<void> answer({int? assessmentId, String? guestId, required int questionId,
-      String? answer, required bool skipped, int? timeSpentSec}) async {}
+  Future<void> answer({
+    int? assessmentId,
+    String? guestId,
+    required int questionId,
+    String? answer,
+    required bool skipped,
+    int? timeSpentSec,
+  }) async {}
   @override
-  Future<AssessmentResult> complete({int? assessmentId, String? guestId}) async =>
+  Future<AssessmentResult> complete({
+    int? assessmentId,
+    String? guestId,
+  }) async =>
       const AssessmentResult(diagnosedLevel: 'MID', confidenceWeight: 0.8);
 }
 
 class _FakeStorage implements GuestClaimStorage {
   String? _v;
-  @override String? read() => _v;
-  @override void write(String g) => _v = g;
-  @override void clear() => _v = null;
+  @override
+  String? read() => _v;
+  @override
+  void write(String g) => _v = g;
+  @override
+  void clear() => _v = null;
 }
 
 void main() {
   test('guest 진단: 시작→15문항→완료→가입게이트', () async {
-    final container = ProviderContainer(overrides: [
-      assessmentApiProvider.overrideWithValue(_FakeApi()),
-      guestClaimStorageProvider.overrideWithValue(_FakeStorage()),
-    ]);
+    final container = ProviderContainer(
+      overrides: [
+        assessmentApiProvider.overrideWithValue(_FakeApi()),
+        guestClaimStorageProvider.overrideWithValue(_FakeStorage()),
+      ],
+    );
     addTearDown(container.dispose);
     final notifier = container.read(diagnosticControllerProvider.notifier);
 

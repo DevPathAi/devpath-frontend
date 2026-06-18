@@ -18,21 +18,24 @@ class AssessmentApi {
 
   Future<String> startGuest(String track) async {
     final data = await client.post<Map<String, dynamic>>(
-        '/onboarding/assessments/guest',
-        body: {'track': track});
+      '/onboarding/assessments/guest',
+      body: {'track': track},
+    );
     return data['guestAssessmentId'] as String;
   }
 
   Future<int> startMember(String track) async {
     final data = await client.post<Map<String, dynamic>>(
-        '/onboarding/assessments',
-        body: {'track': track});
+      '/onboarding/assessments',
+      body: {'track': track},
+    );
     return data['assessmentId'] as int;
   }
 
   Future<NextQuestion?> next({int? assessmentId, String? guestId}) async {
     final data = await client.get<Map<String, dynamic>?>(
-        '${_base(assessmentId: assessmentId, guestId: guestId)}/next');
+      '${_base(assessmentId: assessmentId, guestId: guestId)}/next',
+    );
     if (data == null) return null;
     return NextQuestion.fromJson(data);
   }
@@ -46,31 +49,38 @@ class AssessmentApi {
     int? timeSpentSec,
   }) async {
     await client.post<void>(
-        '${_base(assessmentId: assessmentId, guestId: guestId)}/answer',
-        body: {
-          'questionId': questionId,
-          'answer': answer,
-          'skipped': skipped,
-          'timeSpentSec': timeSpentSec,
-        });
+      '${_base(assessmentId: assessmentId, guestId: guestId)}/answer',
+      body: {
+        'questionId': questionId,
+        'answer': answer,
+        'skipped': skipped,
+        'timeSpentSec': timeSpentSec,
+      },
+    );
   }
 
-  Future<AssessmentResult> complete({int? assessmentId, String? guestId}) async {
+  Future<AssessmentResult> complete({
+    int? assessmentId,
+    String? guestId,
+  }) async {
     final data = await client.post<Map<String, dynamic>>(
-        '${_base(assessmentId: assessmentId, guestId: guestId)}/complete');
+      '${_base(assessmentId: assessmentId, guestId: guestId)}/complete',
+    );
     return AssessmentResult.fromJson(data);
   }
 
   Future<AssessmentResult> result(int assessmentId) async {
     final data = await client.get<Map<String, dynamic>>(
-        '/onboarding/assessments/$assessmentId/result');
+      '/onboarding/assessments/$assessmentId/result',
+    );
     return AssessmentResult.fromJson(data);
   }
 
   Future<int> claim(String guestAssessmentId) async {
     final data = await client.post<Map<String, dynamic>>(
-        '/onboarding/assessments/claim',
-        body: {'guest_assessment_id': guestAssessmentId});
+      '/onboarding/assessments/claim',
+      body: {'guest_assessment_id': guestAssessmentId},
+    );
     return data['assessmentId'] as int;
   }
 }

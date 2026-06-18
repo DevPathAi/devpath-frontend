@@ -7,7 +7,8 @@ class _WebGuestClaimStorage implements GuestClaimStorage {
   @override
   String? read() => web.window.sessionStorage.getItem(_key);
   @override
-  void write(String guestId) => web.window.sessionStorage.setItem(_key, guestId);
+  void write(String guestId) =>
+      web.window.sessionStorage.setItem(_key, guestId);
   @override
   void clear() => web.window.sessionStorage.removeItem(_key);
 }
