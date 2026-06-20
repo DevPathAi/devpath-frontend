@@ -54,6 +54,24 @@ void main() {
     expect(s.result!.milestones.first.tasks, hasLength(3));
   });
 
+  test('기존 경로가 있으면 생성 SSE를 시작하지 않고 바로 로드한다', () async {
+    final container = ProviderContainer(
+      overrides: [
+        pathSseConnectProvider.overrideWithValue(
+          () => throw StateError('existing path should not regenerate'),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(pathControllerProvider.notifier).loadOrStart();
+
+    final s = container.read(pathControllerProvider);
+    expect(s.phase, PathPhase.complete);
+    expect(s.completed, kPathStageLabels);
+    expect(s.result, isNotNull);
+  });
+
   test('중단 시 완료 단계 보존 후 다시 생성으로 처음부터 완성', () async {
     var calls = 0;
     final container = ProviderContainer(
