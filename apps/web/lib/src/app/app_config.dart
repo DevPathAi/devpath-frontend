@@ -4,7 +4,7 @@
 ///
 /// ```
 /// flutter run -d chrome \
-///   --dart-define=API_BASE_URL=https://api.devpath.ai/api/v1 \
+///   --dart-define=API_BASE_URL=https://api.devpath.ai \
 ///   --dart-define=USE_MOCK=false
 /// ```
 ///
@@ -15,7 +15,7 @@
 /// `.env.local` 예시:
 /// ```json
 /// {
-///   "API_BASE_URL": "https://api.devpath.ai/api/v1",
+///   "API_BASE_URL": "https://api.devpath.ai",
 ///   "USE_MOCK": "false"
 /// }
 /// ```
@@ -33,7 +33,7 @@ class AppConfig {
   factory AppConfig.fromEnvironment() => const AppConfig(
     baseUrl: String.fromEnvironment(
       'API_BASE_URL',
-      defaultValue: 'https://mock.devpath.ai/api/v1',
+      defaultValue: 'https://mock.devpath.ai',
     ),
     useMock: bool.fromEnvironment('USE_MOCK', defaultValue: true),
   );
