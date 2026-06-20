@@ -53,6 +53,20 @@ class PathController extends Notifier<PathState> {
     return const PathState();
   }
 
+  /// 기존 ACTIVE 경로가 있으면 바로 보여주고, 없을 때만 새 경로를 생성한다.
+  Future<void> loadOrStart() async {
+    try {
+      await _loadResult();
+      return;
+    } on ApiException catch (e) {
+      if (e.status != 404) {
+        state = state.copyWith(phase: PathPhase.failed, error: e.message);
+        return;
+      }
+    }
+    await start();
+  }
+
   /// 처음부터 생성.
   Future<void> start() {
     _sub?.cancel();
@@ -90,7 +104,11 @@ class PathController extends Notifier<PathState> {
         }
         if (pathEvent.stage == 'done') {
           await _sub?.cancel(); // onDone 경합 방지
-          await _loadResult();
+          try {
+            await _loadResult();
+          } on ApiException catch (e) {
+            state = state.copyWith(phase: PathPhase.failed, error: e.message);
+          }
           if (!done.isCompleted) done.complete();
           return;
         }
@@ -134,18 +152,14 @@ class PathController extends Notifier<PathState> {
   }
 
   Future<void> _loadResult() async {
-    try {
-      final json = await ref
-          .read(apiClientProvider)
-          .get<Map<String, dynamic>>('/learning-paths/me');
-      state = state.copyWith(
-        phase: PathPhase.complete,
-        completed: kPathStageLabels,
-        result: LearningPath.fromJson(json),
-      );
-    } on ApiException catch (e) {
-      state = state.copyWith(phase: PathPhase.failed, error: e.message);
-    }
+    final json = await ref
+        .read(apiClientProvider)
+        .get<Map<String, dynamic>>('/learning-paths/me');
+    state = state.copyWith(
+      phase: PathPhase.complete,
+      completed: kPathStageLabels,
+      result: LearningPath.fromJson(json),
+    );
   }
 
   PathSseEvent? _eventOf(String data) {
