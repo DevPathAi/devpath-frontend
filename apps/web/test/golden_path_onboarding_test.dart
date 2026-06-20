@@ -118,8 +118,9 @@ void main() {
           assessmentApiProvider.overrideWithValue(_FastCompleteAssessmentApi()),
           // E2E 조치(loadOrStart) 정합: 신규 사용자라 첫 GET /me는 404 → start()로 생성.
           // done 후 _loadResult의 GET /me는 목 위임(생성된 경로 200).
-          apiClientProvider
-              .overrideWith((ref) => _NewUserFirstApiClient(_mockInner())),
+          apiClientProvider.overrideWith(
+            (ref) => _NewUserFirstApiClient(_mockInner()),
+          ),
           pathSseConnectProvider.overrideWithValue(() {
             calls++;
             return MockSseSource(
