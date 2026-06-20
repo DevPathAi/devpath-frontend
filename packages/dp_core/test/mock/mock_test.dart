@@ -17,17 +17,19 @@ void main() {
 
   test('MockSseSource는 단계를 지연 emit한다', () async {
     final source = MockSseSource(
-      stages: const ['ANALYZE', 'MAP', 'BUILD', 'DONE'],
+      stages: const ['collecting', 'generating', 'matching', 'done'],
       delay: Duration.zero,
     );
     final got = await source.stream().map((e) => e.data).toList();
     expect(got.length, 4);
-    expect(got.last, contains('DONE'));
+    expect(got.first, contains('"stage":"collecting"'));
+    expect(got.last, contains('"stage":"done"'));
+    expect(got.last, contains('"pathId":101'));
   });
 
   test('failAfter는 N단계 emit 후 ApiException(network)로 중단한다', () async {
     final source = MockSseSource(
-      stages: const ['ANALYZE', 'MAP', 'BUILD', 'DONE'],
+      stages: const ['collecting', 'generating', 'matching', 'done'],
       delay: Duration.zero,
       failAfter: 2,
     );
@@ -41,14 +43,15 @@ void main() {
     expect(got.length, 2); // 2단계까지 보존
   });
 
-  test('fromStep으로 끊긴 지점부터 이어한다(전체 재시작 아님)', () async {
-    final resumed = MockSseSource(
-      stages: const ['ANALYZE', 'MAP', 'BUILD', 'DONE'],
+  test('재시작은 항상 첫 stage부터 다시 emit한다', () async {
+    final restarted = MockSseSource(
+      stages: const ['collecting', 'generating', 'matching', 'done'],
       delay: Duration.zero,
-      fromStep: 2, // 완료 2단계 이후부터
     ).stream().map((e) => e.data);
-    final got = await resumed.toList();
-    expect(got.length, 2); // BUILD, DONE만
-    expect(got.last, contains('DONE'));
+
+    final got = await restarted.toList();
+
+    expect(got, hasLength(4));
+    expect(got.first, contains('"stage":"collecting"'));
   });
 }

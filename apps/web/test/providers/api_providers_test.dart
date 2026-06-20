@@ -4,14 +4,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('목 모드 apiClient는 로그인 픽스처를 반환한다', () async {
+  // POST /auth/login 픽스처는 실흐름에 없으므로 제거됨(Task 4).
+  // 실흐름: OAuth 리다이렉트 → 콜백 → POST /auth/refresh → 세션 복원.
+  test('목 모드 apiClient는 /auth/refresh 픽스처를 반환한다', () async {
     final container = ProviderContainer();
     addTearDown(container.dispose);
 
     final client = container.read(apiClientProvider);
-    final data = await client.post<Map<String, dynamic>>('/auth/login');
+    final data = await client.post<Map<String, dynamic>>('/auth/refresh');
 
-    expect(data['accessToken'], isNotEmpty);
+    expect(data['access_token'], isNotEmpty);
+    expect(data['refresh_token_cookie_set'], isTrue);
     expect((data['user'] as Map)['nickname'], '지수');
   });
 

@@ -5,15 +5,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('목 소스는 fromStep부터 단계를 emit한다', () async {
+  test('목 소스는 stage 이벤트를 처음부터 emit한다', () async {
     final container = ProviderContainer();
     addTearDown(container.dispose);
 
     final connect = container.read(pathSseConnectProvider);
-    final steps = await connect(
-      fromStep: 2,
-    ).map((e) => (jsonDecode(e.data) as Map)['step'] as String).toList();
+    final stages = await connect()
+        .map((e) => (jsonDecode(e.data) as Map)['stage'] as String)
+        .toList();
 
-    expect(steps, ['BUILD', 'DONE']); // kSseSteps[2..] = BUILD, DONE
+    expect(stages, ['collecting', 'generating', 'matching', 'done']);
   });
 }

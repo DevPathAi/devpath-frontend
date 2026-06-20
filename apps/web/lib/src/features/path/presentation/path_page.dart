@@ -41,7 +41,7 @@ class _PathPageState extends ConsumerState<PathPage> {
         completed: s.completed,
         current: s.current,
         note: s.error ?? '연결이 끊겼어요',
-        onResume: notifier.resume,
+        onRestart: notifier.start,
       ),
       _ => _Progress(completed: s.completed, current: s.current),
     };
@@ -53,19 +53,19 @@ class _PathPageState extends ConsumerState<PathPage> {
   }
 }
 
-/// SSE 진행/부분 공통: 단계 표시 + (중단 시) 이어서 생성.
+/// SSE 진행/부분 공통: 단계 표시 + (중단 시) 처음부터 다시 생성.
 class _Progress extends StatelessWidget {
   const _Progress({
     required this.completed,
     this.current,
     this.note,
-    this.onResume,
+    this.onRestart,
   });
 
   final List<String> completed;
   final String? current;
   final String? note;
-  final VoidCallback? onResume;
+  final VoidCallback? onRestart;
 
   @override
   Widget build(BuildContext context) {
@@ -91,9 +91,9 @@ class _Progress extends StatelessWidget {
                 ).textTheme.bodySmall?.copyWith(color: c.warning),
               ),
             ],
-            if (onResume != null) ...[
+            if (onRestart != null) ...[
               const SizedBox(height: DpSpacing.md),
-              FilledButton(onPressed: onResume, child: const Text('이어서 생성')),
+              FilledButton(onPressed: onRestart, child: const Text('다시 생성')),
             ],
           ],
         ),

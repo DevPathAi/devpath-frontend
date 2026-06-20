@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:devpath_web/src/features/path/application/path_controller.dart';
 import 'package:devpath_web/src/features/path/data/path_sse_source.dart';
 import 'package:devpath_web/src/features/path/presentation/path_page.dart';
@@ -7,14 +9,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-Stream<SseEvent> _emit(List<String> steps) async* {
-  for (final s in steps) {
-    yield SseEvent(event: 'stage', data: '{"step":"$s"}');
+Stream<SseEvent> _emit(List<String> stages) async* {
+  for (final s in stages) {
+    yield SseEvent(
+      event: 'progress',
+      data: jsonEncode({
+        'stage': s,
+        'progress': s == 'done' ? 1.0 : 0.5,
+        'message': s,
+        'pathId': s == 'done' ? 101 : null,
+      }),
+    );
   }
 }
 
-Stream<SseEvent> _emitThenError(List<String> steps) async* {
-  yield* _emit(steps);
+Stream<SseEvent> _emitThenError(List<String> stages) async* {
+  yield* _emit(stages);
   throw Exception('끊김');
 }
 
@@ -27,9 +37,7 @@ void main() {
   testWidgets('완료 시 12주 타임라인과 이번 주 과제를 렌더', (tester) async {
     final c = ProviderContainer(
       overrides: [
-        pathSseConnectProvider.overrideWithValue(
-          ({int fromStep = 0}) => _emit(kSseSteps.sublist(fromStep)),
-        ),
+        pathSseConnectProvider.overrideWithValue(() => _emit(kPathStages)),
       ],
     );
     addTearDown(c.dispose);
@@ -42,11 +50,11 @@ void main() {
     expect(find.text('Stream 구독 실습'), findsOneWidget); // 이번 주 과제
   });
 
-  testWidgets('중단 시 "이어서 생성" 노출(DD8)', (tester) async {
+  testWidgets('중단 시 "다시 생성" 노출', (tester) async {
     final c = ProviderContainer(
       overrides: [
         pathSseConnectProvider.overrideWithValue(
-          ({int fromStep = 0}) => _emitThenError(['ANALYZE', 'MAP']),
+          () => _emitThenError(['collecting', 'generating']),
         ),
       ],
     );
@@ -56,7 +64,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(c.read(pathControllerProvider).phase, PathPhase.partial);
-    expect(find.text('이어서 생성'), findsOneWidget);
+    expect(find.text('다시 생성'), findsOneWidget);
     expect(find.byType(DpSseStageView), findsOneWidget); // 완료 단계 보존 표시
 
     // §9.2 PARTIAL: 완료 단계만이 아니라 kPathStageLabels 전체(미완 스켈레톤 포함)를 표시.
@@ -64,6 +72,6 @@ void main() {
       find.byType(DpSseStageView),
     );
     expect(stageView.stages, kPathStageLabels); // 3단계 전부(미완 단계도 노출)
-    expect(stageView.currentIndex, 2); // ANALYZE·MAP 완료 → 남은 1단계가 스켈레톤
+    expect(stageView.currentIndex, 2); // collecting·generating 완료
   });
 }
