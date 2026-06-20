@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:devpath_web/src/features/auth/application/auth_controller.dart';
+import 'package:devpath_web/src/features/auth/state/auth_state.dart';
 import 'package:devpath_web/src/features/path/application/path_controller.dart';
 import 'package:devpath_web/src/features/path/data/path_sse_source.dart';
 import 'package:devpath_web/src/features/path/presentation/path_page.dart';
@@ -33,10 +35,24 @@ Widget _host(ProviderContainer c) => UncontrolledProviderScope(
   child: MaterialApp(theme: DpTheme.light(), home: const PathPage()),
 );
 
+class _AuthedAuthController extends AuthController {
+  @override
+  AuthState build() => const AuthAuthenticated(
+    User(
+      id: '73',
+      email: 'e2e@devpath.local',
+      nickname: 'E2E',
+      role: UserRole.learner,
+      onboardingStatus: OnboardingStatus.done,
+    ),
+  );
+}
+
 void main() {
   testWidgets('완료 시 12주 타임라인과 이번 주 과제를 렌더', (tester) async {
     final c = ProviderContainer(
       overrides: [
+        authControllerProvider.overrideWith(_AuthedAuthController.new),
         pathSseConnectProvider.overrideWithValue(() => _emit(kPathStages)),
       ],
     );
@@ -53,6 +69,7 @@ void main() {
   testWidgets('중단 시 "다시 생성" 노출', (tester) async {
     final c = ProviderContainer(
       overrides: [
+        authControllerProvider.overrideWith(_AuthedAuthController.new),
         pathSseConnectProvider.overrideWithValue(
           () => _emitThenError(['collecting', 'generating']),
         ),
@@ -60,8 +77,9 @@ void main() {
     );
     addTearDown(c.dispose);
 
+    await c.read(pathControllerProvider.notifier).start();
     await tester.pumpWidget(_host(c));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 100));
 
     expect(c.read(pathControllerProvider).phase, PathPhase.partial);
     expect(find.text('다시 생성'), findsOneWidget);

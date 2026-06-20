@@ -2,11 +2,13 @@ import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../auth/application/auth_controller.dart';
+import '../../auth/state/auth_state.dart';
 import '../application/path_controller.dart';
 import '../data/path_sse_source.dart';
 import 'path_plan_view.dart';
 
-/// PATH-001. 진입 시 생성 시작, 상태별 렌더(진행/부분/완료/실패).
+/// PATH-001. 진입 시 기존 경로를 먼저 조회하고, 없으면 생성한다.
 class PathPage extends ConsumerStatefulWidget {
   const PathPage({super.key});
 
@@ -19,14 +21,22 @@ class _PathPageState extends ConsumerState<PathPage> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (ref.read(pathControllerProvider).phase == PathPhase.idle) {
-        ref.read(pathControllerProvider.notifier).start();
-      }
+      _loadWhenAuthenticated(ref.read(authControllerProvider));
     });
+  }
+
+  void _loadWhenAuthenticated(AuthState auth) {
+    if (auth is! AuthAuthenticated) return;
+    if (ref.read(pathControllerProvider).phase != PathPhase.idle) return;
+    ref.read(pathControllerProvider.notifier).loadOrStart();
   }
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<AuthState>(
+      authControllerProvider,
+      (_, next) => _loadWhenAuthenticated(next),
+    );
     final s = ref.watch(pathControllerProvider);
     final notifier = ref.read(pathControllerProvider.notifier);
 
