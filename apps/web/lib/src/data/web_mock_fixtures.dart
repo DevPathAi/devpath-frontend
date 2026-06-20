@@ -183,18 +183,66 @@ final Map<String, MockFixture> webMockFixtures = {
 
 /// 12주 경로 목 데이터(week1만 과제 3개, 나머지는 제목만).
 Map<String, dynamic> mockLearningPath() => {
+  'pathId': 101,
+  'track': 'BACKEND',
+  'totalWeeks': 12,
   'rationale': 'GitHub 분석 결과 비동기·테스트 역량 보강이 필요해 12주 경로를 구성했어요.',
-  'weeks': [
+  'diagnosis': {
+    'diagnosedLevel': 'MID',
+    'strengthConcepts': ['HTTP', '테스트'],
+    'weaknessConcepts': ['비동기', '트랜잭션'],
+  },
+  'milestones': [
     {
-      'week': 1,
+      'weekNum': 1,
       'title': '비동기 기초',
+      'goalDescription': 'Future와 Stream의 차이를 이해하고 작은 기능에 적용합니다.',
+      'targetSkills': ['Future', 'Stream'],
+      'estimatedHours': 4,
+      'whyThisOrder': '진단에서 비동기 흐름과 테스트 보강이 먼저 필요하다고 나왔어요.',
+      'expectedOutcome': '비동기 API 호출과 Stream 구독을 안정적으로 다룰 수 있어요.',
+      'locked': false,
       'tasks': [
-        {'title': 'Future/async-await 정리', 'done': false},
-        {'title': 'Stream 구독 실습', 'done': false},
-        {'title': '에러 처리 패턴 적용', 'done': false},
+        {
+          'orderNum': 1,
+          'taskType': 'READ',
+          'title': 'Future/async-await 정리',
+          'required': true,
+          'contentId': 1,
+          'contentSlug': 'future-async-await',
+          'completed': false,
+        },
+        {
+          'orderNum': 2,
+          'taskType': 'PRACTICE',
+          'title': 'Stream 구독 실습',
+          'required': true,
+          'contentId': 2,
+          'contentSlug': 'stream-subscription',
+          'completed': false,
+        },
+        {
+          'orderNum': 3,
+          'taskType': 'QUIZ',
+          'title': '에러 처리 패턴 적용',
+          'required': false,
+          'contentId': 3,
+          'contentSlug': 'async-error-handling',
+          'completed': false,
+        },
       ],
     },
     for (var w = 2; w <= 12; w++)
-      {'week': w, 'title': '주차 $w 학습', 'tasks': <Map<String, dynamic>>[]},
+      {
+        'weekNum': w,
+        'title': '주차 $w 학습',
+        'goalDescription': '다음 단계 역량을 차근차근 확장합니다.',
+        'targetSkills': ['Skill $w'],
+        'estimatedHours': 3,
+        'whyThisOrder': '1주차 기초 위에 순차적으로 쌓습니다.',
+        'expectedOutcome': '주차 $w 핵심 역량을 설명하고 적용할 수 있어요.',
+        'locked': true,
+        'tasks': <Map<String, dynamic>>[],
+      },
   ],
 };
