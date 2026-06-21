@@ -38,11 +38,25 @@ final Map<String, MockFixture> webMockFixtures = {
   // PATH 생성 완료 후 결과 조회(스펙 §3 비동기 결과 조회 패턴)
   'GET /learning-paths/me': (200, mockLearningPath()),
   // 학습 콘텐츠 조회(CNT-001)
-  'GET /contents/c1': (
+  'GET /contents/c1': (200, mockContent('future-async-await')),
+  'GET /contents/future-async-await': (200, mockContent('future-async-await')),
+  'GET /contents/stream-subscription': (
+    200,
+    mockContent('stream-subscription'),
+  ),
+  'GET /contents/missing': (
+    404,
+    {
+      'error': {'code': 'RESOURCE_NOT_FOUND', 'message': '콘텐츠가 없어요'},
+    },
+  ),
+  'POST /contents/future-async-await/progress': (
     200,
     {
-      'markdown':
-          '# 비동기 기초\n\nDart의 `Future`와 `async`/`await`로 비동기 흐름을 다룹니다.\n\n```dart\nFuture<int> answer() async => 42;\n```\n',
+      'scrollPct': 0.86,
+      'dwellSec': 46,
+      'completed': true,
+      'completedAt': '2026-06-21T10:00:00Z',
     },
   ),
   // 커뮤니티(COM-001) 1페이지 — nextCursor: 'c2'로 "더 보기" 노출
@@ -180,6 +194,31 @@ final Map<String, MockFixture> webMockFixtures = {
     },
   ),
 };
+
+Map<String, dynamic> mockContent(String slug) {
+  final isStream = slug == 'stream-subscription';
+  return {
+    'id': isStream ? 2 : 1,
+    'slug': slug,
+    'title': isStream ? 'Stream 구독 실습' : 'Future/async-await 정리',
+    'track': 'BACKEND',
+    'markdown': isStream
+        ? '# Stream 구독 실습\n\n`StreamSubscription`을 저장하고 필요할 때 `cancel()` 합니다.\n'
+        : '# 비동기 기초\n\nDart의 `Future`와 `async`/`await`로 비동기 흐름을 다룹니다.\n\n```dart\nFuture<int> answer() async => 42;\n```\n',
+    'estimatedMinutes': isStream ? 10 : 8,
+    'difficulty': isStream ? 0.6 : 0.5,
+    'bloomLevel': isStream ? 'APPLY' : 'UNDERSTAND',
+    'conceptTags': isStream
+        ? ['stream', 'subscription']
+        : ['future', 'async-await'],
+    'progress': {
+      'scrollPct': 0.2,
+      'dwellSec': 12,
+      'completed': false,
+      'completedAt': null,
+    },
+  };
+}
 
 /// 12주 경로 목 데이터(week1만 과제 3개, 나머지는 제목만).
 Map<String, dynamic> mockLearningPath() => {
