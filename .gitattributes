@@ -1,0 +1,6 @@
+# Dart 생성 파일(build_runner 산출물)은 LF로 고정한다.
+# build_runner는 LF로 생성하지만 repo core.autocrlf=true가 CRLF를 기대해
+# working tree에 매번 변경(M)으로 뜨는 노이즈가 발생한다. EOL을 LF로 못박아 해소한다.
+# 일반 .dart는 기존 autocrlf 동작을 유지하도록 좁게 생성 파일만 지정한다.
+*.freezed.dart text eol=lf
+*.g.dart text eol=lf
