@@ -1,6 +1,7 @@
 import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 /// 완료된 경로: 멘토 rationale + 이번 주 과제 + 12주 타임라인.
 class PathPlanView extends StatelessWidget {
@@ -63,19 +64,7 @@ class PathPlanView extends StatelessWidget {
           const SizedBox(height: DpSpacing.sm),
           Text(thisWeek.expectedOutcome, style: text.bodySmall),
           const SizedBox(height: DpSpacing.sm),
-          for (final t in thisWeek.tasks)
-            ListTile(
-              dense: true,
-              leading: Icon(
-                t.completed ? DpIcons.stepDone : DpIcons.stepPending,
-                color: t.completed ? c.success : c.textSecondary,
-              ),
-              title: Text(t.title, style: text.bodyMedium),
-              subtitle: Text(
-                '${t.taskType}${t.required ? ' · 필수' : ''}',
-                style: text.bodySmall?.copyWith(color: c.textSecondary),
-              ),
-            ),
+          for (final t in thisWeek.tasks) _TaskTile(task: t),
         ],
         const SizedBox(height: DpSpacing.xl),
         Text('12주 타임라인', style: text.titleMedium),
@@ -100,6 +89,34 @@ class PathPlanView extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _TaskTile extends StatelessWidget {
+  const _TaskTile({required this.task});
+
+  final WeeklyTask task;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.dpColors;
+    final text = Theme.of(context).textTheme;
+    final target = task.contentSlug ?? task.contentId?.toString();
+
+    return ListTile(
+      dense: true,
+      enabled: target != null,
+      onTap: target == null ? null : () => context.go('/content/$target'),
+      leading: Icon(
+        task.completed ? DpIcons.stepDone : DpIcons.stepPending,
+        color: task.completed ? c.success : c.textSecondary,
+      ),
+      title: Text(task.title, style: text.bodyMedium),
+      subtitle: Text(
+        '${task.taskType}${task.required ? ' · 필수' : ''}',
+        style: text.bodySmall?.copyWith(color: c.textSecondary),
+      ),
     );
   }
 }

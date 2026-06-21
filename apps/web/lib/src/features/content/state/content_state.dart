@@ -1,3 +1,5 @@
+import 'package:dp_core/dp_core.dart';
+
 sealed class ContentState {
   const ContentState();
 }
@@ -7,8 +9,8 @@ class ContentLoading extends ContentState {
 }
 
 class ContentLoaded extends ContentState {
-  const ContentLoaded(this.markdown);
-  final String markdown;
+  const ContentLoaded(this.content);
+  final LearningContent content;
 }
 
 class ContentFailed extends ContentState {
