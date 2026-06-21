@@ -73,3 +73,11 @@
 - 코드 리뷰: [documents/12_코드_리뷰_규칙](https://github.com/DevPathAi/documents/blob/main/12_코드_리뷰_규칙.md)
 - 비밀값(Claude API 키·OAuth·결제 키)은 절대 커밋하지 않는다.
 
+## 📚 study-documents 연계 (상시 참조)
+
+- 마스터 카탈로그: [documents/41_study-documents_연계_카탈로그.md](https://github.com/DevPathAi/documents/blob/main/41_study-documents_연계_카탈로그.md)
+- 이 레포 관련 자산:
+  - 스킬: `/devpath-skillpack:flutter-setup` · `:dart-flutter-lint-check` · `:flutter-pubdev-helper` · `:code-reviewer` · `:complexity-analyzer` · `:test-coverage-booster` · `:error-detective`
+  - Sample Codes: Riverpod·GoRouter·Dio 401 Refresh·SSE/STOMP·하이브리드 암호화·UI 컴포넌트 (study-documents `Sample Codes/🐤 Flutter_*`)
+  - 가이드: Flutter-Riverpod 3.0 마이그레이션 · go_router 14→17 마이그레이션
+
