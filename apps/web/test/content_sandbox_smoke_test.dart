@@ -32,12 +32,12 @@ void main() {
         container: c,
         child: MaterialApp(
           theme: DpTheme.light(),
-          home: const ContentPage(contentId: 'c1'),
+          home: const ContentPage(contentId: 'future-async-await'),
         ),
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.textContaining('비동기 기초'), findsWidgets);
+    expect(find.text('Future/async-await 정리'), findsOneWidget);
 
     // Sandbox 실행
     await tester.pumpWidget(

@@ -13,6 +13,7 @@ export 'src/sse/sse_client.dart';
 export 'src/models/enums.dart';
 export 'src/models/user.dart';
 export 'src/models/learning_path.dart';
+export 'src/models/learning_content.dart';
 export 'src/models/path_sse_event.dart';
 export 'src/models/code_review.dart';
 export 'src/models/dashboard_summary.dart';
