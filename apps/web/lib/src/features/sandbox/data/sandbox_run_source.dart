@@ -25,6 +25,7 @@ final sandboxRunConnectProvider = Provider<SandboxRunConnect>((ref) {
         await Future<void>.delayed(const Duration(milliseconds: 200));
         yield SseEvent(event: 'log', data: line);
       }
+      yield const SseEvent(event: 'session', data: '1');
     };
   }
   // 실API: body에 code + language 포함(설계서 §5 D-3).

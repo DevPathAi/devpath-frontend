@@ -13,8 +13,9 @@ class RunRunning extends RunState {
 }
 
 class RunDone extends RunState {
-  const RunDone({this.logs = const []});
+  const RunDone({this.logs = const [], this.sandboxSessionId});
   final List<String> logs;
+  final int? sandboxSessionId;
 }
 
 /// SANDBOX_UNAVAILABLE(503) — 실행만 비활성, 편집 유지(DD4/§9.2).
