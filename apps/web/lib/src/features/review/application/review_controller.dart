@@ -8,12 +8,62 @@ class ReviewController extends Notifier<ReviewState> {
   @override
   ReviewState build() => const ReviewIdle();
 
+  /// 실행 완료 후 sandboxSessionId로 리뷰가 DONE/FAILED로 수렴할 때까지 폴링.
+  /// GET /reviews?sandboxSessionId={id} — status PENDING→재시도, DONE→ReviewLoaded,
+  /// FAILED→ReviewFailed. killSwitch/quota ApiException→각 상태. 타임아웃→ReviewFailed.
+  Future<void> pollForSession(
+    int sandboxSessionId, {
+    Duration interval = const Duration(seconds: 2),
+    int maxAttempts = 30,
+  }) async {
+    state = const ReviewLoading();
+    for (var attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        final json = await ref
+            .read(apiClientProvider)
+            .get<Map<String, dynamic>>(
+              '/reviews',
+              query: {'sandboxSessionId': '$sandboxSessionId'},
+            );
+        final review = CodeReview.fromJson(json);
+        switch (review.status) {
+          case 'DONE':
+            state = ReviewLoaded(review);
+            return;
+          case 'FAILED':
+            state = const ReviewFailed('AI 리뷰 생성에 실패했습니다');
+            return;
+          default:
+            // PENDING 또는 null — 계속 폴링
+            break;
+        }
+      } on ApiException catch (e) {
+        if (e.isKillSwitch) {
+          state = const ReviewKillSwitch();
+          return;
+        }
+        if (e.isQuota) {
+          state = ReviewQuota(e.retryAfterSeconds);
+          return;
+        }
+        // RESOURCE_NOT_FOUND: 아직 리뷰 미생성 — 계속 폴링
+        if (e.code == ApiErrorCode.resourceNotFound) {
+          // fall through to delay and retry
+        } else {
+          state = ReviewFailed(e.message);
+          return;
+        }
+      }
+      await Future<void>.delayed(interval);
+    }
+    state = const ReviewFailed('AI 리뷰 시간이 초과되었습니다');
+  }
+
+  // ignore: unused_element
+  /// @deprecated 동기 POST 프로토(F6-e 이전). 폴링 전환 후 미사용.
   Future<void> request(String code) async {
     state = const ReviewLoading();
     try {
-      // F6-e: 본 프로토는 동기 POST — 완성 리뷰를 즉시 반환받는다.
-      // 계약(§9.2)의 "비동기 결과는 폴링/알림 후 조회"와의 격차는 후속에서 폴링으로 전환
-      // (CodeReview.id/status 자리 선확보로 전환 비용 절감). 리스크 절 참조.
       final json = await ref
           .read(apiClientProvider)
           .post<Map<String, dynamic>>('/reviews', body: {'code': code});
