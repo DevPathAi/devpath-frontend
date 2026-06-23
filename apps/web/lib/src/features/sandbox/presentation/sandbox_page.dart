@@ -11,6 +11,9 @@ import 'sandbox_layout.dart';
 
 const _kInitialCode = 'void main() {\n  print(\'hello devpath\');\n}\n';
 
+/// 지원 언어 목록(설계서 §2 D-3).
+const _kLanguages = ['JAVA', 'NODE', 'PYTHON'];
+
 class SandboxPage extends ConsumerStatefulWidget {
   const SandboxPage({super.key});
 
@@ -20,6 +23,8 @@ class SandboxPage extends ConsumerStatefulWidget {
 
 class _SandboxPageState extends ConsumerState<SandboxPage> {
   String _code = _kInitialCode;
+  String _language = 'JAVA';
+
   // F5-b: 에디터 가시화 시 Monaco 재레이아웃 트리거용 핸들.
   final GlobalKey<MonacoEditorViewState> _editorKey =
       GlobalKey<MonacoEditorViewState>();
@@ -32,10 +37,23 @@ class _SandboxPageState extends ConsumerState<SandboxPage> {
       appBar: AppBar(
         title: const Text('Sandbox'),
         actions: [
+          DropdownButton<String>(
+            key: const Key('sandbox_language_dropdown'),
+            value: _language,
+            items: _kLanguages
+                .map((l) => DropdownMenuItem(value: l, child: Text(l)))
+                .toList(),
+            onChanged: (v) {
+              if (v != null) setState(() => _language = v);
+            },
+          ),
+          const SizedBox(width: DpSpacing.sm),
           FilledButton(
             onPressed: run is RunRunning
                 ? null
-                : () => ref.read(runControllerProvider.notifier).run(_code),
+                : () => ref
+                      .read(runControllerProvider.notifier)
+                      .run(_code, _language),
             child: const Text('실행'),
           ),
           const SizedBox(width: DpSpacing.md),

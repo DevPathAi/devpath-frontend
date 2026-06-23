@@ -4,16 +4,40 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart'; // F6-a: KILL_SWITCH 대체행동 라우팅(context.go)
 
+import '../../sandbox/application/run_controller.dart';
+import '../../sandbox/state/run_state.dart';
 import '../application/review_controller.dart';
 import '../state/review_state.dart';
 
 /// SBX 3페인의 리뷰 칸. 상태별 렌더(요청/생성중/결과/점검/한도/실패).
-class ReviewPanel extends ConsumerWidget {
+/// F6-e: RunDone.sandboxSessionId 감지 시 자동으로 pollForSession 트리거.
+class ReviewPanel extends ConsumerStatefulWidget {
   const ReviewPanel({super.key, required this.onRequest});
+
+  /// 수동 리뷰 요청 또는 재시도 콜백(폴링 재시도 포함).
   final VoidCallback onRequest;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ReviewPanel> createState() => _ReviewPanelState();
+}
+
+class _ReviewPanelState extends ConsumerState<ReviewPanel> {
+  /// 중복 폴링 트리거 방지 가드. 같은 sessionId로 두 번 이상 폴링하지 않는다.
+  int? _lastPolledSessionId;
+
+  @override
+  Widget build(BuildContext context) {
+    // F6-e: RunDone.sandboxSessionId 감지 → 자동 폴링 트리거(중복 가드).
+    ref.listen<RunState>(runControllerProvider, (_, next) {
+      if (next is RunDone) {
+        final sid = next.sandboxSessionId;
+        if (sid != null && sid != _lastPolledSessionId) {
+          _lastPolledSessionId = sid;
+          ref.read(reviewControllerProvider.notifier).pollForSession(sid);
+        }
+      }
+    });
+
     final s = ref.watch(reviewControllerProvider);
     return switch (s) {
       ReviewIdle() => DpEmpty(
@@ -21,7 +45,7 @@ class ReviewPanel extends ConsumerWidget {
         title: 'AI 코드리뷰',
         message: '코드를 작성하고 리뷰를 받아보세요.',
         actionLabel: 'AI 리뷰 요청',
-        onAction: onRequest,
+        onAction: widget.onRequest,
       ),
       ReviewLoading() => const DpLoading(label: '리뷰 생성 중…'),
       // F6-a: P3 DpKillSwitch의 대체행동(altActionLabel/onAltAction)을 배선 —
@@ -37,7 +61,7 @@ class ReviewPanel extends ConsumerWidget {
       ),
       ReviewFailed(:final message) => DpError(
         message: message,
-        onRetry: onRequest,
+        onRetry: widget.onRequest,
       ),
       ReviewLoaded(:final review) => _ReviewBody(review: review),
     };

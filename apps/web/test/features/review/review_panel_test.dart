@@ -1,6 +1,9 @@
 import 'package:devpath_web/src/features/review/application/review_controller.dart';
 import 'package:devpath_web/src/features/review/presentation/review_panel.dart';
 import 'package:devpath_web/src/features/review/state/review_state.dart';
+import 'package:devpath_web/src/features/sandbox/application/run_controller.dart';
+import 'package:devpath_web/src/features/sandbox/data/sandbox_run_source.dart';
+import 'package:devpath_web/src/providers/api_providers.dart';
 import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
@@ -168,5 +171,51 @@ void main() {
     await tester.pumpWidget(_host(c));
     expect(find.byType(DpError), findsOneWidget);
     expect(find.textContaining('서버 오류'), findsOneWidget);
+  });
+
+  // F6-e: RunDone.sandboxSessionId 감지 시 자동 pollForSession 트리거 검증.
+  testWidgets('RunDone with sandboxSessionId → auto-poll triggers ReviewLoaded', (
+    tester,
+  ) async {
+    // 목 ApiClient: GET /reviews?sandboxSessionId=42 → DONE
+    final client = ApiClient.create(
+      const ApiConfig(baseUrl: 'https://t/api/v1'),
+    );
+    client.dio.httpClientAdapter = MockHttpAdapter({
+      'GET /reviews?sandboxSessionId=42': (
+        200,
+        {
+          'status': 'DONE',
+          'confidence': 75,
+          'strengths': ['자동 폴링 테스트'],
+          'improvements': <Map<String, dynamic>>[],
+          'security': <Map<String, dynamic>>[],
+        },
+      ),
+    });
+
+    final c = ProviderContainer(
+      overrides: [
+        apiClientProvider.overrideWithValue(client),
+        // RunController는 실제 구현 사용(상태 전이 감지용).
+        // sandboxRunConnectProvider는 즉시 완료(session=42 포함).
+        sandboxRunConnectProvider.overrideWithValue((_, _) async* {
+          yield const SseEvent(event: 'log', data: 'ok');
+          yield const SseEvent(event: 'session', data: '42');
+        }),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    await tester.pumpWidget(_host(c));
+
+    // RunController.run 호출 → RunDone(sandboxSessionId=42) → ReviewPanel이 감지 → pollForSession
+    await c.read(runControllerProvider.notifier).run('x', 'PYTHON');
+
+    // pollForSession은 비동기이므로 settle 대기
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('75'), findsWidgets);
+    expect(find.textContaining('자동 폴링 테스트'), findsOneWidget);
   });
 }

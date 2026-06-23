@@ -178,7 +178,19 @@ final Map<String, MockFixture> webMockFixtures = {
     200,
     {'diagnosedLevel': 'MID', 'confidenceWeight': 0.8},
   ),
-  // AI 코드리뷰(REV-001)
+  // AI 코드리뷰(REV-001) — 폴링 GET /reviews?sandboxSessionId={id}(F6-e 빌드 E).
+  // MockHttpAdapter query-aware: 키 정렬 → 'GET /reviews?sandboxSessionId=1'
+  'GET /reviews?sandboxSessionId=1': (
+    200,
+    {
+      'status': 'DONE',
+      'confidence': 82,
+      'strengths': ['목 리뷰: 코드가 간결합니다.'],
+      'improvements': <Map<String, dynamic>>[],
+      'security': <Map<String, dynamic>>[],
+    },
+  ),
+  // 동기 POST 프로토 폴백(기존 smoke test 호환)
   'POST /reviews': (
     200,
     {

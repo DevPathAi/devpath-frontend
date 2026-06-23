@@ -21,7 +21,7 @@ void main() {
 
     final c = ProviderContainer(
       overrides: [
-        sandboxRunConnectProvider.overrideWithValue((_) => _logs(['OK'])),
+        sandboxRunConnectProvider.overrideWithValue((_, _) => _logs(['OK'])),
       ],
     );
     addTearDown(c.dispose);
