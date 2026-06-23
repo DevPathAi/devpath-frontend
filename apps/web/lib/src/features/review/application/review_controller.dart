@@ -19,7 +19,9 @@ class ReviewController extends Notifier<ReviewState> {
     state = const ReviewLoading();
     for (var attempt = 0; attempt < maxAttempts; attempt++) {
       try {
-        final json = await ref.read(apiClientProvider).get<Map<String, dynamic>>(
+        final json = await ref
+            .read(apiClientProvider)
+            .get<Map<String, dynamic>>(
               '/reviews',
               query: {'sandboxSessionId': '$sandboxSessionId'},
             );

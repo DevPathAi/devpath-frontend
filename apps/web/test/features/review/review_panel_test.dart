@@ -174,8 +174,9 @@ void main() {
   });
 
   // F6-e: RunDone.sandboxSessionId 감지 시 자동 pollForSession 트리거 검증.
-  testWidgets('RunDone with sandboxSessionId → auto-poll triggers ReviewLoaded',
-      (tester) async {
+  testWidgets('RunDone with sandboxSessionId → auto-poll triggers ReviewLoaded', (
+    tester,
+  ) async {
     // 목 ApiClient: GET /reviews?sandboxSessionId=42 → DONE
     final client = ApiClient.create(
       const ApiConfig(baseUrl: 'https://t/api/v1'),
@@ -193,15 +194,17 @@ void main() {
       ),
     });
 
-    final c = ProviderContainer(overrides: [
-      apiClientProvider.overrideWithValue(client),
-      // RunController는 실제 구현 사용(상태 전이 감지용).
-      // sandboxRunConnectProvider는 즉시 완료(session=42 포함).
-      sandboxRunConnectProvider.overrideWithValue((_, _) async* {
-        yield const SseEvent(event: 'log', data: 'ok');
-        yield const SseEvent(event: 'session', data: '42');
-      }),
-    ]);
+    final c = ProviderContainer(
+      overrides: [
+        apiClientProvider.overrideWithValue(client),
+        // RunController는 실제 구현 사용(상태 전이 감지용).
+        // sandboxRunConnectProvider는 즉시 완료(session=42 포함).
+        sandboxRunConnectProvider.overrideWithValue((_, _) async* {
+          yield const SseEvent(event: 'log', data: 'ok');
+          yield const SseEvent(event: 'session', data: '42');
+        }),
+      ],
+    );
     addTearDown(c.dispose);
 
     await tester.pumpWidget(_host(c));

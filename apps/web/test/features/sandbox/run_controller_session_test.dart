@@ -7,12 +7,14 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('captures sandboxSessionId from session SSE event', () async {
-    final container = ProviderContainer(overrides: [
-      sandboxRunConnectProvider.overrideWithValue((code, language) async* {
-        yield const SseEvent(event: 'log', data: 'compiling');
-        yield const SseEvent(event: 'session', data: '99');
-      }),
-    ]);
+    final container = ProviderContainer(
+      overrides: [
+        sandboxRunConnectProvider.overrideWithValue((code, language) async* {
+          yield const SseEvent(event: 'log', data: 'compiling');
+          yield const SseEvent(event: 'session', data: '99');
+        }),
+      ],
+    );
     addTearDown(container.dispose);
 
     await container.read(runControllerProvider.notifier).run('x', 'PYTHON');

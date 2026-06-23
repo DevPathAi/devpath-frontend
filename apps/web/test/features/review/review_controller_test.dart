@@ -26,7 +26,9 @@ class _SequentialMockAdapter implements HttpClientAdapter {
     return ResponseBody.fromString(
       jsonEncode(r),
       200,
-      headers: {Headers.contentTypeHeader: [Headers.jsonContentType]},
+      headers: {
+        Headers.contentTypeHeader: [Headers.jsonContentType],
+      },
     );
   }
 
@@ -140,7 +142,9 @@ void main() {
     c.dio.httpClientAdapter = MockHttpAdapter({
       'GET /reviews': (
         503,
-        {'error': {'code': 'AI_KILL_SWITCH_ACTIVE', 'message': '점검'}},
+        {
+          'error': {'code': 'AI_KILL_SWITCH_ACTIVE', 'message': '점검'},
+        },
       ),
     });
     final container = ProviderContainer(
@@ -164,7 +168,9 @@ void main() {
     c.dio.httpClientAdapter = MockHttpAdapter({
       'GET /reviews': (
         429,
-        {'error': {'code': 'QUOTA_EXCEEDED', 'message': '한도'}},
+        {
+          'error': {'code': 'QUOTA_EXCEEDED', 'message': '한도'},
+        },
       ),
     });
     final container = ProviderContainer(
