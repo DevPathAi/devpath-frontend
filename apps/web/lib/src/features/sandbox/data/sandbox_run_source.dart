@@ -4,9 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../providers/api_providers.dart';
 
 /// 실행 로그 SSE 스트림 생성기.
-/// F5/D1 반영: 실행할 코드를 전달받아 실서버 분기에서 body로 보낼 수 있게 `code`를 받는다.
-/// (목 분기는 code를 무시.) 테스트 override는 `(_) => stream` 형태.
-typedef SandboxRunConnect = Stream<SseEvent> Function(String code);
+/// D-3 반영: language 파라미터 추가(JAVA/NODE/PYTHON). 목 분기는 무시.
+/// 테스트 override는 `(code, language) => stream` 형태.
+typedef SandboxRunConnect =
+    Stream<SseEvent> Function(String code, String language);
 
 const List<String> _kMockRunLog = [
   '> dart run main.dart',
@@ -19,14 +20,15 @@ const List<String> _kMockRunLog = [
 final sandboxRunConnectProvider = Provider<SandboxRunConnect>((ref) {
   final config = ref.watch(appConfigProvider);
   if (config.useMock) {
-    return (String code) async* {
+    return (String code, String language) async* {
       for (final line in _kMockRunLog) {
         await Future<void>.delayed(const Duration(milliseconds: 200));
         yield SseEvent(event: 'log', data: line);
       }
     };
   }
-  // F5/D1 반영: `client.dio` 직접 접근 금지 → P2 Task 10 `apiClient.sse(path,{body})`만 사용.
+  // 실API: body에 code + language 포함(설계서 §5 D-3).
   final client = ref.watch(apiClientProvider);
-  return (String code) => client.sse('/sandbox/run', body: {'code': code});
+  return (String code, String language) =>
+      client.sse('/sandbox/run', body: {'code': code, 'language': language});
 });

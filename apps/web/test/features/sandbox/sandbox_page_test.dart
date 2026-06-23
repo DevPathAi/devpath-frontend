@@ -22,7 +22,7 @@ void main() {
     final c = ProviderContainer(
       overrides: [
         sandboxRunConnectProvider.overrideWithValue(
-          (_) => _logs(['실행 결과: OK']),
+          (_, _) => _logs(['실행 결과: OK']),
         ),
       ],
     );
@@ -40,5 +40,43 @@ void main() {
     await tester.tap(find.text('실행'));
     await tester.pumpAndSettle();
     expect(find.textContaining('실행 결과: OK'), findsOneWidget);
+  });
+
+  testWidgets('언어 드롭다운에서 NODE 선택 시 run에 NODE가 전달된다', (tester) async {
+    tester.view.physicalSize = const Size(1400, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    String? capturedLanguage;
+    final c = ProviderContainer(
+      overrides: [
+        sandboxRunConnectProvider.overrideWithValue((
+          String code,
+          String language,
+        ) {
+          capturedLanguage = language;
+          return const Stream<SseEvent>.empty();
+        }),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: c,
+        child: MaterialApp(theme: DpTheme.light(), home: const SandboxPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('sandbox_language_dropdown')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('NODE').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('실행'));
+    await tester.pumpAndSettle();
+
+    expect(capturedLanguage, 'NODE');
   });
 }
