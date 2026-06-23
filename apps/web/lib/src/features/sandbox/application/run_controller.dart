@@ -17,7 +17,7 @@ class RunController extends Notifier<RunState> {
 
   Completer<void>? _inFlight; // F5/D1: 재진입 가드
 
-  Future<void> run(String code) {
+  Future<void> run(String code, String language) {
     // F5/D1 반영: 진행 중이면 무시 — 연속 호출로 이전 Completer가 미완료 hang되는 것을 방지.
     if (_inFlight != null && !_inFlight!.isCompleted) return _inFlight!.future;
 
@@ -27,7 +27,7 @@ class RunController extends Notifier<RunState> {
     state = const RunRunning();
 
     _sub = ref
-        .read(sandboxRunConnectProvider)(code)
+        .read(sandboxRunConnectProvider)(code, language)
         .listen(
           (e) {
             final s = state;

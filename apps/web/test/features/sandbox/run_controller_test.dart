@@ -16,13 +16,13 @@ void main() {
     final c = ProviderContainer(
       overrides: [
         sandboxRunConnectProvider.overrideWithValue(
-          (_) => _logs(['컴파일 중…', '테스트 통과']),
+          (_, _) => _logs(['컴파일 중…', '테스트 통과']),
         ),
       ],
     );
     addTearDown(c.dispose);
 
-    await c.read(runControllerProvider.notifier).run('print(1);');
+    await c.read(runControllerProvider.notifier).run('print(1);', 'JAVA');
 
     final s = c.read(runControllerProvider);
     expect(s, isA<RunDone>());
@@ -33,7 +33,7 @@ void main() {
     final c = ProviderContainer(
       overrides: [
         sandboxRunConnectProvider.overrideWithValue(
-          (_) => Stream<SseEvent>.error(
+          (_, _) => Stream<SseEvent>.error(
             const ApiException(
               code: ApiErrorCode.sandboxUnavailable,
               message: '점검',
@@ -44,7 +44,7 @@ void main() {
     );
     addTearDown(c.dispose);
 
-    await c.read(runControllerProvider.notifier).run('print(1);');
+    await c.read(runControllerProvider.notifier).run('print(1);', 'JAVA');
     expect(c.read(runControllerProvider), isA<RunUnavailable>());
   });
 
@@ -53,7 +53,7 @@ void main() {
     var connects = 0;
     final c = ProviderContainer(
       overrides: [
-        sandboxRunConnectProvider.overrideWithValue((_) {
+        sandboxRunConnectProvider.overrideWithValue((_, _) {
           connects++;
           return _logs(['1회차']);
         }),
@@ -62,10 +62,30 @@ void main() {
     addTearDown(c.dispose);
 
     final notifier = c.read(runControllerProvider.notifier);
-    final first = notifier.run('print(1);');
-    final second = notifier.run('print(2);'); // 진행 중 재호출 → 무시
+    final first = notifier.run('print(1);', 'JAVA');
+    final second = notifier.run('print(2);', 'NODE'); // 진행 중 재호출 → 무시
     await Future.wait([first, second]);
 
     expect(connects, 1); // 두 번째 호출은 새 스트림을 만들지 않음
+  });
+
+  test('language가 connect 호출에 전달된다', () async {
+    String? capturedLanguage;
+    final c = ProviderContainer(
+      overrides: [
+        sandboxRunConnectProvider.overrideWithValue((
+          String code,
+          String language,
+        ) {
+          capturedLanguage = language;
+          return _logs(['ok']);
+        }),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    await c.read(runControllerProvider.notifier).run('print(1);', 'NODE');
+
+    expect(capturedLanguage, 'NODE');
   });
 }
