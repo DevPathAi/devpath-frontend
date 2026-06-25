@@ -1,6 +1,7 @@
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../application/mentor_controller.dart';
 import '../state/mentor_state.dart';
@@ -98,10 +99,9 @@ class _MentorPageState extends ConsumerState<MentorPage> {
                 ).textTheme.bodySmall?.copyWith(color: c.danger),
               ),
             ),
-          // ENG-REVIEW(P3): 응답 완료(idle) 시 후속질문 슬롯 — 자리표시만.
-          // 후속질문 *추천*(서버 payload 기반)은 후속(리스크 절 참조).
-          if (s.status == MentorStatus.idle && s.messages.isNotEmpty)
-            const _FollowUpSlot(),
+          // 슬라이스 #7 M-2: 참고자료(event:references) — 있으면 칩으로 렌더, 없으면 미표시.
+          if (s.references.isNotEmpty)
+            _ReferencePanel(references: s.references),
           if (s.status != MentorStatus.killSwitch)
             _Composer(controller: _input, onSend: _send),
         ],
@@ -184,25 +184,47 @@ class _Bubble extends StatelessWidget {
   }
 }
 
-/// 응답 완료 후 후속질문 슬롯 — ENG-REVIEW(P3 수용): 자리표시만 둔다.
-/// 후속질문 *추천*(서버가 내려주는 follow-up payload 렌더)은 후속. 와이어 미명세라
-/// 추측하지 않고 자리만 확보(리스크 절 참조).
-class _FollowUpSlot extends StatelessWidget {
-  const _FollowUpSlot();
+/// 참고자료 패널(슬라이스 #7 M-2). `event:references`로 받은 콘텐츠 링크를
+/// 칩으로 렌더한다. 비어 있으면 호출부에서 미표시.
+class _ReferencePanel extends StatelessWidget {
+  const _ReferencePanel({required this.references});
+  final List<MentorReference> references;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: DpSpacing.lg),
-    child: Align(
-      alignment: Alignment.centerLeft,
-      child: Text(
-        '후속질문 추천은 후속',
-        style: Theme.of(
-          context,
-        ).textTheme.bodySmall?.copyWith(color: context.dpColors.textSecondary),
+  Widget build(BuildContext context) {
+    final c = context.dpColors;
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: DpSpacing.lg,
+        vertical: DpSpacing.sm,
       ),
-    ),
-  );
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '참고자료',
+            style: Theme.of(
+              context,
+            ).textTheme.labelMedium?.copyWith(color: c.textSecondary),
+          ),
+          const SizedBox(height: DpSpacing.xs),
+          Wrap(
+            spacing: DpSpacing.sm,
+            runSpacing: DpSpacing.xs,
+            children: [
+              for (final r in references)
+                ActionChip(
+                  key: ValueKey('ref-${r.contentId}'),
+                  avatar: const Icon(DpIcons.content, size: 16),
+                  label: Text(r.title),
+                  onPressed: () => context.go('/content/${r.contentId}'),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _Composer extends StatelessWidget {
