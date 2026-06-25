@@ -12,13 +12,39 @@ class ChatMessage {
       ChatMessage(fromUser: fromUser, text: text + s);
 }
 
+/// 참고자료 링크(슬라이스 #7 M-2 `event:references`). ai-svc가 질문 임베딩 →
+/// learning 유사검색으로 내려주는 top-K 콘텐츠. mentor feature 내 plain 모델
+/// (state 타입과 co-locate; dp_core 모델은 freezed 기반이라 패턴 분리).
+class MentorReference {
+  const MentorReference({
+    required this.contentId,
+    required this.slug,
+    required this.title,
+  });
+
+  final int contentId;
+  final String slug;
+  final String title;
+
+  factory MentorReference.fromJson(Map<String, dynamic> json) =>
+      MentorReference(
+        contentId: (json['contentId'] as num).toInt(),
+        slug: json['slug'] as String,
+        title: json['title'] as String,
+      );
+}
+
 class MentorState {
   const MentorState({
     this.messages = const [],
     this.status = MentorStatus.idle,
     this.error,
+    this.references = const [],
   });
   final List<ChatMessage> messages;
   final MentorStatus status;
   final String? error;
+
+  /// `event:references`(1회) 결과. 도착 전/없으면 빈 리스트.
+  final List<MentorReference> references;
 }
