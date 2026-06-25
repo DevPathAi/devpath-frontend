@@ -3,9 +3,11 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('MentorReference.fromJson 파싱', () {
-    final r = MentorReference.fromJson(
-      const {'contentId': 7, 'slug': 'async-await', 'title': '비동기 기초'},
-    );
+    final r = MentorReference.fromJson(const {
+      'contentId': 7,
+      'slug': 'async-await',
+      'title': '비동기 기초',
+    });
     expect(r.contentId, 7);
     expect(r.slug, 'async-await');
     expect(r.title, '비동기 기초');
