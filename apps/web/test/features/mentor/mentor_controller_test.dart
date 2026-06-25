@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:devpath_web/src/features/mentor/application/mentor_controller.dart';
 import 'package:devpath_web/src/features/mentor/data/mentor_sse_source.dart';
@@ -18,7 +19,7 @@ void main() {
     final c = ProviderContainer(
       overrides: [
         mentorSseConnectProvider.overrideWithValue(
-          (q, {int fromStep = 0}) => _tokens(['안녕', '하세요']),
+          (q, {String? contentId, int fromStep = 0}) => _tokens(['안녕', '하세요']),
         ),
       ],
     );
@@ -39,7 +40,7 @@ void main() {
     final c = ProviderContainer(
       overrides: [
         mentorSseConnectProvider.overrideWithValue(
-          (q, {int fromStep = 0}) => Stream<SseEvent>.error(
+          (q, {String? contentId, int fromStep = 0}) => Stream<SseEvent>.error(
             const ApiException(
               code: ApiErrorCode.aiKillSwitchActive,
               message: '점검',
@@ -56,7 +57,11 @@ void main() {
 
   // ENG-REVIEW D2: 끊김 시 부분답변 보존(partial) — failed로 버리지 않는다.
   test('부분 토큰 후 끊기면 status partial + 받은 토큰 보존', () async {
-    Stream<SseEvent> partial(String q, {int fromStep = 0}) async* {
+    Stream<SseEvent> partial(
+      String q, {
+      String? contentId,
+      int fromStep = 0,
+    }) async* {
       yield SseEvent(event: 'token', data: '부분');
       throw Exception('연결 끊김');
     }
@@ -77,7 +82,8 @@ void main() {
     final c = ProviderContainer(
       overrides: [
         mentorSseConnectProvider.overrideWithValue(
-          (q, {int fromStep = 0}) => const Stream<SseEvent>.empty(),
+          (q, {String? contentId, int fromStep = 0}) =>
+              const Stream<SseEvent>.empty(),
         ),
       ],
     );
@@ -97,7 +103,11 @@ void main() {
     var call = 0;
     final c = ProviderContainer(
       overrides: [
-        mentorSseConnectProvider.overrideWithValue((q, {int fromStep = 0}) {
+        mentorSseConnectProvider.overrideWithValue((
+          q, {
+          String? contentId,
+          int fromStep = 0,
+        }) {
           call++;
           return call == 1 ? first.stream : _tokens(['두번째']);
         }),
@@ -116,5 +126,54 @@ void main() {
     // 둘째 답변 버블이 '늦은토큰'으로 오염되지 않음.
     expect(s.messages.last.text, '두번째');
     expect(s.messages.map((m) => m.text), isNot(contains('늦은토큰')));
+  });
+
+  test('references 이벤트 → state.references 반영(버블 미오염)', () async {
+    Stream<SseEvent> withRefs(
+      String q, {
+      String? contentId,
+      int fromStep = 0,
+    }) async* {
+      yield SseEvent(event: 'token', data: '답변');
+      yield SseEvent(
+        event: 'references',
+        data: jsonEncode(const [
+          {'contentId': 7, 'slug': 'async', 'title': '비동기'},
+        ]),
+      );
+    }
+
+    final c = ProviderContainer(
+      overrides: [mentorSseConnectProvider.overrideWithValue(withRefs)],
+    );
+    addTearDown(c.dispose);
+
+    await c.read(mentorControllerProvider.notifier).send('질문');
+    final s = c.read(mentorControllerProvider);
+
+    expect(s.status, MentorStatus.idle);
+    // 토큰만 버블에 — references는 버블에 append되지 않는다.
+    expect(s.messages.last.text, '답변');
+    expect(s.references, hasLength(1));
+    expect(s.references.single.contentId, 7);
+    expect(s.references.single.slug, 'async');
+    expect(s.references.single.title, '비동기');
+  });
+
+  test('references 없이 토큰만 와도 정상(references 빈 리스트 유지)', () async {
+    final c = ProviderContainer(
+      overrides: [
+        mentorSseConnectProvider.overrideWithValue(
+          (q, {String? contentId, int fromStep = 0}) => _tokens(['토큰']),
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    await c.read(mentorControllerProvider.notifier).send('질문');
+    final s = c.read(mentorControllerProvider);
+    expect(s.status, MentorStatus.idle);
+    expect(s.messages.last.text, '토큰');
+    expect(s.references, isEmpty);
   });
 }

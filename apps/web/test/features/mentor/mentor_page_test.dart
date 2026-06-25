@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:devpath_web/src/features/mentor/data/mentor_sse_source.dart';
 import 'package:devpath_web/src/features/mentor/presentation/mentor_page.dart';
 import 'package:dp_core/dp_core.dart';
@@ -17,7 +19,7 @@ void main() {
     final c = ProviderContainer(
       overrides: [
         mentorSseConnectProvider.overrideWithValue(
-          (q, {int fromStep = 0}) => _tokens(['도', '움말']),
+          (q, {String? contentId, int fromStep = 0}) => _tokens(['도', '움말']),
         ),
       ],
     );
@@ -42,7 +44,11 @@ void main() {
 
   // ENG-REVIEW D2: 끊김(partial) 시 부분답변 + "다시 시도" 재전송 버튼 노출.
   testWidgets('끊김 시 부분답변 보존 + "다시 시도" 노출', (tester) async {
-    Stream<SseEvent> partial(String q, {int fromStep = 0}) async* {
+    Stream<SseEvent> partial(
+      String q, {
+      String? contentId,
+      int fromStep = 0,
+    }) async* {
       yield SseEvent(event: 'token', data: '부분응답');
       throw Exception('끊김');
     }
@@ -65,5 +71,41 @@ void main() {
 
     expect(find.text('부분응답'), findsOneWidget); // 부분답변 보존
     expect(find.text('다시 시도'), findsOneWidget); // 재전송 액션
+  });
+
+  testWidgets('참고자료 references 도착 시 칩으로 렌더', (tester) async {
+    Stream<SseEvent> withRefs(
+      String q, {
+      String? contentId,
+      int fromStep = 0,
+    }) async* {
+      yield SseEvent(event: 'token', data: '답변본문');
+      yield SseEvent(
+        event: 'references',
+        data: jsonEncode(const [
+          {'contentId': 9, 'slug': 'streams', 'title': 'Stream 가이드'},
+        ]),
+      );
+    }
+
+    final c = ProviderContainer(
+      overrides: [mentorSseConnectProvider.overrideWithValue(withRefs)],
+    );
+    addTearDown(c.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: c,
+        child: MaterialApp(theme: DpTheme.light(), home: const MentorPage()),
+      ),
+    );
+
+    await tester.enterText(find.byType(TextField), '비동기란?');
+    await tester.tap(find.byTooltip('전송'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('답변본문'), findsOneWidget); // 답변 누적
+    expect(find.text('참고자료'), findsOneWidget); // 패널 헤더
+    expect(find.text('Stream 가이드'), findsOneWidget); // 참고자료 칩(제목)
   });
 }
