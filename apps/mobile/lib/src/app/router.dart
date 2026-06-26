@@ -7,6 +7,7 @@ import '../features/auth/application/auth_controller.dart';
 import '../features/auth/presentation/login_page.dart';
 import '../features/auth/state/auth_state.dart';
 import '../features/community/presentation/community_page.dart';
+import '../features/community/presentation/qna_detail_page.dart';
 import '../features/community/presentation/quick_capture_page.dart';
 import '../features/dashboard/presentation/dashboard_page.dart';
 import '../features/learning/presentation/content_viewer_page.dart';
@@ -80,6 +81,11 @@ final routerProvider = Provider<GoRouter>((ref) {
                   GoRoute(
                     path: 'new',
                     builder: (_, _) => const QuickCapturePage(),
+                  ),
+                  GoRoute(
+                    path: 'posts/:id',
+                    builder: (_, state) =>
+                        QnaDetailPage(postId: state.pathParameters['id']!),
                   ),
                 ],
               ),

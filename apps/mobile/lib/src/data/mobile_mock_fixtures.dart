@@ -96,6 +96,92 @@ final Map<String, MockFixture> mobileMockFixtures = {
       'answers': <Map<String, dynamic>>[],
     },
   ),
+  // Q&A 상세(QuestionDetailView) — 목록 항목 탭 진입(COM-002). web 픽스처와 정합.
+  'GET /community/questions/1': (
+    200,
+    {
+      'id': 1,
+      'title': 'async/await가 헷갈려요',
+      'bodyMd': '# 질문\n\n`async/await`에서 예외는 어디서 잡나요?',
+      'solved': true,
+      'acceptedAnswerId': 11,
+      'upvoteCount': 3,
+      'downvoteCount': 0,
+      'tags': ['dart', 'async'],
+      'answers': [
+        {
+          'id': 10,
+          'authorId': null,
+          'bodyMd': 'try/catch로 await 호출을 감싸면 됩니다. (AI 시드 초안)',
+          'aiGenerated': true,
+          'accepted': false,
+          'upvoteCount': 1,
+        },
+        {
+          'id': 11,
+          'authorId': 42,
+          'bodyMd': 'await 식을 try 블록 안에 두면 throw가 catch로 전파됩니다.',
+          'aiGenerated': false,
+          'accepted': true,
+          'upvoteCount': 5,
+        },
+      ],
+    },
+  ),
+  'GET /community/questions/2': (
+    200,
+    {
+      'id': 2,
+      'title': 'Stream 구독 해제는?',
+      'bodyMd': 'StreamSubscription을 언제 cancel 해야 하나요?',
+      'solved': false,
+      'acceptedAnswerId': null,
+      'upvoteCount': 1,
+      'downvoteCount': 0,
+      'tags': ['dart', 'stream'],
+      'answers': [
+        {
+          'id': 20,
+          'authorId': 17,
+          'bodyMd': 'dispose에서 cancel()을 호출하면 됩니다.',
+          'aiGenerated': false,
+          'accepted': false,
+          'upvoteCount': 0,
+        },
+      ],
+    },
+  ),
+  // 답변 작성 → AnswerView.
+  'POST /community/questions/1/answers': (
+    201,
+    {
+      'id': 12,
+      'authorId': 7,
+      'bodyMd': '새 답변',
+      'aiGenerated': false,
+      'accepted': false,
+      'upvoteCount': 0,
+    },
+  ),
+  'POST /community/questions/2/answers': (
+    201,
+    {
+      'id': 21,
+      'authorId': 7,
+      'bodyMd': '새 답변',
+      'aiGenerated': false,
+      'accepted': false,
+      'upvoteCount': 0,
+    },
+  ),
+  // 채택/투표 — void(200, 빈 본문).
+  'POST /community/answers/11/accept': (200, <String, dynamic>{}),
+  'POST /community/answers/20/accept': (200, <String, dynamic>{}),
+  'POST /community/posts/1/vote': (200, <String, dynamic>{}),
+  'POST /community/posts/2/vote': (200, <String, dynamic>{}),
+  'POST /community/answers/10/vote': (200, <String, dynamic>{}),
+  'POST /community/answers/11/vote': (200, <String, dynamic>{}),
+  'POST /community/answers/20/vote': (200, <String, dynamic>{}),
 };
 
 Map<String, dynamic> mockContent(String slug) {
