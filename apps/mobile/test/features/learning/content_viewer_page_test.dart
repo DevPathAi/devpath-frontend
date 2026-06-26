@@ -19,7 +19,9 @@ Map<String, dynamic> _contentJson({
   'track': 'BACKEND',
   'markdown': markdown,
   'estimatedMinutes': 8,
-  'conceptTags': <String>[],
+  'difficulty': 0.5,
+  'bloomLevel': 'APPLY',
+  'conceptTags': ['future', 'async'],
   'progress': {
     'scrollPct': scrollPct,
     'dwellSec': dwellSec,
@@ -87,6 +89,21 @@ void main() {
     await _pumpLoad(tester);
 
     expect(find.text('완료됨'), findsOneWidget);
+  });
+
+  testWidgets('메타데이터(예상시간·블룸·난이도) + 개념 태그 표시', (tester) async {
+    final c = _container({
+      'GET /contents/future-async-await': (200, _contentJson(markdown: '# 본문')),
+      'POST /contents/future-async-await/progress': _progressDone,
+    });
+
+    await tester.pumpWidget(_host(c));
+    await _pumpLoad(tester);
+
+    expect(find.textContaining('8분'), findsOneWidget);
+    expect(find.textContaining('APPLY'), findsOneWidget);
+    expect(find.textContaining('난이도'), findsOneWidget);
+    expect(find.text('#future'), findsOneWidget);
   });
 
   testWidgets('스크롤 끝까지 + 체류 45초↑ → 자동 완료', (tester) async {
