@@ -66,6 +66,7 @@ class _PostList extends StatelessWidget {
           trailing: p.solved
               ? const Icon(DpIcons.stepDone)
               : const Icon(Icons.chevron_right),
+          onTap: () => context.push('/community/posts/${p.id}'),
         );
       },
     );
