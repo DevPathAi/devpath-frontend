@@ -47,6 +47,41 @@ class ContentController extends Notifier<ContentState> {
       state = ContentFailed(e.message);
     }
   }
+
+  /// 스크롤·체류 기반 자동 진척 보고. 완료 응답이면 진척 상태를 갱신하고 응답을 반환한다.
+  /// 자동 보고 실패는 학습 흐름을 막지 않도록 조용히 무시한다(null 반환, 상태 유지).
+  Future<ContentProgressUpdateResponse?> reportProgress(
+    String slug, {
+    required double scrollPct,
+    required int dwellSec,
+  }) async {
+    try {
+      final json = await ref
+          .read(apiClientProvider)
+          .post<Map<String, dynamic>>(
+            '/contents/$slug/progress',
+            body: {'scrollPct': scrollPct, 'dwellSec': dwellSec},
+          );
+      final resp = ContentProgressUpdateResponse.fromJson(json);
+      if (!ref.mounted) return resp;
+      final latest = state;
+      if (latest is ContentLoaded) {
+        state = ContentLoaded(
+          latest.content.copyWith(
+            progress: ContentProgress(
+              scrollPct: resp.scrollPct,
+              dwellSec: resp.dwellSec,
+              completed: resp.completed,
+              completedAt: resp.completedAt,
+            ),
+          ),
+        );
+      }
+      return resp;
+    } on ApiException {
+      return null;
+    }
+  }
 }
 
 final contentControllerProvider =
