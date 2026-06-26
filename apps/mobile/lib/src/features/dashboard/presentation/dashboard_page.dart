@@ -3,6 +3,7 @@ import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../providers/theme_provider.dart';
 import '../application/dashboard_controller.dart';
 import '../state/dashboard_state.dart';
 
@@ -26,8 +27,18 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   @override
   Widget build(BuildContext context) {
     final s = ref.watch(dashboardControllerProvider);
+    final isDark = ref.watch(themeModeProvider) == ThemeMode.dark;
     return Scaffold(
-      appBar: AppBar(title: const Text('홈')),
+      appBar: AppBar(
+        title: const Text('홈'),
+        actions: [
+          IconButton(
+            tooltip: '테마 전환',
+            icon: Icon(isDark ? DpIcons.lightMode : DpIcons.darkMode),
+            onPressed: () => ref.read(themeModeProvider.notifier).toggle(),
+          ),
+        ],
+      ),
       body: switch (s) {
         DashLoading() => const DpLoading(),
         DashFailed(:final message) => DpError(
