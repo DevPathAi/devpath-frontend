@@ -168,6 +168,49 @@ final Map<String, MockFixture> webMockFixtures = {
       {'id': 2, 'name': 'async', 'postCount': 8},
     ],
   ),
+  // LCS(학습 맥락 자동 첨부) — gateway /lcs/** → lcs-svc(슬라이스 #9).
+  // draft 미리보기(작성 폼 맥락 카드). draftId=snap_mock → commit 키와 매칭.
+  'POST /lcs/snapshots/draft': (
+    200,
+    {
+      'draftId': 'snap_mock',
+      'expiresAt': '2026-06-26T23:59:00Z',
+      'content': {
+        'recent_activity': [
+          {'language': 'dart', 'status': 'SUCCESS'},
+        ],
+      },
+      'fieldsAvailable': ['recent_activity'],
+      'fieldsUnavailable': [
+        {'field': 'current_content', 'reason': 'no_content_context'},
+        {'field': 'current_path', 'reason': 'phase2_deferred'},
+      ],
+    },
+  ),
+  // commit(불변 영속) — 게시 후 questionId 로 호출.
+  'POST /lcs/snapshots/snap_mock/commit': (
+    201,
+    {'snapshotId': 7, 'status': 'committed', 'immutable': true},
+  ),
+  // 답변자 맥락 패널 역조회(question 1 만 스냅샷 보유; 그 외는 404→패널 미표시).
+  'GET /lcs/snapshots/by-question/1': (
+    200,
+    {
+      'id': 7,
+      'createdAt': '2026-06-26T10:00:00Z',
+      'content': {
+        'current_content': {
+          'contentId': 1,
+          'title': '비동기 기초',
+          'track': 'BACKEND',
+        },
+        'recent_activity': [
+          {'language': 'dart', 'status': 'SUCCESS'},
+        ],
+      },
+      'renderedFor': 'answerer',
+    },
+  ),
   // 대시보드(DASH-001)
   'GET /dashboard': (
     200,
