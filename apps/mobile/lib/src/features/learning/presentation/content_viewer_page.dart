@@ -195,6 +195,11 @@ class _ContentBody extends ConsumerWidget {
     final progress = content.progress;
     final completed = progress.completed;
     final percent = (progress.scrollPct * 100).round().clamp(0, 100);
+    final meta = [
+      if (content.estimatedMinutes != null) '${content.estimatedMinutes}분',
+      if (content.bloomLevel != null) content.bloomLevel!,
+      if (content.difficulty != null) '난이도 ${content.difficulty}',
+    ];
     return Column(
       children: [
         Padding(
@@ -218,7 +223,32 @@ class _ContentBody extends ConsumerWidget {
           child: SingleChildScrollView(
             controller: controller,
             padding: const EdgeInsets.all(16),
-            child: DpMarkdown(data: content.markdown),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (meta.isNotEmpty)
+                  Text(
+                    meta.join(' · '),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: context.dpColors.textSecondary,
+                    ),
+                  ),
+                if (content.conceptTags.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final t in content.conceptTags)
+                        Chip(label: Text('#$t')),
+                    ],
+                  ),
+                ],
+                if (meta.isNotEmpty || content.conceptTags.isNotEmpty)
+                  const SizedBox(height: 16),
+                DpMarkdown(data: content.markdown),
+              ],
+            ),
           ),
         ),
         SafeArea(
