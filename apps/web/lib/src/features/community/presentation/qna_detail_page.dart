@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../application/qna_detail_controller.dart';
 import '../data/community_source.dart';
 import '../state/qna_detail_state.dart';
+import 'lcs_context.dart';
 
 class QnaDetailPage extends ConsumerStatefulWidget {
   const QnaDetailPage({super.key, required this.postId});
@@ -106,6 +107,8 @@ class _Loaded extends ConsumerWidget {
         ),
         const SizedBox(height: DpSpacing.md),
         DpMarkdown(data: detail.bodyMd),
+        const SizedBox(height: DpSpacing.sm),
+        LcsAnswererPanel(questionId: detail.id),
         if (detail.tags.isNotEmpty) ...[
           const SizedBox(height: DpSpacing.md),
           Wrap(

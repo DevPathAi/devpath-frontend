@@ -1,4 +1,5 @@
 import 'package:devpath_web/src/features/community/data/community_source.dart';
+import 'package:devpath_web/src/features/community/data/lcs_source.dart';
 import 'package:devpath_web/src/features/community/presentation/qna_detail_page.dart';
 import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
@@ -30,6 +31,14 @@ CommunityQuestionDetail _detail({
   answers: answers,
 );
 
+LcsSnapshotView _snap() => LcsSnapshotView(
+  id: 7,
+  createdAt: DateTime(2026, 6, 26),
+  content: const {
+    'current_content': {'title': '비동기 기초', 'track': 'BACKEND'},
+  },
+);
+
 Widget _host(ProviderContainer c) => UncontrolledProviderScope(
   container: c,
   child: MaterialApp(
@@ -51,6 +60,7 @@ void main() {
             ],
           ),
         ),
+        lcsByQuestionProvider.overrideWithValue((qid) async => null),
       ],
     );
     addTearDown(c.dispose);
@@ -77,6 +87,7 @@ void main() {
               : _detail(solved: true, answers: [_ans(11, accepted: true)]);
         }),
         answerAcceptProvider.overrideWithValue((id) async => acceptedId = id),
+        lcsByQuestionProvider.overrideWithValue((qid) async => null),
       ],
     );
     addTearDown(c.dispose);
@@ -107,6 +118,7 @@ void main() {
           seenBody = body;
           return _ans(12);
         }),
+        lcsByQuestionProvider.overrideWithValue((qid) async => null),
       ],
     );
     addTearDown(c.dispose);
@@ -119,5 +131,38 @@ void main() {
 
     expect(seenBody, '새 답변입니다');
     expect(fetchCalls, 2); // 작성 후 재조회
+  });
+
+  testWidgets('답변자 맥락 패널: 스냅샷 있으면 표시', (tester) async {
+    final c = ProviderContainer(
+      overrides: [
+        qnaDetailFetchProvider.overrideWithValue(
+          (id) async => _detail(answers: [_ans(11)]),
+        ),
+        lcsByQuestionProvider.overrideWithValue((qid) async => _snap()),
+      ],
+    );
+    addTearDown(c.dispose);
+    await tester.pumpWidget(_host(c));
+    await tester.pumpAndSettle();
+
+    expect(find.text('📚 작성자 학습 맥락'), findsOneWidget);
+    expect(find.text('현재 콘텐츠'), findsOneWidget); // content 키 → 라벨 칩
+  });
+
+  testWidgets('답변자 맥락 패널: 스냅샷 없으면(null) 미표시', (tester) async {
+    final c = ProviderContainer(
+      overrides: [
+        qnaDetailFetchProvider.overrideWithValue(
+          (id) async => _detail(answers: [_ans(11)]),
+        ),
+        lcsByQuestionProvider.overrideWithValue((qid) async => null),
+      ],
+    );
+    addTearDown(c.dispose);
+    await tester.pumpWidget(_host(c));
+    await tester.pumpAndSettle();
+
+    expect(find.text('📚 작성자 학습 맥락'), findsNothing);
   });
 }
