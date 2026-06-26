@@ -10,6 +10,7 @@ import '../features/community/presentation/quick_capture_page.dart';
 import '../features/dashboard/presentation/dashboard_page.dart';
 import '../features/learning/presentation/content_viewer_page.dart';
 import '../features/learning/presentation/learn_page.dart';
+import '../features/notifications/presentation/notifications_page.dart';
 import '../features/shell/presentation/mobile_shell.dart';
 
 /// 모바일 라우터 게이트.
@@ -74,6 +75,14 @@ final routerProvider = Provider<GoRouter>((ref) {
                     builder: (_, _) => const QuickCapturePage(),
                   ),
                 ],
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/notifications',
+                builder: (_, _) => const NotificationsPage(),
               ),
             ],
           ),
