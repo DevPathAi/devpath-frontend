@@ -30,7 +30,7 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
     return Scaffold(
       appBar: AppBar(title: const Text('커뮤니티')),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {}, // 작성(후속)
+        onPressed: () => context.go('/community/new'),
         icon: const Icon(DpIcons.edit),
         label: const Text('질문하기'),
       ),
@@ -45,45 +45,33 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
           title: '첫 질문을 남겨보세요',
           message: '막힌 부분을 커뮤니티에 물어보세요.',
           actionLabel: '질문 작성',
-          onAction: () {},
+          onAction: () => context.go('/community/new'),
         ),
         CommunityPhase.loaded => ListView.separated(
           padding: const EdgeInsets.all(DpSpacing.lg),
-          itemCount: s.posts.length + (s.hasMore ? 1 : 0),
+          itemCount: s.posts.length,
           separatorBuilder: (_, _) => const SizedBox(height: DpSpacing.sm),
           itemBuilder: (_, i) {
-            if (i >= s.posts.length) {
-              // 🔶 ENG-REVIEW(P2): loadMore 에러를 무음으로 두지 않는다.
-              // error가 있으면 인라인 메시지 + 재시도, 없으면 더 보기 버튼.
-              if (s.error != null) {
-                return Column(
-                  children: [
-                    Text(
-                      s.error!,
-                      style: TextStyle(color: context.dpColors.danger),
-                    ),
-                    const SizedBox(height: DpSpacing.xs),
-                    TextButton(
-                      onPressed: s.loadingMore ? null : notifier.loadMore,
-                      child: const Text('재시도'),
-                    ),
-                  ],
-                );
-              }
-              return Center(
-                child: TextButton(
-                  onPressed: s.loadingMore ? null : notifier.loadMore,
-                  child: Text(s.loadingMore ? '불러오는 중…' : '더 보기'),
-                ),
-              );
-            }
             final p = s.posts[i];
             final c = context.dpColors;
             return Card(
               child: ListTile(
-                title: Text(p.title),
+                title: Row(
+                  children: [
+                    if (p.solved)
+                      Padding(
+                        padding: const EdgeInsets.only(right: DpSpacing.xs),
+                        child: Icon(
+                          DpIcons.stepDone,
+                          size: 18,
+                          color: c.success,
+                        ),
+                      ),
+                    Expanded(child: Text(p.title)),
+                  ],
+                ),
                 subtitle: Text(
-                  '${p.author} · 답변 ${p.answerCount}',
+                  '답변 ${p.answerCount} · 추천 ${p.upvoteCount}',
                   style: TextStyle(color: c.textSecondary),
                 ),
                 onTap: () => context.go('/community/${p.id}'),

@@ -10,6 +10,7 @@ import '../features/auth/state/auth_state.dart';
 import '../features/content/presentation/content_page.dart';
 import '../features/community/presentation/community_home_page.dart';
 import '../features/community/presentation/qna_detail_page.dart';
+import '../features/community/presentation/question_create_page.dart';
 import '../features/dashboard/presentation/dashboard_page.dart';
 import '../features/mentor/presentation/mentor_page.dart';
 import '../features/diagnostic/presentation/diagnostic_page.dart';
@@ -87,6 +88,12 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/community',
             builder: (_, _) => const CommunityHomePage(),
+          ),
+          // '/community/new'는 '/community/:id'보다 먼저 — 선언 순서 매칭에서 'new'가
+          // id로 잡히지 않도록(int.parse('new') 회피).
+          GoRoute(
+            path: '/community/new',
+            builder: (_, _) => const QuestionCreatePage(),
           ),
           GoRoute(
             path: '/community/:id',

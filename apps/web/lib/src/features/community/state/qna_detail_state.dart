@@ -9,8 +9,25 @@ class QnaLoading extends QnaDetailState {
 }
 
 class QnaLoaded extends QnaDetailState {
-  const QnaLoaded(this.post);
-  final CommunityPost post;
+  const QnaLoaded(this.detail, {this.submitting = false, this.actionError});
+
+  final CommunityQuestionDetail detail;
+
+  /// 답변 작성·채택·투표 진행 중(버튼 비활성/스피너).
+  final bool submitting;
+
+  /// 직전 액션 실패 메시지(예: 비작성자 채택 403). 상세는 유지한 채 표면화.
+  final String? actionError;
+
+  QnaLoaded copyWith({
+    CommunityQuestionDetail? detail,
+    bool? submitting,
+    String? actionError,
+  }) => QnaLoaded(
+    detail ?? this.detail,
+    submitting: submitting ?? this.submitting,
+    actionError: actionError,
+  );
 }
 
 class QnaFailed extends QnaDetailState {
