@@ -43,3 +43,10 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Firebase/FCM 설정 — 프로젝트별 실값(키 포함). 절대 커밋하지 않는다.
+# 배치 절차는 docs/FCM_SETUP.md, 구조는 *.example 참조. CI/기본 클론에는 없으므로
+# 목 모드로 동작하고 Android google-services 플러그인도 조건부로 비적용된다.
+/android/app/google-services.json
+/ios/Runner/GoogleService-Info.plist
+/lib/firebase_options.dart

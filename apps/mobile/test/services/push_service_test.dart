@@ -39,6 +39,17 @@ void main() {
     });
   });
 
+  group('firebaseMessagingBackgroundHandler 계약', () {
+    test('onBackgroundMessage가 요구하는 시그니처를 만족한다', () {
+      // top-level·@pragma('vm:entry-point') 진입점. 호출은 별 isolate에서
+      // Firebase.initializeApp을 유발하므로(테스트 불가) 등록 가능 시그니처만 검증한다.
+      expect(
+        firebaseMessagingBackgroundHandler,
+        isA<Future<void> Function(RemoteMessage)>(),
+      );
+    });
+  });
+
   group('pushServiceProvider 결선(교체 경계)', () {
     test('useMock=true → StubPushService', () {
       final c = ProviderContainer();

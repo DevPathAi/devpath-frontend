@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- FCM: Android 13(API 33)+ 알림 표시 런타임 권한. 앱에서 권한 요청 후 알림 노출. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
         android:label="devpath_mobile"
         android:name="${applicationName}"

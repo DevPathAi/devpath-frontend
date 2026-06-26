@@ -21,6 +21,10 @@ plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
     id("com.android.application") version "9.0.1" apply false
     id("org.jetbrains.kotlin.android") version "2.3.20" apply false
+    // FCM 결선(후속): classpath에만 올려두고 적용은 app 모듈에서 조건부로 한다.
+    // google-services.json이 없을 때 빌드가 깨지지 않도록 apply false. AGP 호환에 따라
+    // 버전 조정 필요 시 docs/FCM_SETUP.md 참조. 실제 적용: app/build.gradle.kts.
+    id("com.google.gms.google-services") version "4.4.2" apply false
 }
 
 include(":app")
