@@ -59,67 +59,114 @@ final Map<String, MockFixture> webMockFixtures = {
       'completedAt': '2026-06-21T10:00:00Z',
     },
   ),
-  // 커뮤니티(COM-001) 1페이지 — nextCursor: 'c2'로 "더 보기" 노출
+  // 커뮤니티 Q&A 목록(COM-001) — 실계약: bare 배열(PostSummaryView), 페이지네이션 없음.
   'GET /community/posts': (
     200,
-    {
-      'data': [
-        {
-          'id': 'q1',
-          'title': 'async/await가 헷갈려요',
-          'author': '지수',
-          'answerCount': 2,
-        },
-        {
-          'id': 'q2',
-          'title': 'Stream 구독 해제는?',
-          'author': '민준',
-          'answerCount': 1,
-        },
-        {
-          'id': 'q3',
-          'title': 'Riverpod Notifier 패턴',
-          'author': '서연',
-          'answerCount': 5,
-        },
-      ],
-      'nextCursor': 'c2', // 다음 페이지 있음 → 더 보기 활성
-      'limit': 20,
-    },
+    [
+      {
+        'id': 1,
+        'title': 'async/await가 헷갈려요',
+        'authorId': 42,
+        'solved': true,
+        'upvoteCount': 3,
+        'answerCount': 2,
+      },
+      {
+        'id': 2,
+        'title': 'Stream 구독 해제는?',
+        'authorId': 17,
+        'solved': false,
+        'upvoteCount': 1,
+        'answerCount': 1,
+      },
+      {
+        'id': 3,
+        'title': 'Riverpod Notifier 패턴',
+        'authorId': 8,
+        'solved': false,
+        'upvoteCount': 5,
+        'answerCount': 0,
+      },
+    ],
   ),
-  // 2페이지 — query-aware 키(P2 Task 10). nextCursor: null로 마지막
-  'GET /community/posts?cursor=c2': (
+  // 커뮤니티 Q&A 상세(COM-003) — QuestionDetailView(인간/AI 답변 스레드).
+  'GET /community/questions/1': (
     200,
     {
-      'data': [
-        {
-          'id': 'q4',
-          'title': 'FutureProvider vs Notifier',
-          'author': '도윤',
-          'answerCount': 0,
-        },
-        {
-          'id': 'q5',
-          'title': 'go_router 가드 적용',
-          'author': '하은',
-          'answerCount': 3,
-        },
-      ],
-      'nextCursor': null, // 마지막 페이지
-      'limit': 20,
-    },
-  ),
-  // 커뮤니티 Q&A 상세(COM-003)
-  'GET /community/posts/q1': (
-    200,
-    {
-      'id': 'q1',
+      'id': 1,
       'title': 'async/await가 헷갈려요',
-      'author': '지수',
-      'answerCount': 2,
-      'body':
+      'bodyMd':
           '# 질문\n\n`async/await`에서 예외는 어디서 잡나요?\n\n```dart\ntry { await f(); } catch (e) {}\n```',
+      'solved': true,
+      'acceptedAnswerId': 11,
+      'upvoteCount': 3,
+      'downvoteCount': 0,
+      'tags': ['dart', 'async'],
+      'answers': [
+        {
+          'id': 10,
+          'authorId': null,
+          'bodyMd': 'try/catch로 await 호출을 감싸면 됩니다. (AI 시드 초안)',
+          'aiGenerated': true,
+          'accepted': false,
+          'upvoteCount': 1,
+        },
+        {
+          'id': 11,
+          'authorId': 7,
+          'bodyMd': '저는 `Future.catchError`도 함께 씁니다.',
+          'aiGenerated': false,
+          'accepted': true,
+          'upvoteCount': 4,
+        },
+      ],
     },
+  ),
+  // 질문 작성 → 즉시 게시(QuestionDetailView; AI 시드는 비동기라 답변 빈 채로 시작).
+  'POST /community/questions': (
+    201,
+    {
+      'id': 99,
+      'title': '새 질문',
+      'bodyMd': '본문',
+      'solved': false,
+      'acceptedAnswerId': null,
+      'upvoteCount': 0,
+      'downvoteCount': 0,
+      'tags': <String>[],
+      'answers': <Map<String, dynamic>>[],
+    },
+  ),
+  // 인간 답변 작성(AnswerView).
+  'POST /community/questions/1/answers': (
+    201,
+    {
+      'id': 12,
+      'authorId': 7,
+      'bodyMd': '새 답변',
+      'aiGenerated': false,
+      'accepted': false,
+      'upvoteCount': 0,
+    },
+  ),
+  // 채택/투표 — void(200, 빈 본문).
+  'POST /community/answers/11/accept': (200, <String, dynamic>{}),
+  'POST /community/posts/1/vote': (200, <String, dynamic>{}),
+  'POST /community/answers/11/vote': (200, <String, dynamic>{}),
+  // 유사질문(폴백 키 — q 무관). 중복 안내용 top-K.
+  'GET /community/questions/similar': (
+    200,
+    [
+      {'questionId': 2, 'title': 'Stream 구독 해제는?'},
+    ],
+  ),
+  // 태그 자동완성(폴백 키).
+  'GET /community/tags': (
+    200,
+    [
+      {'id': 1, 'name': 'dart', 'postCount': 12},
+      {'id': 2, 'name': 'async', 'postCount': 8},
+    ],
   ),
   // 대시보드(DASH-001)
   'GET /dashboard': (

@@ -5,46 +5,67 @@ import 'package:dp_core/dp_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-CommunityPost _p(String id) =>
-    CommunityPost(id: id, title: '글 $id', author: '지수');
+CommunityPostSummary _p(int id) =>
+    CommunityPostSummary(id: id, title: '글 $id', answerCount: 1);
 
 void main() {
-  test('첫 로드 후 loadMore가 다음 페이지를 누적한다', () async {
+  test('load: bare 배열을 목록으로 채운다(페이지네이션 없음)', () async {
     final c = ProviderContainer(
       overrides: [
-        communityFetchProvider.overrideWithValue(({String? cursor}) async {
-          if (cursor == null) {
-            return Page(data: [_p('1'), _p('2')], nextCursor: 'c2', limit: 20);
-          }
-          return Page(data: [_p('3')], limit: 20); // nextCursor 없음 → 끝
-        }),
+        communityListProvider.overrideWithValue(
+          ({String? board, String? tag, String? sort}) async => [_p(1), _p(2)],
+        ),
       ],
     );
     addTearDown(c.dispose);
 
     await c.read(communityControllerProvider.notifier).load();
-    var s = c.read(communityControllerProvider);
+    final s = c.read(communityControllerProvider);
     expect(s.phase, CommunityPhase.loaded);
-    expect(s.posts.map((e) => e.id), ['1', '2']);
-    expect(s.nextCursor, 'c2');
-
-    await c.read(communityControllerProvider.notifier).loadMore();
-    s = c.read(communityControllerProvider);
-    expect(s.posts.map((e) => e.id), ['1', '2', '3']);
-    expect(s.nextCursor, isNull); // 더 없음
+    expect(s.posts.map((e) => e.id), [1, 2]);
   });
 
-  // 🔶 ENG-REVIEW(P2): copyWith의 nextCursor는 명시 대입(L496) — 비대칭 고정.
-  // 인자를 안 주면 기존값 유지가 아니라 null이 됨을 회귀 방지로 고정한다.
-  test('copyWith: nextCursor를 생략하면 null로 떨어진다(명시 대입 비대칭)', () {
-    const s = CommunityState(
-      posts: [],
-      nextCursor: 'c2',
-      phase: CommunityPhase.loaded,
+  test('load 실패: failed + error 메시지', () async {
+    final c = ProviderContainer(
+      overrides: [
+        communityListProvider.overrideWithValue(
+          ({String? board, String? tag, String? sort}) async =>
+              throw const ApiException(
+                code: ApiErrorCode.network,
+                message: '네트워크 오류',
+              ),
+        ),
+      ],
     );
-    final next = s.copyWith(loadingMore: true); // nextCursor 미전달
-    expect(next.nextCursor, isNull); // ?? this.nextCursor가 아님 — 명시 대입
-    final kept = s.copyWith(nextCursor: 'c2'); // 명시해야 유지
-    expect(kept.nextCursor, 'c2');
+    addTearDown(c.dispose);
+
+    await c.read(communityControllerProvider.notifier).load();
+    final s = c.read(communityControllerProvider);
+    expect(s.phase, CommunityPhase.failed);
+    expect(s.error, '네트워크 오류');
+  });
+
+  test('load: board/tag/sort 필터를 데이터 레이어로 전달한다', () async {
+    String? seenBoard, seenSort;
+    final c = ProviderContainer(
+      overrides: [
+        communityListProvider.overrideWithValue(({
+          String? board,
+          String? tag,
+          String? sort,
+        }) async {
+          seenBoard = board;
+          seenSort = sort;
+          return const [];
+        }),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    await c
+        .read(communityControllerProvider.notifier)
+        .load(board: 'QNA', sort: 'unanswered');
+    expect(seenBoard, 'QNA');
+    expect(seenSort, 'unanswered');
   });
 }
