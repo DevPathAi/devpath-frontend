@@ -5,8 +5,11 @@ import 'package:go_router/go_router.dart';
 import '../features/auth/application/auth_controller.dart';
 import '../features/auth/presentation/login_page.dart';
 import '../features/auth/state/auth_state.dart';
-import '../features/common/presentation/placeholder_page.dart';
+import '../features/community/presentation/community_page.dart';
+import '../features/community/presentation/quick_capture_page.dart';
 import '../features/dashboard/presentation/dashboard_page.dart';
+import '../features/learning/presentation/content_viewer_page.dart';
+import '../features/learning/presentation/learn_page.dart';
 import '../features/shell/presentation/mobile_shell.dart';
 
 /// 모바일 라우터 게이트.
@@ -49,7 +52,14 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/learn',
-                builder: (_, _) => const PlaceholderPage(title: '학습'),
+                builder: (_, _) => const LearnPage(),
+                routes: [
+                  GoRoute(
+                    path: 'content/:slug',
+                    builder: (_, state) =>
+                        ContentViewerPage(slug: state.pathParameters['slug']!),
+                  ),
+                ],
               ),
             ],
           ),
@@ -57,7 +67,13 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/community',
-                builder: (_, _) => const PlaceholderPage(title: '커뮤니티'),
+                builder: (_, _) => const CommunityPage(),
+                routes: [
+                  GoRoute(
+                    path: 'new',
+                    builder: (_, _) => const QuickCapturePage(),
+                  ),
+                ],
               ),
             ],
           ),
