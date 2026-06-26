@@ -2,6 +2,7 @@ import 'package:devpath_mobile/src/features/dashboard/data/dashboard_cache.dart'
 import 'package:devpath_mobile/src/features/dashboard/data/drift_dashboard_cache.dart';
 import 'package:devpath_mobile/src/features/dashboard/presentation/dashboard_page.dart';
 import 'package:devpath_mobile/src/providers/api_providers.dart';
+import 'package:devpath_mobile/src/providers/theme_provider.dart';
 import 'package:devpath_mobile/src/services/connectivity_service.dart';
 import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
@@ -78,5 +79,16 @@ void main() {
     expect(find.byType(DpOfflineBanner), findsOneWidget);
     expect(find.text('3일'), findsOneWidget);
     expect(find.text('캐시 과제'), findsOneWidget);
+  });
+
+  testWidgets('테마 토글 버튼 → 다크모드 전환', (tester) async {
+    final c = _container();
+    await tester.pumpWidget(_host(c));
+    await tester.pumpAndSettle();
+
+    expect(c.read(themeModeProvider), ThemeMode.system);
+    await tester.tap(find.byTooltip('테마 전환'));
+    await tester.pump();
+    expect(c.read(themeModeProvider), ThemeMode.dark);
   });
 }

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../features/auth/application/auth_controller.dart';
 import '../features/auth/application/deep_link_service.dart';
+import '../providers/theme_provider.dart';
 import 'router.dart';
 
 /// 루트 위젯. 시작 시 딥링크 서비스를 가동해 OAuth 콜백 토큰을 AuthController로 흘린다.
@@ -41,11 +42,13 @@ class _DevPathMobileAppState extends ConsumerState<DevPathMobileApp> {
   @override
   Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
+    final themeMode = ref.watch(themeModeProvider);
     return MaterialApp.router(
       title: 'DevPath AI',
       debugShowCheckedModeBanner: false,
       theme: DpTheme.light(),
       darkTheme: DpTheme.dark(),
+      themeMode: themeMode,
       routerConfig: router,
     );
   }
