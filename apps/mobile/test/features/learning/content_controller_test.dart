@@ -72,5 +72,42 @@ void main() {
       await c.read(contentControllerProvider.notifier).load('missing');
       expect(c.read(contentControllerProvider), isA<ContentFailed>());
     });
+
+    test('reportProgress → 응답 반환 + 진척(completed) 상태 반영', () async {
+      final c = _container(_fx);
+      final n = c.read(contentControllerProvider.notifier);
+      await n.load('future-async-await');
+
+      final resp = await n.reportProgress(
+        'future-async-await',
+        scrollPct: 0.85,
+        dwellSec: 50,
+      );
+
+      expect(resp, isNotNull);
+      expect(resp!.completed, isTrue);
+      final s = c.read(contentControllerProvider);
+      expect((s as ContentLoaded).content.progress.completed, isTrue);
+    });
+
+    test(
+      'reportProgress 실패 → null 반환, 상태는 ContentLoaded 유지(흐름 방해 없음)',
+      () async {
+        final c = _container({
+          'GET /contents/future-async-await': (200, _content(completed: false)),
+        });
+        final n = c.read(contentControllerProvider.notifier);
+        await n.load('future-async-await');
+
+        final resp = await n.reportProgress(
+          'future-async-await',
+          scrollPct: 0.5,
+          dwellSec: 30,
+        );
+
+        expect(resp, isNull);
+        expect(c.read(contentControllerProvider), isA<ContentLoaded>());
+      },
+    );
   });
 }
