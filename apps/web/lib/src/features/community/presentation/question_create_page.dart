@@ -7,6 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../data/community_source.dart';
+import '../data/lcs_source.dart';
+import 'lcs_context.dart';
 
 /// 질문 작성(FAB). `POST /community/questions {title, bodyMd, tags[]}` → 즉시 게시(AI 시드는 비동기).
 /// 제목 입력 중 유사질문(`GET /community/questions/similar?q=`)을 디바운스로 안내해 중복을 줄인다.
@@ -25,6 +27,9 @@ class _QuestionCreatePageState extends ConsumerState<QuestionCreatePage> {
   Timer? _debounce;
   List<SimilarQuestion> _similar = const [];
   bool _submitting = false;
+
+  /// 맥락 카드가 통지한 첨부 선택값(없으면 미첨부). 게시 후 commit 에 사용.
+  LcsAttach? _attach;
 
   static const _debounceDelay = Duration(milliseconds: 400);
 
@@ -79,6 +84,20 @@ class _QuestionCreatePageState extends ConsumerState<QuestionCreatePage> {
         bodyMd: body,
         tags: _parseTags(),
       );
+      // 맥락 첨부(opt-in): 게시 응답 questionId 로 draft 를 commit. best-effort —
+      // 첨부 실패가 게시를 막지 않는다(질문은 이미 생성됨).
+      final attach = _attach;
+      if (attach != null) {
+        try {
+          await ref.read(lcsCommitProvider)(
+            draftId: attach.draftId,
+            attachedToId: created.id,
+            visibility: attach.visibility,
+          );
+        } on ApiException {
+          // 맥락 첨부 실패는 무시(게시는 성공).
+        }
+      }
       if (mounted) context.go('/community/${created.id}');
     } on ApiException catch (e) {
       if (mounted) {
@@ -166,6 +185,8 @@ class _QuestionCreatePageState extends ConsumerState<QuestionCreatePage> {
               border: OutlineInputBorder(),
             ),
           ),
+          const SizedBox(height: DpSpacing.md),
+          LcsContextCard(enabled: !_submitting, onChanged: (a) => _attach = a),
           const SizedBox(height: DpSpacing.lg),
           FilledButton.icon(
             onPressed: _submitting ? null : _submit,

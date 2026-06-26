@@ -18,6 +18,7 @@ export 'src/models/path_sse_event.dart';
 export 'src/models/code_review.dart';
 export 'src/models/dashboard_summary.dart';
 export 'src/models/community_post.dart';
+export 'src/models/lcs_snapshot.dart';
 export 'src/models/assessment.dart';
 export 'src/api/assessment_api.dart';
 export 'src/mock/mock_http_adapter.dart';
