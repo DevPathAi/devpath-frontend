@@ -1,3 +1,4 @@
+import 'package:dp_core/dp_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -11,20 +12,25 @@ import '../features/dashboard/presentation/dashboard_page.dart';
 import '../features/learning/presentation/content_viewer_page.dart';
 import '../features/learning/presentation/learn_page.dart';
 import '../features/notifications/presentation/notifications_page.dart';
+import '../features/onboarding/presentation/onboarding_page.dart';
 import '../features/shell/presentation/mobile_shell.dart';
 
 /// 모바일 라우터 게이트.
 /// - AuthLoading: 모든 리다이렉트 보류(부팅 세션 복원 중).
 /// - 미인증: /login 외 모든 경로 → /login.
-/// - 인증 + /login: → /home.
-/// 온보딩 게이트는 후속(모바일은 post-onboarding 진입; 목 사용자 onboardingStatus=DONE).
+/// - 인증 + onboardingStatus != DONE: /onboarding 강제(온보딩 미완료).
+/// - 인증 + 온보딩 완료 + /login·/onboarding: → /home.
 String? gateRedirect(AuthState auth, String location) {
   if (auth is AuthLoading) return null;
   final atLogin = location == '/login';
   if (auth is! AuthAuthenticated) {
     return atLogin ? null : '/login';
   }
-  if (atLogin) return '/home';
+  final atOnboarding = location == '/onboarding';
+  if (auth.user.onboardingStatus != OnboardingStatus.done) {
+    return atOnboarding ? null : '/onboarding';
+  }
+  if (atLogin || atOnboarding) return '/home';
   return null;
 }
 
@@ -40,6 +46,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         gateRedirect(ref.read(authControllerProvider), state.matchedLocation),
     routes: [
       GoRoute(path: '/login', builder: (_, _) => const LoginPage()),
+      GoRoute(path: '/onboarding', builder: (_, _) => const OnboardingPage()),
       StatefulShellRoute.indexedStack(
         builder: (_, _, navigationShell) =>
             MobileShell(navigationShell: navigationShell),

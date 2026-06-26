@@ -116,5 +116,26 @@ void main() {
       await n.bootstrapSession();
       expect(c.read(authControllerProvider), isA<AuthUnauthenticated>());
     });
+
+    test('onboardingCompleted → 인증 사용자 교체(갱신 반영)', () async {
+      final c = _container();
+      final n = c.read(authControllerProvider.notifier);
+      await pumpEventQueue();
+      await n.mockLogin();
+
+      n.onboardingCompleted(
+        const User(
+          id: 'u-mock',
+          email: 'learner@devpath.ai',
+          nickname: '완료된지수',
+          role: UserRole.learner,
+          onboardingStatus: OnboardingStatus.done,
+        ),
+      );
+
+      final s = c.read(authControllerProvider);
+      expect(s, isA<AuthAuthenticated>());
+      expect((s as AuthAuthenticated).user.nickname, '완료된지수');
+    });
   });
 }
