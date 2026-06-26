@@ -36,6 +36,11 @@ dependencies:
   path: ^1.9.0
   connectivity_plus: ^6.1.0        # 재연결 동기화 감지
 
+  # FCM 푸시 (Build D) — 실 FcmPushService 골격(PushService 교체 경계).
+  # 실 동작은 Firebase 프로젝트 + google-services.json/APNs + Firebase.initializeApp 후속.
+  firebase_core: ^4.11.0           # Firebase 초기화(후속 결선)
+  firebase_messaging: ^16.4.1      # getToken·onMessage(포그라운드) → PushMessage
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

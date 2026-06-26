@@ -1,4 +1,7 @@
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../providers/api_providers.dart';
 
 /// 수신 푸시 메시지 1건. 실 FCM `RemoteMessage`를 이 형태로 매핑한다(후속).
 /// 알림센터 목록·미읽음 배지의 단위.
@@ -37,5 +40,42 @@ class StubPushService implements PushService {
   Stream<PushMessage> get incoming => const Stream.empty();
 }
 
-/// 푸시 서비스 주입점. 실 FCM 전환 시 이 provider만 교체한다.
-final pushServiceProvider = Provider<PushService>((ref) => StubPushService());
+/// FCM `RemoteMessage` → [PushMessage] 매핑(순수 함수). 단위 테스트 대상.
+PushMessage pushMessageFromRemote(RemoteMessage m) => PushMessage(
+  id: m.messageId ?? '',
+  title: m.notification?.title ?? '',
+  body: m.notification?.body ?? '',
+);
+
+/// 실 FCM 구현. `firebase_messaging`의 토큰·`onMessage`(포그라운드)를
+/// [PushService]로 어댑팅한다.
+///
+/// 활성화 조건: `--dart-define=USE_MOCK=false`.
+/// **선행 후속(설정 제공 시)**: Firebase 프로젝트 + `google-services.json` /
+/// `GoogleService-Info.plist`(+ iOS APNs 키) 추가, `main`에서 `Firebase.initializeApp`
+/// 호출. 본 골격은 그 결선 지점만 제공한다.
+///
+/// `FirebaseMessaging.instance`는 **lazy** 참조 — 생성자에서 Firebase를 건드리지
+/// 않으므로 미초기화 환경에서도 인스턴스화는 가능(실제 토큰·수신 호출 시점에만 초기화 필요).
+class FcmPushService implements PushService {
+  /// [messaging]은 테스트 주입용(미지정 시 `FirebaseMessaging.instance`를 lazy 사용).
+  FcmPushService([this._messaging]);
+
+  final FirebaseMessaging? _messaging;
+
+  FirebaseMessaging get _fm => _messaging ?? FirebaseMessaging.instance;
+
+  @override
+  Future<String?> getToken() => _fm.getToken();
+
+  @override
+  Stream<PushMessage> get incoming =>
+      FirebaseMessaging.onMessage.map(pushMessageFromRemote);
+}
+
+/// 푸시 서비스 주입점(교체 경계). 목 모드=스텁, 실 모드=FCM.
+final pushServiceProvider = Provider<PushService>((ref) {
+  return ref.watch(appConfigProvider).useMock
+      ? StubPushService()
+      : FcmPushService();
+});
