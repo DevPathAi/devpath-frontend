@@ -70,6 +70,11 @@ class AuthController extends Notifier<AuthState> {
     if (!ref.mounted) return;
     state = const AuthUnauthenticated();
   }
+
+  /// 온보딩 완료 — 갱신된 사용자로 세션 상태를 교체한다(게이트가 진입점으로 통과).
+  void onboardingCompleted(User user) {
+    if (state is AuthAuthenticated) state = AuthAuthenticated(user);
+  }
 }
 
 final authControllerProvider = NotifierProvider<AuthController, AuthState>(

@@ -3,12 +3,12 @@ import 'package:devpath_mobile/src/features/auth/state/auth_state.dart';
 import 'package:dp_core/dp_core.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-User _user() => const User(
+User _user({OnboardingStatus onboarding = OnboardingStatus.done}) => User(
   id: 'u1',
   email: 'a@b.c',
   nickname: '지수',
   role: UserRole.learner,
-  onboardingStatus: OnboardingStatus.done,
+  onboardingStatus: onboarding,
 );
 
 void main() {
@@ -33,6 +33,25 @@ void main() {
     test('인증 + 보호경로 → 허용(null)', () {
       expect(gateRedirect(AuthAuthenticated(_user()), '/home'), isNull);
       expect(gateRedirect(AuthAuthenticated(_user()), '/learn'), isNull);
+    });
+
+    test('인증 + 온보딩 미완료 + 보호경로 → /onboarding', () {
+      final pending = AuthAuthenticated(
+        _user(onboarding: OnboardingStatus.pending),
+      );
+      expect(gateRedirect(pending, '/home'), '/onboarding');
+      expect(gateRedirect(pending, '/community'), '/onboarding');
+    });
+
+    test('인증 + 온보딩 미완료 + /onboarding → 허용(null)', () {
+      final pending = AuthAuthenticated(
+        _user(onboarding: OnboardingStatus.pending),
+      );
+      expect(gateRedirect(pending, '/onboarding'), isNull);
+    });
+
+    test('인증 + 온보딩 완료 + /onboarding → /home', () {
+      expect(gateRedirect(AuthAuthenticated(_user()), '/onboarding'), '/home');
     });
   });
 }
