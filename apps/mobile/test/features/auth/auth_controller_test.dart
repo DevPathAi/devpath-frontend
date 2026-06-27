@@ -96,15 +96,17 @@ void main() {
       expect(await store.readAccess(), isNull);
     });
 
-    test('login() → GitHub OAuth 인가 URL 실행', () async {
+    test('login() → GitHub OAuth 인가 URL(모바일 식별 client_type=mobile) 실행', () async {
       final launcher = _FakeLauncher();
       final c = _container(launcher: launcher);
       final n = c.read(authControllerProvider.notifier);
       await pumpEventQueue();
       await n.login();
+      // 백엔드가 이 플로우를 모바일로 식별해 devpath://callback 딥링크로 토큰을 회신하도록
+      // client_type=mobile을 붙인다(없으면 웹 쿠키 플로우로 처리됨).
       expect(
         launcher.launched,
-        'https://mock.devpath.ai/oauth2/authorization/github',
+        'https://mock.devpath.ai/oauth2/authorization/github?client_type=mobile',
       );
     });
 
