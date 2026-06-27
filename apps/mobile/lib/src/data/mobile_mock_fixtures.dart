@@ -23,6 +23,8 @@ final Map<String, MockFixture> mobileMockFixtures = {
     200,
     {'access_token': 'mock-access-2', 'refresh_token': 'mock-refresh-2'},
   ),
+  // FCM 디바이스 토큰 등록(트랙 C). 목 모드에선 스텁 토큰으로 no-op 성공.
+  'POST /notifications/devices': (200, <String, dynamic>{}),
   // 홈 대시보드(DASH-001).
   'GET /dashboard': (
     200,
