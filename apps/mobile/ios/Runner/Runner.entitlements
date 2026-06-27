@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  FCM/APNs 푸시 엔타이틀먼트.
+	  - debug/TestFlight 빌드: development
+	  - App Store 릴리스: production 으로 변경
+	  이 파일은 Xcode에서 Target > Signing & Capabilities > Push Notifications 를
+	  추가하면 CODE_SIGN_ENTITLEMENTS 빌드 설정으로 자동 연결된다. 수동 연결 시
+	  Build Settings의 Code Signing Entitlements = Runner/Runner.entitlements.
+	  자세한 절차: ../../docs/FCM_SETUP.md
+	-->
+	<key>aps-environment</key>
+	<string>development</string>
+</dict>
+</plist>

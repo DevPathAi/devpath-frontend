@@ -16,6 +16,26 @@
 	<string>6.0</string>
 	<key>CFBundleName</key>
 	<string>devpath_mobile</string>
+	<!-- OAuth 콜백 딥링크: devpath://callback (슬라이스 #10) -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>ai.devpath.mobile.oauth</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>devpath</string>
+			</array>
+		</dict>
+	</array>
+	<!-- FCM: 백그라운드 원격 알림 수신(data 메시지 핸들러 구동). aps-environment는
+	     Runner.entitlements + Xcode Push Notifications capability에서 설정한다. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- FCM: Android 13(API 33)+ 알림 표시 런타임 권한. 앱에서 권한 요청 후 알림 노출. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
         android:label="devpath_mobile"
         android:name="${applicationName}"
@@ -23,6 +25,13 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+            <!-- OAuth 콜백 딥링크: devpath://callback (슬라이스 #10) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="devpath" android:host="callback"/>
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
