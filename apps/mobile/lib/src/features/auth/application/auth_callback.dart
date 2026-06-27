@@ -1,13 +1,12 @@
-import 'package:dp_core/dp_core.dart';
-
-/// OAuth 콜백 딥링크(`devpath://callback`) 파서.
+/// OAuth 콜백 딥링크(`devpath://callback`) 파서 — 하드닝 트랙 A(일회용 code + PKCE).
 ///
-/// 모바일 OAuth 계약(프론트 주도, 백엔드 후속 과제):
-/// OAuth 성공 후 백엔드가 `devpath://callback?access_token=<jwt>&refresh_token=<token>`
-/// 으로 리다이렉트한다. 토큰은 query 또는 fragment(`#a=1&b=2`) 어디에 와도 파싱한다.
+/// 모바일 OAuth 계약: OAuth 성공 후 백엔드가 토큰 대신 **일회용 code**를 실어
+/// `devpath://callback?code=<code>` 로 리다이렉트한다. 앱은 이 code를 보관해 둔
+/// `code_verifier`와 함께 `POST /auth/oauth/token`으로 교환해 토큰을 받는다(토큰은
+/// URL에 절대 실리지 않는다). code는 query 또는 fragment 어디에 와도 파싱한다.
 ///
-/// 스킴/호스트가 다르거나 토큰이 비면 null(무시).
-TokenPair? parseAuthCallback(Uri uri) {
+/// 스킴/호스트가 다르거나 code가 비면 null(무시).
+String? parseAuthCallbackCode(Uri uri) {
   if (uri.scheme != 'devpath' || uri.host != 'callback') return null;
 
   final params = <String, String>{
@@ -15,11 +14,9 @@ TokenPair? parseAuthCallback(Uri uri) {
     ..._parseFragment(uri.fragment),
   };
 
-  final access = params['access_token'];
-  final refresh = params['refresh_token'];
-  if (access == null || access.isEmpty) return null;
-  if (refresh == null || refresh.isEmpty) return null;
-  return TokenPair(access: access, refresh: refresh);
+  final code = params['code'];
+  if (code == null || code.isEmpty) return null;
+  return code;
 }
 
 Map<String, String> _parseFragment(String fragment) {

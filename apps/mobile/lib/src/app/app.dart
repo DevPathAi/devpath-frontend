@@ -24,9 +24,9 @@ class _DevPathMobileAppState extends ConsumerState<DevPathMobileApp> {
     super.initState();
     final service = DeepLinkService(
       AppLinks(),
-      onTokens: (tokens) => ref
+      onCode: (code) => ref
           .read(authControllerProvider.notifier)
-          .completeFromDeepLink(tokens),
+          .completeFromCode(code),
     );
     _deepLinks = service;
     // 플랫폼 채널이 없는 환경(테스트 등)에서도 앱 부팅을 막지 않는다.
