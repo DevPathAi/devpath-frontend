@@ -1,5 +1,7 @@
+import 'package:devpath_mobile/src/data/key_value_store.dart';
 import 'package:devpath_mobile/src/features/auth/application/auth_controller.dart';
 import 'package:devpath_mobile/src/features/auth/application/oauth_launcher.dart';
+import 'package:devpath_mobile/src/features/auth/application/pkce.dart';
 import 'package:devpath_mobile/src/features/auth/state/auth_state.dart';
 import 'package:devpath_mobile/src/providers/api_providers.dart';
 import 'package:dp_core/dp_core.dart';
@@ -18,6 +20,8 @@ ApiClient _client(Map<String, MockFixture> fx) {
   return c;
 }
 
+const _kVerifier = 'dp.auth.pkce_verifier';
+
 final Map<String, MockFixture> _userOk = {
   'GET /users/me': (
     200,
@@ -35,12 +39,14 @@ ProviderContainer _container({
   Map<String, MockFixture>? fixtures,
   TokenStore? store,
   OAuthLauncher? launcher,
+  KeyValueStore? kv,
 }) {
   final c = ProviderContainer(
     overrides: [
       tokenStoreProvider.overrideWithValue(store ?? InMemoryTokenStore()),
       apiClientProvider.overrideWithValue(_client(fixtures ?? _userOk)),
       oauthLauncherProvider.overrideWithValue(launcher ?? _FakeLauncher()),
+      keyValueStoreProvider.overrideWithValue(kv ?? InMemoryKeyValueStore()),
     ],
   );
   addTearDown(c.dispose);
@@ -70,18 +76,38 @@ void main() {
       expect(await store.readRefresh(), 'mock-refresh');
     });
 
-    test('completeFromDeepLink → 딥링크 토큰 저장 + 인증', () async {
+    test('completeFromCode → 코드 교환 + 토큰 저장 + 인증 + verifier 삭제', () async {
       final store = InMemoryTokenStore();
-      final c = _container(store: store);
+      final kv = InMemoryKeyValueStore();
+      await kv.write(_kVerifier, 'the-verifier');
+      final c = _container(
+        store: store,
+        kv: kv,
+        fixtures: {
+          ..._userOk,
+          'POST /auth/oauth/token': (
+            200,
+            {'access_token': 'deep-a', 'refresh_token': 'deep-r'},
+          ),
+        },
+      );
       final n = c.read(authControllerProvider.notifier);
       await pumpEventQueue();
-      await n.completeFromDeepLink(
-        const TokenPair(access: 'deep-a', refresh: 'deep-r'),
-      );
+      await n.completeFromCode('the-code');
 
       expect(c.read(authControllerProvider), isA<AuthAuthenticated>());
       expect(await store.readAccess(), 'deep-a');
       expect(await store.readRefresh(), 'deep-r');
+      expect(await kv.read(_kVerifier), isNull, reason: '교환 후 verifier 삭제');
+    });
+
+    test('completeFromCode: verifier 없으면 미인증', () async {
+      final kv = InMemoryKeyValueStore(); // verifier 미보관
+      final c = _container(kv: kv);
+      final n = c.read(authControllerProvider.notifier);
+      await pumpEventQueue();
+      await n.completeFromCode('the-code');
+      expect(c.read(authControllerProvider), isA<AuthUnauthenticated>());
     });
 
     test('logout → 미인증 + 토큰 제거', () async {
@@ -96,17 +122,28 @@ void main() {
       expect(await store.readAccess(), isNull);
     });
 
-    test('login() → GitHub OAuth 인가 URL(모바일 식별 client_type=mobile) 실행', () async {
+    test('login() → PKCE challenge 포함 인가 URL + verifier 보관', () async {
       final launcher = _FakeLauncher();
-      final c = _container(launcher: launcher);
+      final kv = InMemoryKeyValueStore();
+      final c = _container(launcher: launcher, kv: kv);
       final n = c.read(authControllerProvider.notifier);
       await pumpEventQueue();
       await n.login();
-      // 백엔드가 이 플로우를 모바일로 식별해 devpath://callback 딥링크로 토큰을 회신하도록
-      // client_type=mobile을 붙인다(없으면 웹 쿠키 플로우로 처리됨).
+
+      final url = launcher.launched!;
       expect(
-        launcher.launched,
-        'https://mock.devpath.ai/oauth2/authorization/github?client_type=mobile',
+        url,
+        startsWith(
+          'https://mock.devpath.ai/oauth2/authorization/github?client_type=mobile&code_challenge=',
+        ),
+      );
+      expect(url, contains('&code_challenge_method=S256'));
+      final verifier = await kv.read(_kVerifier);
+      expect(verifier, isNotNull);
+      // URL의 challenge는 보관된 verifier로부터 계산된 값과 일치해야 한다.
+      expect(
+        Uri.parse(url).queryParameters['code_challenge'],
+        PkcePair.challengeFor(verifier!),
       );
     });
 

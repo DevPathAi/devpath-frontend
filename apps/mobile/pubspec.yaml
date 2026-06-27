@@ -41,6 +41,8 @@ dependencies:
   firebase_core: ^4.11.0           # Firebase 초기화(후속 결선)
   firebase_messaging: ^16.4.1      # getToken·onMessage(포그라운드) → PushMessage
 
+  crypto: ^3.0.6                   # PKCE code_challenge = SHA256(verifier) (하드닝 트랙 A)
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
