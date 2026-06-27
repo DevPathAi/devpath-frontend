@@ -4,6 +4,13 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// FCM 결선: google-services.json이 모듈에 있으면 google-services 플러그인을 자동 적용한다.
+// 파일이 없으면(목/CI/기본 클론) 적용하지 않아 빌드가 녹색을 유지한다 → 추가 Gradle 편집
+// 없이 설정 파일 배치만으로 결선된다. 배치 위치·절차: docs/FCM_SETUP.md.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 android {
     namespace = "ai.devpath.devpath_mobile"
     compileSdk = flutter.compileSdkVersion

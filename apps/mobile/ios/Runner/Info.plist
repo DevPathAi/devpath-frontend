@@ -30,6 +30,12 @@
 			</array>
 		</dict>
 	</array>
+	<!-- FCM: 백그라운드 원격 알림 수신(data 메시지 핸들러 구동). aps-environment는
+	     Runner.entitlements + Xcode Push Notifications capability에서 설정한다. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

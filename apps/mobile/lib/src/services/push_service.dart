@@ -1,3 +1,4 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -46,6 +47,18 @@ PushMessage pushMessageFromRemote(RemoteMessage m) => PushMessage(
   title: m.notification?.title ?? '',
   body: m.notification?.body ?? '',
 );
+
+/// 백그라운드/종료 상태 수신 진입점. **반드시 top-level**(앱이 비활성일 때 별
+/// isolate에서 호출됨)이며 `@pragma('vm:entry-point')`로 release tree-shaking을
+/// 막는다. 별 isolate이므로 Firebase를 다시 초기화한다.
+///
+/// 알림형(`notification`) 메시지는 OS 트레이가 자동 표시하므로 여기서는 초기화만
+/// 보장한다. data 전용 메시지의 후속 처리 훅 지점(스펙 확정 시 확장).
+/// `main`의 실 모드 분기에서 `FirebaseMessaging.onBackgroundMessage`에 등록한다.
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+}
 
 /// 실 FCM 구현. `firebase_messaging`의 토큰·`onMessage`(포그라운드)를
 /// [PushService]로 어댑팅한다.
