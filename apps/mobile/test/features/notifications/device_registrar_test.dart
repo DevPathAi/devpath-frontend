@@ -22,7 +22,9 @@ void main() {
   group('DeviceRegistrar', () {
     test('토큰 있으면 POST /notifications/devices 등록(경로/메서드 일치)', () async {
       // 픽스처가 'POST /notifications/devices'에만 매칭 → 다른 경로면 예외.
-      final c = _client({'POST /notifications/devices': (200, <String, dynamic>{})});
+      final c = _client({
+        'POST /notifications/devices': (200, <String, dynamic>{}),
+      });
       final r = DeviceRegistrar(c, _FakePush('fcm-tok'), 'ANDROID');
       await r.register(); // 무예외 = 올바른 경로로 호출됨
     });

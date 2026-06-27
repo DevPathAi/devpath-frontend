@@ -48,7 +48,9 @@ class _DevPathMobileAppState extends ConsumerState<DevPathMobileApp> {
     // 인증 진입(전이) 시 1회 FCM 디바이스 토큰 등록(트랙 C). 부가 기능이라 실패는 무시.
     ref.listen(authControllerProvider, (prev, next) {
       if (next is AuthAuthenticated && prev is! AuthAuthenticated) {
-        unawaited(ref.read(deviceRegistrarProvider).register().catchError((_) {}));
+        unawaited(
+          ref.read(deviceRegistrarProvider).register().catchError((_) {}),
+        );
       }
     });
     final router = ref.watch(routerProvider);
