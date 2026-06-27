@@ -41,7 +41,9 @@ class AuthController extends Notifier<AuthState> {
     final pkce = PkcePair.generate();
     await ref.read(keyValueStoreProvider).write(_kPkceVerifier, pkce.verifier);
     final base = ref.read(appConfigProvider).baseUrl;
-    await ref.read(oauthLauncherProvider).launch(
+    await ref
+        .read(oauthLauncherProvider)
+        .launch(
           '$base/oauth2/authorization/github'
           '?client_type=mobile'
           '&code_challenge=${pkce.challenge}'

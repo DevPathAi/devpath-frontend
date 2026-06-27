@@ -18,11 +18,17 @@ void main() {
     });
 
     test('스킴 불일치 → null', () {
-      expect(parseAuthCallbackCode(Uri.parse('https://callback?code=abc')), isNull);
+      expect(
+        parseAuthCallbackCode(Uri.parse('https://callback?code=abc')),
+        isNull,
+      );
     });
 
     test('호스트 불일치 → null', () {
-      expect(parseAuthCallbackCode(Uri.parse('devpath://other?code=abc')), isNull);
+      expect(
+        parseAuthCallbackCode(Uri.parse('devpath://other?code=abc')),
+        isNull,
+      );
     });
 
     test('code 누락 → null', () {
@@ -30,7 +36,10 @@ void main() {
     });
 
     test('빈 code → null', () {
-      expect(parseAuthCallbackCode(Uri.parse('devpath://callback?code=')), isNull);
+      expect(
+        parseAuthCallbackCode(Uri.parse('devpath://callback?code=')),
+        isNull,
+      );
     });
   });
 }

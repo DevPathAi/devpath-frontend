@@ -15,7 +15,11 @@ void main() {
     test('generate: verifier 43자 base64url, challenge가 verifier와 일치', () {
       final p = PkcePair.generate(random: Random(42));
       expect(p.verifier.length, 43);
-      expect(RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(p.verifier), isTrue, reason: p.verifier);
+      expect(
+        RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(p.verifier),
+        isTrue,
+        reason: p.verifier,
+      );
       expect(p.challenge, PkcePair.challengeFor(p.verifier));
     });
 
