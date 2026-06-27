@@ -6,11 +6,12 @@
 > 설계 배경: devpath-platform-svc `docs/mobile-auth-hardening.md`(PR #15) 트랙 B.
 > 트랙 A(일회용 code + PKCE, PR #16/#50)와 결합하면 "https 링크 + 1회용 code"로 노출·가로채기를 모두 차단.
 
-## 0. 먼저 정해야 할 것 (팀 결정 — 미정이라 보류 중)
+## 0. 먼저 정해야 할 것 (팀 결정)
 
-- [ ] **콜백 도메인/호스트**: 두 well-known 파일을 HTTPS로 서빙할 도메인. 후보: `devpath-landing-page`(정적 호스팅) 또는 `devpath-gateway`. 예: `https://devpath.ai/auth/mobile-callback`.
-- [ ] **Android 서명 인증서 SHA-256 지문**: 빌드 variant별로 모두 필요.
-  - 현재 `android/app/build.gradle.kts`는 release에 **debug 키**를 사용(릴리스 키스토어 미존재) → 우선 debug 지문으로 검증하고, 릴리스 키스토어 생성 후 그 지문 + Play 앱서명 지문을 추가.
+> **결정 현황(2026-06-27)**: ① 콜백 도메인 **아직 미확보 → 트랙 B 전체 보류 유지**(도메인 확보 시 재개). ② Android 서명 = **Google Play App Signing 사용 예정**(지문은 Play Console에서 확보).
+
+- [ ] **콜백 도메인/호스트** *(미확보 — 현재 보류 사유)*: 두 well-known 파일을 HTTPS로 서빙할 도메인. 후보: `devpath-landing-page`(정적 호스팅) 또는 `devpath-gateway`. 예: `https://devpath.ai/auth/mobile-callback`.
+- [x] **Android 서명 지문 출처 = Google Play App Signing**: 출시 시점에 **Play Console → 앱 무결성 → 앱 서명**의 SHA-256 지문을 `assetlinks.json`에 등록. 내부 테스트/디버그 검증용으로는 debug 키 지문(`~/.android/debug.keystore`)도 함께 등록 가능. (현재 `android/app/build.gradle.kts` release는 debug 키 사용 중 — Play 업로드 키 도입 시 교체.)
 - [ ] **iOS Team ID + Bundle ID**: `<TeamID>.ai.devpath.devpath_mobile`(Apple Developer 계정 필요).
 
 ## 1. 호스팅할 well-known 파일 (도메인 측)
