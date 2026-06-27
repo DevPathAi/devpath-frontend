@@ -101,6 +101,38 @@ void main() {
       expect(await kv.read(_kVerifier), isNull, reason: '교환 후 verifier 삭제');
     });
 
+    test('completeFromCode: 교환 실패해도 verifier 폐기(1회용)', () async {
+      // code는 교환을 시도한 순간 서버에서 소비되므로, 실패해도 verifier는 더 이상
+      // 유효하지 않다. 잔존 시 secure_storage에 만료된 1회용 비밀이 남는다 → 폐기 보장.
+      final store = InMemoryTokenStore();
+      final kv = InMemoryKeyValueStore();
+      await kv.write(_kVerifier, 'the-verifier');
+      final c = _container(
+        store: store,
+        kv: kv,
+        fixtures: {
+          ..._userOk,
+          'POST /auth/oauth/token': (
+            401,
+            {
+              'error': {'code': 'UNAUTHORIZED', 'message': 'bad code'},
+            },
+          ),
+        },
+      );
+      final n = c.read(authControllerProvider.notifier);
+      await pumpEventQueue();
+      await n.completeFromCode('the-code');
+
+      expect(c.read(authControllerProvider), isA<AuthUnauthenticated>());
+      expect(await store.readAccess(), isNull, reason: '교환 실패 → 토큰 미저장');
+      expect(
+        await kv.read(_kVerifier),
+        isNull,
+        reason: '실패해도 1회용 verifier는 폐기',
+      );
+    });
+
     test('completeFromCode: verifier 없으면 미인증', () async {
       final kv = InMemoryKeyValueStore(); // verifier 미보관
       final c = _container(kv: kv);
