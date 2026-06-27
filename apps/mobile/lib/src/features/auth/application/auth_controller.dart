@@ -28,11 +28,14 @@ class AuthController extends Notifier<AuthState> {
   }
 
   /// 실모드 OAuth 시작 — GitHub 인가 엔드포인트를 외부 브라우저로 연다.
+  ///
+  /// `client_type=mobile`로 모바일 플로우임을 알린다 → 백엔드가 OAuth 성공 후
+  /// `devpath://callback`(access·refresh fragment) 딥링크로 토큰을 회신한다(웹은 쿠키).
   Future<void> login() async {
     final base = ref.read(appConfigProvider).baseUrl;
     await ref
         .read(oauthLauncherProvider)
-        .launch('$base/oauth2/authorization/github');
+        .launch('$base/oauth2/authorization/github?client_type=mobile');
   }
 
   /// 목 모드 로그인 — 딥링크 도착을 가짜 토큰으로 대체해 동일 경로로 세션 구성.
