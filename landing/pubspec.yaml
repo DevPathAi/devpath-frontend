@@ -1,0 +1,21 @@
+name: devpath_landing
+description: DevPath AI 공개 랜딩(Jaspr SSG). 워크스페이스 밖 독립 프로젝트.
+publish_to: none
+version: 0.0.1
+
+environment:
+  sdk: ^3.12.1
+
+# ⚠️ resolution: workspace 를 두지 않는다 — 독립 해석(T-LANDING-WORKSPACE=standalone).
+
+dependencies:
+  jaspr: ^0.23.0
+
+dev_dependencies:
+  jaspr_builder: ^0.23.0
+  jaspr_test: ^0.23.0
+  build_runner: ^2.4.13
+  lints: ^5.0.0
+
+jaspr:
+  mode: static        # SSG — SEO·정적 HTML 생성

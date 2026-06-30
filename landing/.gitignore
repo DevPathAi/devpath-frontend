@@ -1,0 +1,6 @@
+/build/
+/.dart_tool/
+.jaspr_web/
+
+# jaspr codegen 산출물(빌드 시 재생성 — server_options)
+*.options.dart
