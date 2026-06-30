@@ -25,6 +25,35 @@ jobs:
       - name: Test
         run: melos run test
 
+  # T-LANDING-CI: landing(Jaspr SSG)은 워크스페이스 밖 독립 프로젝트라 melos에 안 잡힘
+  # → 전용 job으로 analyze·test·정적 빌드를 검증한다(standalone, 자체 dart pub get).
+  landing:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: landing
+    steps:
+      - uses: actions/checkout@v6
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Pub get
+        run: dart pub get
+      - name: Analyze
+        run: dart analyze
+      - name: Test
+        run: dart test
+      - name: Activate jaspr_cli
+        run: dart pub global activate jaspr_cli 0.23.1   # jaspr 코어 ^0.23.0와 정렬(버전 핀 — CLI 상위버전이 코어 제약 올릴 때 CI 깨짐 방지)
+      - name: SSG build
+        run: dart pub global run jaspr_cli:jaspr build
+      - name: SEO/CTA gate
+        run: |
+          grep -q 'lang="ko"' build/jaspr/index.html
+          grep -q 'og:title' build/jaspr/index.html
+          grep -q '무료로 시작하기' build/jaspr/index.html
+
 # NOTE: React 전용 image/deploy(web-image·admin-image·web-deploy·admin-deploy)는
 # 제거됨. Flutter Web → nginx 이미지 빌드·gitops 배포는 P4(web)/P5(admin)에서
 # 앱 빌드 산출물이 생긴 뒤 재도입한다.
