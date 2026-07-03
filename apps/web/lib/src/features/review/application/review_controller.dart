@@ -46,8 +46,10 @@ class ReviewController extends Notifier<ReviewState> {
           state = ReviewQuota(e.retryAfterSeconds);
           return;
         }
-        // RESOURCE_NOT_FOUND: 아직 리뷰 미생성 — 계속 폴링
-        if (e.code == ApiErrorCode.resourceNotFound) {
+        // 아직 리뷰 미생성 — 계속 폴링.
+        // 실 ai-svc는 ReviewNotFoundException을 Spring 기본 404(중첩 error.code 없음)로
+        // 반환하므로 HTTP 404도 미생성 신호로 취급한다. mock은 {error:{code:RESOURCE_NOT_FOUND}}.
+        if (e.code == ApiErrorCode.resourceNotFound || e.status == 404) {
           // fall through to delay and retry
         } else {
           state = ReviewFailed(e.message);
@@ -57,24 +59,6 @@ class ReviewController extends Notifier<ReviewState> {
       await Future<void>.delayed(interval);
     }
     state = const ReviewFailed('AI 리뷰 시간이 초과되었습니다');
-  }
-
-  // ignore: unused_element
-  /// @deprecated 동기 POST 프로토(F6-e 이전). 폴링 전환 후 미사용.
-  Future<void> request(String code) async {
-    state = const ReviewLoading();
-    try {
-      final json = await ref
-          .read(apiClientProvider)
-          .post<Map<String, dynamic>>('/reviews', body: {'code': code});
-      state = ReviewLoaded(CodeReview.fromJson(json));
-    } on ApiException catch (e) {
-      state = switch (e) {
-        _ when e.isKillSwitch => const ReviewKillSwitch(),
-        _ when e.isQuota => ReviewQuota(e.retryAfterSeconds),
-        _ => ReviewFailed(e.message),
-      };
-    }
   }
 }
 

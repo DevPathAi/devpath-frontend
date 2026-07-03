@@ -65,12 +65,16 @@
 |---|---|---|---|
 | 요약 | `dashboard_controller.dart:16` `GET /dashboard` | learning `/dashboard/**` | ✅ 경로 / `DashboardSummary` DTO 대조 필요 |
 
-### T2-6. AI 리뷰 (review)
-| 항목 | 프론트 | 게이트웨이 | 판정 |
+### T2-6. AI 리뷰 (review) — ✅ 조각 2 정합 완료
+| 항목 | 프론트 | 실서버(ai-svc `ReviewController`) | 판정 |
 |---|---|---|---|
-| 생성 | `POST /reviews`(목 픽스처 `web_mock_fixtures.dart:284`) | ai-review `/reviews/**` | ✅ 경로 / DTO·폴링 대조 필요 |
-| 폴링 | `GET /reviews?sandboxSessionId={id}`(픽스처 :273) | ai-review `/reviews/**` | ✅ 경로 / query 계약 대조 필요 |
-- 잔여: 프론트 review controller 실서버 분기 정밀 대조(조각 2).
+| 폴링 | `GET /reviews?sandboxSessionId={id}` → `pollForSession`(자동: `RunDone.sandboxSessionId` 트리거) | `@GetMapping(params="sandboxSessionId")` | ✅ 경로·query·DTO(`CodeReview{id,status,confidence,strengths,improvements,security}`)·`status`(PENDING/DONE/FAILED) 일치 |
+| 조회 | (웹 미사용) | `GET /reviews/{id}` | — |
+| 피드백 | `ReviewPanel` thumbUp/Down 버튼 **미배선**(onPressed no-op) | `POST /reviews/{id}/feedback` {UP\|DOWN} | ⚠️ 프론트 배선 후속(golden path 밖) |
+- **해소 2건(조각 2)**:
+  1. **동기 생성 없음**: 실 ai-svc엔 `POST /reviews`(동기 생성)가 없다 — 리뷰는 샌드박스 실행 시 Kafka로 비동기 생성되고 웹은 세션으로 폴링. deprecated `request()`/`POST /reviews` 배선(및 목 픽스처)을 제거하고, 수동 요청/재시도는 실행이 만든 `sandboxSessionId` **재폴링**(세션 없으면 "먼저 코드를 실행하세요" 안내)으로 정합.
+  2. **미생성 시 맨 404**: 실 `ReviewNotFoundException`은 Spring 기본 404(중첩 `error.code` 없음)를 반환 → 프론트 폴링이 `resourceNotFound` 코드뿐 아니라 **`status==404`도 미생성 신호**로 취급하도록 정합(비동기 생성 지연 중 폴링 지속, 소진 시에만 타임아웃 실패). mock의 `{error:{code:RESOURCE_NOT_FOUND}}` 중첩 envelope가 이 gap을 가리고 있었음.
+- **후속(별도 슬라이스)**: ai-svc `GlobalExceptionHandler`가 내는 에러 body가 프론트 `ApiException` envelope(`{error:{code,message}}`)와 계통적으로 불일치(예: killswitch `{errorCode}` 최상위, forbidden/notfound는 문자열/기본형). learning/community-svc도 동일 패턴 — **에러 envelope 표준화는 review 스코프 밖의 크로스레포 과제**(R-err).
 
 ### T3-7. 온보딩 (onboarding) — ⚠️ 라우트 gap 확정
 | 항목 | 프론트 | 게이트웨이 | 판정 |

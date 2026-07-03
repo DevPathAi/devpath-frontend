@@ -69,8 +69,20 @@ class _SandboxPageState extends ConsumerState<SandboxPage> {
         ),
         log: _LogPane(run: run),
         review: ReviewPanel(
-          onRequest: () =>
-              ref.read(reviewControllerProvider.notifier).request(_code),
+          // 실 ai-svc엔 동기 생성(POST /reviews)이 없다 — 리뷰는 실행 시 Kafka로
+          // 비동기 생성되고 웹은 sandboxSessionId로 폴링한다. 수동 요청/재시도는
+          // 실행이 만든 세션을 재폴링하고, 세션이 없으면 먼저 실행하도록 안내한다.
+          onRequest: () {
+            final runState = ref.read(runControllerProvider);
+            final sid = runState is RunDone ? runState.sandboxSessionId : null;
+            if (sid != null) {
+              ref.read(reviewControllerProvider.notifier).pollForSession(sid);
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('먼저 코드를 실행하세요.')),
+              );
+            }
+          },
         ),
       ),
     );
