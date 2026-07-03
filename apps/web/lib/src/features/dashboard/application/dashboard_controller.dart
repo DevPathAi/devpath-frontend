@@ -13,7 +13,7 @@ class DashboardController extends Notifier<DashboardState> {
     try {
       final json = await ref
           .read(apiClientProvider)
-          .get<Map<String, dynamic>>('/dashboard');
+          .get<Map<String, dynamic>>('/dashboard/me');
       state = DashLoaded(DashboardSummary.fromJson(json));
     } on ApiException catch (e) {
       state = DashFailed(e.message);
