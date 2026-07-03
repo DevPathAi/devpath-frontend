@@ -14,12 +14,11 @@ import '../features/community/presentation/question_create_page.dart';
 import '../features/dashboard/presentation/dashboard_page.dart';
 import '../features/mentor/presentation/mentor_page.dart';
 import '../features/diagnostic/presentation/diagnostic_page.dart';
-import '../features/onboarding/presentation/onboarding_page.dart';
 import '../features/path/presentation/path_page.dart';
 import '../features/sandbox/presentation/sandbox_page.dart';
 import '../features/shell/presentation/app_shell.dart';
 
-/// 게이트 판정(순수): 미인증→/login, 인증·온보딩미완→/onboarding, 그 외 통과.
+/// 게이트 판정(순수): 미인증→/login, 인증·온보딩미완→/diagnostic, 그 외 통과.
 /// /auth/callback은 미인증이어도 통과(bootstrapFromCallback 진행 중이므로).
 ///
 /// I-1 정책: [AuthLoading]은 어느 경로에서도 null(보류)을 반환한다.
@@ -66,7 +65,6 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(path: '/login', builder: (_, _) => const LoginPage()),
       GoRoute(path: '/diagnostic', builder: (_, _) => const DiagnosticPage()),
-      GoRoute(path: '/onboarding', builder: (_, _) => const OnboardingPage()),
       // OAuth 콜백: platform이 이 URL로 리다이렉트. bootstrapFromCallback() 호출 후
       // 게이트가 인증 상태에 따라 분기한다.
       GoRoute(
