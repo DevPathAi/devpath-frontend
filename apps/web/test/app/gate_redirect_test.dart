@@ -52,15 +52,6 @@ void main() {
         isNull,
       );
     });
-    test('인증 + 온보딩 완료 + /onboarding → 통과(null)(게이트 미처리)', () {
-      expect(
-        gateRedirect(
-          AuthAuthenticated(_user(OnboardingStatus.done)),
-          '/onboarding',
-        ),
-        isNull,
-      );
-    });
     test('인증 + 온보딩 완료 + /diagnostic → /path', () {
       expect(
         gateRedirect(
@@ -99,8 +90,8 @@ void main() {
     test('AuthLoading + /auth/callback → null(보류)', () {
       expect(gateRedirect(const AuthLoading(), '/auth/callback'), isNull);
     });
-    test('AuthLoading + /onboarding → null(보류)', () {
-      expect(gateRedirect(const AuthLoading(), '/onboarding'), isNull);
+    test('AuthLoading + /diagnostic → null(보류)', () {
+      expect(gateRedirect(const AuthLoading(), '/diagnostic'), isNull);
     });
   });
 }

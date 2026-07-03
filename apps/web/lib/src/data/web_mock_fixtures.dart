@@ -22,19 +22,6 @@ final Map<String, MockFixture> webMockFixtures = {
       },
     },
   ),
-  // 진단 제출 → DONE 유저 반환(게이트 해제)
-  'POST /onboarding': (
-    200,
-    {
-      'user': {
-        'id': 'u-mock',
-        'email': 'learner@devpath.ai',
-        'nickname': '지수',
-        'role': 'LEARNER',
-        'onboardingStatus': 'DONE',
-      },
-    },
-  ),
   // PATH 생성 완료 후 결과 조회(스펙 §3 비동기 결과 조회 패턴)
   'GET /learning-paths/me': (200, mockLearningPath()),
   // 학습 콘텐츠 조회(CNT-001)
