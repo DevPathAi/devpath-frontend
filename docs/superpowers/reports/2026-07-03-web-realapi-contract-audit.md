@@ -144,3 +144,23 @@ cd apps/web && flutter run -d chrome --dart-define-from-file=.env.local
 - **R2 응답 View DTO**: T1/T2 응답 필드 단위 대조는 화면별 정합(조각 1b/2)에서. 규약 축은 정합 확인됨.
 - **R4 auth OAuth**: 위 핵심 gap 3.
 - **온보딩 이중 플로우**: 목 픽스처의 `/onboarding` vs `/onboarding/assessments/*` 혼재 원인은 learning-svc 실측으로 확정(조각 3).
+
+## 조각 1b — T1 응답 View DTO 대조 (2026-07-03, 완료)
+
+T1 잔여였던 응답 View DTO 필드 대조를 완료했다. **전부 정합 — 수정 불필요.**
+
+| 백엔드 View DTO (origin/develop) | 프론트 dp_core 모델 | 결과 |
+|---|---|---|
+| `PostSummaryView(id,title,authorId,solved,upvoteCount,answerCount)` | `CommunityPostSummary` | ✅ 필드명·타입 일치 |
+| `QuestionDetailView(id,title,bodyMd,solved,acceptedAnswerId,upvoteCount,downvoteCount,tags,answers)` | `CommunityQuestionDetail` | ✅ |
+| `AnswerView(id,authorId,bodyMd,aiGenerated,accepted,upvoteCount)` | `CommunityAnswer` | ✅ |
+| `TagView(id,name,postCount)` | `CommunityTag` | ✅ |
+| `SimilarQuestionView(questionId,title)` | `SimilarQuestion` | ✅ |
+| `DraftResponse(draftId,expiresAt,content,fieldsAvailable,fieldsUnavailable)` | `LcsDraft` | ✅ (`content`=Map 그대로, `expiresAt` Instant→DateTime ISO) |
+| `CommitResponse(snapshotId,status,immutable)` | lcs_source가 `snapshotId` 직접 파싱 | ✅ |
+| `SnapshotView(id,createdAt,content,renderedFor)` | `LcsSnapshotView` | ✅ |
+| `UserSummary(id,email,nickname,role,onboardingStatus)` | `User` | ✅ (`role`/`onboardingStatus` String→enum `unknownEnumValue` fallback) |
+
+**결론: T1(auth·커뮤니티·LCS)은 실API 계약이 응답 DTO까지 완전 정합.** slice8·slice9·web-auth-realapi PR의 정합 결과. **R2(T1) 해소.**
+
+**회귀 커버:** 기존 화면별 위젯·컨트롤러 테스트(`community_home_page_test`·`qna_detail_*_test`·`lcs_source_test` 등)가 T1 UI/흐름 회귀를 커버. 추가로 `apps/web/test/golden_path_t1_realapi_test.dart`(DONE 유저→대시보드→커뮤니티 목록) 골든패스 통합 스모크 1건(`flutter test` green). **단, 이들은 목 레벨이라 실API 계약 회귀는 잡지 못한다 — 실 계약 회귀 검증은 위 "부분 bootRun 스모크"(실서버) 경로가 담당한다.**
