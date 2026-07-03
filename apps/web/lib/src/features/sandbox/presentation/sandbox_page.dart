@@ -78,9 +78,9 @@ class _SandboxPageState extends ConsumerState<SandboxPage> {
             if (sid != null) {
               ref.read(reviewControllerProvider.notifier).pollForSession(sid);
             } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('먼저 코드를 실행하세요.')),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('먼저 코드를 실행하세요.')));
             }
           },
         ),

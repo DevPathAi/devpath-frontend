@@ -118,13 +118,16 @@ void main() {
     client.dio.httpClientAdapter = _StatusSequentialMockAdapter([
       (404, _bareNotFound()),
       (404, _bareNotFound()),
-      (200, {
-        'status': 'DONE',
-        'confidence': 88,
-        'strengths': ['clear'],
-        'improvements': <Map<String, dynamic>>[],
-        'security': <Map<String, dynamic>>[],
-      }),
+      (
+        200,
+        {
+          'status': 'DONE',
+          'confidence': 88,
+          'strengths': ['clear'],
+          'improvements': <Map<String, dynamic>>[],
+          'security': <Map<String, dynamic>>[],
+        },
+      ),
     ]);
     final container = ProviderContainer(
       overrides: [apiClientProvider.overrideWithValue(client)],
