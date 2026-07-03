@@ -65,6 +65,7 @@
 ## 환경 변수
 
 - 런타임 설정(API 엔드포인트·`useMock` 등)은 **`--dart-define`(또는 `--dart-define-from-file`)** 로 주입하고 `AppConfig.fromEnvironment`(`String.fromEnvironment`/`bool.fromEnvironment`)로 읽는다. 기본값은 목 프로토. 비밀값(키·토큰)은 절대 커밋하지 않는다.
+- 실API 로컬 실행: `apps/web/.env.local.example`을 `.env.local`로 복사(gitignore됨) 후 `cd apps/web && flutter run -d chrome --dart-define-from-file=.env.local`. 게이트웨이(`:8080`)와 대상 서비스가 로컬 구동돼 있어야 한다(부분 bootRun 스모크 절차: `docs/superpowers/reports/2026-07-03-web-realapi-contract-audit.md`).
 - 화면 설계: [storyboard](https://github.com/DevPathAi/storyboard) · [documents/06_화면_기능_정의서](https://github.com/DevPathAi/documents/blob/main/06_화면_기능_정의서.md)
 
 ## 공통 규칙
