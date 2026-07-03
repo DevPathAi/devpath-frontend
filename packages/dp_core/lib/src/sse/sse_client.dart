@@ -48,10 +48,14 @@ class SseClient {
         continue;
       }
       if (line.startsWith('event:')) {
-        event = line.substring(6).trim();
+        final e = line.substring(6);
+        // SSE 규격: 선행 스페이스 1개만 제거(내부·후행 공백 보존, data와 일관).
+        event = e.startsWith(' ') ? e.substring(1) : e;
       } else if (line.startsWith('data:')) {
         if (dataBuf.isNotEmpty) dataBuf.write('\n');
-        dataBuf.write(line.substring(5).trim());
+        final v = line.substring(5);
+        // SSE 규격: 선행 스페이스 1개만 제거 — LLM 토큰의 앞뒤 공백을 보존한다.
+        dataBuf.write(v.startsWith(' ') ? v.substring(1) : v);
       }
       // 'id:'/'retry:' 등은 P2 범위 밖(필요 시 feature에서 확장).
     }
