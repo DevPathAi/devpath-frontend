@@ -280,21 +280,6 @@ final Map<String, MockFixture> webMockFixtures = {
       'security': <Map<String, dynamic>>[],
     },
   ),
-  // 동기 POST 프로토 폴백(기존 smoke test 호환)
-  'POST /reviews': (
-    200,
-    {
-      'confidence': 78,
-      'strengths': ['main 함수가 간결합니다.', 'print 사용이 적절합니다.'],
-      'improvements': [
-        {'line': 2, 'severity': 'warning', 'message': '예외 처리를 추가하세요.'},
-        {'line': 1, 'severity': 'info', 'message': '함수에 문서 주석을 권장합니다.'},
-      ],
-      'security': [
-        {'severity': 'info', 'message': '외부 입력이 없어 위험이 낮습니다.'},
-      ],
-    },
-  ),
 };
 
 Map<String, dynamic> mockContent(String slug) {
