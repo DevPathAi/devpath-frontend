@@ -112,6 +112,32 @@
 
 - 공통: 모든 mutation·인증 경로는 platform-svc가 JWT를 발급해야 게이트웨이 JWT 검증(`GatewaySecurityConfig`)을 통과. community `similar`는 ai-svc 임베딩 필요(없으면 빈 결과 폴백 — `CommunityController.java:68`).
 
+## 부분 bootRun 스모크 절차
+
+전-스택 상시 구동 없이 화면별로 필요한 서비스만 띄워 실 게이트웨이(`:8080`) 경유로 검증한다.
+
+### 공통 기동
+```bash
+# 1. 인프라 (postgres·pgvector·redis·es·kafka)
+docker compose -f devpath-shared/docker-compose.yml up -d
+# 2. 필요한 서비스만 (각 레포 루트에서)
+cd devpath-gateway && ./gradlew bootRun          # :8080 (항상)
+cd devpath-platform-svc && ./gradlew bootRun     # :8081 (JWT 발급 — 인증 필요 화면 전부)
+cd <대상 svc> && ./gradlew bootRun               # 아래 조합표 참조
+# 3. web 실API 프로파일
+cp apps/web/.env.local.example apps/web/.env.local
+cd apps/web && flutter run -d chrome --dart-define-from-file=.env.local
+```
+
+### T1 화면별 최소 스모크 조합
+| 화면 | 서비스 조합(+인프라) | 확인 동작 |
+|---|---|---|
+| auth | gateway + platform(:8081) | 로그인 → `/auth/refresh`로 access 재발급·세션 유지 (OAuth 실 리다이렉트는 R4 — 조각 1b에서 범위 결정) |
+| community | gateway + platform(:8081) + community(:8086) | 로그인 → `/community` 목록 로드 → 상세 → 작성/투표 (similar는 ai-svc 없으면 빈 결과 폴백) |
+| lcs | gateway + platform(:8081) + lcs(:8087) | 질문 작성 폼 맥락 카드 draft → commit → 상세 답변자 패널(by-question) |
+
+포트는 §게이트웨이 라우트·스펙 §2.4와 일치. 실제 기동·관측은 실행 조각(1b) 스모크에서 수행한다(이 절은 절차 정의).
+
 ## 미결정 / 리스크
 
 - **R1 SSE 와이어**: 백엔드 SSE 엔드포인트(learning `/learning-paths/me/generate`, sandbox `/sandbox/run`, ai `/ai-mentor/sessions`) 실측 미완 — 조각 3 선행. 미구현/미합의면 프론트 단독 완결 불가.
