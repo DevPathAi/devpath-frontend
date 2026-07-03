@@ -211,8 +211,8 @@ final Map<String, MockFixture> webMockFixtures = {
       'renderedFor': 'answerer',
     },
   ),
-  // 대시보드(DASH-001)
-  'GET /dashboard': (
+  // 대시보드(DASH-001) — 백엔드 GET /dashboard/me (DashboardController @GetMapping("/me"))
+  'GET /dashboard/me': (
     200,
     {
       'streakDays': 7,

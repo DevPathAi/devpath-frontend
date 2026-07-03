@@ -58,7 +58,7 @@ void main() {
         ),
       ],
       'GET /learning-paths/me': [(200, mockLearningPath())],
-      'GET /dashboard': [
+      'GET /dashboard/me': [
         (
           200,
           {
@@ -85,7 +85,7 @@ void main() {
     expect(adapter.postBodies, isNotEmpty);
     expect(adapter.postBodies.last, containsPair('dwellSec', 6));
     expect(adapter.count('GET /learning-paths/me'), 1);
-    expect(adapter.count('GET /dashboard'), 1);
+    expect(adapter.count('GET /dashboard/me'), 1);
   });
 
   testWidgets('retry button reloads', (tester) async {
