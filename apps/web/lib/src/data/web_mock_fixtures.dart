@@ -19,6 +19,7 @@ final Map<String, MockFixture> webMockFixtures = {
         'nickname': '지수',
         'role': 'LEARNER',
         'onboardingStatus': 'PENDING',
+        'consentStatus': 'DONE',
       },
     },
   ),

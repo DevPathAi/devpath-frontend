@@ -31,6 +31,7 @@ final Map<String, MockFixture> _userOk = {
       'nickname': '지수',
       'role': 'LEARNER',
       'onboardingStatus': 'DONE',
+      'consentStatus': 'DONE',
     },
   ),
 };
@@ -201,6 +202,7 @@ void main() {
           nickname: '완료된지수',
           role: UserRole.learner,
           onboardingStatus: OnboardingStatus.done,
+          consentStatus: ConsentStatus.done,
         ),
       );
 

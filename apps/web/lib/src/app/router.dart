@@ -18,7 +18,8 @@ import '../features/path/presentation/path_page.dart';
 import '../features/sandbox/presentation/sandbox_page.dart';
 import '../features/shell/presentation/app_shell.dart';
 
-/// 게이트 판정(순수): 미인증→/login, 인증·온보딩미완→/diagnostic, 그 외 통과.
+/// 게이트 판정(순수): 미인증→/login, 인증·동의미완→/consent(온보딩보다 앞),
+/// 인증·온보딩미완→/diagnostic, 그 외 통과.
 /// /auth/callback은 미인증이어도 통과(bootstrapFromCallback 진행 중이므로).
 ///
 /// I-1 정책: [AuthLoading]은 어느 경로에서도 null(보류)을 반환한다.
@@ -42,7 +43,17 @@ String? gateRedirect(AuthState auth, String location) {
     if (atLogin || atDiagnostic) return null; // 비회원 guest 진단 진입 허용
     return '/login';
   }
+  final consentDone = auth.user.consentStatus == ConsentStatus.done;
   final onboardingDone = auth.user.onboardingStatus == OnboardingStatus.done;
+  final atConsent = location == '/consent';
+  // 동의(consent) 게이트가 온보딩(진단)보다 앞선다: 필수 동의 미완이면 /consent로.
+  if (!consentDone) {
+    return atConsent ? null : '/consent';
+  }
+  // 동의 완료 유저가 consent 페이지에 재진입하면 onboarding 게이트로 위임한다.
+  if (atConsent) {
+    return onboardingDone ? '/path' : '/diagnostic';
+  }
   if (!onboardingDone) {
     return atDiagnostic ? null : '/diagnostic'; // 온보딩 게이트 = 진단
   }

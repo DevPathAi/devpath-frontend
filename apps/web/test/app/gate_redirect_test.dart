@@ -3,13 +3,15 @@ import 'package:devpath_web/src/features/auth/state/auth_state.dart';
 import 'package:dp_core/dp_core.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-User _user(OnboardingStatus s) => User(
-  id: 'u',
-  email: 'e@x.com',
-  nickname: 'n',
-  role: UserRole.learner,
-  onboardingStatus: s,
-);
+User _user(OnboardingStatus s, {ConsentStatus consent = ConsentStatus.done}) =>
+    User(
+      id: 'u',
+      email: 'e@x.com',
+      nickname: 'n',
+      role: UserRole.learner,
+      onboardingStatus: s,
+      consentStatus: consent,
+    );
 
 void main() {
   group('gateRedirect', () {
@@ -92,6 +94,66 @@ void main() {
     });
     test('AuthLoading + /diagnostic → null(보류)', () {
       expect(gateRedirect(const AuthLoading(), '/diagnostic'), isNull);
+    });
+
+    // --- Task 4: consent 게이트 (onboarding보다 앞) ---
+    test('인증 + 동의 미완(PENDING) + 보호경로 → /consent', () {
+      expect(
+        gateRedirect(
+          AuthAuthenticated(
+            _user(OnboardingStatus.done, consent: ConsentStatus.pending),
+          ),
+          '/dashboard',
+        ),
+        '/consent',
+      );
+    });
+    test('인증 + 동의 미완 + /consent → 그대로(null)', () {
+      expect(
+        gateRedirect(
+          AuthAuthenticated(
+            _user(OnboardingStatus.done, consent: ConsentStatus.pending),
+          ),
+          '/consent',
+        ),
+        isNull,
+      );
+    });
+    test('인증 + 동의 미완 → consent가 onboarding보다 우선(/consent)', () {
+      // onboarding도 pending이지만 consent 게이트가 앞서므로 /consent로.
+      expect(
+        gateRedirect(
+          AuthAuthenticated(
+            _user(OnboardingStatus.pending, consent: ConsentStatus.pending),
+          ),
+          '/dashboard',
+        ),
+        '/consent',
+      );
+    });
+    test('인증 + 동의 완료 + 온보딩 미완 + /consent → /diagnostic', () {
+      // consent 완료면 /consent에 머무르지 않고 onboarding 게이트(진단)로.
+      expect(
+        gateRedirect(
+          AuthAuthenticated(
+            _user(OnboardingStatus.pending, consent: ConsentStatus.done),
+          ),
+          '/consent',
+        ),
+        '/diagnostic',
+      );
+    });
+    test('인증 + 동의 완료 + 온보딩 완료 + /consent → /path', () {
+      // consent·onboarding 모두 완료면 /consent 접근 시 정상 홈(/path)로.
+      expect(
+        gateRedirect(
+          AuthAuthenticated(
+            _user(OnboardingStatus.done, consent: ConsentStatus.done),
+          ),
+          '/consent',
+        ),
+        '/path',
+      );
     });
   });
 }

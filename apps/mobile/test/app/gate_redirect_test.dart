@@ -9,6 +9,7 @@ User _user({OnboardingStatus onboarding = OnboardingStatus.done}) => User(
   nickname: '지수',
   role: UserRole.learner,
   onboardingStatus: onboarding,
+  consentStatus: ConsentStatus.done,
 );
 
 void main() {
