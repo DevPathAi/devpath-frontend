@@ -7,6 +7,7 @@ import '../features/auth/application/auth_controller.dart';
 import '../features/auth/presentation/auth_callback_page.dart';
 import '../features/auth/presentation/login_page.dart';
 import '../features/auth/state/auth_state.dart';
+import '../features/consent/presentation/consent_page.dart';
 import '../features/content/presentation/content_page.dart';
 import '../features/community/presentation/community_home_page.dart';
 import '../features/community/presentation/qna_detail_page.dart';
@@ -75,6 +76,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         gateRedirect(ref.read(authControllerProvider), state.matchedLocation),
     routes: [
       GoRoute(path: '/login', builder: (_, _) => const LoginPage()),
+      GoRoute(path: '/consent', builder: (_, _) => const ConsentPage()),
       GoRoute(path: '/diagnostic', builder: (_, _) => const DiagnosticPage()),
       // OAuth 콜백: platform이 이 URL로 리다이렉트. bootstrapFromCallback() 호출 후
       // 게이트가 인증 상태에 따라 분기한다.
