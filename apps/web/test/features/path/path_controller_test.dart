@@ -180,4 +180,33 @@ void main() {
     expect(s.phase, PathPhase.failed);
     expect(s.error, 'error');
   });
+
+  test('중간 ApiException(event:error 유래)은 failed로 표면화한다', () async {
+    Stream<SseEvent> emitThenApi() async* {
+      yield SseEvent(
+        event: 'progress',
+        data: jsonEncode({
+          'stage': 'collecting',
+          'progress': 0.15,
+          'message': 'x',
+          'pathId': null,
+        }),
+      );
+      throw const ApiException(
+        code: ApiErrorCode.unknown,
+        message: 'ai-svc path generate failed',
+      );
+    }
+
+    final container = ProviderContainer(
+      overrides: [
+        pathSseConnectProvider.overrideWithValue(() => emitThenApi()),
+      ],
+    );
+    addTearDown(container.dispose);
+    await container.read(pathControllerProvider.notifier).start();
+    final st = container.read(pathControllerProvider);
+    expect(st.phase, PathPhase.failed);
+    expect(st.error, 'ai-svc path generate failed');
+  });
 }
