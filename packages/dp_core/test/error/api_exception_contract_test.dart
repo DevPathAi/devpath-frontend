@@ -48,7 +48,8 @@ void main() {
         'QUOTA_EXCEEDED': ApiErrorCode.quotaExceeded,
         'AI_KILL_SWITCH_ACTIVE': ApiErrorCode.aiKillSwitchActive,
         'SANDBOX_UNAVAILABLE': ApiErrorCode.sandboxUnavailable,
-        'INTERNAL_ERROR': ApiErrorCode.unknown, // 프론트 enum에 INTERNAL_ERROR 없음 → unknown 폴백
+        'INTERNAL_ERROR':
+            ApiErrorCode.unknown, // 프론트 enum에 INTERNAL_ERROR 없음 → unknown 폴백
       };
       wire.forEach((w, expected) {
         expect(ApiErrorCode.fromWire(w), expected, reason: 'wire=$w');

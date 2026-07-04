@@ -334,27 +334,30 @@ void main() {
   // markOnboardingIncomplete()
   // -------------------------------------------------------------------------
   group('markOnboardingIncomplete()', () {
-    test('AuthAuthenticated(done) → onboardingStatus를 pending으로 강등한다', () async {
-      final container = _containerWithAdapter(_DoneUserRefreshAdapter());
-      addTearDown(container.dispose);
-      final ctrl = container.read(authControllerProvider.notifier);
-      await ctrl.bootstrapFromCallback(); // AuthAuthenticated(done)로 만든다
-      expect(
-        (container.read(authControllerProvider) as AuthAuthenticated)
-            .user
-            .onboardingStatus,
-        OnboardingStatus.done,
-      );
+    test(
+      'AuthAuthenticated(done) → onboardingStatus를 pending으로 강등한다',
+      () async {
+        final container = _containerWithAdapter(_DoneUserRefreshAdapter());
+        addTearDown(container.dispose);
+        final ctrl = container.read(authControllerProvider.notifier);
+        await ctrl.bootstrapFromCallback(); // AuthAuthenticated(done)로 만든다
+        expect(
+          (container.read(authControllerProvider) as AuthAuthenticated)
+              .user
+              .onboardingStatus,
+          OnboardingStatus.done,
+        );
 
-      ctrl.markOnboardingIncomplete();
+        ctrl.markOnboardingIncomplete();
 
-      final state = container.read(authControllerProvider);
-      expect(state, isA<AuthAuthenticated>());
-      expect(
-        (state as AuthAuthenticated).user.onboardingStatus,
-        OnboardingStatus.pending,
-      );
-    });
+        final state = container.read(authControllerProvider);
+        expect(state, isA<AuthAuthenticated>());
+        expect(
+          (state as AuthAuthenticated).user.onboardingStatus,
+          OnboardingStatus.pending,
+        );
+      },
+    );
 
     test('비-AuthAuthenticated(AuthLoading) 상태에선 무동작', () {
       final container = ProviderContainer();
@@ -363,7 +366,9 @@ void main() {
       final before = container.read(authControllerProvider);
       expect(before, isA<AuthLoading>());
 
-      container.read(authControllerProvider.notifier).markOnboardingIncomplete();
+      container
+          .read(authControllerProvider.notifier)
+          .markOnboardingIncomplete();
 
       expect(container.read(authControllerProvider), isA<AuthLoading>());
     });
