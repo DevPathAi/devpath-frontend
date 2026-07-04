@@ -28,6 +28,17 @@ class _CapturingApiClient implements ApiClient {
       throw UnimplementedError();
 
   @override
+  Future<T> put<T>(String path, {Object? body, Map<String, dynamic>? query}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<T> delete<T>(
+    String path, {
+    Object? body,
+    Map<String, dynamic>? query,
+  }) => throw UnimplementedError();
+
+  @override
   Stream<SseEvent> sse(String path, {Object? body}) =>
       throw UnimplementedError();
 
