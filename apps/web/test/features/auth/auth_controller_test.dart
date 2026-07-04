@@ -92,6 +92,38 @@ class _MockRefreshAdapter implements HttpClientAdapter {
 }
 
 // ---------------------------------------------------------------------------
+// onboardingStatus=DONE 유저를 반환하는 refresh 어댑터(markOnboardingIncomplete 검증용).
+// ---------------------------------------------------------------------------
+class _DoneUserRefreshAdapter implements HttpClientAdapter {
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    return ResponseBody.fromString(
+      jsonEncode({
+        'access_token': 'test-access-token',
+        'user': {
+          'id': 'u-2',
+          'email': 'done@devpath.ai',
+          'nickname': '완료자',
+          'role': 'LEARNER',
+          'onboardingStatus': 'DONE',
+        },
+      }),
+      200,
+      headers: {
+        Headers.contentTypeHeader: [Headers.jsonContentType],
+      },
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
+// ---------------------------------------------------------------------------
 // 헬퍼: apiClientProvider를 Mock 어댑터로 교체한 ProviderContainer 생성.
 // ---------------------------------------------------------------------------
 ProviderContainer _containerWithAdapter(HttpClientAdapter adapter) {
@@ -296,6 +328,45 @@ void main() {
         );
       },
     );
+  });
+
+  // -------------------------------------------------------------------------
+  // markOnboardingIncomplete()
+  // -------------------------------------------------------------------------
+  group('markOnboardingIncomplete()', () {
+    test('AuthAuthenticated(done) → onboardingStatus를 pending으로 강등한다', () async {
+      final container = _containerWithAdapter(_DoneUserRefreshAdapter());
+      addTearDown(container.dispose);
+      final ctrl = container.read(authControllerProvider.notifier);
+      await ctrl.bootstrapFromCallback(); // AuthAuthenticated(done)로 만든다
+      expect(
+        (container.read(authControllerProvider) as AuthAuthenticated)
+            .user
+            .onboardingStatus,
+        OnboardingStatus.done,
+      );
+
+      ctrl.markOnboardingIncomplete();
+
+      final state = container.read(authControllerProvider);
+      expect(state, isA<AuthAuthenticated>());
+      expect(
+        (state as AuthAuthenticated).user.onboardingStatus,
+        OnboardingStatus.pending,
+      );
+    });
+
+    test('비-AuthAuthenticated(AuthLoading) 상태에선 무동작', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      // build() 직후 microtask 실행 전 → AuthLoading.
+      final before = container.read(authControllerProvider);
+      expect(before, isA<AuthLoading>());
+
+      container.read(authControllerProvider.notifier).markOnboardingIncomplete();
+
+      expect(container.read(authControllerProvider), isA<AuthLoading>());
+    });
   });
 
   // -------------------------------------------------------------------------

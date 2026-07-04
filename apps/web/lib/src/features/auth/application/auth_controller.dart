@@ -82,6 +82,18 @@ class AuthController extends Notifier<AuthState> {
   void onboardingCompleted(User user) {
     if (state is AuthAuthenticated) state = AuthAuthenticated(user);
   }
+
+  /// 서버가 라이브 403 ONBOARDING_INCOMPLETE를 반환하면(캐시된 onboardingStatus와
+  /// 서버 진실 불일치) 온보딩 상태를 pending으로 강등해 게이트를 재평가시킨다.
+  void markOnboardingIncomplete() {
+    final s = state;
+    if (s is AuthAuthenticated &&
+        s.user.onboardingStatus != OnboardingStatus.pending) {
+      state = AuthAuthenticated(
+        s.user.copyWith(onboardingStatus: OnboardingStatus.pending),
+      );
+    }
+  }
 }
 
 final authControllerProvider = NotifierProvider<AuthController, AuthState>(
