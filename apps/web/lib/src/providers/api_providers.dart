@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../app/app_config.dart';
 import '../data/web_mock_fixtures.dart';
+import '../features/auth/application/auth_controller.dart';
+import 'onboarding_gate_interceptor.dart';
 
 final appConfigProvider = Provider<AppConfig>(
   (ref) => AppConfig.fromEnvironment(),
@@ -38,6 +40,18 @@ final apiClientProvider = Provider<ApiClient>((ref) {
         return TokenPair(access: data['access_token'] as String, refresh: '');
       },
       retry: (options) => client.dio.fetch(options),
+    ),
+  );
+
+  // 라이브 403 ONBOARDING_INCOMPLETE → 온보딩 게이트 재평가.
+  // ref.read은 에러 발생 시점(지연)에 실행되므로 build-time 순환 의존이 없다
+  // (AuthInterceptor의 refresh 콜백과 동일 패턴 — auth는 api를 의존하지만
+  //  api는 빌드 시점에 auth를 읽지 않는다).
+  client.dio.interceptors.insert(
+    0,
+    OnboardingGateInterceptor(
+      () =>
+          ref.read(authControllerProvider.notifier).markOnboardingIncomplete(),
     ),
   );
 
