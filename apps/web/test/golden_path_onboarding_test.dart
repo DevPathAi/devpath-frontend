@@ -87,6 +87,21 @@ class _NewUserFirstApiClient implements ApiClient {
       _inner.sse(path, body: body);
 
   @override
+  Future<T> postMultipart<T>(
+    String path, {
+    required List<int> bytes,
+    required String filename,
+    String field = 'file',
+    String? contentType,
+  }) => _inner.postMultipart<T>(
+    path,
+    bytes: bytes,
+    filename: filename,
+    field: field,
+    contentType: contentType,
+  );
+
+  @override
   Dio get dio => _inner.dio;
 }
 

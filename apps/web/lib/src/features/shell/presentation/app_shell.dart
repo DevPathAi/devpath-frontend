@@ -61,6 +61,19 @@ class AppShellView extends StatelessWidget {
               selectedIndex: _index,
               onDestinationSelected: _select,
               labelType: NavigationRailLabelType.all,
+              trailing: Expanded(
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: DpSpacing.md),
+                    child: IconButton(
+                      icon: const Icon(Icons.account_circle),
+                      tooltip: '마이페이지',
+                      onPressed: () => onSelect?.call('/mypage'),
+                    ),
+                  ),
+                ),
+              ),
               destinations: [
                 for (final d in kShellDestinations)
                   NavigationRailDestination(

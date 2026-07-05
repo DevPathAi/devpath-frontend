@@ -17,6 +17,7 @@ import '../features/mentor/presentation/mentor_page.dart';
 import '../features/diagnostic/presentation/diagnostic_page.dart';
 import '../features/path/presentation/path_page.dart';
 import '../features/sandbox/presentation/sandbox_page.dart';
+import '../features/mypage/presentation/mypage_page.dart';
 import '../features/settings/presentation/settings_page.dart';
 import '../features/shell/presentation/app_shell.dart';
 
@@ -113,6 +114,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                 QnaDetailPage(postId: state.pathParameters['id']!),
           ),
           GoRoute(path: '/settings', builder: (_, _) => const SettingsPage()),
+          GoRoute(path: '/mypage', builder: (_, _) => const MyPagePage()),
         ],
       ),
     ],

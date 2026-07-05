@@ -11,6 +11,7 @@ abstract class DashboardSummary with _$DashboardSummary {
     required int progressPercent,
     String? nextTaskTitle,
     @Default(<String>[]) List<String> badges,
+    @Default(0) int completedContentCount,
   }) = _DashboardSummary;
 
   factory DashboardSummary.fromJson(Map<String, dynamic> json) =>
