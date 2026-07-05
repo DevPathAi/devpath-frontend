@@ -10,6 +10,7 @@ const List<ShellDestination> kShellDestinations = [
   (path: '/path', icon: DpIcons.path, label: '경로'),
   (path: '/mentor', icon: DpIcons.mentor, label: '멘토'),
   (path: '/community', icon: DpIcons.community, label: '커뮤니티'),
+  (path: '/settings', icon: DpIcons.settings, label: '설정'),
 ];
 
 /// 라우터 결합 셸: 현재 위치를 읽고 표현부에 위임.

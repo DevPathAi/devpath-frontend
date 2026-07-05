@@ -12,6 +12,7 @@ final Map<String, MockFixture> adminMockFixtures = {
         'nickname': '운영자',
         'role': 'ADMIN',
         'onboardingStatus': 'DONE',
+        'consentStatus': 'DONE',
       },
     },
   ),

@@ -72,6 +72,17 @@ class _NewUserFirstApiClient implements ApiClient {
       _inner.post<T>(path, body: body, query: query);
 
   @override
+  Future<T> put<T>(String path, {Object? body, Map<String, dynamic>? query}) =>
+      _inner.put<T>(path, body: body, query: query);
+
+  @override
+  Future<T> delete<T>(
+    String path, {
+    Object? body,
+    Map<String, dynamic>? query,
+  }) => _inner.delete<T>(path, body: body, query: query);
+
+  @override
   Stream<SseEvent> sse(String path, {Object? body}) =>
       _inner.sse(path, body: body);
 

@@ -23,6 +23,7 @@ class _DoneUserAuthController extends AuthController {
       nickname: '지수',
       role: UserRole.learner,
       onboardingStatus: OnboardingStatus.done,
+      consentStatus: ConsentStatus.done,
     ),
   );
 }

@@ -16,6 +16,7 @@ final Map<String, MockFixture> mobileMockFixtures = {
       'nickname': '지수',
       'role': 'LEARNER',
       'onboardingStatus': 'DONE',
+      'consentStatus': 'DONE',
     },
   ),
   // AuthInterceptor 401 refresh 경로(모바일 토큰-바디 계약, 백엔드 후속).

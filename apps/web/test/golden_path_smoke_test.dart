@@ -26,6 +26,7 @@ class _MockAuthController extends AuthController {
         nickname: '지수',
         role: UserRole.learner,
         onboardingStatus: OnboardingStatus.pending,
+        consentStatus: ConsentStatus.done,
       ),
     );
   }

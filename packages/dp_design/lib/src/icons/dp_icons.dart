@@ -11,6 +11,7 @@ abstract final class DpIcons {
   static const IconData notifications = Symbols.notifications_rounded;
   static const IconData dashboard = Symbols.dashboard_rounded;
   static const IconData content = Symbols.menu_book_rounded;
+  static const IconData settings = Symbols.settings_rounded;
 
   // 상태
   static const IconData killSwitch = Symbols.build_rounded; // 점검 중

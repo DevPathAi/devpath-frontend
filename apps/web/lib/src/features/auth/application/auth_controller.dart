@@ -83,6 +83,11 @@ class AuthController extends Notifier<AuthState> {
     if (state is AuthAuthenticated) state = AuthAuthenticated(user);
   }
 
+  /// 필수 동의 완료로 갱신된 유저 반영(게이트 재평가 트리거 → /consent 벗어남).
+  void markConsentDone(User user) {
+    if (state is AuthAuthenticated) state = AuthAuthenticated(user);
+  }
+
   /// 서버가 라이브 403 ONBOARDING_INCOMPLETE를 반환하면(캐시된 onboardingStatus와
   /// 서버 진실 불일치) 온보딩 상태를 pending으로 강등해 게이트를 재평가시킨다.
   void markOnboardingIncomplete() {

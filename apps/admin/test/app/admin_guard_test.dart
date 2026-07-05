@@ -9,6 +9,7 @@ User _u(UserRole r) => User(
   nickname: 'n',
   role: r,
   onboardingStatus: OnboardingStatus.done,
+  consentStatus: ConsentStatus.done,
 );
 
 void main() {
