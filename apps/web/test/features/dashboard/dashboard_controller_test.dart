@@ -43,6 +43,15 @@ class _CapturingApiClient implements ApiClient {
       throw UnimplementedError();
 
   @override
+  Future<T> postMultipart<T>(
+    String path, {
+    required List<int> bytes,
+    required String filename,
+    String field = 'file',
+    String? contentType,
+  }) => throw UnimplementedError();
+
+  @override
   Dio get dio => throw UnimplementedError();
 }
 

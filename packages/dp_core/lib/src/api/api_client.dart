@@ -105,4 +105,30 @@ class ApiClient {
   /// feature의 `*ConnectProvider`는 `apiClient.sse(path, body: ...)`를 호출한다.
   Stream<SseEvent> sse(String path, {Object? body}) =>
       SseClient(dio).connect(path, body: body);
+
+  /// multipart 업로드(part=[field]). 실패 시 [ApiException] throw.
+  Future<T> postMultipart<T>(
+    String path, {
+    required List<int> bytes,
+    required String filename,
+    String field = 'file',
+    String? contentType,
+  }) async {
+    final form = FormData.fromMap({
+      field: MultipartFile.fromBytes(
+        bytes,
+        filename: filename,
+        contentType:
+            contentType == null ? null : DioMediaType.parse(contentType),
+      ),
+    });
+    try {
+      final res = await dio.post<T>(path, data: form);
+      return res.data as T;
+    } on DioException catch (e) {
+      throw (e.error is ApiException)
+          ? e.error as ApiException
+          : ApiException.fromDio(e);
+    }
+  }
 }
