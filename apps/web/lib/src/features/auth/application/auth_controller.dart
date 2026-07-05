@@ -26,9 +26,11 @@ class AuthController extends Notifier<AuthState> {
 
   /// GitHub OAuth 흐름 시작: 브라우저를 gateway OAuth 엔드포인트로 리다이렉트.
   /// 실제 리다이렉트는 [oauthLauncherProvider]에 위임(테스트에서 Fake로 교체 가능).
-  Future<void> login() async {
+  Future<void> login({String provider = 'github'}) async {
     final base = ref.read(appConfigProvider).baseUrl;
-    ref.read(oauthLauncherProvider).launch('$base/oauth2/authorization/github');
+    ref
+        .read(oauthLauncherProvider)
+        .launch('$base/oauth2/authorization/$provider');
   }
 
   /// 앱 시작 세션 복원: POST /auth/refresh(HttpOnly 쿠키, 본문 없음) → access 저장

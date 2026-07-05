@@ -72,6 +72,17 @@ class LoginPage extends ConsumerWidget {
                       : ref.read(authControllerProvider.notifier).login(),
                   child: Text(useMock ? 'GitHub로 계속하기 (목)' : 'GitHub로 계속하기'),
                 ),
+                const SizedBox(height: DpSpacing.sm),
+                OutlinedButton(
+                  onPressed: () => useMock
+                      ? ref
+                            .read(authControllerProvider.notifier)
+                            .bootstrapFromCallback()
+                      : ref
+                            .read(authControllerProvider.notifier)
+                            .login(provider: 'google'),
+                  child: Text(useMock ? 'Google로 계속하기 (목)' : 'Google로 계속하기'),
+                ),
               ],
             ),
           ),
