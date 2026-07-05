@@ -93,14 +93,13 @@ class _NewUserFirstApiClient implements ApiClient {
     required String filename,
     String field = 'file',
     String? contentType,
-  }) =>
-      _inner.postMultipart<T>(
-        path,
-        bytes: bytes,
-        filename: filename,
-        field: field,
-        contentType: contentType,
-      );
+  }) => _inner.postMultipart<T>(
+    path,
+    bytes: bytes,
+    filename: filename,
+    field: field,
+    contentType: contentType,
+  );
 
   @override
   Dio get dio => _inner.dio;
