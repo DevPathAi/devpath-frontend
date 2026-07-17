@@ -63,6 +63,22 @@ class UsersController extends Notifier<UsersState> {
           body: {'action': action},
         );
   }
+
+  /// 베타 대기(BETA_PENDING) 사용자를 승인한다 — POST /admin/users/{id}/approve (204).
+  /// 승인 후 목록을 갱신해 해당 사용자가 필터에서 빠지도록 load()를 재호출한다.
+  Future<void> approve(String userId) async {
+    await ref
+        .read(apiClientProvider)
+        .post<void>('/admin/users/$userId/approve');
+    await load();
+  }
+
+  /// 이메일을 허용 목록에 사전 등록한다 — POST /admin/allowlist {email} (204).
+  Future<void> preApprove(String email) async {
+    await ref
+        .read(apiClientProvider)
+        .post<void>('/admin/allowlist', body: {'email': email});
+  }
 }
 
 final adminUsersProvider = NotifierProvider<UsersController, UsersState>(
