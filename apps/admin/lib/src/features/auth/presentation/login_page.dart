@@ -30,7 +30,13 @@ class AdminLoginPage extends ConsumerWidget {
               const SizedBox(height: DpSpacing.xl),
               FilledButton(
                 onPressed: () => ref.read(adminAuthProvider.notifier).login(),
-                child: const Text('관리자 로그인 (목)'),
+                child: const Text('GitHub로 관리자 로그인'),
+              ),
+              const SizedBox(height: DpSpacing.sm),
+              OutlinedButton(
+                onPressed: () =>
+                    ref.read(adminAuthProvider.notifier).login(provider: 'google'),
+                child: const Text('Google로 관리자 로그인'),
               ),
             ],
           ),

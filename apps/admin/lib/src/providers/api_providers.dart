@@ -31,6 +31,8 @@ final apiClientProvider = Provider<ApiClient>((ref) {
     ),
   );
 
+  client.dio.options.extra['withCredentials'] = true;
+
   if (config.useMock) {
     client.dio.httpClientAdapter = MockHttpAdapter(adminMockFixtures);
   }
