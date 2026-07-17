@@ -43,6 +43,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  dio: ^5.0.0                 # 테스트가 HttpClientAdapter/ResponseBody 등 dio 타입을 직접 사용(web 앱 패턴)
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

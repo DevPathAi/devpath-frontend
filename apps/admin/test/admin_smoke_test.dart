@@ -1,7 +1,6 @@
 import 'package:devpath_admin/src/app/app.dart';
 import 'package:devpath_admin/src/features/auth/application/oauth_launcher.dart';
 import 'package:devpath_admin/src/features/auth/presentation/login_page.dart';
-import 'package:devpath_admin/src/providers/api_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
