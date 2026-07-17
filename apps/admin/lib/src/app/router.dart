@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/auth/application/auth_controller.dart';
+import '../features/auth/presentation/auth_callback_page.dart';
 import '../features/auth/presentation/login_page.dart';
 import '../features/auth/state/auth_state.dart';
 import '../features/dashboard/presentation/dashboard_page.dart';
@@ -10,12 +11,13 @@ import '../features/reports/presentation/reports_page.dart';
 import '../features/shell/presentation/admin_shell.dart';
 import '../features/users/presentation/users_page.dart';
 
-/// 가드: 미인증→/login, 비관리자→/forbidden, 관리자가 /login이면→/dashboard.
+/// 가드: 미인증→/login, 비관리자→/forbidden, 관리자가 /login|/auth/callback이면→/dashboard.
 String? adminGuard(AdminAuthState auth, String location) {
   final atLogin = location == '/login';
-  if (auth is! AdminAuthed) return atLogin ? null : '/login';
+  final atCallback = location == '/auth/callback';
+  if (auth is! AdminAuthed) return (atLogin || atCallback) ? null : '/login';
   if (!auth.isAdmin) return location == '/forbidden' ? null : '/forbidden';
-  if (atLogin) return '/dashboard';
+  if (atLogin || atCallback) return '/dashboard';
   return null;
 }
 
@@ -31,6 +33,10 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
         adminGuard(ref.read(adminAuthProvider), state.matchedLocation),
     routes: [
       GoRoute(path: '/login', builder: (_, _) => const AdminLoginPage()),
+      GoRoute(
+        path: '/auth/callback',
+        builder: (_, _) => const AdminAuthCallbackPage(),
+      ),
       GoRoute(
         path: '/forbidden',
         builder: (_, _) => const Scaffold(
