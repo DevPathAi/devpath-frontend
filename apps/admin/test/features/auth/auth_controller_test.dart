@@ -14,11 +14,14 @@ class _FakeLauncher implements OAuthLauncher {
 void main() {
   test('login() OAuth 런처를 호출하고 client_type=admin URL을 전달', () async {
     final fake = _FakeLauncher();
-    final c = ProviderContainer(overrides: [
-      oauthLauncherProvider.overrideWithValue(fake),
-      appConfigProvider.overrideWithValue(
-        const AppConfig(baseUrl: 'https://api.test', useMock: false)),
-    ]);
+    final c = ProviderContainer(
+      overrides: [
+        oauthLauncherProvider.overrideWithValue(fake),
+        appConfigProvider.overrideWithValue(
+          const AppConfig(baseUrl: 'https://api.test', useMock: false),
+        ),
+      ],
+    );
     addTearDown(c.dispose);
 
     await c.read(adminAuthProvider.notifier).login();
@@ -31,11 +34,14 @@ void main() {
 
   test('login(provider: google) Google OAuth URL을 전달', () async {
     final fake = _FakeLauncher();
-    final c = ProviderContainer(overrides: [
-      oauthLauncherProvider.overrideWithValue(fake),
-      appConfigProvider.overrideWithValue(
-        const AppConfig(baseUrl: 'https://api.test', useMock: false)),
-    ]);
+    final c = ProviderContainer(
+      overrides: [
+        oauthLauncherProvider.overrideWithValue(fake),
+        appConfigProvider.overrideWithValue(
+          const AppConfig(baseUrl: 'https://api.test', useMock: false),
+        ),
+      ],
+    );
     addTearDown(c.dispose);
 
     await c.read(adminAuthProvider.notifier).login(provider: 'google');

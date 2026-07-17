@@ -20,12 +20,15 @@ class AdminAuthController extends Notifier<AdminAuthState> {
   /// + User 파싱 → AdminAuthed. 실패 시 AdminUnauthed(error).
   Future<void> bootstrapFromCallback() async {
     try {
-      final data = await ref.read(apiClientProvider)
+      final data = await ref
+          .read(apiClientProvider)
           .post<Map<String, dynamic>>('/auth/refresh');
-      await ref.read(tokenStoreProvider)
+      await ref
+          .read(tokenStoreProvider)
           .save(access: data['access_token'] as String, refresh: '');
       state = AdminAuthed(
-        User.fromJson((data['user'] as Map).cast<String, dynamic>()));
+        User.fromJson((data['user'] as Map).cast<String, dynamic>()),
+      );
     } on ApiException catch (e) {
       state = AdminUnauthed(error: e.message);
     } catch (_) {

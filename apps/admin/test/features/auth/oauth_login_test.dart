@@ -14,15 +14,21 @@ class _FakeLauncher implements OAuthLauncher {
 void main() {
   test('login() launches OAuth with client_type=admin', () async {
     final fake = _FakeLauncher();
-    final container = ProviderContainer(overrides: [
-      oauthLauncherProvider.overrideWithValue(fake),
-      appConfigProvider.overrideWithValue(
-        const AppConfig(baseUrl: 'https://api.test', useMock: false)),
-    ]);
+    final container = ProviderContainer(
+      overrides: [
+        oauthLauncherProvider.overrideWithValue(fake),
+        appConfigProvider.overrideWithValue(
+          const AppConfig(baseUrl: 'https://api.test', useMock: false),
+        ),
+      ],
+    );
     addTearDown(container.dispose);
 
     await container.read(adminAuthProvider.notifier).login();
 
-    expect(fake.launched, 'https://api.test/oauth2/authorization/github?client_type=admin');
+    expect(
+      fake.launched,
+      'https://api.test/oauth2/authorization/github?client_type=admin',
+    );
   });
 }

@@ -33,6 +33,9 @@ void main() {
     // GitHub 버튼 탭 → OAuth 런처 호출 확인
     await tester.tap(find.text('GitHub로 관리자 로그인'));
     await tester.pumpAndSettle();
-    expect(fake.launched, contains('/oauth2/authorization/github?client_type=admin'));
+    expect(
+      fake.launched,
+      contains('/oauth2/authorization/github?client_type=admin'),
+    );
   });
 }

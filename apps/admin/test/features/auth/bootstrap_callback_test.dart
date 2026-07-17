@@ -76,24 +76,26 @@ ProviderContainer _containerWithAdapter(HttpClientAdapter adapter) {
 
 void main() {
   group('bootstrapFromCallback()', () {
-    test('POST /auth/refresh 성공(role=ADMIN) 시 AdminAuthed로 전이하고 isAdmin이 true다',
-        () async {
-      final container = _containerWithAdapter(
-        _MockRefreshAdapter(statusCode: 200),
-      );
-      addTearDown(container.dispose);
+    test(
+      'POST /auth/refresh 성공(role=ADMIN) 시 AdminAuthed로 전이하고 isAdmin이 true다',
+      () async {
+        final container = _containerWithAdapter(
+          _MockRefreshAdapter(statusCode: 200),
+        );
+        addTearDown(container.dispose);
 
-      await container
-          .read(adminAuthProvider.notifier)
-          .bootstrapFromCallback();
+        await container
+            .read(adminAuthProvider.notifier)
+            .bootstrapFromCallback();
 
-      final state = container.read(adminAuthProvider);
-      expect(state, isA<AdminAuthed>());
-      final auth = state as AdminAuthed;
-      expect(auth.user.id, 'admin-1');
-      expect(auth.user.nickname, '운영자');
-      expect(auth.isAdmin, isTrue);
-    });
+        final state = container.read(adminAuthProvider);
+        expect(state, isA<AdminAuthed>());
+        final auth = state as AdminAuthed;
+        expect(auth.user.id, 'admin-1');
+        expect(auth.user.nickname, '운영자');
+        expect(auth.isAdmin, isTrue);
+      },
+    );
 
     test('POST /auth/refresh 성공 시 access_token이 TokenStore에 저장된다', () async {
       final container = _containerWithAdapter(
@@ -101,29 +103,26 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      await container
-          .read(adminAuthProvider.notifier)
-          .bootstrapFromCallback();
+      await container.read(adminAuthProvider.notifier).bootstrapFromCallback();
 
       final stored = await container.read(tokenStoreProvider).readAccess();
       expect(stored, 'admin-access-token');
     });
 
-    test('POST /auth/refresh 실패(401/ApiException) 시 AdminUnauthed로 전이한다',
-        () async {
-      final container = _containerWithAdapter(
-        _MockRefreshAdapter(statusCode: 401),
-      );
-      addTearDown(container.dispose);
+    test(
+      'POST /auth/refresh 실패(401/ApiException) 시 AdminUnauthed로 전이한다',
+      () async {
+        final container = _containerWithAdapter(
+          _MockRefreshAdapter(statusCode: 401),
+        );
+        addTearDown(container.dispose);
 
-      await container
-          .read(adminAuthProvider.notifier)
-          .bootstrapFromCallback();
+        await container
+            .read(adminAuthProvider.notifier)
+            .bootstrapFromCallback();
 
-      expect(
-        container.read(adminAuthProvider),
-        isA<AdminUnauthed>(),
-      );
-    });
+        expect(container.read(adminAuthProvider), isA<AdminUnauthed>());
+      },
+    );
   });
 }

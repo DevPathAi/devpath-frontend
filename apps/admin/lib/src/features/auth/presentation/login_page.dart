@@ -34,8 +34,9 @@ class AdminLoginPage extends ConsumerWidget {
               ),
               const SizedBox(height: DpSpacing.sm),
               OutlinedButton(
-                onPressed: () =>
-                    ref.read(adminAuthProvider.notifier).login(provider: 'google'),
+                onPressed: () => ref
+                    .read(adminAuthProvider.notifier)
+                    .login(provider: 'google'),
                 child: const Text('Google로 관리자 로그인'),
               ),
             ],
