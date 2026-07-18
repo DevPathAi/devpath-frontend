@@ -90,17 +90,15 @@ if (!betaGate.admit(user)) {
 
 ### 5.2 `BetaPendingPage` (신규, `features/beta/presentation/beta_pending_page.dart`)
 - 안내 문구: 대기자 명단 등록됨 / 승인되면 이메일 통보 / 승인 시 자동 입장.
-- `Timer.periodic(Duration(seconds: 5))` → `ApiClient.getBetaStatus()`:
+- `Timer.periodic(Duration(seconds: 5))` → `apiClient.get<Map>('/beta/status')` + `BetaStatus.fromJson`:
   - `APPROVED` → 타이머 취소 후 `authController.login(provider)`(provider 없으면 `/login` 이동).
   - `PENDING` → 계속 폴링(대기 상태 유지).
   - `EXPIRED` → 타이머 취소, "다시 로그인" 버튼 노출(→ `/login`).
 - `dispose`에서 타이머 취소(누수 방지). 위젯 상태이므로 `ConsumerStatefulWidget`.
 
 ### 5.3 dp_core
-- `ApiClient.getBetaStatus() → Future<BetaStatus>`: `GET /beta/status`(쿠키 자동 동봉, withCredentials).
-- 모델 `BetaStatus { BetaStatusKind status; String? provider; }`, `enum BetaStatusKind { pending, approved, expired }`.
-- **fake 파급**: `implements ApiClient` 하는 apps/web fake 2곳(dashboard_controller_test·golden_path_onboarding_test 등)에
-  override 추가(기존 교훈 ②⑮ — 확장 전 `grep "implements ApiClient"` 선점검).
+- 모델 `BetaStatus { BetaStatusKind status; String? provider; }`, `enum BetaStatusKind { pending, approved, expired }` + `BetaStatus.fromJson`. dp_core.dart export.
+- 조회는 **기존 dashboard 패턴**대로 페이지가 `apiClient.get<Map>('/beta/status')`(withCredentials로 쿠키 자동 동봉) 호출 후 `BetaStatus.fromJson` 파싱. `ApiClient`에 도메인 메서드를 추가하지 않으므로 **fake override 파급 없음**(위젯테스트는 자체 fake의 `get`만 스텁).
 
 ## 6. 엣지 / 에러 처리
 
