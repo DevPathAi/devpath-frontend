@@ -19,6 +19,7 @@ export 'src/models/code_review.dart';
 export 'src/models/dashboard_summary.dart';
 export 'src/models/profile_view.dart';
 export 'src/models/my_activity.dart';
+export 'src/models/beta_status.dart';
 export 'src/models/community_post.dart';
 export 'src/models/lcs_snapshot.dart';
 export 'src/models/assessment.dart';
