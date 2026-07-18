@@ -7,6 +7,7 @@ import '../features/auth/application/auth_controller.dart';
 import '../features/auth/presentation/auth_callback_page.dart';
 import '../features/auth/presentation/login_page.dart';
 import '../features/auth/state/auth_state.dart';
+import '../features/beta/presentation/beta_pending_page.dart';
 import '../features/consent/presentation/consent_page.dart';
 import '../features/content/presentation/content_page.dart';
 import '../features/community/presentation/community_home_page.dart';
@@ -41,11 +42,15 @@ String? gateRedirect(AuthState auth, String location) {
 
   final atLogin = location == '/login';
   final atDiagnostic = location == '/diagnostic';
+  final atBetaPending = location == '/beta-pending';
 
   if (auth is! AuthAuthenticated) {
-    if (atLogin || atDiagnostic) return null; // 비회원 guest 진단 진입 허용
+    // 비회원 guest 진단 진입 + 미승인자 대기 페이지(/beta-pending) 허용.
+    if (atLogin || atDiagnostic || atBetaPending) return null;
     return '/login';
   }
+  // 인증(토큰 보유=승인)된 유저가 대기 페이지에 오면 정상 게이트로 흡수.
+  if (atBetaPending) return '/dashboard';
   final consentDone = auth.user.consentStatus == ConsentStatus.done;
   final onboardingDone = auth.user.onboardingStatus == OnboardingStatus.done;
   final atConsent = location == '/consent';
@@ -78,6 +83,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         gateRedirect(ref.read(authControllerProvider), state.matchedLocation),
     routes: [
       GoRoute(path: '/login', builder: (_, _) => const LoginPage()),
+      GoRoute(
+        path: '/beta-pending',
+        builder: (_, _) => const BetaPendingPage(),
+      ),
       GoRoute(path: '/consent', builder: (_, _) => const ConsentPage()),
       GoRoute(path: '/diagnostic', builder: (_, _) => const DiagnosticPage()),
       // OAuth 콜백: platform이 이 URL로 리다이렉트. bootstrapFromCallback() 호출 후

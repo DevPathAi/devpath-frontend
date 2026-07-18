@@ -66,6 +66,21 @@ void main() {
     test('미인증 + /diagnostic → 통과(null) — guest 진단 진입 허용', () {
       expect(gateRedirect(const AuthUnauthenticated(), '/diagnostic'), isNull);
     });
+    test('미인증 + /beta-pending → 통과(null) — 미승인자 대기 허용', () {
+      expect(
+        gateRedirect(const AuthUnauthenticated(), '/beta-pending'),
+        isNull,
+      );
+    });
+    test('인증(완료) + /beta-pending → /dashboard 흡수', () {
+      expect(
+        gateRedirect(
+          AuthAuthenticated(_user(OnboardingStatus.done)),
+          '/beta-pending',
+        ),
+        '/dashboard',
+      );
+    });
     test('미인증 + /auth/callback → 통과(null) — bootstrapFromCallback 진행 중', () {
       expect(
         gateRedirect(const AuthUnauthenticated(), '/auth/callback'),
