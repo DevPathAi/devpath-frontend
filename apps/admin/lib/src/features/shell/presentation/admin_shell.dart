@@ -8,6 +8,7 @@ const List<AdminDestination> kAdminDestinations = [
   (path: '/dashboard', icon: DpIcons.dashboard, label: '대시보드'),
   (path: '/users', icon: DpIcons.community, label: '사용자'),
   (path: '/reports', icon: DpIcons.error, label: '신고'),
+  (path: '/ads', icon: DpIcons.ads, label: '광고'),
 ];
 
 class AdminShell extends StatelessWidget {
