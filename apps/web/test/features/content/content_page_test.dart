@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:devpath_web/src/data/web_mock_fixtures.dart';
+import 'package:devpath_web/src/features/ads/data/ads_source.dart';
 import 'package:devpath_web/src/features/content/presentation/content_page.dart';
 import 'package:devpath_web/src/providers/api_providers.dart';
 import 'package:dio/dio.dart';
@@ -129,7 +130,11 @@ Widget _host(_SequenceAdapter adapter) {
   );
 
   return ProviderScope(
-    overrides: [apiClientProvider.overrideWithValue(client)],
+    overrides: [
+      apiClientProvider.overrideWithValue(client),
+      // 광고 위젯은 이 테스트 범위 밖 — 네트워크 미실행(fail-silent null).
+      adFetchProvider.overrideWithValue((slot) async => null),
+    ],
     child: MaterialApp.router(theme: DpTheme.light(), routerConfig: router),
   );
 }
