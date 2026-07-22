@@ -45,6 +45,7 @@ dependencies:
   go_router: ^14.6.0          # 하한 가이드 — bootstrap 결과로 확정
   web: ^1.1.0                 # Monaco 임베드(DOM) 용. bootstrap 결과로 확정
   dio: ^5.0.0                 # OnboardingGateInterceptor(프로덕션 lib)·테스트가 dio 타입/HttpClientAdapter를 직접 사용
+  visibility_detector: ^0.4.0+2
 
 dev_dependencies:
   flutter_test:
