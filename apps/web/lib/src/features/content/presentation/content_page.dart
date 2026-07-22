@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import '../application/content_controller.dart';
 import '../application/content_progress_tracker.dart';
 import '../state/content_state.dart';
+import '../../ads/presentation/ad_slot_widget.dart';
 import '../../dashboard/application/dashboard_controller.dart';
 import '../../path/application/path_controller.dart';
 import '../../../providers/api_providers.dart';
@@ -263,6 +264,8 @@ class _ContentBody extends StatelessWidget {
               ],
               const SizedBox(height: DpSpacing.xl),
               DpMarkdown(data: content.markdown),
+              const SizedBox(height: DpSpacing.lg),
+              const AdSlotWidget(slot: 'CONTENT_PAGE'),
             ],
           ),
         ),
