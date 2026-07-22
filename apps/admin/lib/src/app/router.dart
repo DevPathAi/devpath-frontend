@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../features/auth/application/auth_controller.dart';
 import '../features/auth/presentation/auth_callback_page.dart';
 import '../features/auth/presentation/login_page.dart';
+import '../features/ads/presentation/ads_page.dart';
 import '../features/auth/state/auth_state.dart';
 import '../features/dashboard/presentation/dashboard_page.dart';
 import '../features/reports/presentation/reports_page.dart';
@@ -52,6 +53,7 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(path: '/users', builder: (_, _) => const AdminUsersPage()),
           GoRoute(path: '/reports', builder: (_, _) => const ReportsPage()),
+          GoRoute(path: '/ads', builder: (_, _) => const AdminAdsPage()),
         ],
       ),
     ],
