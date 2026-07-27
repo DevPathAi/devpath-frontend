@@ -49,10 +49,14 @@ class _ConsentPageState extends ConsumerState<ConsentPage> {
     for (final k in _ConsentKind.values) k: false,
   };
   final TextEditingController _birthYear = TextEditingController();
+  final FocusNode _birthYearFocus = FocusNode();
+  String? _yearError;
+  String? _requiredError;
 
   @override
   void dispose() {
     _birthYear.dispose();
+    _birthYearFocus.dispose();
     super.dispose();
   }
 
@@ -60,18 +64,37 @@ class _ConsentPageState extends ConsumerState<ConsentPage> {
       .where((k) => k.required)
       .every((k) => _agreed[k] == true);
 
-  int? get _year => int.tryParse(_birthYear.text.trim());
+  /// 전각 숫자(０-９)를 반각으로 정규화한 뒤 4자리 연도로 파싱한다.
+  /// IME 전각 모드 입력을 조용히 버리지 않기 위한 내성 처리.
+  int? get _year {
+    final normalized = _birthYear.text.trim().replaceAllMapped(
+      RegExp('[０-９]'),
+      (m) => String.fromCharCode(m.group(0)!.codeUnitAt(0) - 0xFF10 + 0x30),
+    );
+    if (!RegExp(r'^\d{4}$').hasMatch(normalized)) return null;
+    return int.tryParse(normalized);
+  }
 
-  bool get _canSubmit => _requiredAllChecked && _year != null;
-
-  void _submit() {
+  /// 버튼은 항상 활성 — 미충족 항목은 비활성 대신 명시적 에러로 안내한다.
+  /// (조용한 비활성 버튼은 사용자가 원인을 알 수 없이 갇히는 사고를 냈음: 2026-07-27)
+  void _submitPressed() {
+    final requiredOk = _requiredAllChecked;
+    final year = _year;
+    setState(() {
+      _requiredError = requiredOk ? null : '필수 항목(이용약관·개인정보)에 모두 동의해 주세요.';
+      _yearError = year != null ? null : '출생 연도 4자리를 숫자로 입력해 주세요 (예: 1995)';
+    });
+    if (!requiredOk || year == null) {
+      if (year == null) _birthYearFocus.requestFocus();
+      return;
+    }
     final items = <ConsentSubmitItem>[
       for (final k in _ConsentKind.values)
         (type: k.wire, agreed: _agreed[k] ?? false),
     ];
     ref
         .read(consentControllerProvider.notifier)
-        .submit(items: items, birthYear: _year!);
+        .submit(items: items, birthYear: year);
   }
 
   @override
@@ -102,17 +125,20 @@ class _ConsentPageState extends ConsumerState<ConsentPage> {
                 const Divider(height: DpSpacing.xl),
                 TextField(
                   controller: _birthYear,
+                  focusNode: _birthYearFocus,
                   keyboardType: TextInputType.number,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    LengthLimitingTextInputFormatter(4),
-                  ],
-                  decoration: const InputDecoration(
+                  // digitsOnly 라이브 필터는 IME 조합(한글·전각) 입력을 조용히
+                  // 삼킬 수 있어 제거 — 검증은 제출 시 _year 파싱으로 수행한다.
+                  inputFormatters: [LengthLimitingTextInputFormatter(4)],
+                  decoration: InputDecoration(
                     labelText: '출생 연도 (필수)',
                     hintText: '예: 2000',
                     helperText: '만 14세 미만은 가입할 수 없습니다.',
+                    errorText: _yearError,
                   ),
-                  onChanged: (_) => setState(() {}),
+                  onChanged: (_) => setState(() {
+                    if (_year != null) _yearError = null;
+                  }),
                 ),
                 const SizedBox(height: DpSpacing.lg),
                 Text(
@@ -132,9 +158,18 @@ class _ConsentPageState extends ConsumerState<ConsentPage> {
                     ).textTheme.bodySmall?.copyWith(color: c.danger),
                   ),
                 ],
+                if (_requiredError != null) ...[
+                  const SizedBox(height: DpSpacing.md),
+                  Text(
+                    _requiredError!,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: c.danger),
+                  ),
+                ],
                 const SizedBox(height: DpSpacing.xl),
                 FilledButton(
-                  onPressed: _canSubmit && !submitting ? _submit : null,
+                  onPressed: submitting ? null : _submitPressed,
                   child: submitting
                       ? const SizedBox(
                           height: 20,
