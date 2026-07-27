@@ -27,11 +27,27 @@ final tokenStoreProvider = Provider<TokenStore>(
   (ref) => SecureStorageTokenStore(ref.watch(keyValueStoreProvider)),
 );
 
+/// refresh/재시도 전용 클라이언트 — **AuthInterceptor를 절대 장착하지 않는다.**
+/// QueuedInterceptor의 onError 안에서 같은 dio로 /auth/refresh를 재호출하면
+/// refresh 401 시 에러 콜백이 자기 큐를 기다리는 교착이 된다(웹 무인증 부팅 무한
+/// 스피너, 2026-07-27 운영 실측 — 모바일도 만료 refresh 콜드부트에서 동일 위험).
+final authFlowClientProvider = Provider<ApiClient>((ref) {
+  final config = ref.watch(appConfigProvider);
+  final client = ApiClient.create(
+    ApiConfig(baseUrl: config.baseUrl, useMock: config.useMock),
+  );
+  if (config.useMock) {
+    client.dio.httpClientAdapter = MockHttpAdapter(mobileMockFixtures);
+  }
+  return client;
+});
+
 /// dp_core ApiClient + 모바일 토큰 기반 401 refresh 인터셉터.
 /// 목 모드면 [MockHttpAdapter]를 장착한다(웹과 동일 패턴).
 final apiClientProvider = Provider<ApiClient>((ref) {
   final config = ref.watch(appConfigProvider);
   final store = ref.watch(tokenStoreProvider);
+  final authFlow = ref.watch(authFlowClientProvider);
   final client = ApiClient.create(
     ApiConfig(baseUrl: config.baseUrl, useMock: config.useMock),
   );
@@ -43,7 +59,7 @@ final apiClientProvider = Provider<ApiClient>((ref) {
       // 모바일: 저장된 refresh 토큰을 바디로 전송(백엔드 토큰-바디 계약, 후속).
       refresh: (refreshToken) async {
         if (refreshToken == null || refreshToken.isEmpty) return null;
-        final data = await client.post<Map<String, dynamic>>(
+        final data = await authFlow.post<Map<String, dynamic>>(
           '/auth/refresh',
           body: {'refresh_token': refreshToken},
         );
@@ -52,7 +68,7 @@ final apiClientProvider = Provider<ApiClient>((ref) {
           refresh: (data['refresh_token'] as String?) ?? refreshToken,
         );
       },
-      retry: (options) => client.dio.fetch(options),
+      retry: (options) => authFlow.dio.fetch(options),
     ),
   );
 

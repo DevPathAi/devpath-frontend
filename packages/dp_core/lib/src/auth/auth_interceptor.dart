@@ -46,10 +46,10 @@ class AuthInterceptor extends QueuedInterceptor {
     final currentAccess = await store.readAccess();
     final usedAuth = err.requestOptions.headers['Authorization'] as String?;
 
-    // 다른 요청이 이미 토큰을 교체했다면(요청이 쓴 토큰 != 현재 토큰) refresh 없이 재시도.
-    if (usedAuth != null &&
-        currentAccess != null &&
-        usedAuth != 'Bearer $currentAccess') {
+    // 다른 요청/부트스트랩이 이미 유효 토큰을 확보했다면(요청이 쓴 토큰 != 현재 토큰)
+    // refresh 없이 현재 토큰으로 재시도한다. 무토큰 발사(usedAuth==null) 요청도 포함 —
+    // 부팅 직후 선발사 요청의 401마다 refresh를 추가 발사(불필요한 회전)하지 않기 위함.
+    if (currentAccess != null && usedAuth != 'Bearer $currentAccess') {
       try {
         final req = err.requestOptions
           ..headers['Authorization'] = 'Bearer $currentAccess';
