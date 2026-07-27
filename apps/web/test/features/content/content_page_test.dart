@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:devpath_web/src/data/web_mock_fixtures.dart';
+import 'package:devpath_web/src/features/ads/data/ads_source.dart';
 import 'package:devpath_web/src/features/content/presentation/content_page.dart';
 import 'package:devpath_web/src/providers/api_providers.dart';
 import 'package:dio/dio.dart';
@@ -58,7 +59,7 @@ void main() {
         ),
       ],
       'GET /learning-paths/me': [(200, mockLearningPath())],
-      'GET /dashboard': [
+      'GET /dashboard/me': [
         (
           200,
           {
@@ -85,7 +86,7 @@ void main() {
     expect(adapter.postBodies, isNotEmpty);
     expect(adapter.postBodies.last, containsPair('dwellSec', 6));
     expect(adapter.count('GET /learning-paths/me'), 1);
-    expect(adapter.count('GET /dashboard'), 1);
+    expect(adapter.count('GET /dashboard/me'), 1);
   });
 
   testWidgets('retry button reloads', (tester) async {
@@ -129,7 +130,11 @@ Widget _host(_SequenceAdapter adapter) {
   );
 
   return ProviderScope(
-    overrides: [apiClientProvider.overrideWithValue(client)],
+    overrides: [
+      apiClientProvider.overrideWithValue(client),
+      // 광고 위젯은 이 테스트 범위 밖 — 네트워크 미실행(fail-silent null).
+      adFetchProvider.overrideWithValue((slot) async => null),
+    ],
     child: MaterialApp.router(theme: DpTheme.light(), routerConfig: router),
   );
 }

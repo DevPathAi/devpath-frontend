@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../ads/presentation/ad_slot_widget.dart';
 import '../application/dashboard_controller.dart';
 import '../state/dashboard_state.dart';
 
@@ -64,6 +65,8 @@ class _Body extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(DpSpacing.lg),
       children: [
+        // 0) 광고(베타 무료기간, fail-silent)
+        const AdSlotWidget(slot: 'DASHBOARD_TOP'),
         // 1) 스트릭
         card(
           Row(

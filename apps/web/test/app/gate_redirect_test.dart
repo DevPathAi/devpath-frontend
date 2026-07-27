@@ -3,13 +3,15 @@ import 'package:devpath_web/src/features/auth/state/auth_state.dart';
 import 'package:dp_core/dp_core.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-User _user(OnboardingStatus s) => User(
-  id: 'u',
-  email: 'e@x.com',
-  nickname: 'n',
-  role: UserRole.learner,
-  onboardingStatus: s,
-);
+User _user(OnboardingStatus s, {ConsentStatus consent = ConsentStatus.done}) =>
+    User(
+      id: 'u',
+      email: 'e@x.com',
+      nickname: 'n',
+      role: UserRole.learner,
+      onboardingStatus: s,
+      consentStatus: consent,
+    );
 
 void main() {
   group('gateRedirect', () {
@@ -52,15 +54,6 @@ void main() {
         isNull,
       );
     });
-    test('인증 + 온보딩 완료 + /onboarding → 통과(null)(게이트 미처리)', () {
-      expect(
-        gateRedirect(
-          AuthAuthenticated(_user(OnboardingStatus.done)),
-          '/onboarding',
-        ),
-        isNull,
-      );
-    });
     test('인증 + 온보딩 완료 + /diagnostic → /path', () {
       expect(
         gateRedirect(
@@ -72,6 +65,21 @@ void main() {
     });
     test('미인증 + /diagnostic → 통과(null) — guest 진단 진입 허용', () {
       expect(gateRedirect(const AuthUnauthenticated(), '/diagnostic'), isNull);
+    });
+    test('미인증 + /beta-pending → 통과(null) — 미승인자 대기 허용', () {
+      expect(
+        gateRedirect(const AuthUnauthenticated(), '/beta-pending'),
+        isNull,
+      );
+    });
+    test('인증(완료) + /beta-pending → /dashboard 흡수', () {
+      expect(
+        gateRedirect(
+          AuthAuthenticated(_user(OnboardingStatus.done)),
+          '/beta-pending',
+        ),
+        '/dashboard',
+      );
     });
     test('미인증 + /auth/callback → 통과(null) — bootstrapFromCallback 진행 중', () {
       expect(
@@ -99,8 +107,68 @@ void main() {
     test('AuthLoading + /auth/callback → null(보류)', () {
       expect(gateRedirect(const AuthLoading(), '/auth/callback'), isNull);
     });
-    test('AuthLoading + /onboarding → null(보류)', () {
-      expect(gateRedirect(const AuthLoading(), '/onboarding'), isNull);
+    test('AuthLoading + /diagnostic → null(보류)', () {
+      expect(gateRedirect(const AuthLoading(), '/diagnostic'), isNull);
+    });
+
+    // --- Task 4: consent 게이트 (onboarding보다 앞) ---
+    test('인증 + 동의 미완(PENDING) + 보호경로 → /consent', () {
+      expect(
+        gateRedirect(
+          AuthAuthenticated(
+            _user(OnboardingStatus.done, consent: ConsentStatus.pending),
+          ),
+          '/dashboard',
+        ),
+        '/consent',
+      );
+    });
+    test('인증 + 동의 미완 + /consent → 그대로(null)', () {
+      expect(
+        gateRedirect(
+          AuthAuthenticated(
+            _user(OnboardingStatus.done, consent: ConsentStatus.pending),
+          ),
+          '/consent',
+        ),
+        isNull,
+      );
+    });
+    test('인증 + 동의 미완 → consent가 onboarding보다 우선(/consent)', () {
+      // onboarding도 pending이지만 consent 게이트가 앞서므로 /consent로.
+      expect(
+        gateRedirect(
+          AuthAuthenticated(
+            _user(OnboardingStatus.pending, consent: ConsentStatus.pending),
+          ),
+          '/dashboard',
+        ),
+        '/consent',
+      );
+    });
+    test('인증 + 동의 완료 + 온보딩 미완 + /consent → /diagnostic', () {
+      // consent 완료면 /consent에 머무르지 않고 onboarding 게이트(진단)로.
+      expect(
+        gateRedirect(
+          AuthAuthenticated(
+            _user(OnboardingStatus.pending, consent: ConsentStatus.done),
+          ),
+          '/consent',
+        ),
+        '/diagnostic',
+      );
+    });
+    test('인증 + 동의 완료 + 온보딩 완료 + /consent → /path', () {
+      // consent·onboarding 모두 완료면 /consent 접근 시 정상 홈(/path)로.
+      expect(
+        gateRedirect(
+          AuthAuthenticated(
+            _user(OnboardingStatus.done, consent: ConsentStatus.done),
+          ),
+          '/consent',
+        ),
+        '/path',
+      );
     });
   });
 }

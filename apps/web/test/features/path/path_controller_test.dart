@@ -166,18 +166,35 @@ void main() {
     expect(s.completed, ['진단 분석']); // 무이벤트 직전 단계 보존
   });
 
-  test('서버 error stage는 failed로 종료한다', () async {
+  // 인밴드 progress(stage=error)는 C2에서 폐지 — 백엔드는 event:error 프레임을 보내고
+  // SseClient가 ApiException으로 throw한다. 아래 "중간 ApiException" 테스트가 대체한다.
+
+  test('중간 ApiException(event:error 유래)은 failed로 표면화한다', () async {
+    Stream<SseEvent> emitThenApi() async* {
+      yield SseEvent(
+        event: 'progress',
+        data: jsonEncode({
+          'stage': 'collecting',
+          'progress': 0.15,
+          'message': 'x',
+          'pathId': null,
+        }),
+      );
+      throw const ApiException(
+        code: ApiErrorCode.unknown,
+        message: 'ai-svc path generate failed',
+      );
+    }
+
     final container = ProviderContainer(
       overrides: [
-        pathSseConnectProvider.overrideWithValue(() => _emit(['error'])),
+        pathSseConnectProvider.overrideWithValue(() => emitThenApi()),
       ],
     );
     addTearDown(container.dispose);
-
     await container.read(pathControllerProvider.notifier).start();
-
-    final s = container.read(pathControllerProvider);
-    expect(s.phase, PathPhase.failed);
-    expect(s.error, 'error');
+    final st = container.read(pathControllerProvider);
+    expect(st.phase, PathPhase.failed);
+    expect(st.error, 'ai-svc path generate failed');
   });
 }

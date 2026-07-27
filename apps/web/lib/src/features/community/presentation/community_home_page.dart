@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../ads/presentation/ad_slot_widget.dart';
 import '../application/community_controller.dart';
 import '../state/community_state.dart';
 
@@ -49,10 +50,15 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
         ),
         CommunityPhase.loaded => ListView.separated(
           padding: const EdgeInsets.all(DpSpacing.lg),
-          itemCount: s.posts.length,
+          itemCount: s.posts.length + (s.posts.length >= 5 ? 1 : 0),
           separatorBuilder: (_, _) => const SizedBox(height: DpSpacing.sm),
           itemBuilder: (_, i) {
-            final p = s.posts[i];
+            const feedAdAt = 5; // 5번째 게시글(인덱스 4) 뒤
+            final showAd = s.posts.length >= feedAdAt;
+            if (showAd && i == feedAdAt) {
+              return const AdSlotWidget(slot: 'COMMUNITY_FEED');
+            }
+            final p = s.posts[(showAd && i > feedAdAt) ? i - 1 : i];
             final c = context.dpColors;
             return Card(
               child: ListTile(

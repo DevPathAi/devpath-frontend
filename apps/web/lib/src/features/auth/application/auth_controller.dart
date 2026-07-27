@@ -26,9 +26,11 @@ class AuthController extends Notifier<AuthState> {
 
   /// GitHub OAuth 흐름 시작: 브라우저를 gateway OAuth 엔드포인트로 리다이렉트.
   /// 실제 리다이렉트는 [oauthLauncherProvider]에 위임(테스트에서 Fake로 교체 가능).
-  Future<void> login() async {
+  Future<void> login({String provider = 'github'}) async {
     final base = ref.read(appConfigProvider).baseUrl;
-    ref.read(oauthLauncherProvider).launch('$base/oauth2/authorization/github');
+    ref
+        .read(oauthLauncherProvider)
+        .launch('$base/oauth2/authorization/$provider');
   }
 
   /// 앱 시작 세션 복원: POST /auth/refresh(HttpOnly 쿠키, 본문 없음) → access 저장
@@ -81,6 +83,23 @@ class AuthController extends Notifier<AuthState> {
   /// 온보딩 완료로 갱신된 유저 반영(게이트 재평가 트리거).
   void onboardingCompleted(User user) {
     if (state is AuthAuthenticated) state = AuthAuthenticated(user);
+  }
+
+  /// 필수 동의 완료로 갱신된 유저 반영(게이트 재평가 트리거 → /consent 벗어남).
+  void markConsentDone(User user) {
+    if (state is AuthAuthenticated) state = AuthAuthenticated(user);
+  }
+
+  /// 서버가 라이브 403 ONBOARDING_INCOMPLETE를 반환하면(캐시된 onboardingStatus와
+  /// 서버 진실 불일치) 온보딩 상태를 pending으로 강등해 게이트를 재평가시킨다.
+  void markOnboardingIncomplete() {
+    final s = state;
+    if (s is AuthAuthenticated &&
+        s.user.onboardingStatus != OnboardingStatus.pending) {
+      state = AuthAuthenticated(
+        s.user.copyWith(onboardingStatus: OnboardingStatus.pending),
+      );
+    }
   }
 }
 

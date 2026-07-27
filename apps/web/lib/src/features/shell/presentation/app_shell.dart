@@ -10,6 +10,7 @@ const List<ShellDestination> kShellDestinations = [
   (path: '/path', icon: DpIcons.path, label: '경로'),
   (path: '/mentor', icon: DpIcons.mentor, label: '멘토'),
   (path: '/community', icon: DpIcons.community, label: '커뮤니티'),
+  (path: '/settings', icon: DpIcons.settings, label: '설정'),
 ];
 
 /// 라우터 결합 셸: 현재 위치를 읽고 표현부에 위임.
@@ -60,6 +61,19 @@ class AppShellView extends StatelessWidget {
               selectedIndex: _index,
               onDestinationSelected: _select,
               labelType: NavigationRailLabelType.all,
+              trailing: Expanded(
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: DpSpacing.md),
+                    child: IconButton(
+                      icon: const Icon(Icons.account_circle),
+                      tooltip: '마이페이지',
+                      onPressed: () => onSelect?.call('/mypage'),
+                    ),
+                  ),
+                ),
+              ),
               destinations: [
                 for (final d in kShellDestinations)
                   NavigationRailDestination(

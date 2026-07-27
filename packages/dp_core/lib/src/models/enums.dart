@@ -28,3 +28,15 @@ enum OnboardingStatus {
   done,
   unknown,
 }
+
+/// 개인정보/약관 동의 게이트 상태. `PENDING`=필수 동의 미완(회원가입 gate 노출),
+/// `DONE`=필수 2종(TERMS·PRIVACY) 동의 완료. `onboardingStatus`와 평행하며
+/// 라우터 게이트에서 consent가 onboarding보다 앞선다.
+@JsonEnum()
+enum ConsentStatus {
+  @JsonValue('PENDING')
+  pending,
+  @JsonValue('DONE')
+  done,
+  unknown,
+}

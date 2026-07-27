@@ -1,0 +1,67 @@
+import 'package:devpath_admin/src/features/ads/data/ad_row.dart';
+import 'package:devpath_admin/src/features/ads/data/ads_source.dart';
+import 'package:devpath_admin/src/features/ads/presentation/ads_page.dart';
+import 'package:dp_design/dp_design.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+AdRow _ad(int id, String title) => AdRow(
+  id: id,
+  title: title,
+  imageUrl: null,
+  linkUrl: 'https://e.com',
+  slot: 'DASHBOARD_TOP',
+  weight: 1,
+  status: 'ACTIVE',
+  startsAt: null,
+  endsAt: null,
+);
+
+void main() {
+  testWidgets('renders ad rows and global switch', (tester) async {
+    tester.view.physicalSize = const Size(1400, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          adsListProvider.overrideWithValue(
+            ({slot, status}) async => [_ad(1, '첫 배너')],
+          ),
+          adSettingsGetProvider.overrideWithValue(() async => true),
+        ],
+        child: MaterialApp(theme: DpTheme.light(), home: const AdminAdsPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('첫 배너'), findsOneWidget);
+    expect(find.byType(Switch), findsWidgets); // 전역 스위치 + 행 토글
+  });
+
+  testWidgets('tapping 광고 생성 opens form dialog', (tester) async {
+    tester.view.physicalSize = const Size(1400, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          adsListProvider.overrideWithValue(
+            ({slot, status}) async => [_ad(1, '기존 배너')],
+          ),
+          adSettingsGetProvider.overrideWithValue(() async => false),
+        ],
+        child: MaterialApp(theme: DpTheme.light(), home: const AdminAdsPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 목록이 비어있지 않아 DpEmpty가 없으므로 AppBar의 생성 버튼만 존재.
+    await tester.tap(find.widgetWithText(FilledButton, '광고 생성'));
+    await tester.pumpAndSettle();
+    expect(find.text('링크 URL'), findsOneWidget); // 폼 필드 라벨
+  });
+}

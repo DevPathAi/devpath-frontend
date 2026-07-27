@@ -31,7 +31,7 @@ void main() {
 
     expect(adapter.count('POST /contents/future-async-await/progress'), 1);
     expect(adapter.count('GET /learning-paths/me'), greaterThanOrEqualTo(1));
-    expect(adapter.count('GET /dashboard'), 1);
+    expect(adapter.count('GET /dashboard/me'), 1);
   });
 
   testWidgets('missing content shows retry UI', (tester) async {

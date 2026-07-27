@@ -93,15 +93,8 @@ class PathController extends Notifier<PathState> {
       (event) async {
         final pathEvent = _eventOf(event.data);
         if (pathEvent == null) return;
-        if (pathEvent.stage == 'error') {
-          await _sub?.cancel();
-          state = state.copyWith(
-            phase: PathPhase.failed,
-            error: pathEvent.message,
-          );
-          if (!done.isCompleted) done.complete();
-          return;
-        }
+        // 중간 에러는 백엔드가 event:error 프레임으로 보내며 SseClient가 ApiException으로
+        // throw한다(C2) → onError에서 처리. 인밴드 progress(stage=error)는 더 이상 없다.
         if (pathEvent.stage == 'done') {
           await _sub?.cancel(); // onDone 경합 방지
           try {
@@ -130,11 +123,11 @@ class PathController extends Notifier<PathState> {
             phase: e.isKillSwitch ? PathPhase.killSwitch : PathPhase.failed,
             error: e.message,
           );
-        } else {
-          state = state.copyWith(
-            phase: PathPhase.partial,
-            error: 'SSE 연결이 끊겼어요',
-          );
+        } else if (e is ApiException && e.code != ApiErrorCode.network) {
+          // 중간 event:error = 서버 확정 실패(네트워크 끊김과 구분).
+          state = state.copyWith(phase: PathPhase.failed, error: e.message);
+        } else if (state.phase == PathPhase.streaming) {
+          state = state.copyWith(phase: PathPhase.partial, error: '생성이 중단됐어요');
         }
         if (!done.isCompleted) done.complete();
       },

@@ -95,12 +95,15 @@ class AuthController extends Notifier<AuthState> {
         access: data['access_token'] as String,
         refresh: data['refresh_token'] as String,
       );
-      await kv.delete(_kPkceVerifier);
       if (!ref.mounted) return;
       await bootstrapSession();
     } on ApiException catch (e) {
       if (!ref.mounted) return;
       state = AuthUnauthenticated(error: e.message);
+    } finally {
+      // 1회용 PKCE verifier: code는 교환을 시도한 순간 서버에서 소비되므로
+      // 성공/실패와 무관하게 폐기한다(secure_storage에 만료된 비밀 잔존 방지).
+      await kv.delete(_kPkceVerifier);
     }
   }
 

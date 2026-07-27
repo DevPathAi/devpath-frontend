@@ -14,6 +14,8 @@ abstract class User with _$User {
     @JsonKey(unknownEnumValue: UserRole.unknown) required UserRole role,
     @JsonKey(unknownEnumValue: OnboardingStatus.unknown)
     required OnboardingStatus onboardingStatus,
+    @JsonKey(unknownEnumValue: ConsentStatus.unknown)
+    required ConsentStatus consentStatus,
   }) = _User;
 
   factory User.fromJson(Map<String, dynamic> json) => _$UserFromJson(json);

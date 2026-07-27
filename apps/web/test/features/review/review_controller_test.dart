@@ -36,6 +36,41 @@ class _SequentialMockAdapter implements HttpClientAdapter {
   void close({bool force = false}) {}
 }
 
+/// 상태코드까지 순차 지정하는 목 어댑터(실 ai-svc 맨 404 시뮬레이션).
+class _StatusSequentialMockAdapter implements HttpClientAdapter {
+  _StatusSequentialMockAdapter(this._responses);
+  final List<(int, Map<String, dynamic>)> _responses;
+  int _i = 0;
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<dynamic>? cancelFuture,
+  ) async {
+    final (status, body) = _responses[_i.clamp(0, _responses.length - 1)];
+    _i++;
+    return ResponseBody.fromString(
+      jsonEncode(body),
+      status,
+      headers: {
+        Headers.contentTypeHeader: [Headers.jsonContentType],
+      },
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
+// 실 ai-svc ReviewNotFoundException = Spring 기본 404 body(중첩 error.code 없음).
+Map<String, dynamic> _bareNotFound() => {
+  'status': 404,
+  'error': 'Not Found',
+  'message': 'review not found for session',
+  'path': '/reviews',
+};
+
 void main() {
   test('polls until DONE then ReviewLoaded', () async {
     final client = ApiClient.create(
@@ -73,6 +108,68 @@ void main() {
     final s = container.read(reviewControllerProvider);
     expect(s, isA<ReviewLoaded>());
     expect((s as ReviewLoaded).review.confidence, 88);
+  });
+
+  test('bare 404(실 ai-svc, 중첩 error.code 없음) → 폴링 지속 후 ReviewLoaded', () async {
+    final client = ApiClient.create(
+      const ApiConfig(baseUrl: 'https://t/api/v1'),
+    );
+    // 리뷰 미생성(비동기 파이프라인 지연) 동안 맨 404 → 계속 폴링 → DONE 수렴.
+    client.dio.httpClientAdapter = _StatusSequentialMockAdapter([
+      (404, _bareNotFound()),
+      (404, _bareNotFound()),
+      (
+        200,
+        {
+          'status': 'DONE',
+          'confidence': 88,
+          'strengths': ['clear'],
+          'improvements': <Map<String, dynamic>>[],
+          'security': <Map<String, dynamic>>[],
+        },
+      ),
+    ]);
+    final container = ProviderContainer(
+      overrides: [apiClientProvider.overrideWithValue(client)],
+    );
+    addTearDown(container.dispose);
+
+    await container
+        .read(reviewControllerProvider.notifier)
+        .pollForSession(
+          99,
+          interval: const Duration(milliseconds: 1),
+          maxAttempts: 5,
+        );
+
+    final s = container.read(reviewControllerProvider);
+    expect(s, isA<ReviewLoaded>());
+    expect((s as ReviewLoaded).review.confidence, 88);
+  });
+
+  test('지속 404 → maxAttempts 소진 시 ReviewFailed(초과), 종단 실패 아님', () async {
+    final client = ApiClient.create(
+      const ApiConfig(baseUrl: 'https://t/api/v1'),
+    );
+    client.dio.httpClientAdapter = _StatusSequentialMockAdapter([
+      (404, _bareNotFound()),
+    ]);
+    final container = ProviderContainer(
+      overrides: [apiClientProvider.overrideWithValue(client)],
+    );
+    addTearDown(container.dispose);
+
+    await container
+        .read(reviewControllerProvider.notifier)
+        .pollForSession(
+          1,
+          interval: const Duration(milliseconds: 1),
+          maxAttempts: 3,
+        );
+
+    final s = container.read(reviewControllerProvider);
+    expect(s, isA<ReviewFailed>());
+    expect((s as ReviewFailed).message, contains('초과'));
   });
 
   test('FAILED status → ReviewFailed', () async {

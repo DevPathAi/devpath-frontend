@@ -20,6 +20,11 @@ _User _$UserFromJson(Map<String, dynamic> json) => _User(
     json['onboardingStatus'],
     unknownValue: OnboardingStatus.unknown,
   ),
+  consentStatus: $enumDecode(
+    _$ConsentStatusEnumMap,
+    json['consentStatus'],
+    unknownValue: ConsentStatus.unknown,
+  ),
 );
 
 Map<String, dynamic> _$UserToJson(_User instance) => <String, dynamic>{
@@ -28,6 +33,7 @@ Map<String, dynamic> _$UserToJson(_User instance) => <String, dynamic>{
   'nickname': instance.nickname,
   'role': _$UserRoleEnumMap[instance.role]!,
   'onboardingStatus': _$OnboardingStatusEnumMap[instance.onboardingStatus]!,
+  'consentStatus': _$ConsentStatusEnumMap[instance.consentStatus]!,
 };
 
 const _$UserRoleEnumMap = {
@@ -45,4 +51,10 @@ const _$OnboardingStatusEnumMap = {
   OnboardingStatus.inProgress: 'IN_PROGRESS',
   OnboardingStatus.done: 'DONE',
   OnboardingStatus.unknown: 'unknown',
+};
+
+const _$ConsentStatusEnumMap = {
+  ConsentStatus.pending: 'PENDING',
+  ConsentStatus.done: 'DONE',
+  ConsentStatus.unknown: 'unknown',
 };

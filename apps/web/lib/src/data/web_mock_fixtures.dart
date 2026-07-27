@@ -19,19 +19,7 @@ final Map<String, MockFixture> webMockFixtures = {
         'nickname': '지수',
         'role': 'LEARNER',
         'onboardingStatus': 'PENDING',
-      },
-    },
-  ),
-  // 진단 제출 → DONE 유저 반환(게이트 해제)
-  'POST /onboarding': (
-    200,
-    {
-      'user': {
-        'id': 'u-mock',
-        'email': 'learner@devpath.ai',
-        'nickname': '지수',
-        'role': 'LEARNER',
-        'onboardingStatus': 'DONE',
+        'consentStatus': 'DONE',
       },
     },
   ),
@@ -211,8 +199,8 @@ final Map<String, MockFixture> webMockFixtures = {
       'renderedFor': 'answerer',
     },
   ),
-  // 대시보드(DASH-001)
-  'GET /dashboard': (
+  // 대시보드(DASH-001) — 백엔드 GET /dashboard/me (DashboardController @GetMapping("/me"))
+  'GET /dashboard/me': (
     200,
     {
       'streakDays': 7,
@@ -278,21 +266,6 @@ final Map<String, MockFixture> webMockFixtures = {
       'strengths': ['목 리뷰: 코드가 간결합니다.'],
       'improvements': <Map<String, dynamic>>[],
       'security': <Map<String, dynamic>>[],
-    },
-  ),
-  // 동기 POST 프로토 폴백(기존 smoke test 호환)
-  'POST /reviews': (
-    200,
-    {
-      'confidence': 78,
-      'strengths': ['main 함수가 간결합니다.', 'print 사용이 적절합니다.'],
-      'improvements': [
-        {'line': 2, 'severity': 'warning', 'message': '예외 처리를 추가하세요.'},
-        {'line': 1, 'severity': 'info', 'message': '함수에 문서 주석을 권장합니다.'},
-      ],
-      'security': [
-        {'severity': 'info', 'message': '외부 입력이 없어 위험이 낮습니다.'},
-      ],
     },
   ),
 };

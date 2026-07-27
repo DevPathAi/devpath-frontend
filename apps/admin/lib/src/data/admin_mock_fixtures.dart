@@ -12,6 +12,7 @@ final Map<String, MockFixture> adminMockFixtures = {
         'nickname': '운영자',
         'role': 'ADMIN',
         'onboardingStatus': 'DONE',
+        'consentStatus': 'DONE',
       },
     },
   ),
@@ -76,5 +77,42 @@ final Map<String, MockFixture> adminMockFixtures = {
   'GET /admin/stats': (
     200,
     {'dau': 1280, 'newUsers': 64, 'openReports': 2, 'aiCalls': 9421},
+  ),
+  // 광고 관리(P2) — 목 한계: query 무시(전체 목록 반환)
+  'GET /admin/ads': (
+    200,
+    [
+      {
+        'id': 1,
+        'title': '하우스 배너 · 부트캠프',
+        'imageUrl': null,
+        'linkUrl': 'https://example.com/promo',
+        'slot': 'DASHBOARD_TOP',
+        'weight': 3,
+        'status': 'ACTIVE',
+        'startsAt': null,
+        'endsAt': null,
+      },
+      {
+        'id': 2,
+        'title': '커뮤니티 스폰서',
+        'imageUrl': null,
+        'linkUrl': 'https://example.com/sponsor',
+        'slot': 'COMMUNITY_FEED',
+        'weight': 1,
+        'status': 'PAUSED',
+        'startsAt': null,
+        'endsAt': null,
+      },
+    ],
+  ),
+  'GET /admin/ads/settings': (200, {'enabled': true}),
+  'PUT /admin/ads/settings': (200, {'enabled': true}),
+  'GET /admin/ads/1/stats': (
+    200,
+    [
+      {'date': '2026-07-21', 'impressions': 120, 'clicks': 4},
+      {'date': '2026-07-22', 'impressions': 98, 'clicks': 7},
+    ],
   ),
 };

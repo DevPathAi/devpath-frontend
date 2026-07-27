@@ -23,13 +23,18 @@ final apiClientProvider = Provider<ApiClient>((ref) {
     0,
     AuthInterceptor(
       store: store,
-      // admin 토큰 refresh 엔드포인트는 아직 미정의(login만 존재) → null 반환:
-      // 401 시 store.clear + 에러 전파로 재로그인을 유도한다. 자동 갱신 배선은
-      // 백엔드 admin refresh 엔드포인트 확정 후 후속.
-      refresh: (refreshToken) async => null,
+      // refresh 콜백: 쿠키 기반 — 본문 없이 POST /auth/refresh(HttpOnly 쿠키 자동 전송,
+      // withCredentials=true). 응답 최상위 access_token(snake_case). refresh 토큰은
+      // HttpOnly 쿠키가 보유하므로 TokenPair.refresh는 빈 문자열(web 패턴과 동일).
+      refresh: (refreshToken) async {
+        final data = await client.post<Map<String, dynamic>>('/auth/refresh');
+        return TokenPair(access: data['access_token'] as String, refresh: '');
+      },
       retry: (options) => client.dio.fetch(options),
     ),
   );
+
+  client.dio.options.extra['withCredentials'] = true;
 
   if (config.useMock) {
     client.dio.httpClientAdapter = MockHttpAdapter(adminMockFixtures);

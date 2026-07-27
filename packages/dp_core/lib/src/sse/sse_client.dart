@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 
+import '../error/api_error_code.dart';
 import '../error/api_exception.dart';
 import 'sse_event.dart';
 
@@ -41,23 +42,47 @@ class SseClient {
       if (line.isEmpty) {
         // 빈 줄 = 이벤트 경계
         if (dataBuf.isNotEmpty) {
-          yield SseEvent(event: event, data: dataBuf.toString());
+          final ev = SseEvent(event: event, data: dataBuf.toString());
           dataBuf.clear();
+          final name = event;
           event = null;
+          if (name == 'error') {
+            throw _sseError(ev.data);
+          }
+          yield ev;
         }
         continue;
       }
       if (line.startsWith('event:')) {
-        event = line.substring(6).trim();
+        final e = line.substring(6);
+        // SSE 규격: 선행 스페이스 1개만 제거(내부·후행 공백 보존, data와 일관).
+        event = e.startsWith(' ') ? e.substring(1) : e;
       } else if (line.startsWith('data:')) {
         if (dataBuf.isNotEmpty) dataBuf.write('\n');
-        dataBuf.write(line.substring(5).trim());
+        final v = line.substring(5);
+        // SSE 규격: 선행 스페이스 1개만 제거 — LLM 토큰의 앞뒤 공백을 보존한다.
+        dataBuf.write(v.startsWith(' ') ? v.substring(1) : v);
       }
       // 'id:'/'retry:' 등은 P2 범위 밖(필요 시 feature에서 확장).
     }
     // 스트림 종료 시 버퍼에 남은 이벤트를 flush(마지막 DONE에 빈 줄이 없는 서버 대비).
     if (dataBuf.isNotEmpty) {
-      yield SseEvent(event: event, data: dataBuf.toString());
+      final ev = SseEvent(event: event, data: dataBuf.toString());
+      if (event == 'error') throw _sseError(ev.data);
+      yield ev;
     }
+  }
+
+  ApiException _sseError(String data) {
+    try {
+      final decoded = json.decode(data);
+      if (decoded is Map) {
+        return ApiException.fromEnvelope(decoded.cast<String, dynamic>());
+      }
+    } catch (_) {}
+    return const ApiException(
+      code: ApiErrorCode.unknown,
+      message: '스트림 오류가 발생했습니다.',
+    );
   }
 }

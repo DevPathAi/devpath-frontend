@@ -68,9 +68,68 @@ class ApiClient {
     }
   }
 
+  /// PUT 후 JSON 반환. 실패 시 [ApiException] throw. (post 헬퍼와 동일 규약)
+  Future<T> put<T>(
+    String path, {
+    Object? body,
+    Map<String, dynamic>? query,
+  }) async {
+    try {
+      final res = await dio.put<T>(path, data: body, queryParameters: query);
+      return res.data as T;
+    } on DioException catch (e) {
+      throw (e.error is ApiException)
+          ? e.error as ApiException
+          : ApiException.fromDio(e);
+    }
+  }
+
+  /// DELETE 후 JSON 반환(본문 없으면 null). 실패 시 [ApiException] throw.
+  Future<T> delete<T>(
+    String path, {
+    Object? body,
+    Map<String, dynamic>? query,
+  }) async {
+    try {
+      final res = await dio.delete<T>(path, data: body, queryParameters: query);
+      return res.data as T;
+    } on DioException catch (e) {
+      throw (e.error is ApiException)
+          ? e.error as ApiException
+          : ApiException.fromDio(e);
+    }
+  }
+
   /// SSE 스트림 연결(D1). 앱은 dio를 직접 만지지 않고 이 헬퍼만 사용.
   /// 실패는 SseClient.connect 규약대로 [ApiException]으로 정규화된다.
   /// feature의 `*ConnectProvider`는 `apiClient.sse(path, body: ...)`를 호출한다.
   Stream<SseEvent> sse(String path, {Object? body}) =>
       SseClient(dio).connect(path, body: body);
+
+  /// multipart 업로드(part=[field]). 실패 시 [ApiException] throw.
+  Future<T> postMultipart<T>(
+    String path, {
+    required List<int> bytes,
+    required String filename,
+    String field = 'file',
+    String? contentType,
+  }) async {
+    final form = FormData.fromMap({
+      field: MultipartFile.fromBytes(
+        bytes,
+        filename: filename,
+        contentType: contentType == null
+            ? null
+            : DioMediaType.parse(contentType),
+      ),
+    });
+    try {
+      final res = await dio.post<T>(path, data: form);
+      return res.data as T;
+    } on DioException catch (e) {
+      throw (e.error is ApiException)
+          ? e.error as ApiException
+          : ApiException.fromDio(e);
+    }
+  }
 }

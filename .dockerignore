@@ -1,0 +1,13 @@
+.git
+.github
+**/.dart_tool
+**/build
+**/.dockerignore
+node_modules
+**/node_modules
+landing
+docs
+test
+**/test
+**/*.iml
+.gitconfig-codex

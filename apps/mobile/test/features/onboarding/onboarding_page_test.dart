@@ -20,6 +20,7 @@ final Map<String, MockFixture> _ok = {
         'nickname': '지수',
         'role': 'LEARNER',
         'onboardingStatus': 'DONE',
+        'consentStatus': 'DONE',
       },
     },
   ),

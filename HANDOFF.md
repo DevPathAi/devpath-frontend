@@ -1,5 +1,7 @@
 # HANDOFF — React→Flutter 전환 & 프로토 UI
 
+> **갱신 메모(2026-07-02)**: 아래 "다음은 P6(mobile)"는 2026-06-16 시점 기준이다. 현재 `apps/mobile`에는 이미 GoRoute 기반 라우트(로그인·온보딩·홈·학습·커뮤니티·알림 등)가 구현되어 있다(목 데이터 기반, `USE_MOCK=true` 기본값). 상세: [documents/42_전체_정합성_점검_2차](https://github.com/DevPathAi/documents/blob/main/42_전체_정합성_점검_2차.md) §4.3.
+
 > 최종 업데이트: 2026-06-16 · 브랜치 전략: **main 보호 · develop 통합 · 작업브랜치→develop PR→머지→main 릴리스 PR**(CLAUDE.md "🔀 Git 브랜치 전략" + 전역 규칙).
 > **상태: 설계·계획 + 디자인/Eng 리뷰 완료 + P1·P2·P3(main, PR#3) + P4a~P4f(web 골든패스 전체) + P5(admin 대표 3화면) 구현 완료.** 다음은 **P6(mobile)**.
 

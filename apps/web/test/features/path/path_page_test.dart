@@ -44,6 +44,7 @@ class _AuthedAuthController extends AuthController {
       nickname: 'E2E',
       role: UserRole.learner,
       onboardingStatus: OnboardingStatus.done,
+      consentStatus: ConsentStatus.done,
     ),
   );
 }
