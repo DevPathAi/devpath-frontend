@@ -21,13 +21,13 @@ RUN dart pub global activate melos 7.0.0 \
  && melos bootstrap
 
 # 실 API 설정을 빌드시 각인(Flutter Web은 런타임 주입 불가)
-RUN cd apps/web \
+RUN cd apps/admin \
  && flutter build web --release \
       --dart-define=API_BASE_URL=${API_BASE_URL} \
       --dart-define=USE_MOCK=${USE_MOCK}
 
 # ---- runtime stage: nginx ----
 FROM nginx:alpine AS runtime
-COPY --from=build /src/apps/web/build/web /usr/share/nginx/html
-COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /src/apps/admin/build/web /usr/share/nginx/html
+COPY apps/admin/nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 8080
