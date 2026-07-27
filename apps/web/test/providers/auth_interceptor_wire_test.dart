@@ -47,7 +47,70 @@ class _RefreshCaptureAdapter implements HttpClientAdapter {
   void close({bool force = false}) {}
 }
 
+/// 모든 요청에 401을 반환하는 어댑터 — 무인증 부팅(쿠키 없음/무효) 시나리오.
+class _Always401Adapter implements HttpClientAdapter {
+  int requests = 0;
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    requests++;
+    return ResponseBody.fromString(
+      jsonEncode({
+        'error': {'code': 'UNAUTHORIZED', 'message': '401'},
+      }),
+      401,
+      headers: {
+        Headers.contentTypeHeader: [Headers.jsonContentType],
+      },
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
 void main() {
+  test('refresh 자체가 401이어도 교착 없이 실패로 완결된다(무인증 부팅 시나리오)', () async {
+    // 회귀 고정: AuthInterceptor(QueuedInterceptor) 안에서 같은 dio로 refresh를
+    // 재호출하면 refresh 401의 에러 콜백이 같은 큐를 기다리며 교착한다.
+    // 수정 후에는 refresh/retry가 전용 authFlow 클라이언트로 분리되어,
+    // 무인증 부팅의 bootstrapSession(/auth/refresh POST)이 ApiException으로 완결된다.
+    final c = ProviderContainer();
+    addTearDown(c.dispose);
+    final adapter = _Always401Adapter();
+    c.read(apiClientProvider).dio.httpClientAdapter = adapter;
+    c.read(authFlowClientProvider).dio.httpClientAdapter = adapter;
+
+    await expectLater(
+      c
+          .read(apiClientProvider)
+          .post<Map<String, dynamic>>('/auth/refresh')
+          .timeout(const Duration(seconds: 5)),
+      throwsA(isA<ApiException>()),
+      reason: '교착 시 TimeoutException, 완결 시 ApiException — 완결이어야 한다',
+    );
+  });
+
+  test('authFlowClient에는 AuthInterceptor가 없다(재진입 교착 방지 불변식)', () {
+    final c = ProviderContainer();
+    addTearDown(c.dispose);
+    final authFlow = c.read(authFlowClientProvider);
+    expect(
+      authFlow.dio.interceptors.whereType<AuthInterceptor>(),
+      isEmpty,
+      reason: 'refresh/retry 전용 클라이언트가 AuthInterceptor를 가지면 교착이 재발한다',
+    );
+    expect(
+      authFlow.dio.options.extra['withCredentials'],
+      isTrue,
+      reason: 'refresh는 HttpOnly 쿠키 전송이 필요하다',
+    );
+  });
+
   test('apiClientProvider에 AuthInterceptor가 결선된다', () {
     final c = ProviderContainer();
     addTearDown(c.dispose);

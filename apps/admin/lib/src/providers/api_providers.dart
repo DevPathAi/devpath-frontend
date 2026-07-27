@@ -9,9 +9,26 @@ final appConfigProvider = Provider<AppConfig>(
 );
 final tokenStoreProvider = Provider<TokenStore>((ref) => InMemoryTokenStore());
 
+/// refresh/재시도 전용 클라이언트 — **AuthInterceptor를 절대 장착하지 않는다.**
+/// QueuedInterceptor의 onError 안에서 같은 dio로 /auth/refresh를 재호출하면
+/// refresh 401 시 에러 콜백이 자기 큐를 기다리는 교착이 된다(무인증 부팅 무한 스피너,
+/// 2026-07-27 운영 실측 — web과 동일 패턴 격리).
+final authFlowClientProvider = Provider<ApiClient>((ref) {
+  final config = ref.watch(appConfigProvider);
+  final client = ApiClient.create(
+    ApiConfig(baseUrl: config.baseUrl, useMock: config.useMock),
+  );
+  client.dio.options.extra['withCredentials'] = true;
+  if (config.useMock) {
+    client.dio.httpClientAdapter = MockHttpAdapter(adminMockFixtures);
+  }
+  return client;
+});
+
 final apiClientProvider = Provider<ApiClient>((ref) {
   final config = ref.watch(appConfigProvider);
   final store = ref.watch(tokenStoreProvider);
+  final authFlow = ref.watch(authFlowClientProvider);
   final client = ApiClient.create(
     ApiConfig(baseUrl: config.baseUrl, useMock: config.useMock),
   );
@@ -27,10 +44,10 @@ final apiClientProvider = Provider<ApiClient>((ref) {
       // withCredentials=true). 응답 최상위 access_token(snake_case). refresh 토큰은
       // HttpOnly 쿠키가 보유하므로 TokenPair.refresh는 빈 문자열(web 패턴과 동일).
       refresh: (refreshToken) async {
-        final data = await client.post<Map<String, dynamic>>('/auth/refresh');
+        final data = await authFlow.post<Map<String, dynamic>>('/auth/refresh');
         return TokenPair(access: data['access_token'] as String, refresh: '');
       },
-      retry: (options) => client.dio.fetch(options),
+      retry: (options) => authFlow.dio.fetch(options),
     ),
   );
 

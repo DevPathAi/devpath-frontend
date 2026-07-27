@@ -103,7 +103,10 @@ void main() {
       retry: retrier.call,
     );
 
-    final req = RequestOptions(path: '/users/me');
+    // 실제 파이프라인처럼 요청은 당시의 현재 토큰(old)을 사용했다 — 그래야
+    // rotation-guard(현재 토큰과 동일)를 지나 refresh 경로로 진입한다.
+    final req = RequestOptions(path: '/users/me')
+      ..headers['Authorization'] = 'Bearer old';
     final err = DioException(
       requestOptions: req,
       response: Response(requestOptions: req, statusCode: 401),
@@ -126,7 +129,9 @@ void main() {
       refresh: (_) async => throw StateError('refresh failed'),
       retry: (_) async => Response(requestOptions: RequestOptions(path: '/')),
     );
-    final req = RequestOptions(path: '/users/me');
+    // 요청은 당시의 현재 토큰(old)을 사용 — refresh 경로 진입 조건(가드 통과 아님).
+    final req = RequestOptions(path: '/users/me')
+      ..headers['Authorization'] = 'Bearer old';
     final err = DioException(
       requestOptions: req,
       response: Response(requestOptions: req, statusCode: 401),
@@ -167,7 +172,9 @@ void main() {
       retry: retrier.call,
     );
 
-    final req = RequestOptions(path: '/users/me');
+    // 요청은 당시의 현재 토큰(old)을 사용 — refresh 경로 진입 조건(가드 통과 아님).
+    final req = RequestOptions(path: '/users/me')
+      ..headers['Authorization'] = 'Bearer old';
     final err = DioException(
       requestOptions: req,
       response: Response(requestOptions: req, statusCode: 401),
@@ -222,6 +229,45 @@ void main() {
 
     expect(refreshCalls, 1, reason: '쿠키 store + 동시 401이어도 refresh는 1회');
     expect(results.every((r) => r.statusCode == 200), isTrue);
+  });
+
+  test('무토큰 요청 401 후 현재 토큰이 있으면 refresh 없이 재시도한다', () async {
+    // 부팅 직후 대시보드 fetch처럼 Authorization 없이 발사된 요청이 401을 받았고,
+    // 그 사이 다른 경로(부트스트랩)가 access를 확보했다면 refresh를 추가 발사하지 않고
+    // 현재 토큰으로 재시도해야 한다(불필요한 회전 방지).
+    var refreshCalls = 0;
+    final store = InMemoryTokenStore()..save(access: 'CUR', refresh: 'R');
+    final retrier = _MockRetrier();
+    when(() => retrier.call(any())).thenAnswer(
+      (_) async => Response(
+        requestOptions: RequestOptions(path: '/dashboard/me'),
+        statusCode: 200,
+        data: {'ok': true},
+      ),
+    );
+
+    final interceptor = AuthInterceptor(
+      store: store,
+      refresh: (_) async {
+        refreshCalls++;
+        return const TokenPair(access: 'NEW', refresh: '');
+      },
+      retry: retrier.call,
+    );
+
+    final req = RequestOptions(path: '/dashboard/me'); // 무토큰 발사(헤더 없음)
+    final err = DioException(
+      requestOptions: req,
+      response: Response(requestOptions: req, statusCode: 401),
+      type: DioExceptionType.badResponse,
+    );
+    await interceptor.onError(err, ErrorInterceptorHandler());
+
+    expect(refreshCalls, 0, reason: '이미 확보된 토큰이 있으면 refresh 불필요');
+    final captured =
+        verify(() => retrier.call(captureAny())).captured.single
+            as RequestOptions;
+    expect(captured.headers['Authorization'], 'Bearer CUR');
   });
 
   test('동시 401 N건이 단일 refresh로 직렬화된다(큐잉)', () async {
