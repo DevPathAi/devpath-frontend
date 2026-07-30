@@ -46,4 +46,11 @@ abstract final class DpIcons {
   // 테마 토글(P4a — DD3 단일 Symbols 셋 유지)
   static const IconData lightMode = Symbols.light_mode_rounded;
   static const IconData darkMode = Symbols.dark_mode_rounded;
+
+  // 명령 팔레트 / 셸 토글 / 리스트 액션 (로드맵 §4.4)
+  static const IconData search = Symbols.search_rounded;
+  static const IconData moreVert = Symbols.more_vert_rounded;
+  static const IconData star = Symbols.star_rounded;
+  static const IconData menu = Symbols.menu_rounded;
+  static const IconData menuOpen = Symbols.menu_open_rounded;
 }
