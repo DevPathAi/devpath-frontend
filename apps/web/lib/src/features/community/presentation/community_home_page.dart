@@ -1,3 +1,4 @@
+import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -23,6 +24,47 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
     );
   }
 
+  /// FAB 스피드다이얼 — 질문/자유글/피드백 요청 3종 작성 진입.
+  void _openComposeSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(DpIcons.mentor),
+              title: const Text('질문하기'),
+              subtitle: const Text('Q&A 보드에 질문을 올려요'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                context.go('/community/new');
+              },
+            ),
+            ListTile(
+              leading: const Icon(DpIcons.community),
+              title: const Text('자유글'),
+              subtitle: const Text('자유롭게 이야기를 나눠요'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                context.go('/community/new/post?board=FREE');
+              },
+            ),
+            ListTile(
+              leading: const Icon(DpIcons.thumbUp),
+              title: const Text('피드백 요청'),
+              subtitle: const Text('내 코드/프로젝트 리뷰를 요청해요'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                context.go('/community/new/post?board=FEEDBACK');
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = ref.watch(communityControllerProvider);
@@ -31,61 +73,141 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
     return Scaffold(
       appBar: AppBar(title: const Text('커뮤니티')),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.go('/community/new'),
+        onPressed: () => _openComposeSheet(context),
         icon: const Icon(DpIcons.edit),
-        label: const Text('질문하기'),
+        label: const Text('새 글'),
       ),
-      body: switch (s.phase) {
-        CommunityPhase.loading => const DpLoading(),
-        CommunityPhase.failed => DpError(
-          message: s.error ?? '불러오지 못했어요',
-          onRetry: notifier.load,
-        ),
-        CommunityPhase.loaded when s.posts.isEmpty => DpEmpty(
-          icon: DpIcons.community,
-          title: '첫 질문을 남겨보세요',
-          message: '막힌 부분을 커뮤니티에 물어보세요.',
-          actionLabel: '질문 작성',
-          onAction: () => context.go('/community/new'),
-        ),
-        CommunityPhase.loaded => ListView.separated(
-          padding: const EdgeInsets.all(DpSpacing.lg),
-          itemCount: s.posts.length + (s.posts.length >= 5 ? 1 : 0),
-          separatorBuilder: (_, _) => const SizedBox(height: DpSpacing.sm),
-          itemBuilder: (_, i) {
-            const feedAdAt = 5; // 5번째 게시글(인덱스 4) 뒤
-            final showAd = s.posts.length >= feedAdAt;
-            if (showAd && i == feedAdAt) {
-              return const AdSlotWidget(slot: 'COMMUNITY_FEED');
-            }
-            final p = s.posts[(showAd && i > feedAdAt) ? i - 1 : i];
-            final c = context.dpColors;
-            return Card(
-              child: ListTile(
-                title: Row(
-                  children: [
-                    if (p.solved)
-                      Padding(
-                        padding: const EdgeInsets.only(right: DpSpacing.xs),
-                        child: Icon(
-                          DpIcons.stepDone,
-                          size: 18,
-                          color: c.success,
-                        ),
-                      ),
-                    Expanded(child: Text(p.title)),
-                  ],
-                ),
-                subtitle: Text(
-                  '답변 ${p.replyCount} · 추천 ${p.upvoteCount}',
-                  style: TextStyle(color: c.textSecondary),
-                ),
-                onTap: () => context.go('/community/${p.id}'),
+      body: Column(
+        children: [
+          _BoardFilterBar(current: s.board, onSelect: notifier.selectBoard),
+          Expanded(
+            child: switch (s.phase) {
+              CommunityPhase.loading => const DpLoading(),
+              CommunityPhase.failed => DpError(
+                message: s.error ?? '불러오지 못했어요',
+                onRetry: notifier.load,
               ),
-            );
-          },
+              CommunityPhase.loaded when s.posts.isEmpty => DpEmpty(
+                icon: DpIcons.community,
+                title: '아직 글이 없어요',
+                message: '첫 글을 남겨보세요.',
+                actionLabel: '글 작성',
+                onAction: () => _openComposeSheet(context),
+              ),
+              CommunityPhase.loaded => ListView.separated(
+                padding: const EdgeInsets.all(DpSpacing.lg),
+                itemCount: s.posts.length + (s.posts.length >= 5 ? 1 : 0),
+                separatorBuilder: (_, _) =>
+                    const SizedBox(height: DpSpacing.sm),
+                itemBuilder: (_, i) {
+                  const feedAdAt = 5; // 5번째 게시글(인덱스 4) 뒤
+                  final showAd = s.posts.length >= feedAdAt;
+                  if (showAd && i == feedAdAt) {
+                    return const AdSlotWidget(slot: 'COMMUNITY_FEED');
+                  }
+                  final p = s.posts[(showAd && i > feedAdAt) ? i - 1 : i];
+                  return _PostCard(post: p);
+                },
+              ),
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 통합 피드 상단 보드 필터 — 전체/Q&A/자유/피드백.
+class _BoardFilterBar extends StatelessWidget {
+  const _BoardFilterBar({required this.current, required this.onSelect});
+
+  final CommunityBoard current;
+  final Future<void> Function(CommunityBoard) onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        DpSpacing.lg,
+        DpSpacing.md,
+        DpSpacing.lg,
+        0,
+      ),
+      child: Wrap(
+        spacing: DpSpacing.sm,
+        children: [
+          for (final b in CommunityBoard.values)
+            ChoiceChip(
+              label: Text(b.label),
+              selected: current == b,
+              onSelected: (_) => onSelect(b),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 목록 카드 — 보드 뱃지 + 제목 + 보드별 메타(QNA=답변/일반=댓글) + 라우팅.
+class _PostCard extends StatelessWidget {
+  const _PostCard({required this.post});
+
+  final CommunityPostSummary post;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.dpColors;
+    final isQna = post.boardType == 'QNA';
+    return Card(
+      child: ListTile(
+        title: Row(
+          children: [
+            _BoardBadge(post.boardType),
+            if (isQna && post.solved)
+              Padding(
+                padding: const EdgeInsets.only(right: DpSpacing.xs),
+                child: Icon(DpIcons.stepDone, size: 18, color: c.success),
+              ),
+            Expanded(child: Text(post.title)),
+          ],
         ),
-      },
+        subtitle: Text(
+          '${isQna ? '답변' : '댓글'} ${post.replyCount} · 추천 ${post.upvoteCount}',
+          style: TextStyle(color: c.textSecondary),
+        ),
+        onTap: () => context.go(
+          isQna ? '/community/${post.id}' : '/community/post/${post.id}',
+        ),
+      ),
+    );
+  }
+}
+
+/// 보드 구분 뱃지. QNA='Q&A'/FREE='자유'/FEEDBACK='피드백'.
+class _BoardBadge extends StatelessWidget {
+  const _BoardBadge(this.boardType);
+
+  final String boardType;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.dpColors;
+    final label = switch (boardType) {
+      'FREE' => '자유',
+      'FEEDBACK' => '피드백',
+      _ => 'Q&A',
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: DpSpacing.xs, vertical: 2),
+      margin: const EdgeInsets.only(right: DpSpacing.xs),
+      decoration: BoxDecoration(
+        color: c.border,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(fontSize: 11, color: c.textSecondary),
+      ),
     );
   }
 }

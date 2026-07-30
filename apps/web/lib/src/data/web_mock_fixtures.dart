@@ -47,33 +47,37 @@ final Map<String, MockFixture> webMockFixtures = {
       'completedAt': '2026-06-21T10:00:00Z',
     },
   ),
-  // 커뮤니티 Q&A 목록(COM-001) — 실계약: bare 배열(PostSummaryView), 페이지네이션 없음.
+  // 커뮤니티 통합 피드(COM-001) — 실계약: bare 배열(PostSummaryView), 페이지네이션 없음.
+  // 전 보드(QNA/FREE/FEEDBACK) 혼합. boardType·replyCount(QNA=답변/일반=댓글) 포함.
   'GET /community/posts': (
     200,
     [
       {
         'id': 1,
+        'boardType': 'QNA',
         'title': 'async/await가 헷갈려요',
         'authorId': 42,
         'solved': true,
         'upvoteCount': 3,
-        'answerCount': 2,
+        'replyCount': 2,
       },
       {
-        'id': 2,
-        'title': 'Stream 구독 해제는?',
-        'authorId': 17,
-        'solved': false,
-        'upvoteCount': 1,
-        'answerCount': 1,
-      },
-      {
-        'id': 3,
-        'title': 'Riverpod Notifier 패턴',
+        'id': 10,
+        'boardType': 'FREE',
+        'title': '오늘 배운 것 공유',
         'authorId': 8,
         'solved': false,
         'upvoteCount': 5,
-        'answerCount': 0,
+        'replyCount': 4,
+      },
+      {
+        'id': 20,
+        'boardType': 'FEEDBACK',
+        'title': '제 코드 리뷰 부탁해요',
+        'authorId': 17,
+        'solved': false,
+        'upvoteCount': 1,
+        'replyCount': 1,
       },
     ],
   ),
