@@ -6,8 +6,10 @@ import 'package:dp_design/src/theme/dp_tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-Widget _host(Widget child) =>
-    MaterialApp(theme: DpTheme.light(), home: Scaffold(body: child));
+Widget _host(Widget child) => MaterialApp(
+  theme: DpTheme.light(),
+  home: Scaffold(body: child),
+);
 
 void main() {
   testWidgets('DpMaxWidth는 maxWidth 미지정 시 contentMaxWidth로 제약', (tester) async {
@@ -45,7 +47,9 @@ void main() {
     expect(find.text('선택가능'), findsOneWidget);
   });
 
-  testWidgets('DpScrollbar는 thumbVisibility=true로 Scrollbar를 구성', (tester) async {
+  testWidgets('DpScrollbar는 thumbVisibility=true로 Scrollbar를 구성', (
+    tester,
+  ) async {
     final ctrl = ScrollController();
     addTearDown(ctrl.dispose);
     await tester.pumpWidget(

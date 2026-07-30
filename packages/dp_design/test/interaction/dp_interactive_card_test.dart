@@ -3,25 +3,26 @@ import 'package:dp_design/src/theme/dp_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-Widget _host(Widget child) =>
-    MaterialApp(theme: DpTheme.light(), home: Scaffold(body: child));
+Widget _host(Widget child) => MaterialApp(
+  theme: DpTheme.light(),
+  home: Scaffold(body: child),
+);
 
 void main() {
   testWidgets('탭하면 onTap을 호출한다', (tester) async {
     var tapped = false;
     await tester.pumpWidget(
       _host(
-        DpInteractiveCard(
-          onTap: () => tapped = true,
-          child: const Text('카드'),
-        ),
+        DpInteractiveCard(onTap: () => tapped = true, child: const Text('카드')),
       ),
     );
     await tester.tap(find.text('카드'));
     expect(tapped, isTrue);
   });
 
-  testWidgets('키보드 접근성을 위해 FocusableActionDetector와 InkWell을 포함', (tester) async {
+  testWidgets('키보드 접근성을 위해 FocusableActionDetector와 InkWell을 포함', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       _host(DpInteractiveCard(onTap: () {}, child: const Text('카드'))),
     );
@@ -30,9 +31,7 @@ void main() {
   });
 
   testWidgets('onTap이 null이면 InkWell은 비활성(탭 무동작)', (tester) async {
-    await tester.pumpWidget(
-      _host(const DpInteractiveCard(child: Text('정적'))),
-    );
+    await tester.pumpWidget(_host(const DpInteractiveCard(child: Text('정적'))));
     final inkwell = tester.widget<InkWell>(find.byType(InkWell));
     expect(inkwell.onTap, isNull);
   });
