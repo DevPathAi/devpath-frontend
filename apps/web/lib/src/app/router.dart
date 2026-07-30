@@ -11,6 +11,7 @@ import '../features/beta/presentation/beta_pending_page.dart';
 import '../features/consent/presentation/consent_page.dart';
 import '../features/content/presentation/content_page.dart';
 import '../features/community/presentation/community_home_page.dart';
+import '../features/community/presentation/post_create_page.dart';
 import '../features/community/presentation/post_detail_page.dart';
 import '../features/community/presentation/qna_detail_page.dart';
 import '../features/community/presentation/question_create_page.dart';
@@ -117,6 +118,13 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/community/new',
             builder: (_, _) => const QuestionCreatePage(),
+          ),
+          // 일반 게시글 작성(FREE/FEEDBACK) — ?board= 프리셋.
+          GoRoute(
+            path: '/community/new/post',
+            builder: (_, state) => PostCreatePage(
+              board: state.uri.queryParameters['board'] ?? 'FREE',
+            ),
           ),
           // 일반 게시글(FREE/FEEDBACK) 상세 — '/community/:id'(Q&A)보다 먼저 선언해
           // '/community/post/:id'가 :id로 흡수되지 않도록 한다.

@@ -115,6 +115,21 @@ final Map<String, MockFixture> webMockFixtures = {
     },
   ),
   'POST /community/posts/10/vote': (200, <String, dynamic>{}),
+  // 일반 게시글 작성(FREE/FEEDBACK) → PostDetailView.
+  'POST /community/posts': (
+    201,
+    {
+      'id': 30,
+      'boardType': 'FREE',
+      'title': '새 자유글',
+      'bodyMd': '본문',
+      'authorId': 1,
+      'upvoteCount': 0,
+      'downvoteCount': 0,
+      'tags': <String>[],
+      'comments': <Map<String, dynamic>>[],
+    },
+  ),
   // 커뮤니티 Q&A 상세(COM-003) — QuestionDetailView(인간/AI 답변 스레드).
   'GET /community/questions/1': (
     200,
