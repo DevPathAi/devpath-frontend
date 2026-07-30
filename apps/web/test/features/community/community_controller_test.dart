@@ -61,9 +61,7 @@ void main() {
     );
     addTearDown(c.dispose);
 
-    await c
-        .read(communityControllerProvider.notifier)
-        .load(sort: 'unanswered');
+    await c.read(communityControllerProvider.notifier).load(sort: 'unanswered');
     expect(seenSort, 'unanswered');
   });
 

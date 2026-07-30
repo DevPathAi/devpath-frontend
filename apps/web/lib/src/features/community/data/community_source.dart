@@ -172,7 +172,8 @@ typedef PostCreate =
 typedef PostDetailFetch = Future<CommunityPostDetail> Function(int id);
 
 /// 댓글 작성 `POST /community/posts/{id}/comments {bodyMd}` → `CommentView`.
-typedef CommentCreate = Future<CommunityComment> Function(int postId, String bodyMd);
+typedef CommentCreate =
+    Future<CommunityComment> Function(int postId, String bodyMd);
 
 final postCreateProvider = Provider<PostCreate>((ref) {
   final client = ref.watch(apiClientProvider);

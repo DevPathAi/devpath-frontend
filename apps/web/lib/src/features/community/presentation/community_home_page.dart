@@ -198,7 +198,10 @@ class _BoardBadge extends StatelessWidget {
       _ => 'Q&A',
     };
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: DpSpacing.xs, vertical: 2),
+      padding: const EdgeInsets.symmetric(
+        horizontal: DpSpacing.xs,
+        vertical: 2,
+      ),
       margin: const EdgeInsets.only(right: DpSpacing.xs),
       decoration: BoxDecoration(
         color: c.border,

@@ -7,12 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
-CommunityPostDetail _created(int id, String board) => CommunityPostDetail(
-  id: id,
-  boardType: board,
-  title: '새 글',
-  bodyMd: '본문',
-);
+CommunityPostDetail _created(int id, String board) =>
+    CommunityPostDetail(id: id, boardType: board, title: '새 글', bodyMd: '본문');
 
 Widget _host(ProviderContainer c, {String board = 'FREE'}) {
   final router = GoRouter(
@@ -39,8 +35,12 @@ void main() {
     final c = ProviderContainer(
       overrides: [
         postCreateProvider.overrideWithValue(
-          ({required boardType, required title, required bodyMd, required tags}) async =>
-              _created(30, boardType),
+          ({
+            required boardType,
+            required title,
+            required bodyMd,
+            required tags,
+          }) async => _created(30, boardType),
         ),
       ],
     );
@@ -57,8 +57,12 @@ void main() {
     final c = ProviderContainer(
       overrides: [
         postCreateProvider.overrideWithValue(
-          ({required boardType, required title, required bodyMd, required tags}) async =>
-              _created(31, boardType),
+          ({
+            required boardType,
+            required title,
+            required bodyMd,
+            required tags,
+          }) async => _created(31, boardType),
         ),
       ],
     );
@@ -69,7 +73,9 @@ void main() {
     expect(find.text('피드백 요청'), findsOneWidget);
   });
 
-  testWidgets('제목·본문 입력 후 게시하면 postCreate(boardType) 호출 + 상세로 이동', (tester) async {
+  testWidgets('제목·본문 입력 후 게시하면 postCreate(boardType) 호출 + 상세로 이동', (
+    tester,
+  ) async {
     String? seenBoard, seenTitle, seenBody;
     List<String>? seenTags;
     final c = ProviderContainer(

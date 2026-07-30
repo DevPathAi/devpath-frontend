@@ -98,10 +98,7 @@ class _Loaded extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(DpSpacing.lg),
       children: [
-        Text(
-          detail.title,
-          style: Theme.of(context).textTheme.headlineSmall,
-        ),
+        Text(detail.title, style: Theme.of(context).textTheme.headlineSmall),
         if (detail.tags.isNotEmpty) ...[
           const SizedBox(height: DpSpacing.sm),
           Wrap(
@@ -118,7 +115,10 @@ class _Loaded extends StatelessWidget {
               tooltip: '추천',
               onPressed: submitting ? null : onUpvote,
             ),
-            Text('${detail.upvoteCount}', style: TextStyle(color: c.textSecondary)),
+            Text(
+              '${detail.upvoteCount}',
+              style: TextStyle(color: c.textSecondary),
+            ),
           ],
         ),
         const SizedBox(height: DpSpacing.md),
