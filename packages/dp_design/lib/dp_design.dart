@@ -5,6 +5,7 @@ export 'src/theme/dp_colors.dart';
 export 'src/theme/dp_spacing.dart';
 export 'src/theme/dp_typography.dart';
 export 'src/theme/dp_theme.dart';
+export 'src/theme/dp_tokens.dart';
 export 'src/icons/dp_icons.dart';
 export 'src/a11y/dp_tap_target.dart';
 export 'src/states/dp_state_scaffold.dart';

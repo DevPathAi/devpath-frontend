@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'dp_colors.dart';
+import 'dp_tokens.dart';
 import 'dp_typography.dart';
 
 /// DESIGN.md 토큰을 ThemeData로 조립. 타이포는 Task 2에서 textTheme 주입.
@@ -31,7 +32,7 @@ abstract final class DpTheme {
         brightness,
       ).apply(bodyColor: c.textPrimary, displayColor: c.textPrimary),
       fontFamily: DpTypography.family,
-      extensions: [c],
+      extensions: [c, AppTokens.standard],
       // 포커스 가시성(DD7): 2px primaryText 링은 컴포넌트에서 FocusRing로 적용.
     );
   }
