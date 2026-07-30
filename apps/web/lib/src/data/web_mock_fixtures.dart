@@ -81,6 +81,40 @@ final Map<String, MockFixture> webMockFixtures = {
       },
     ],
   ),
+  // 일반 게시글(FREE) 상세 — PostDetailView(댓글 스레드).
+  'GET /community/posts/10': (
+    200,
+    {
+      'id': 10,
+      'boardType': 'FREE',
+      'title': '오늘 배운 것 공유',
+      'bodyMd': '# 공유\n\n오늘 `Riverpod`을 배웠어요.',
+      'authorId': 8,
+      'upvoteCount': 5,
+      'downvoteCount': 0,
+      'tags': ['riverpod'],
+      'comments': [
+        {
+          'id': 100,
+          'authorId': 42,
+          'bodyMd': '좋은 정리네요!',
+          'upvoteCount': 0,
+          'createdAt': '2026-07-29T00:00:00Z',
+        },
+      ],
+    },
+  ),
+  'POST /community/posts/10/comments': (
+    201,
+    {
+      'id': 101,
+      'authorId': 1,
+      'bodyMd': '새 댓글',
+      'upvoteCount': 0,
+      'createdAt': '2026-07-29T01:00:00Z',
+    },
+  ),
+  'POST /community/posts/10/vote': (200, <String, dynamic>{}),
   // 커뮤니티 Q&A 상세(COM-003) — QuestionDetailView(인간/AI 답변 스레드).
   'GET /community/questions/1': (
     200,
