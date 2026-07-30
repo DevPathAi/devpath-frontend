@@ -13,6 +13,8 @@ export 'src/layout/dp_scrollbar.dart';
 export 'src/layout/dp_window_class.dart';
 export 'src/shell/dp_destination.dart';
 export 'src/shell/dp_app_shell.dart';
+export 'src/shell/dp_command.dart';
+export 'src/shell/dp_command_palette.dart';
 export 'src/interaction/dp_interactive_card.dart';
 export 'src/icons/dp_icons.dart';
 export 'src/a11y/dp_tap_target.dart';
