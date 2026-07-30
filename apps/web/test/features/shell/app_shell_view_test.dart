@@ -47,4 +47,25 @@ void main() {
     await tester.tap(find.text('멘토'));
     expect(picked, '/mentor');
   });
+
+  testWidgets('중간 폭(600–839)은 접힌 NavigationRail(하단 Bar 아님)', (tester) async {
+    _setWidth(tester, 700);
+    await tester.pumpWidget(
+      _host(const AppShellView(location: '/dashboard', child: Text('본문'))),
+    );
+    expect(find.byType(NavigationRail), findsOneWidget);
+    expect(find.byType(NavigationBar), findsNothing);
+    final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
+    expect(rail.extended, isFalse);
+  });
+
+  testWidgets('Large 폭(≥1240)은 펼친 Rail + 본문 최대폭 제약', (tester) async {
+    _setWidth(tester, 1400);
+    await tester.pumpWidget(
+      _host(const AppShellView(location: '/dashboard', child: Text('본문'))),
+    );
+    final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
+    expect(rail.extended, isTrue);
+    expect(find.byType(DpMaxWidth), findsOneWidget);
+  });
 }
