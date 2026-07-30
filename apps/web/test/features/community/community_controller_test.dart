@@ -45,8 +45,8 @@ void main() {
     expect(s.error, '네트워크 오류');
   });
 
-  test('load: board/tag/sort 필터를 데이터 레이어로 전달한다', () async {
-    String? seenBoard, seenSort;
+  test('load: sort 필터를 데이터 레이어로 전달한다', () async {
+    String? seenSort;
     final c = ProviderContainer(
       overrides: [
         communityListProvider.overrideWithValue(({
@@ -54,7 +54,6 @@ void main() {
           String? tag,
           String? sort,
         }) async {
-          seenBoard = board;
           seenSort = sort;
           return const [];
         }),
@@ -64,8 +63,52 @@ void main() {
 
     await c
         .read(communityControllerProvider.notifier)
-        .load(board: 'QNA', sort: 'unanswered');
-    expect(seenBoard, 'QNA');
+        .load(sort: 'unanswered');
     expect(seenSort, 'unanswered');
+  });
+
+  test('selectBoard: 필터를 board 파라미터로 전달하고 재조회', () async {
+    String? seenBoard;
+    final c = ProviderContainer(
+      overrides: [
+        communityListProvider.overrideWithValue(({
+          String? board,
+          String? tag,
+          String? sort,
+        }) async {
+          seenBoard = board;
+          return const [];
+        }),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    await c
+        .read(communityControllerProvider.notifier)
+        .selectBoard(CommunityBoard.free);
+    expect(seenBoard, 'FREE');
+    expect(c.read(communityControllerProvider).board, CommunityBoard.free);
+  });
+
+  test('selectBoard.all: board=null(전체)로 조회', () async {
+    String? seenBoard = 'sentinel';
+    final c = ProviderContainer(
+      overrides: [
+        communityListProvider.overrideWithValue(({
+          String? board,
+          String? tag,
+          String? sort,
+        }) async {
+          seenBoard = board;
+          return const [];
+        }),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    await c
+        .read(communityControllerProvider.notifier)
+        .selectBoard(CommunityBoard.all);
+    expect(seenBoard, isNull);
   });
 }
