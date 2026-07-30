@@ -62,7 +62,7 @@ class _PostList extends StatelessWidget {
         final p = posts[i];
         return ListTile(
           title: Text(p.title),
-          subtitle: Text('답변 ${p.answerCount} · 추천 ${p.upvoteCount}'),
+          subtitle: Text('답변 ${p.replyCount} · 추천 ${p.upvoteCount}'),
           trailing: p.solved
               ? const Icon(DpIcons.stepDone)
               : const Icon(Icons.chevron_right),

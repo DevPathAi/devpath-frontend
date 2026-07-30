@@ -72,7 +72,7 @@ final Map<String, MockFixture> mobileMockFixtures = {
         'authorId': 42,
         'solved': true,
         'upvoteCount': 3,
-        'answerCount': 2,
+        'replyCount': 2,
       },
       {
         'id': 2,
@@ -80,7 +80,7 @@ final Map<String, MockFixture> mobileMockFixtures = {
         'authorId': 17,
         'solved': false,
         'upvoteCount': 1,
-        'answerCount': 1,
+        'replyCount': 1,
       },
     ],
   ),

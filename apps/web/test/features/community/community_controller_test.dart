@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 CommunityPostSummary _p(int id) =>
-    CommunityPostSummary(id: id, title: '글 $id', answerCount: 1);
+    CommunityPostSummary(id: id, title: '글 $id', replyCount: 1);
 
 void main() {
   test('load: bare 배열을 목록으로 채운다(페이지네이션 없음)', () async {

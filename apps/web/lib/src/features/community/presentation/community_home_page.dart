@@ -77,7 +77,7 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
                   ],
                 ),
                 subtitle: Text(
-                  '답변 ${p.answerCount} · 추천 ${p.upvoteCount}',
+                  '답변 ${p.replyCount} · 추천 ${p.upvoteCount}',
                   style: TextStyle(color: c.textSecondary),
                 ),
                 onTap: () => context.go('/community/${p.id}'),

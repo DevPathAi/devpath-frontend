@@ -12,7 +12,7 @@ CommunityPostSummary _p(int id, {String? title, bool solved = false}) =>
       id: id,
       title: title ?? '글 $id',
       solved: solved,
-      answerCount: 1,
+      replyCount: 1,
     );
 
 Widget _host(ProviderContainer c) {
