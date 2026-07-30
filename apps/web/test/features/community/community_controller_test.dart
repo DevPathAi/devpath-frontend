@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 CommunityPostSummary _p(int id) =>
-    CommunityPostSummary(id: id, title: '글 $id', answerCount: 1);
+    CommunityPostSummary(id: id, title: '글 $id', replyCount: 1);
 
 void main() {
   test('load: bare 배열을 목록으로 채운다(페이지네이션 없음)', () async {
@@ -45,8 +45,28 @@ void main() {
     expect(s.error, '네트워크 오류');
   });
 
-  test('load: board/tag/sort 필터를 데이터 레이어로 전달한다', () async {
-    String? seenBoard, seenSort;
+  test('load: sort 필터를 데이터 레이어로 전달한다', () async {
+    String? seenSort;
+    final c = ProviderContainer(
+      overrides: [
+        communityListProvider.overrideWithValue(({
+          String? board,
+          String? tag,
+          String? sort,
+        }) async {
+          seenSort = sort;
+          return const [];
+        }),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    await c.read(communityControllerProvider.notifier).load(sort: 'unanswered');
+    expect(seenSort, 'unanswered');
+  });
+
+  test('selectBoard: 필터를 board 파라미터로 전달하고 재조회', () async {
+    String? seenBoard;
     final c = ProviderContainer(
       overrides: [
         communityListProvider.overrideWithValue(({
@@ -55,7 +75,6 @@ void main() {
           String? sort,
         }) async {
           seenBoard = board;
-          seenSort = sort;
           return const [];
         }),
       ],
@@ -64,8 +83,30 @@ void main() {
 
     await c
         .read(communityControllerProvider.notifier)
-        .load(board: 'QNA', sort: 'unanswered');
-    expect(seenBoard, 'QNA');
-    expect(seenSort, 'unanswered');
+        .selectBoard(CommunityBoard.free);
+    expect(seenBoard, 'FREE');
+    expect(c.read(communityControllerProvider).board, CommunityBoard.free);
+  });
+
+  test('selectBoard.all: board=null(전체)로 조회', () async {
+    String? seenBoard = 'sentinel';
+    final c = ProviderContainer(
+      overrides: [
+        communityListProvider.overrideWithValue(({
+          String? board,
+          String? tag,
+          String? sort,
+        }) async {
+          seenBoard = board;
+          return const [];
+        }),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    await c
+        .read(communityControllerProvider.notifier)
+        .selectBoard(CommunityBoard.all);
+    expect(seenBoard, isNull);
   });
 }

@@ -47,35 +47,88 @@ final Map<String, MockFixture> webMockFixtures = {
       'completedAt': '2026-06-21T10:00:00Z',
     },
   ),
-  // 커뮤니티 Q&A 목록(COM-001) — 실계약: bare 배열(PostSummaryView), 페이지네이션 없음.
+  // 커뮤니티 통합 피드(COM-001) — 실계약: bare 배열(PostSummaryView), 페이지네이션 없음.
+  // 전 보드(QNA/FREE/FEEDBACK) 혼합. boardType·replyCount(QNA=답변/일반=댓글) 포함.
   'GET /community/posts': (
     200,
     [
       {
         'id': 1,
+        'boardType': 'QNA',
         'title': 'async/await가 헷갈려요',
         'authorId': 42,
         'solved': true,
         'upvoteCount': 3,
-        'answerCount': 2,
+        'replyCount': 2,
       },
       {
-        'id': 2,
-        'title': 'Stream 구독 해제는?',
-        'authorId': 17,
-        'solved': false,
-        'upvoteCount': 1,
-        'answerCount': 1,
-      },
-      {
-        'id': 3,
-        'title': 'Riverpod Notifier 패턴',
+        'id': 10,
+        'boardType': 'FREE',
+        'title': '오늘 배운 것 공유',
         'authorId': 8,
         'solved': false,
         'upvoteCount': 5,
-        'answerCount': 0,
+        'replyCount': 4,
+      },
+      {
+        'id': 20,
+        'boardType': 'FEEDBACK',
+        'title': '제 코드 리뷰 부탁해요',
+        'authorId': 17,
+        'solved': false,
+        'upvoteCount': 1,
+        'replyCount': 1,
       },
     ],
+  ),
+  // 일반 게시글(FREE) 상세 — PostDetailView(댓글 스레드).
+  'GET /community/posts/10': (
+    200,
+    {
+      'id': 10,
+      'boardType': 'FREE',
+      'title': '오늘 배운 것 공유',
+      'bodyMd': '# 공유\n\n오늘 `Riverpod`을 배웠어요.',
+      'authorId': 8,
+      'upvoteCount': 5,
+      'downvoteCount': 0,
+      'tags': ['riverpod'],
+      'comments': [
+        {
+          'id': 100,
+          'authorId': 42,
+          'bodyMd': '좋은 정리네요!',
+          'upvoteCount': 0,
+          'createdAt': '2026-07-29T00:00:00Z',
+        },
+      ],
+    },
+  ),
+  'POST /community/posts/10/comments': (
+    201,
+    {
+      'id': 101,
+      'authorId': 1,
+      'bodyMd': '새 댓글',
+      'upvoteCount': 0,
+      'createdAt': '2026-07-29T01:00:00Z',
+    },
+  ),
+  'POST /community/posts/10/vote': (200, <String, dynamic>{}),
+  // 일반 게시글 작성(FREE/FEEDBACK) → PostDetailView.
+  'POST /community/posts': (
+    201,
+    {
+      'id': 30,
+      'boardType': 'FREE',
+      'title': '새 자유글',
+      'bodyMd': '본문',
+      'authorId': 1,
+      'upvoteCount': 0,
+      'downvoteCount': 0,
+      'tags': <String>[],
+      'comments': <Map<String, dynamic>>[],
+    },
   ),
   // 커뮤니티 Q&A 상세(COM-003) — QuestionDetailView(인간/AI 답변 스레드).
   'GET /community/questions/1': (

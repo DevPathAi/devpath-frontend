@@ -23,14 +23,14 @@ void main() {
       'authorId': 42,
       'solved': false,
       'upvoteCount': 3,
-      'answerCount': 2,
+      'replyCount': 2,
     });
     expect(p.id, 1);
     expect(p.title, 'async 질문');
     expect(p.authorId, 42);
     expect(p.solved, isFalse);
     expect(p.upvoteCount, 3);
-    expect(p.answerCount, 2);
+    expect(p.replyCount, 2);
   });
 
   test('CommunityQuestionDetail 역직렬화(답변 스레드·AI 뱃지 플래그)', () {

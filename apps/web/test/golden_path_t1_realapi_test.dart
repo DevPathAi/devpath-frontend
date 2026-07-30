@@ -43,7 +43,7 @@ void main() {
               const CommunityPostSummary(
                 id: 1,
                 title: '실API 골든패스 질문',
-                answerCount: 2,
+                replyCount: 2,
               ),
             ],
           ),
