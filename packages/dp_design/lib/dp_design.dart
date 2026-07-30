@@ -10,6 +10,7 @@ export 'src/theme/dp_state_style.dart';
 export 'src/layout/dp_max_width.dart';
 export 'src/layout/dp_selectable.dart';
 export 'src/layout/dp_scrollbar.dart';
+export 'src/interaction/dp_interactive_card.dart';
 export 'src/icons/dp_icons.dart';
 export 'src/a11y/dp_tap_target.dart';
 export 'src/states/dp_state_scaffold.dart';
