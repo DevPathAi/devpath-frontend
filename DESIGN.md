@@ -83,6 +83,17 @@ Material 3 타입 스케일(Pretendard 적용):
 - **라운드**: 칩 `12` · 버튼 `8` · 카드/패널 `10` · 입력 `8` · 다이얼로그 `12`.
 - **고도/그림자**: 장식용 그림자 금지(APP UI). 보더(`border` 토큰) 우선, 그림자는 오버레이(드롭다운·다이얼로그·시트)에만.
 
+**레이아웃 토큰(`AppTokens` — 밝기 무관)**
+| 토큰 | 값 | 용도 |
+|---|---|---|
+| `contentMaxWidth` | 1440 | Large 본문 최대 폭 |
+| `readableMaxWidth` | 880 | 문서·상세 읽기 폭 |
+| `railWidth` | 256 | 확장 rail 폭 |
+| `railCollapsedWidth` | 72 | Medium 접힘 rail 폭 |
+| `panelRadius` | 10 | 패널 반경(=카드) |
+
+> 소비: `context.appTokens`. 최대폭 제약은 `DpMaxWidth`, 상태 스타일은 `DpStateStyle`, 클릭 카드 베이스는 `DpInteractiveCard`, 텍스트 선택은 `DpSelectable`, 스크롤바는 `DpScrollbar`. (UI/UX 고도화 로드맵 Phase 0 산출.)
+
 ## 4. 아이콘
 
 - **Material Symbols**(Rounded, weight 400) 단일 아이콘셋. `dp_design/icons`에 매핑.
