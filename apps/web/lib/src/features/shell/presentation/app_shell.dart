@@ -13,7 +13,7 @@ const List<ShellDestination> kShellDestinations = [
   (path: '/settings', icon: DpIcons.settings, label: '설정'),
 ];
 
-/// 라우터 결합 셸: 현재 위치를 읽고 표현부에 위임.
+/// 라우터 결합 셸: 위치를 읽고, 명령 팔레트로 감싸 표현부에 위임.
 class AppShell extends StatelessWidget {
   const AppShell({super.key, required this.child});
   final Widget child;
@@ -21,15 +21,26 @@ class AppShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final loc = GoRouterState.of(context).matchedLocation;
-    return AppShellView(
-      location: loc,
-      onSelect: (path) => context.go(path),
-      child: child,
+    return DpCommandPalette(
+      commands: [
+        for (final d in kShellDestinations)
+          (
+            id: d.path,
+            label: d.label,
+            icon: d.icon,
+            onInvoke: () => context.go(d.path),
+          ),
+      ],
+      child: AppShellView(
+        location: loc,
+        onSelect: (path) => context.go(path),
+        child: child,
+      ),
     );
   }
 }
 
-/// 표현부: go_router 비의존 — 폭에 따라 NavigationBar/Rail 전환(§9.3).
+/// 표현부: go_router 비의존 — DpAppShell(4-클래스 반응형)로 위임.
 class AppShellView extends StatelessWidget {
   const AppShellView({
     super.key,
@@ -47,58 +58,29 @@ class AppShellView extends StatelessWidget {
     return i < 0 ? 0 : i;
   }
 
-  void _select(int i) => onSelect?.call(kShellDestinations[i].path);
-
   @override
   Widget build(BuildContext context) {
-    final wide = MediaQuery.sizeOf(context).width >= 840;
-
-    if (wide) {
-      return Scaffold(
-        body: Row(
-          children: [
-            NavigationRail(
-              selectedIndex: _index,
-              onDestinationSelected: _select,
-              labelType: NavigationRailLabelType.all,
-              trailing: Expanded(
-                child: Align(
-                  alignment: Alignment.bottomCenter,
-                  child: Padding(
-                    padding: const EdgeInsets.only(bottom: DpSpacing.md),
-                    child: IconButton(
-                      icon: const Icon(Icons.account_circle),
-                      tooltip: '마이페이지',
-                      onPressed: () => onSelect?.call('/mypage'),
-                    ),
-                  ),
-                ),
-              ),
-              destinations: [
-                for (final d in kShellDestinations)
-                  NavigationRailDestination(
-                    icon: Icon(d.icon),
-                    label: Text(d.label),
-                  ),
-              ],
-            ),
-            const VerticalDivider(width: 1),
-            Expanded(child: child),
-          ],
+    return DpAppShell(
+      selectedIndex: _index,
+      onSelect: (i) => onSelect?.call(kShellDestinations[i].path),
+      destinations: [
+        for (final d in kShellDestinations)
+          (icon: d.icon, label: d.label, badgeCount: 0),
+      ],
+      trailing: Builder(
+        builder: (context) => IconButton(
+          icon: const Icon(DpIcons.search),
+          tooltip: '명령 팔레트 (Ctrl/Cmd+K)',
+          onPressed: () =>
+              Actions.invoke(context, const OpenCommandPaletteIntent()),
         ),
-      );
-    }
-
-    return Scaffold(
-      body: child,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: _select,
-        destinations: [
-          for (final d in kShellDestinations)
-            NavigationDestination(icon: Icon(d.icon), label: d.label),
-        ],
       ),
+      accountSlot: IconButton(
+        icon: const Icon(Icons.account_circle),
+        tooltip: '마이페이지',
+        onPressed: () => onSelect?.call('/mypage'),
+      ),
+      body: child,
     );
   }
 }
