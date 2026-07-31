@@ -23,9 +23,7 @@ class DashboardBody extends StatelessWidget {
 
     // 셀 폭 배분(cross열 기준): CTA는 넓게, KPI는 1열, 도넛/배지는 폭별 조정.
     final ctaSpan = cross >= 4 ? 2 : cross;
-    final donutSpan = cross >= 4
-        ? 2
-        : (cross == 2 ? 2 : 1);
+    final donutSpan = cross >= 4 ? 2 : (cross == 2 ? 2 : 1);
     final badgeSpan = cross;
 
     final tiles = <StaggeredGridTile>[

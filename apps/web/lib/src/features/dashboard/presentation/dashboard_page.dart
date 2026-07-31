@@ -1,10 +1,21 @@
+import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 
 import '../application/dashboard_controller.dart';
 import '../state/dashboard_state.dart';
 import 'widgets/dashboard_body.dart';
+
+/// 로딩 스켈레톤이 실제 카드 구조를 반영하도록 DashboardBody에 주입하는 자리표시 요약.
+const _skeletonSummary = DashboardSummary(
+  streakDays: 0,
+  progressPercent: 0,
+  nextTaskTitle: '불러오는 중 자리표시자 텍스트',
+  badges: ['배지', '배지'],
+  completedContentCount: 0,
+);
 
 class DashboardPage extends ConsumerStatefulWidget {
   const DashboardPage({super.key});
@@ -27,14 +38,26 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     final s = ref.watch(dashboardControllerProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('대시보드')),
-      body: switch (s) {
-        DashLoading() => const DpLoading(),
-        DashFailed(:final message) => DpError(
-          message: message,
-          onRetry: () => ref.read(dashboardControllerProvider.notifier).load(),
-        ),
-        DashLoaded(:final summary) => DashboardBody(summary: summary),
-      },
+      body: AnimatedSwitcher(
+        key: const ValueKey('dash-switcher'),
+        duration: DpDurations.stageReveal,
+        child: switch (s) {
+          DashLoading() => const Skeletonizer(
+            key: ValueKey('loading'),
+            child: DashboardBody(summary: _skeletonSummary),
+          ),
+          DashFailed(:final message) => DpError(
+            key: const ValueKey('error'),
+            message: message,
+            onRetry: () =>
+                ref.read(dashboardControllerProvider.notifier).load(),
+          ),
+          DashLoaded(:final summary) => DashboardBody(
+            key: const ValueKey('loaded'),
+            summary: summary,
+          ),
+        },
+      ),
     );
   }
 }

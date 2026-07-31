@@ -61,7 +61,7 @@ class DpKpiCard extends StatelessWidget {
             TweenAnimationBuilder<int>(
               duration: countUpDuration,
               tween: IntTween(begin: 0, end: value),
-              builder: (_, v, __) => Text(
+              builder: (_, v, _) => Text(
                 '$v${suffix ?? ''}',
                 style: text.displaySmall?.copyWith(color: c.primaryText),
               ),
