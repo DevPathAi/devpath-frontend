@@ -8,6 +8,8 @@
 
 **Tech Stack:** Java 21 · Spring Boot 4 · NamedParameterJdbcTemplate · JUnit 5 + Mockito + AssertJ · Flutter Web · freezed/json_serializable · fl_chart 1.2.0 · flutter_test · melos.
 
+> **구현 편차(2026-07-31)**: 백엔드 DTO `DailyActivity`·`ProgressPoint`의 `date`는 계획의 `LocalDate` 대신 **`String`(ISO `yyyy-MM-dd`)** 으로 구현했다. 이유: (1) 프론트 dp_core도 `String date` — 계약 대칭, (2) Jackson java.time 모듈이 이 서비스 테스트 classpath에 미해결이라 `LocalDate` 직렬화가 취약, (3) JSON 와이어 계약(`"date":"2026-07-31"`)은 양쪽 동일. 헬퍼는 DTO 경계에서 `LocalDate.toString()` 변환. Task 1의 JSON 테스트는 `@JsonTest` 대신 순수 `ObjectMapper`(모듈 불필요)로 수행. 나머지 Task 코드/계약은 계획대로.
+
 ## Global Constraints
 
 - **TDD 필수**(CLAUDE.md 규칙 2): 각 기능은 실패 테스트 선작성 → 최소 구현 → 통과 확인. 테스트 없는 구현 변경 금지.
