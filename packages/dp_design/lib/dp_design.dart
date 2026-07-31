@@ -28,3 +28,4 @@ export 'src/states/dp_sandbox_unavailable.dart';
 export 'src/states/dp_offline_banner.dart';
 export 'src/states/dp_sse_stage.dart';
 export 'src/content/dp_markdown.dart';
+export 'src/data/dp_kpi_card.dart';
