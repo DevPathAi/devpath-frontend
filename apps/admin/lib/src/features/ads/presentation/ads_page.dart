@@ -2,6 +2,7 @@ import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../widgets/bulk_action_bar.dart';
 import '../application/ads_controller.dart';
 import '../data/ad_row.dart';
 import '../data/ad_stats_row.dart';
@@ -67,43 +68,68 @@ class _AdsPageState extends ConsumerState<AdminAdsPage> {
           ),
         ),
       ),
-      body: switch (s.phase) {
-        AdsPhase.loading => const DpLoading(),
-        AdsPhase.failed => DpError(message: s.error ?? '오류', onRetry: n.load),
-        AdsPhase.loaded when s.rows.isEmpty => DpEmpty(
-          icon: DpIcons.ads,
-          title: '광고가 없어요',
-          actionLabel: '광고 생성',
-          onAction: () => _openForm(context, n, null),
-        ),
-        AdsPhase.loaded => DpDataTable(
-          minWidth: 760,
-          columns: [
-            DataColumn2(label: const Text('제목')),
-            DataColumn2(label: const Text('슬롯')),
-            DataColumn2(label: const Text('가중치')),
-            DataColumn2(label: const Text('상태')),
-            DataColumn2(label: const Text('액션'), fixedWidth: 64),
-          ],
-          rows: [
-            for (final r in s.rows)
-              DataRow2(
-                cells: [
-                  DataCell(Text(r.title)),
-                  DataCell(Text(r.slot)),
-                  DataCell(Text('${r.weight}')),
-                  DataCell(
-                    Switch(
-                      value: r.status == 'ACTIVE',
-                      onChanged: (_) => n.toggleStatus(r),
-                    ),
+      body: Column(
+        children: [
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 180),
+            child: s.selectedIds.isEmpty
+                ? const SizedBox.shrink()
+                : BulkActionBar(
+                    key: const Key('ads-bulk-bar'),
+                    count: s.selectedIds.length,
+                    actionLabel: '삭제',
+                    onAction: n.bulkDelete,
+                    onClear: n.clearSelection,
                   ),
-                  DataCell(_rowMenu(context, n, r)),
+          ),
+          Expanded(
+            child: switch (s.phase) {
+              AdsPhase.loading => const DpLoading(),
+              AdsPhase.failed => DpError(
+                message: s.error ?? '오류',
+                onRetry: n.load,
+              ),
+              AdsPhase.loaded when s.rows.isEmpty => DpEmpty(
+                icon: DpIcons.ads,
+                title: '광고가 없어요',
+                actionLabel: '광고 생성',
+                onAction: () => _openForm(context, n, null),
+              ),
+              AdsPhase.loaded => DpDataTable(
+                minWidth: 760,
+                showCheckboxColumn: true,
+                onSelectAll: (v) => n.selectAll(v ?? false),
+                columns: [
+                  DataColumn2(label: const Text('제목')),
+                  DataColumn2(label: const Text('슬롯')),
+                  DataColumn2(label: const Text('가중치')),
+                  DataColumn2(label: const Text('상태')),
+                  DataColumn2(label: const Text('액션'), fixedWidth: 64),
+                ],
+                rows: [
+                  for (final r in s.rows)
+                    DataRow2(
+                      selected: s.selectedIds.contains(r.id),
+                      onSelectChanged: (_) => n.toggleSelect(r.id!),
+                      cells: [
+                        DataCell(Text(r.title)),
+                        DataCell(Text(r.slot)),
+                        DataCell(Text('${r.weight}')),
+                        DataCell(
+                          Switch(
+                            value: r.status == 'ACTIVE',
+                            onChanged: (_) => n.toggleStatus(r),
+                          ),
+                        ),
+                        DataCell(_rowMenu(context, n, r)),
+                      ],
+                    ),
                 ],
               ),
-          ],
-        ),
-      },
+            },
+          ),
+        ],
+      ),
     );
   }
 

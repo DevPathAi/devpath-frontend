@@ -89,4 +89,28 @@ void main() {
     expect(find.widgetWithText(MenuItemButton, '통계'), findsOneWidget);
     expect(find.widgetWithText(MenuItemButton, '삭제'), findsOneWidget);
   });
+
+  testWidgets('ads_page: 행 선택 시 벌크바 등장', (tester) async {
+    tester.view.physicalSize = const Size(1400, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          adsListProvider.overrideWithValue(
+            ({slot, status}) async => [_ad(1, '첫 배너')],
+          ),
+          adSettingsGetProvider.overrideWithValue(() async => false),
+        ],
+        child: MaterialApp(theme: DpTheme.light(), home: const AdminAdsPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('ads-bulk-bar')), findsNothing);
+    await tester.tap(find.byType(Checkbox).last);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('ads-bulk-bar')), findsOneWidget);
+  });
 }
