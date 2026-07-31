@@ -69,6 +69,14 @@ final adDeleteProvider = Provider<AdDelete>((ref) {
   return (id) => client.delete<void>('/admin/ads/$id');
 });
 
+typedef AdBulkDelete = Future<void> Function(List<int> ids);
+
+final adBulkDeleteProvider = Provider<AdBulkDelete>((ref) {
+  final client = ref.watch(apiClientProvider);
+  return (ids) =>
+      client.post<void>('/admin/ads/bulk-delete', body: {'ids': ids});
+});
+
 final adImageUploadProvider = Provider<AdImageUpload>((ref) {
   final client = ref.watch(apiClientProvider);
   return (id, bytes, filename, contentType) async {

@@ -69,6 +69,27 @@ class AdsController extends Notifier<AdsState> {
     await load();
   }
 
+  void toggleSelect(int id) {
+    final next = {...state.selectedIds};
+    next.contains(id) ? next.remove(id) : next.add(id);
+    state = state.copyWith(selectedIds: next);
+  }
+
+  void selectAll(bool selected) => state = state.copyWith(
+    selectedIds: selected
+        ? state.rows.map((r) => r.id).whereType<int>().toSet()
+        : <int>{},
+  );
+
+  void clearSelection() => state = state.copyWith(selectedIds: <int>{});
+
+  /// 선택된 광고 일괄 삭제 후 목록 재조회(새 state로 선택 초기화).
+  Future<void> bulkDelete() async {
+    if (state.selectedIds.isEmpty) return;
+    await ref.read(adBulkDeleteProvider)(state.selectedIds.toList());
+    await load();
+  }
+
   Future<void> toggleStatus(AdRow row) async {
     final next = row.status == 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
     await ref.read(adUpdateProvider)(row.id!, row.copyWith(status: next));
