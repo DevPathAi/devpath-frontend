@@ -8,6 +8,9 @@ import '../state/mentor_state.dart';
 
 const _kExamples = ['비동기란?', '테스트는 어떻게 작성하나요?', 'Riverpod이 뭔가요?'];
 
+/// 하단에서 이 픽셀 이내면 새 메시지·토큰을 자동 추종(더 멀면 사용자가 읽는 중으로 보고 억제).
+const double _kFollowThreshold = 120;
+
 class MentorPage extends ConsumerStatefulWidget {
   const MentorPage({super.key});
 
@@ -17,11 +20,25 @@ class MentorPage extends ConsumerStatefulWidget {
 
 class _MentorPageState extends ConsumerState<MentorPage> {
   final _input = TextEditingController();
+  final _scroll = ScrollController();
 
   @override
   void dispose() {
     _input.dispose();
+    _scroll.dispose();
     super.dispose();
+  }
+
+  /// 하단 근처일 때만 새 메시지·토큰을 하단으로 추종(위로 읽는 중이면 억제).
+  void _autoFollow() {
+    if (!_scroll.hasClients) return;
+    final pos = _scroll.position;
+    if (pos.maxScrollExtent - pos.pixels > _kFollowThreshold) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scroll.hasClients) {
+        _scroll.jumpTo(_scroll.position.maxScrollExtent);
+      }
+    });
   }
 
   void _send(String q) {
@@ -31,6 +48,16 @@ class _MentorPageState extends ConsumerState<MentorPage> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(mentorControllerProvider, (prev, next) {
+      final grew = (prev?.messages.length ?? 0) != next.messages.length;
+      final tailChanged =
+          prev != null &&
+          prev.messages.isNotEmpty &&
+          next.messages.isNotEmpty &&
+          prev.messages.last.text != next.messages.last.text;
+      if (grew || tailChanged) _autoFollow();
+    });
+
     final s = ref.watch(mentorControllerProvider);
     final c = context.dpColors;
 
@@ -45,6 +72,7 @@ class _MentorPageState extends ConsumerState<MentorPage> {
               child: s.messages.isEmpty
                   ? _Empty(onPick: _send)
                   : ListView.builder(
+                      controller: _scroll,
                       padding: const EdgeInsets.all(DpSpacing.lg),
                       itemCount: s.messages.length,
                       // ENG-REVIEW F9: 각 버블에 ValueKey 부여 + 스트리밍 중(마지막) 버블만
