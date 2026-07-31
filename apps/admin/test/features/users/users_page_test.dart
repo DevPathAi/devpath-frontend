@@ -8,7 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('테이블 렌더 + 행 선택 시 제재 패널', (tester) async {
+  testWidgets('테이블 렌더 + 행 MenuAnchor 제재 메뉴', (tester) async {
     tester.view.physicalSize = const Size(1400, 900);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
@@ -36,17 +36,15 @@ void main() {
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: c,
-        child: MaterialApp(
-          theme: DpTheme.light(),
-          home: const AdminUsersPage(),
-        ),
+        child: MaterialApp(theme: DpTheme.light(), home: const AdminUsersPage()),
       ),
     );
     await tester.pumpAndSettle();
 
     expect(find.text('지수'), findsOneWidget);
-    await tester.tap(find.text('지수'));
+    // 행 MenuAnchor 열기 → 제재 메뉴
+    await tester.tap(find.byIcon(DpIcons.moreVert));
     await tester.pumpAndSettle();
-    expect(find.text('영구 밴'), findsOneWidget); // 제재 패널
+    expect(find.text('영구 밴'), findsOneWidget);
   });
 }

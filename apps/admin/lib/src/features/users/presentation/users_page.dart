@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../application/users_controller.dart';
+import '../data/admin_user_row.dart';
 import '../state/users_state.dart';
 
 class AdminUsersPage extends ConsumerStatefulWidget {
@@ -27,6 +28,31 @@ class _S extends ConsumerState<AdminUsersPage> {
   void dispose() {
     _emailCtrl.dispose();
     super.dispose();
+  }
+
+  Widget _rowMenu(BuildContext context, UsersController n, AdminUserRow r) {
+    return MenuAnchor(
+      builder: (context, controller, child) => IconButton(
+        icon: const Icon(DpIcons.moreVert),
+        tooltip: '작업',
+        onPressed: () =>
+            controller.isOpen ? controller.close() : controller.open(),
+      ),
+      menuChildren: r.status == 'BETA_PENDING'
+          ? [
+              MenuItemButton(
+                onPressed: () => n.approve(r.id),
+                child: const Text('승인'),
+              ),
+            ]
+          : [
+              for (final a in const ['경고', '7일 정지', '30일 정지', '영구 밴'])
+                MenuItemButton(
+                  onPressed: () => n.sanction(r.id, a),
+                  child: Text(a),
+                ),
+            ],
+    );
   }
 
   @override
@@ -95,46 +121,26 @@ class _S extends ConsumerState<AdminUsersPage> {
                 actionLabel: '필터 초기화',
                 onAction: () => n.setStatusFilter('ACTIVE'),
               ),
-              UsersPhase.loaded => Row(
-                children: [
-                  // 테이블
-                  Expanded(
-                    flex: 3,
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: DataTable(
-                        columns: const [
-                          DataColumn(label: Text('닉네임')),
-                          DataColumn(label: Text('이메일')),
-                          DataColumn(label: Text('역할')),
-                          DataColumn(label: Text('상태')),
-                        ],
-                        rows: [
-                          for (final r in s.rows)
-                            DataRow(
-                              selected: s.selected?.id == r.id,
-                              onSelectChanged: (_) => n.select(r),
-                              cells: [
-                                DataCell(Text(r.nickname)),
-                                DataCell(Text(r.email)),
-                                DataCell(Text(r.role.name)),
-                                DataCell(Text(r.status)),
-                              ],
-                            ),
-                        ],
-                      ),
+              UsersPhase.loaded => DpDataTable(
+                minWidth: 720,
+                columns: [
+                  DataColumn2(label: const Text('닉네임')),
+                  DataColumn2(label: const Text('이메일')),
+                  DataColumn2(label: const Text('역할')),
+                  DataColumn2(label: const Text('상태')),
+                  DataColumn2(label: const Text('작업'), fixedWidth: 64),
+                ],
+                rows: [
+                  for (final r in s.rows)
+                    DataRow2(
+                      cells: [
+                        DataCell(Text(r.nickname)),
+                        DataCell(Text(r.email)),
+                        DataCell(Text(r.role.name)),
+                        DataCell(Text(r.status)),
+                        DataCell(_rowMenu(context, n, r)),
+                      ],
                     ),
-                  ),
-                  const VerticalDivider(width: 1),
-                  // 상세·제재 패널 (변경 2: onApprove 콜백 추가)
-                  Expanded(
-                    flex: 2,
-                    child: _SanctionPanel(
-                      selected: s.selected,
-                      onSanction: n.sanction,
-                      onApprove: (id) => n.approve(id),
-                    ),
-                  ),
                 ],
               ),
             },
@@ -188,58 +194,3 @@ class _PreApproveBar extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// 상세·제재 패널 (변경 2: BETA_PENDING이면 승인 버튼, 아니면 기존 제재 버튼)
-// ---------------------------------------------------------------------------
-class _SanctionPanel extends StatelessWidget {
-  const _SanctionPanel({
-    required this.selected,
-    required this.onSanction,
-    required this.onApprove,
-  });
-
-  final dynamic selected; // AdminUserRow?
-  final Future<void> Function(String userId, String action) onSanction;
-  final Future<void> Function(String userId) onApprove;
-
-  @override
-  Widget build(BuildContext context) {
-    if (selected == null) {
-      return const Center(child: Text('행을 선택하면 상세가 표시됩니다.'));
-    }
-    final r = selected;
-    return Padding(
-      padding: const EdgeInsets.all(DpSpacing.lg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(r.nickname, style: Theme.of(context).textTheme.titleMedium),
-          Text(r.email, style: Theme.of(context).textTheme.bodySmall),
-          const SizedBox(height: DpSpacing.lg),
-          // (변경 2) BETA_PENDING → 승인 버튼, 그 외 → 기존 제재 버튼
-          if (r.status == 'BETA_PENDING') ...[
-            Text('베타 승인', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: DpSpacing.sm),
-            FilledButton(
-              onPressed: () => onApprove(r.id),
-              child: const Text('승인'),
-            ),
-          ] else ...[
-            Text('제재', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: DpSpacing.sm),
-            Wrap(
-              spacing: DpSpacing.sm,
-              children: [
-                for (final a in const ['경고', '7일 정지', '30일 정지', '영구 밴'])
-                  OutlinedButton(
-                    onPressed: () => onSanction(r.id, a),
-                    child: Text(a),
-                  ),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
