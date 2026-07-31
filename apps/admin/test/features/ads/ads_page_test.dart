@@ -64,4 +64,29 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('링크 URL'), findsOneWidget); // 폼 필드 라벨
   });
+
+  testWidgets('행 MenuAnchor에 수정/통계/삭제가 있다', (tester) async {
+    tester.view.physicalSize = const Size(1400, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          adsListProvider.overrideWithValue(
+            ({slot, status}) async => [_ad(1, '첫 배너')],
+          ),
+          adSettingsGetProvider.overrideWithValue(() async => true),
+        ],
+        child: MaterialApp(theme: DpTheme.light(), home: const AdminAdsPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(DpIcons.moreVert));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(MenuItemButton, '수정'), findsOneWidget);
+    expect(find.widgetWithText(MenuItemButton, '통계'), findsOneWidget);
+    expect(find.widgetWithText(MenuItemButton, '삭제'), findsOneWidget);
+  });
 }

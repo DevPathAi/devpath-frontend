@@ -105,7 +105,7 @@ void main() {
   // -------------------------------------------------------------------------
   // (b) BETA_PENDING 행 선택 시 승인 버튼이 나타나고 탭하면 approve() 호출
   // -------------------------------------------------------------------------
-  testWidgets('(b) BETA_PENDING 행 선택 시 승인 버튼이 표시되고 탭하면 approve(id) 호출', (
+  testWidgets('(b) BETA_PENDING 행 메뉴에 승인이 있고 탭하면 approve(id) 호출', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(1400, 900);
@@ -119,27 +119,22 @@ void main() {
     await tester.pumpWidget(_wrap(c));
     await tester.pumpAndSettle();
 
-    // BETA_PENDING 행 선택
-    await tester.tap(find.text('대기자'));
+    // 첫 행(대기자, BETA_PENDING)의 MenuAnchor 열기
+    await tester.tap(find.byIcon(DpIcons.moreVert).first);
     await tester.pumpAndSettle();
 
-    // 승인 FilledButton이 있어야 한다
-    expect(find.widgetWithText(FilledButton, '승인'), findsOneWidget);
+    expect(find.widgetWithText(MenuItemButton, '승인'), findsOneWidget);
+    expect(find.text('영구 밴'), findsNothing); // BETA_PENDING엔 제재 없음
 
-    // 기존 제재 버튼은 없어야 한다
-    expect(find.text('영구 밴'), findsNothing);
-
-    // 승인 버튼 탭
-    await tester.tap(find.widgetWithText(FilledButton, '승인'));
+    await tester.tap(find.widgetWithText(MenuItemButton, '승인'));
     await tester.pumpAndSettle();
-
     expect(spy.approvedIds, contains('u-pending'));
   });
 
   // -------------------------------------------------------------------------
   // (b-2) ACTIVE 행 선택 시 기존 제재 버튼이 표시된다 (기존 동작 보존)
   // -------------------------------------------------------------------------
-  testWidgets('(b-2) ACTIVE 행 선택 시 기존 제재 버튼이 표시된다', (tester) async {
+  testWidgets('(b-2) ACTIVE 행 메뉴에 제재가 있다', (tester) async {
     tester.view.physicalSize = const Size(1400, 900);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
@@ -150,11 +145,12 @@ void main() {
     await tester.pumpWidget(_wrap(c));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('활성유저'));
+    // 둘째 행(활성유저, ACTIVE)의 MenuAnchor 열기
+    await tester.tap(find.byIcon(DpIcons.moreVert).at(1));
     await tester.pumpAndSettle();
 
     expect(find.text('영구 밴'), findsOneWidget);
-    expect(find.text('승인'), findsNothing);
+    expect(find.widgetWithText(MenuItemButton, '승인'), findsNothing);
   });
 
   // -------------------------------------------------------------------------
