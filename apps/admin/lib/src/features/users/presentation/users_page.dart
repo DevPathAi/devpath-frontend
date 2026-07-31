@@ -193,4 +193,3 @@ class _PreApproveBar extends StatelessWidget {
     );
   }
 }
-

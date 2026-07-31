@@ -36,7 +36,10 @@ void main() {
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: c,
-        child: MaterialApp(theme: DpTheme.light(), home: const AdminUsersPage()),
+        child: MaterialApp(
+          theme: DpTheme.light(),
+          home: const AdminUsersPage(),
+        ),
       ),
     );
     await tester.pumpAndSettle();

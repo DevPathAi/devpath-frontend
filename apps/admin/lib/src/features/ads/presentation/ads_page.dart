@@ -76,54 +76,32 @@ class _AdsPageState extends ConsumerState<AdminAdsPage> {
           actionLabel: '광고 생성',
           onAction: () => _openForm(context, n, null),
         ),
-        AdsPhase.loaded => SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: DataTable(
-            columns: const [
-              DataColumn(label: Text('제목')),
-              DataColumn(label: Text('슬롯')),
-              DataColumn(label: Text('가중치')),
-              DataColumn(label: Text('상태')),
-              DataColumn(label: Text('액션')),
-            ],
-            rows: [
-              for (final r in s.rows)
-                DataRow(
-                  cells: [
-                    DataCell(Text(r.title)),
-                    DataCell(Text(r.slot)),
-                    DataCell(Text('${r.weight}')),
-                    DataCell(
-                      Switch(
-                        value: r.status == 'ACTIVE',
-                        onChanged: (_) => n.toggleStatus(r),
-                      ),
+        AdsPhase.loaded => DpDataTable(
+          minWidth: 760,
+          columns: [
+            DataColumn2(label: const Text('제목')),
+            DataColumn2(label: const Text('슬롯')),
+            DataColumn2(label: const Text('가중치')),
+            DataColumn2(label: const Text('상태')),
+            DataColumn2(label: const Text('액션'), fixedWidth: 64),
+          ],
+          rows: [
+            for (final r in s.rows)
+              DataRow2(
+                cells: [
+                  DataCell(Text(r.title)),
+                  DataCell(Text(r.slot)),
+                  DataCell(Text('${r.weight}')),
+                  DataCell(
+                    Switch(
+                      value: r.status == 'ACTIVE',
+                      onChanged: (_) => n.toggleStatus(r),
                     ),
-                    DataCell(
-                      Row(
-                        children: [
-                          IconButton(
-                            icon: const Icon(DpIcons.edit),
-                            tooltip: '수정',
-                            onPressed: () => _openForm(context, n, r),
-                          ),
-                          IconButton(
-                            icon: const Icon(DpIcons.dashboard),
-                            tooltip: '통계',
-                            onPressed: () => _openStats(context, r),
-                          ),
-                          IconButton(
-                            icon: const Icon(DpIcons.error),
-                            tooltip: '삭제',
-                            onPressed: () => n.remove(r.id!),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-            ],
-          ),
+                  ),
+                  DataCell(_rowMenu(context, n, r)),
+                ],
+              ),
+          ],
         ),
       },
     );
@@ -150,6 +128,31 @@ class _AdsPageState extends ConsumerState<AdminAdsPage> {
     await showDialog<void>(
       context: context,
       builder: (_) => _AdStatsDialog(adId: row.id!, title: row.title),
+    );
+  }
+
+  Widget _rowMenu(BuildContext context, AdsController n, AdRow r) {
+    return MenuAnchor(
+      builder: (context, controller, child) => IconButton(
+        icon: const Icon(DpIcons.moreVert),
+        tooltip: '작업',
+        onPressed: () =>
+            controller.isOpen ? controller.close() : controller.open(),
+      ),
+      menuChildren: [
+        MenuItemButton(
+          onPressed: () => _openForm(context, n, r),
+          child: const Text('수정'),
+        ),
+        MenuItemButton(
+          onPressed: () => _openStats(context, r),
+          child: const Text('통계'),
+        ),
+        MenuItemButton(
+          onPressed: () => n.remove(r.id!),
+          child: const Text('삭제'),
+        ),
+      ],
     );
   }
 }
