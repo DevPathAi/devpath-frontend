@@ -1,4 +1,5 @@
 import 'package:dp_design/dp_design.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -41,5 +42,28 @@ void main() {
       ),
     );
     expect(find.byType(FocusableActionDetector), findsWidgets);
+  });
+
+  testWidgets('DpListRow: preview 지정 시 hover로 미리보기 등장', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: DpTheme.light(),
+        home: const Scaffold(
+          body: Center(
+            child: DpListRow(title: '제목 행', preview: '본문 미리보기 요약 텍스트'),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('본문 미리보기 요약 텍스트'), findsNothing); // 초기 미표시
+
+    final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await gesture.addPointer(location: Offset.zero);
+    addTearDown(gesture.removePointer);
+    await gesture.moveTo(tester.getCenter(find.text('제목 행')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('본문 미리보기 요약 텍스트'), findsOneWidget); // hover 후 등장
   });
 }

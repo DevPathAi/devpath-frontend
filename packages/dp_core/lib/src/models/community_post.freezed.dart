@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$CommunityPostSummary {
 
- int get id; String get title; String get boardType; int? get authorId; bool get solved; int get upvoteCount; int get replyCount;
+ int get id; String get title; String get boardType; int? get authorId; bool get solved; int get upvoteCount; int get replyCount; String get excerpt;
 /// Create a copy of CommunityPostSummary
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -28,16 +28,16 @@ $CommunityPostSummaryCopyWith<CommunityPostSummary> get copyWith => _$CommunityP
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is CommunityPostSummary&&(identical(other.id, id) || other.id == id)&&(identical(other.title, title) || other.title == title)&&(identical(other.boardType, boardType) || other.boardType == boardType)&&(identical(other.authorId, authorId) || other.authorId == authorId)&&(identical(other.solved, solved) || other.solved == solved)&&(identical(other.upvoteCount, upvoteCount) || other.upvoteCount == upvoteCount)&&(identical(other.replyCount, replyCount) || other.replyCount == replyCount));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is CommunityPostSummary&&(identical(other.id, id) || other.id == id)&&(identical(other.title, title) || other.title == title)&&(identical(other.boardType, boardType) || other.boardType == boardType)&&(identical(other.authorId, authorId) || other.authorId == authorId)&&(identical(other.solved, solved) || other.solved == solved)&&(identical(other.upvoteCount, upvoteCount) || other.upvoteCount == upvoteCount)&&(identical(other.replyCount, replyCount) || other.replyCount == replyCount)&&(identical(other.excerpt, excerpt) || other.excerpt == excerpt));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,title,boardType,authorId,solved,upvoteCount,replyCount);
+int get hashCode => Object.hash(runtimeType,id,title,boardType,authorId,solved,upvoteCount,replyCount,excerpt);
 
 @override
 String toString() {
-  return 'CommunityPostSummary(id: $id, title: $title, boardType: $boardType, authorId: $authorId, solved: $solved, upvoteCount: $upvoteCount, replyCount: $replyCount)';
+  return 'CommunityPostSummary(id: $id, title: $title, boardType: $boardType, authorId: $authorId, solved: $solved, upvoteCount: $upvoteCount, replyCount: $replyCount, excerpt: $excerpt)';
 }
 
 
@@ -48,7 +48,7 @@ abstract mixin class $CommunityPostSummaryCopyWith<$Res>  {
   factory $CommunityPostSummaryCopyWith(CommunityPostSummary value, $Res Function(CommunityPostSummary) _then) = _$CommunityPostSummaryCopyWithImpl;
 @useResult
 $Res call({
- int id, String title, String boardType, int? authorId, bool solved, int upvoteCount, int replyCount
+ int id, String title, String boardType, int? authorId, bool solved, int upvoteCount, int replyCount, String excerpt
 });
 
 
@@ -65,7 +65,7 @@ class _$CommunityPostSummaryCopyWithImpl<$Res>
 
 /// Create a copy of CommunityPostSummary
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? title = null,Object? boardType = null,Object? authorId = freezed,Object? solved = null,Object? upvoteCount = null,Object? replyCount = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? title = null,Object? boardType = null,Object? authorId = freezed,Object? solved = null,Object? upvoteCount = null,Object? replyCount = null,Object? excerpt = null,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,title: null == title ? _self.title : title // ignore: cast_nullable_to_non_nullable
@@ -74,7 +74,8 @@ as String,authorId: freezed == authorId ? _self.authorId : authorId // ignore: c
 as int?,solved: null == solved ? _self.solved : solved // ignore: cast_nullable_to_non_nullable
 as bool,upvoteCount: null == upvoteCount ? _self.upvoteCount : upvoteCount // ignore: cast_nullable_to_non_nullable
 as int,replyCount: null == replyCount ? _self.replyCount : replyCount // ignore: cast_nullable_to_non_nullable
-as int,
+as int,excerpt: null == excerpt ? _self.excerpt : excerpt // ignore: cast_nullable_to_non_nullable
+as String,
   ));
 }
 
@@ -159,10 +160,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String title,  String boardType,  int? authorId,  bool solved,  int upvoteCount,  int replyCount)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String title,  String boardType,  int? authorId,  bool solved,  int upvoteCount,  int replyCount,  String excerpt)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _CommunityPostSummary() when $default != null:
-return $default(_that.id,_that.title,_that.boardType,_that.authorId,_that.solved,_that.upvoteCount,_that.replyCount);case _:
+return $default(_that.id,_that.title,_that.boardType,_that.authorId,_that.solved,_that.upvoteCount,_that.replyCount,_that.excerpt);case _:
   return orElse();
 
 }
@@ -180,10 +181,10 @@ return $default(_that.id,_that.title,_that.boardType,_that.authorId,_that.solved
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String title,  String boardType,  int? authorId,  bool solved,  int upvoteCount,  int replyCount)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String title,  String boardType,  int? authorId,  bool solved,  int upvoteCount,  int replyCount,  String excerpt)  $default,) {final _that = this;
 switch (_that) {
 case _CommunityPostSummary():
-return $default(_that.id,_that.title,_that.boardType,_that.authorId,_that.solved,_that.upvoteCount,_that.replyCount);case _:
+return $default(_that.id,_that.title,_that.boardType,_that.authorId,_that.solved,_that.upvoteCount,_that.replyCount,_that.excerpt);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -200,10 +201,10 @@ return $default(_that.id,_that.title,_that.boardType,_that.authorId,_that.solved
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String title,  String boardType,  int? authorId,  bool solved,  int upvoteCount,  int replyCount)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String title,  String boardType,  int? authorId,  bool solved,  int upvoteCount,  int replyCount,  String excerpt)?  $default,) {final _that = this;
 switch (_that) {
 case _CommunityPostSummary() when $default != null:
-return $default(_that.id,_that.title,_that.boardType,_that.authorId,_that.solved,_that.upvoteCount,_that.replyCount);case _:
+return $default(_that.id,_that.title,_that.boardType,_that.authorId,_that.solved,_that.upvoteCount,_that.replyCount,_that.excerpt);case _:
   return null;
 
 }
@@ -215,7 +216,7 @@ return $default(_that.id,_that.title,_that.boardType,_that.authorId,_that.solved
 @JsonSerializable()
 
 class _CommunityPostSummary implements CommunityPostSummary {
-  const _CommunityPostSummary({required this.id, required this.title, this.boardType = 'QNA', this.authorId, this.solved = false, this.upvoteCount = 0, this.replyCount = 0});
+  const _CommunityPostSummary({required this.id, required this.title, this.boardType = 'QNA', this.authorId, this.solved = false, this.upvoteCount = 0, this.replyCount = 0, this.excerpt = ''});
   factory _CommunityPostSummary.fromJson(Map<String, dynamic> json) => _$CommunityPostSummaryFromJson(json);
 
 @override final  int id;
@@ -225,6 +226,7 @@ class _CommunityPostSummary implements CommunityPostSummary {
 @override@JsonKey() final  bool solved;
 @override@JsonKey() final  int upvoteCount;
 @override@JsonKey() final  int replyCount;
+@override@JsonKey() final  String excerpt;
 
 /// Create a copy of CommunityPostSummary
 /// with the given fields replaced by the non-null parameter values.
@@ -239,16 +241,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _CommunityPostSummary&&(identical(other.id, id) || other.id == id)&&(identical(other.title, title) || other.title == title)&&(identical(other.boardType, boardType) || other.boardType == boardType)&&(identical(other.authorId, authorId) || other.authorId == authorId)&&(identical(other.solved, solved) || other.solved == solved)&&(identical(other.upvoteCount, upvoteCount) || other.upvoteCount == upvoteCount)&&(identical(other.replyCount, replyCount) || other.replyCount == replyCount));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _CommunityPostSummary&&(identical(other.id, id) || other.id == id)&&(identical(other.title, title) || other.title == title)&&(identical(other.boardType, boardType) || other.boardType == boardType)&&(identical(other.authorId, authorId) || other.authorId == authorId)&&(identical(other.solved, solved) || other.solved == solved)&&(identical(other.upvoteCount, upvoteCount) || other.upvoteCount == upvoteCount)&&(identical(other.replyCount, replyCount) || other.replyCount == replyCount)&&(identical(other.excerpt, excerpt) || other.excerpt == excerpt));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,title,boardType,authorId,solved,upvoteCount,replyCount);
+int get hashCode => Object.hash(runtimeType,id,title,boardType,authorId,solved,upvoteCount,replyCount,excerpt);
 
 @override
 String toString() {
-  return 'CommunityPostSummary(id: $id, title: $title, boardType: $boardType, authorId: $authorId, solved: $solved, upvoteCount: $upvoteCount, replyCount: $replyCount)';
+  return 'CommunityPostSummary(id: $id, title: $title, boardType: $boardType, authorId: $authorId, solved: $solved, upvoteCount: $upvoteCount, replyCount: $replyCount, excerpt: $excerpt)';
 }
 
 
@@ -259,7 +261,7 @@ abstract mixin class _$CommunityPostSummaryCopyWith<$Res> implements $CommunityP
   factory _$CommunityPostSummaryCopyWith(_CommunityPostSummary value, $Res Function(_CommunityPostSummary) _then) = __$CommunityPostSummaryCopyWithImpl;
 @override @useResult
 $Res call({
- int id, String title, String boardType, int? authorId, bool solved, int upvoteCount, int replyCount
+ int id, String title, String boardType, int? authorId, bool solved, int upvoteCount, int replyCount, String excerpt
 });
 
 
@@ -276,7 +278,7 @@ class __$CommunityPostSummaryCopyWithImpl<$Res>
 
 /// Create a copy of CommunityPostSummary
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? title = null,Object? boardType = null,Object? authorId = freezed,Object? solved = null,Object? upvoteCount = null,Object? replyCount = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? title = null,Object? boardType = null,Object? authorId = freezed,Object? solved = null,Object? upvoteCount = null,Object? replyCount = null,Object? excerpt = null,}) {
   return _then(_CommunityPostSummary(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,title: null == title ? _self.title : title // ignore: cast_nullable_to_non_nullable
@@ -285,7 +287,8 @@ as String,authorId: freezed == authorId ? _self.authorId : authorId // ignore: c
 as int?,solved: null == solved ? _self.solved : solved // ignore: cast_nullable_to_non_nullable
 as bool,upvoteCount: null == upvoteCount ? _self.upvoteCount : upvoteCount // ignore: cast_nullable_to_non_nullable
 as int,replyCount: null == replyCount ? _self.replyCount : replyCount // ignore: cast_nullable_to_non_nullable
-as int,
+as int,excerpt: null == excerpt ? _self.excerpt : excerpt // ignore: cast_nullable_to_non_nullable
+as String,
   ));
 }
 

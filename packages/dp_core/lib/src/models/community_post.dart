@@ -18,6 +18,7 @@ abstract class CommunityPostSummary with _$CommunityPostSummary {
     @Default(false) bool solved,
     @Default(0) int upvoteCount,
     @Default(0) int replyCount,
+    @Default('') String excerpt,
   }) = _CommunityPostSummary;
 
   factory CommunityPostSummary.fromJson(Map<String, dynamic> json) =>

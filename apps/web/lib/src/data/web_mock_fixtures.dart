@@ -60,6 +60,8 @@ final Map<String, MockFixture> webMockFixtures = {
         'solved': true,
         'upvoteCount': 3,
         'replyCount': 2,
+        'excerpt':
+            'async/await는 Future를 순차적으로 다루는 문법입니다. 이벤트 루프와 마이크로태스크 큐를 이해하면 동작이 또렷해져요…',
       },
       {
         'id': 10,
@@ -69,6 +71,8 @@ final Map<String, MockFixture> webMockFixtures = {
         'solved': false,
         'upvoteCount': 5,
         'replyCount': 4,
+        'excerpt':
+            '오늘은 Riverpod의 Notifier와 AsyncNotifier 차이를 정리했습니다. 상태 복원과 자동 폐기(autoDispose)까지…',
       },
       {
         'id': 20,
@@ -78,6 +82,7 @@ final Map<String, MockFixture> webMockFixtures = {
         'solved': false,
         'upvoteCount': 1,
         'replyCount': 1,
+        'excerpt': '로그인 폼 검증 로직 리뷰 부탁드립니다. 특히 IME 전각 처리와 디바운스 부분이 고민입니다.',
       },
     ],
   ),

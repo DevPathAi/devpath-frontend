@@ -16,6 +16,7 @@ _CommunityPostSummary _$CommunityPostSummaryFromJson(
   solved: json['solved'] as bool? ?? false,
   upvoteCount: (json['upvoteCount'] as num?)?.toInt() ?? 0,
   replyCount: (json['replyCount'] as num?)?.toInt() ?? 0,
+  excerpt: json['excerpt'] as String? ?? '',
 );
 
 Map<String, dynamic> _$CommunityPostSummaryToJson(
@@ -28,6 +29,7 @@ Map<String, dynamic> _$CommunityPostSummaryToJson(
   'solved': instance.solved,
   'upvoteCount': instance.upvoteCount,
   'replyCount': instance.replyCount,
+  'excerpt': instance.excerpt,
 };
 
 _CommunityAnswer _$CommunityAnswerFromJson(Map<String, dynamic> json) =>

@@ -16,6 +16,18 @@ void main() {
     expect(s.replyCount, 3);
   });
 
+  test('CommunityPostSummary.fromJson: excerpt 파싱 + 부재 시 빈 문자열', () {
+    final withExcerpt = CommunityPostSummary.fromJson({
+      'id': 1,
+      'title': '자유글',
+      'excerpt': '본문 미리보기 요약',
+    });
+    expect(withExcerpt.excerpt, '본문 미리보기 요약');
+
+    final without = CommunityPostSummary.fromJson({'id': 2, 'title': 't'});
+    expect(without.excerpt, '');
+  });
+
   test('CommunityPostDetail.fromJson: 댓글 스레드 파싱', () {
     final d = CommunityPostDetail.fromJson({
       'id': 5,
