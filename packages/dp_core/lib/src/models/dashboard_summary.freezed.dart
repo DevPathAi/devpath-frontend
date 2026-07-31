@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$DashboardSummary {
 
- int get streakDays; int get progressPercent; String? get nextTaskTitle; List<String> get badges; int get completedContentCount;
+ int get streakDays; int get progressPercent; String? get nextTaskTitle; List<String> get badges; int get completedContentCount; List<DailyActivity> get weeklyActivity; List<ProgressPoint> get progressHistory;
 /// Create a copy of DashboardSummary
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -28,16 +28,16 @@ $DashboardSummaryCopyWith<DashboardSummary> get copyWith => _$DashboardSummaryCo
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is DashboardSummary&&(identical(other.streakDays, streakDays) || other.streakDays == streakDays)&&(identical(other.progressPercent, progressPercent) || other.progressPercent == progressPercent)&&(identical(other.nextTaskTitle, nextTaskTitle) || other.nextTaskTitle == nextTaskTitle)&&const DeepCollectionEquality().equals(other.badges, badges)&&(identical(other.completedContentCount, completedContentCount) || other.completedContentCount == completedContentCount));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is DashboardSummary&&(identical(other.streakDays, streakDays) || other.streakDays == streakDays)&&(identical(other.progressPercent, progressPercent) || other.progressPercent == progressPercent)&&(identical(other.nextTaskTitle, nextTaskTitle) || other.nextTaskTitle == nextTaskTitle)&&const DeepCollectionEquality().equals(other.badges, badges)&&(identical(other.completedContentCount, completedContentCount) || other.completedContentCount == completedContentCount)&&const DeepCollectionEquality().equals(other.weeklyActivity, weeklyActivity)&&const DeepCollectionEquality().equals(other.progressHistory, progressHistory));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,streakDays,progressPercent,nextTaskTitle,const DeepCollectionEquality().hash(badges),completedContentCount);
+int get hashCode => Object.hash(runtimeType,streakDays,progressPercent,nextTaskTitle,const DeepCollectionEquality().hash(badges),completedContentCount,const DeepCollectionEquality().hash(weeklyActivity),const DeepCollectionEquality().hash(progressHistory));
 
 @override
 String toString() {
-  return 'DashboardSummary(streakDays: $streakDays, progressPercent: $progressPercent, nextTaskTitle: $nextTaskTitle, badges: $badges, completedContentCount: $completedContentCount)';
+  return 'DashboardSummary(streakDays: $streakDays, progressPercent: $progressPercent, nextTaskTitle: $nextTaskTitle, badges: $badges, completedContentCount: $completedContentCount, weeklyActivity: $weeklyActivity, progressHistory: $progressHistory)';
 }
 
 
@@ -48,7 +48,7 @@ abstract mixin class $DashboardSummaryCopyWith<$Res>  {
   factory $DashboardSummaryCopyWith(DashboardSummary value, $Res Function(DashboardSummary) _then) = _$DashboardSummaryCopyWithImpl;
 @useResult
 $Res call({
- int streakDays, int progressPercent, String? nextTaskTitle, List<String> badges, int completedContentCount
+ int streakDays, int progressPercent, String? nextTaskTitle, List<String> badges, int completedContentCount, List<DailyActivity> weeklyActivity, List<ProgressPoint> progressHistory
 });
 
 
@@ -65,14 +65,16 @@ class _$DashboardSummaryCopyWithImpl<$Res>
 
 /// Create a copy of DashboardSummary
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? streakDays = null,Object? progressPercent = null,Object? nextTaskTitle = freezed,Object? badges = null,Object? completedContentCount = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? streakDays = null,Object? progressPercent = null,Object? nextTaskTitle = freezed,Object? badges = null,Object? completedContentCount = null,Object? weeklyActivity = null,Object? progressHistory = null,}) {
   return _then(_self.copyWith(
 streakDays: null == streakDays ? _self.streakDays : streakDays // ignore: cast_nullable_to_non_nullable
 as int,progressPercent: null == progressPercent ? _self.progressPercent : progressPercent // ignore: cast_nullable_to_non_nullable
 as int,nextTaskTitle: freezed == nextTaskTitle ? _self.nextTaskTitle : nextTaskTitle // ignore: cast_nullable_to_non_nullable
 as String?,badges: null == badges ? _self.badges : badges // ignore: cast_nullable_to_non_nullable
 as List<String>,completedContentCount: null == completedContentCount ? _self.completedContentCount : completedContentCount // ignore: cast_nullable_to_non_nullable
-as int,
+as int,weeklyActivity: null == weeklyActivity ? _self.weeklyActivity : weeklyActivity // ignore: cast_nullable_to_non_nullable
+as List<DailyActivity>,progressHistory: null == progressHistory ? _self.progressHistory : progressHistory // ignore: cast_nullable_to_non_nullable
+as List<ProgressPoint>,
   ));
 }
 
@@ -157,10 +159,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int streakDays,  int progressPercent,  String? nextTaskTitle,  List<String> badges,  int completedContentCount)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int streakDays,  int progressPercent,  String? nextTaskTitle,  List<String> badges,  int completedContentCount,  List<DailyActivity> weeklyActivity,  List<ProgressPoint> progressHistory)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _DashboardSummary() when $default != null:
-return $default(_that.streakDays,_that.progressPercent,_that.nextTaskTitle,_that.badges,_that.completedContentCount);case _:
+return $default(_that.streakDays,_that.progressPercent,_that.nextTaskTitle,_that.badges,_that.completedContentCount,_that.weeklyActivity,_that.progressHistory);case _:
   return orElse();
 
 }
@@ -178,10 +180,10 @@ return $default(_that.streakDays,_that.progressPercent,_that.nextTaskTitle,_that
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int streakDays,  int progressPercent,  String? nextTaskTitle,  List<String> badges,  int completedContentCount)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int streakDays,  int progressPercent,  String? nextTaskTitle,  List<String> badges,  int completedContentCount,  List<DailyActivity> weeklyActivity,  List<ProgressPoint> progressHistory)  $default,) {final _that = this;
 switch (_that) {
 case _DashboardSummary():
-return $default(_that.streakDays,_that.progressPercent,_that.nextTaskTitle,_that.badges,_that.completedContentCount);case _:
+return $default(_that.streakDays,_that.progressPercent,_that.nextTaskTitle,_that.badges,_that.completedContentCount,_that.weeklyActivity,_that.progressHistory);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -198,10 +200,10 @@ return $default(_that.streakDays,_that.progressPercent,_that.nextTaskTitle,_that
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int streakDays,  int progressPercent,  String? nextTaskTitle,  List<String> badges,  int completedContentCount)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int streakDays,  int progressPercent,  String? nextTaskTitle,  List<String> badges,  int completedContentCount,  List<DailyActivity> weeklyActivity,  List<ProgressPoint> progressHistory)?  $default,) {final _that = this;
 switch (_that) {
 case _DashboardSummary() when $default != null:
-return $default(_that.streakDays,_that.progressPercent,_that.nextTaskTitle,_that.badges,_that.completedContentCount);case _:
+return $default(_that.streakDays,_that.progressPercent,_that.nextTaskTitle,_that.badges,_that.completedContentCount,_that.weeklyActivity,_that.progressHistory);case _:
   return null;
 
 }
@@ -213,7 +215,7 @@ return $default(_that.streakDays,_that.progressPercent,_that.nextTaskTitle,_that
 @JsonSerializable()
 
 class _DashboardSummary implements DashboardSummary {
-  const _DashboardSummary({required this.streakDays, required this.progressPercent, this.nextTaskTitle, final  List<String> badges = const <String>[], this.completedContentCount = 0}): _badges = badges;
+  const _DashboardSummary({required this.streakDays, required this.progressPercent, this.nextTaskTitle, final  List<String> badges = const <String>[], this.completedContentCount = 0, final  List<DailyActivity> weeklyActivity = const <DailyActivity>[], final  List<ProgressPoint> progressHistory = const <ProgressPoint>[]}): _badges = badges,_weeklyActivity = weeklyActivity,_progressHistory = progressHistory;
   factory _DashboardSummary.fromJson(Map<String, dynamic> json) => _$DashboardSummaryFromJson(json);
 
 @override final  int streakDays;
@@ -227,6 +229,20 @@ class _DashboardSummary implements DashboardSummary {
 }
 
 @override@JsonKey() final  int completedContentCount;
+ final  List<DailyActivity> _weeklyActivity;
+@override@JsonKey() List<DailyActivity> get weeklyActivity {
+  if (_weeklyActivity is EqualUnmodifiableListView) return _weeklyActivity;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_weeklyActivity);
+}
+
+ final  List<ProgressPoint> _progressHistory;
+@override@JsonKey() List<ProgressPoint> get progressHistory {
+  if (_progressHistory is EqualUnmodifiableListView) return _progressHistory;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_progressHistory);
+}
+
 
 /// Create a copy of DashboardSummary
 /// with the given fields replaced by the non-null parameter values.
@@ -241,16 +257,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _DashboardSummary&&(identical(other.streakDays, streakDays) || other.streakDays == streakDays)&&(identical(other.progressPercent, progressPercent) || other.progressPercent == progressPercent)&&(identical(other.nextTaskTitle, nextTaskTitle) || other.nextTaskTitle == nextTaskTitle)&&const DeepCollectionEquality().equals(other._badges, _badges)&&(identical(other.completedContentCount, completedContentCount) || other.completedContentCount == completedContentCount));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _DashboardSummary&&(identical(other.streakDays, streakDays) || other.streakDays == streakDays)&&(identical(other.progressPercent, progressPercent) || other.progressPercent == progressPercent)&&(identical(other.nextTaskTitle, nextTaskTitle) || other.nextTaskTitle == nextTaskTitle)&&const DeepCollectionEquality().equals(other._badges, _badges)&&(identical(other.completedContentCount, completedContentCount) || other.completedContentCount == completedContentCount)&&const DeepCollectionEquality().equals(other._weeklyActivity, _weeklyActivity)&&const DeepCollectionEquality().equals(other._progressHistory, _progressHistory));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,streakDays,progressPercent,nextTaskTitle,const DeepCollectionEquality().hash(_badges),completedContentCount);
+int get hashCode => Object.hash(runtimeType,streakDays,progressPercent,nextTaskTitle,const DeepCollectionEquality().hash(_badges),completedContentCount,const DeepCollectionEquality().hash(_weeklyActivity),const DeepCollectionEquality().hash(_progressHistory));
 
 @override
 String toString() {
-  return 'DashboardSummary(streakDays: $streakDays, progressPercent: $progressPercent, nextTaskTitle: $nextTaskTitle, badges: $badges, completedContentCount: $completedContentCount)';
+  return 'DashboardSummary(streakDays: $streakDays, progressPercent: $progressPercent, nextTaskTitle: $nextTaskTitle, badges: $badges, completedContentCount: $completedContentCount, weeklyActivity: $weeklyActivity, progressHistory: $progressHistory)';
 }
 
 
@@ -261,7 +277,7 @@ abstract mixin class _$DashboardSummaryCopyWith<$Res> implements $DashboardSumma
   factory _$DashboardSummaryCopyWith(_DashboardSummary value, $Res Function(_DashboardSummary) _then) = __$DashboardSummaryCopyWithImpl;
 @override @useResult
 $Res call({
- int streakDays, int progressPercent, String? nextTaskTitle, List<String> badges, int completedContentCount
+ int streakDays, int progressPercent, String? nextTaskTitle, List<String> badges, int completedContentCount, List<DailyActivity> weeklyActivity, List<ProgressPoint> progressHistory
 });
 
 
@@ -278,14 +294,16 @@ class __$DashboardSummaryCopyWithImpl<$Res>
 
 /// Create a copy of DashboardSummary
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? streakDays = null,Object? progressPercent = null,Object? nextTaskTitle = freezed,Object? badges = null,Object? completedContentCount = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? streakDays = null,Object? progressPercent = null,Object? nextTaskTitle = freezed,Object? badges = null,Object? completedContentCount = null,Object? weeklyActivity = null,Object? progressHistory = null,}) {
   return _then(_DashboardSummary(
 streakDays: null == streakDays ? _self.streakDays : streakDays // ignore: cast_nullable_to_non_nullable
 as int,progressPercent: null == progressPercent ? _self.progressPercent : progressPercent // ignore: cast_nullable_to_non_nullable
 as int,nextTaskTitle: freezed == nextTaskTitle ? _self.nextTaskTitle : nextTaskTitle // ignore: cast_nullable_to_non_nullable
 as String?,badges: null == badges ? _self._badges : badges // ignore: cast_nullable_to_non_nullable
 as List<String>,completedContentCount: null == completedContentCount ? _self.completedContentCount : completedContentCount // ignore: cast_nullable_to_non_nullable
-as int,
+as int,weeklyActivity: null == weeklyActivity ? _self._weeklyActivity : weeklyActivity // ignore: cast_nullable_to_non_nullable
+as List<DailyActivity>,progressHistory: null == progressHistory ? _self._progressHistory : progressHistory // ignore: cast_nullable_to_non_nullable
+as List<ProgressPoint>,
   ));
 }
 

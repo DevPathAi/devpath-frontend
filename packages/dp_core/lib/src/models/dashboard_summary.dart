@@ -1,5 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import 'dashboard_timeseries.dart';
+
 part 'dashboard_summary.freezed.dart';
 part 'dashboard_summary.g.dart';
 
@@ -12,6 +14,8 @@ abstract class DashboardSummary with _$DashboardSummary {
     String? nextTaskTitle,
     @Default(<String>[]) List<String> badges,
     @Default(0) int completedContentCount,
+    @Default(<DailyActivity>[]) List<DailyActivity> weeklyActivity,
+    @Default(<ProgressPoint>[]) List<ProgressPoint> progressHistory,
   }) = _DashboardSummary;
 
   factory DashboardSummary.fromJson(Map<String, dynamic> json) =>

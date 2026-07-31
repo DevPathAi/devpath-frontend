@@ -16,6 +16,36 @@ void main() {
     expect(d.badges, ['첫 경로']);
   });
 
+  test('DashboardSummary 시계열 필드 역직렬화', () {
+    final d = DashboardSummary.fromJson({
+      'streakDays': 7,
+      'progressPercent': 62,
+      'nextTaskTitle': '비동기 기초',
+      'badges': ['첫 경로'],
+      'weeklyActivity': [
+        {'date': '2026-07-30', 'completedCount': 1},
+        {'date': '2026-07-31', 'completedCount': 3},
+      ],
+      'progressHistory': [
+        {'date': '2026-07-31', 'percent': 42},
+      ],
+    });
+    expect(d.weeklyActivity, hasLength(2));
+    expect(d.weeklyActivity.last.date, '2026-07-31');
+    expect(d.weeklyActivity.last.completedCount, 3);
+    expect(d.progressHistory.single.percent, 42);
+  });
+
+  test('DashboardSummary 시계열 필드 부재 시 빈 리스트 기본값', () {
+    final d = DashboardSummary.fromJson({
+      'streakDays': 0,
+      'progressPercent': 0,
+      'badges': <String>[],
+    });
+    expect(d.weeklyActivity, isEmpty);
+    expect(d.progressHistory, isEmpty);
+  });
+
   test('CommunityPostSummary 역직렬화(목록 메타·authorId 논리참조)', () {
     final p = CommunityPostSummary.fromJson({
       'id': 1,
