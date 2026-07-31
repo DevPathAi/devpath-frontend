@@ -178,6 +178,7 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
     return DpListRow(
       accentColor: accent,
       title: post.title,
+      preview: post.excerpt.isEmpty ? null : post.excerpt,
       badges: [
         _badgeChip(context, label),
         if (isQna && post.solved) _badgeChip(context, '✓ 해결됨', tone: c.success),
