@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../interaction/dp_interactive_card.dart';
-import '../theme/dp_colors.dart';
 import '../theme/dp_spacing.dart';
 
 /// 리스트 행(Layer 2). 좌측 상태 표시선(accent) + 상단 뱃지행 → 제목 + 우측 trailing 메타.
@@ -69,10 +68,7 @@ class DpListRow extends StatelessWidget {
                   horizontal: DpSpacing.md,
                   vertical: DpSpacing.md,
                 ),
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: trailing,
-                ),
+                child: Align(alignment: Alignment.centerRight, child: trailing),
               ),
           ],
         ),

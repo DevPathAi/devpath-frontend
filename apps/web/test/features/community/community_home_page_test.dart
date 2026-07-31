@@ -248,4 +248,22 @@ void main() {
     await tester.pumpAndSettle();
     expect(seen, contains('FREE'));
   });
+
+  testWidgets('피드 행이 DpListRow로 렌더된다', (tester) async {
+    final c = ProviderContainer(
+      overrides: [
+        communityListProvider.overrideWithValue(
+          ({String? board, String? tag, String? sort}) async => [
+            _p(1, title: 'DpListRow 행', boardType: 'FREE'),
+          ],
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+    await tester.pumpWidget(_host(c));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(DpListRow), findsOneWidget);
+    expect(find.text('DpListRow 행'), findsOneWidget);
+  });
 }

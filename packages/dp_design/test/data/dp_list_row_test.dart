@@ -35,7 +35,9 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: DpTheme.light(),
-        home: Scaffold(body: DpListRow(title: '글', onTap: () {})),
+        home: Scaffold(
+          body: DpListRow(title: '글', onTap: () {}),
+        ),
       ),
     );
     expect(find.byType(FocusableActionDetector), findsWidgets);
