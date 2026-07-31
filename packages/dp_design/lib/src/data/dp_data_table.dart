@@ -16,6 +16,8 @@ class DpDataTable extends StatelessWidget {
     this.minWidth,
     this.fixedLeftColumns = 0,
     this.empty,
+    this.showCheckboxColumn = false,
+    this.onSelectAll,
   });
 
   final List<DataColumn2> columns;
@@ -23,6 +25,8 @@ class DpDataTable extends StatelessWidget {
   final double? minWidth;
   final int fixedLeftColumns;
   final Widget? empty;
+  final bool showCheckboxColumn;
+  final ValueChanged<bool?>? onSelectAll;
 
   @override
   Widget build(BuildContext context) {
@@ -34,6 +38,8 @@ class DpDataTable extends StatelessWidget {
       fixedLeftColumns: fixedLeftColumns,
       isHorizontalScrollBarVisible: true,
       empty: empty,
+      showCheckboxColumn: showCheckboxColumn,
+      onSelectAll: onSelectAll,
       headingRowColor: WidgetStatePropertyAll(c.surface),
       border: TableBorder.all(color: c.border, width: 1),
     );

@@ -36,4 +36,33 @@ void main() {
     expect(find.text('홍길동'), findsOneWidget);
     expect(find.text('ACTIVE'), findsOneWidget);
   });
+
+  testWidgets('DpDataTable: showCheckboxColumn 시 체크박스 렌더', (tester) async {
+    tester.view.physicalSize = const Size(900, 600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: DpTheme.light(),
+        home: Scaffold(
+          body: DpDataTable(
+            minWidth: 400,
+            showCheckboxColumn: true,
+            columns: [DataColumn2(label: const Text('이름'))],
+            rows: [
+              DataRow2(
+                selected: true,
+                onSelectChanged: (_) {},
+                cells: [DataCell(const Text('홍길동'))],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Checkbox), findsWidgets);
+  });
 }
