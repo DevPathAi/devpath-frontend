@@ -1,5 +1,6 @@
 import 'package:devpath_web/src/features/community/data/community_source.dart';
 import 'package:devpath_web/src/features/community/presentation/community_home_page.dart';
+import 'package:devpath_web/src/features/community/state/community_state.dart';
 import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
@@ -175,14 +176,14 @@ void main() {
     await tester.pumpWidget(_host(c));
     await tester.pumpAndSettle();
 
-    // 필터칩: 전체/Q&A/자유/피드백
-    expect(find.widgetWithText(ChoiceChip, '전체'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, 'Q&A'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, '자유'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, '피드백'), findsOneWidget);
+    // 필터: SegmentedButton(전체/Q&A/자유/피드백)
+    expect(find.byType(SegmentedButton<CommunityBoard>), findsOneWidget);
+    expect(find.text('전체'), findsOneWidget);
+    expect(find.text('Q&A'), findsOneWidget);
+    expect(find.text('피드백'), findsOneWidget);
     // 카드 제목 + 보드 뱃지('자유')
     expect(find.text('자유글'), findsOneWidget);
-    expect(find.text('자유'), findsWidgets); // 필터칩 + 뱃지
+    expect(find.text('자유'), findsWidgets); // 세그먼트 + 뱃지
     // subtitle: FREE는 "댓글" 라벨
     expect(find.textContaining('댓글 1'), findsOneWidget);
 
@@ -192,7 +193,7 @@ void main() {
     expect(find.text('일반 상세 화면'), findsOneWidget);
   });
 
-  testWidgets('필터칩 선택 시 selectBoard로 재조회한다', (tester) async {
+  testWidgets('SegmentedButton 선택 시 selectBoard로 재조회한다', (tester) async {
     final seen = <String?>[];
     final c = ProviderContainer(
       overrides: [
@@ -202,7 +203,7 @@ void main() {
           String? sort,
         }) async {
           seen.add(board);
-          return [_p(10, title: '자유글', boardType: 'FREE')];
+          return [_p(10, title: '질문글', boardType: 'QNA')];
         }),
       ],
     );
@@ -210,7 +211,40 @@ void main() {
     await tester.pumpWidget(_host(c));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(ChoiceChip, '자유'));
+    await tester.tap(find.text('자유')); // QNA post라 '자유'는 세그먼트뿐
+    await tester.pumpAndSettle();
+    expect(seen, contains('FREE'));
+  });
+
+  testWidgets('initialBoard 쿼리로 진입 시 초기 필터가 반영된다', (tester) async {
+    final seen = <String?>[];
+    final c = ProviderContainer(
+      overrides: [
+        communityListProvider.overrideWithValue(({
+          String? board,
+          String? tag,
+          String? sort,
+        }) async {
+          seen.add(board);
+          return const [];
+        }),
+      ],
+    );
+    addTearDown(c.dispose);
+    final router = GoRouter(
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (_, _) => const CommunityHomePage(initialBoard: 'FREE'),
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: c,
+        child: MaterialApp.router(theme: DpTheme.light(), routerConfig: router),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(seen, contains('FREE'));
   });

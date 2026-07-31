@@ -9,7 +9,10 @@ import '../application/community_controller.dart';
 import '../state/community_state.dart';
 
 class CommunityHomePage extends ConsumerStatefulWidget {
-  const CommunityHomePage({super.key});
+  const CommunityHomePage({super.key, this.initialBoard});
+
+  /// URL 쿼리 `?board=`(QNA/FREE/FEEDBACK) 프리셋. null=전체.
+  final String? initialBoard;
 
   @override
   ConsumerState<CommunityHomePage> createState() => _CommunityHomePageState();
@@ -19,9 +22,18 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => ref.read(communityControllerProvider.notifier).load(),
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final board = CommunityBoard.values.firstWhere(
+        (b) => b.value == widget.initialBoard,
+        orElse: () => CommunityBoard.all,
+      );
+      final notifier = ref.read(communityControllerProvider.notifier);
+      if (board == CommunityBoard.all) {
+        notifier.load();
+      } else {
+        notifier.selectBoard(board);
+      }
+    });
   }
 
   /// FAB 스피드다이얼 — 질문/자유글/피드백 요청 3종 작성 진입.
@@ -79,7 +91,13 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
       ),
       body: Column(
         children: [
-          _BoardFilterBar(current: s.board, onSelect: notifier.selectBoard),
+          _BoardFilterBar(
+            current: s.board,
+            onSelect: (board) {
+              notifier.selectBoard(board);
+              context.go('/community?board=${board.value ?? ''}');
+            },
+          ),
           Expanded(
             child: switch (s.phase) {
               CommunityPhase.loading => const DpLoading(),
@@ -122,7 +140,7 @@ class _BoardFilterBar extends StatelessWidget {
   const _BoardFilterBar({required this.current, required this.onSelect});
 
   final CommunityBoard current;
-  final Future<void> Function(CommunityBoard) onSelect;
+  final void Function(CommunityBoard) onSelect;
 
   @override
   Widget build(BuildContext context) {
@@ -131,18 +149,22 @@ class _BoardFilterBar extends StatelessWidget {
         DpSpacing.lg,
         DpSpacing.md,
         DpSpacing.lg,
-        0,
+        DpSpacing.sm,
       ),
-      child: Wrap(
-        spacing: DpSpacing.sm,
-        children: [
-          for (final b in CommunityBoard.values)
-            ChoiceChip(
-              label: Text(b.label),
-              selected: current == b,
-              onSelected: (_) => onSelect(b),
-            ),
-        ],
+      child: SizedBox(
+        width: double.infinity,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: SegmentedButton<CommunityBoard>(
+            segments: [
+              for (final b in CommunityBoard.values)
+                ButtonSegment(value: b, label: Text(b.label)),
+            ],
+            selected: {current},
+            showSelectedIcon: false,
+            onSelectionChanged: (s) => onSelect(s.first),
+          ),
+        ),
       ),
     );
   }

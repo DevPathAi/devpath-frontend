@@ -111,7 +111,9 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(path: '/mentor', builder: (_, _) => const MentorPage()),
           GoRoute(
             path: '/community',
-            builder: (_, _) => const CommunityHomePage(),
+            builder: (_, state) => CommunityHomePage(
+              initialBoard: state.uri.queryParameters['board'],
+            ),
           ),
           // '/community/new'는 '/community/:id'보다 먼저 — 선언 순서 매칭에서 'new'가
           // id로 잡히지 않도록(int.parse('new') 회피).
