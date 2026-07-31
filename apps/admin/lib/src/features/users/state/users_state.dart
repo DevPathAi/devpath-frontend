@@ -10,6 +10,7 @@ class UsersState {
     this.phase = UsersPhase.loading,
     this.selected,
     this.error,
+    this.selectedIds = const {},
   });
 
   final List<AdminUserRow> rows;
@@ -18,6 +19,7 @@ class UsersState {
   final UsersPhase phase;
   final AdminUserRow? selected;
   final String? error;
+  final Set<String> selectedIds;
 
   bool get hasMore => nextCursor != null;
 
@@ -28,6 +30,7 @@ class UsersState {
     UsersPhase? phase,
     AdminUserRow? selected,
     String? error,
+    Set<String>? selectedIds,
   }) => UsersState(
     rows: rows ?? this.rows,
     nextCursor: nextCursor,
@@ -35,5 +38,6 @@ class UsersState {
     phase: phase ?? this.phase,
     selected: selected ?? this.selected,
     error: error,
+    selectedIds: selectedIds ?? this.selectedIds,
   );
 }

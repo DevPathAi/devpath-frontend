@@ -48,6 +48,8 @@ final Map<String, MockFixture> adminMockFixtures = {
     },
   ),
   'POST /admin/users/u1/sanction': (200, {'ok': true}),
+  'POST /admin/users/bulk-approve': (204, <String, dynamic>{}),
+  'POST /admin/ads/bulk-delete': (204, <String, dynamic>{}),
   // 신고(A-006)
   'GET /admin/reports': (
     200,

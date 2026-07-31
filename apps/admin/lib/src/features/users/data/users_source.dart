@@ -23,3 +23,11 @@ final adminUsersFetchProvider = Provider<AdminUsersFetch>((ref) {
     );
   };
 });
+
+typedef AdminUsersBulkApprove = Future<void> Function(List<int> ids);
+
+final adminUsersBulkApproveProvider = Provider<AdminUsersBulkApprove>((ref) {
+  final client = ref.watch(apiClientProvider);
+  return (ids) =>
+      client.post<void>('/admin/users/bulk-approve', body: {'ids': ids});
+});

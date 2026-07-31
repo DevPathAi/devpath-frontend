@@ -92,4 +92,29 @@ void main() {
     expect(s.phase, AdsPhase.failed);
     expect(s.error, '실패');
   });
+
+  test('bulkDelete: 선택 id로 POST 후 재조회·선택 초기화', () async {
+    List<int>? sentIds;
+    final c = ProviderContainer(
+      overrides: [
+        adsListProvider.overrideWithValue(
+          ({slot, status}) async => [_ad(id: 1), _ad(id: 2)],
+        ),
+        adSettingsGetProvider.overrideWithValue(() async => false),
+        adBulkDeleteProvider.overrideWithValue((ids) async {
+          sentIds = ids;
+        }),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    await c.read(adsProvider.notifier).load();
+    c.read(adsProvider.notifier).toggleSelect(1);
+    c.read(adsProvider.notifier).toggleSelect(2);
+    expect(c.read(adsProvider).selectedIds, {1, 2});
+
+    await c.read(adsProvider.notifier).bulkDelete();
+    expect(sentIds, [1, 2]);
+    expect(c.read(adsProvider).selectedIds, isEmpty);
+  });
 }

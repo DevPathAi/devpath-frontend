@@ -79,6 +79,31 @@ class UsersController extends Notifier<UsersState> {
         .read(apiClientProvider)
         .post<void>('/admin/allowlist', body: {'email': email});
   }
+
+  void toggleSelect(String id) {
+    final next = {...state.selectedIds};
+    next.contains(id) ? next.remove(id) : next.add(id);
+    state = state.copyWith(selectedIds: next, nextCursor: state.nextCursor);
+  }
+
+  void selectAll(bool selected) => state = state.copyWith(
+    selectedIds: selected ? state.rows.map((r) => r.id).toSet() : <String>{},
+    nextCursor: state.nextCursor,
+  );
+
+  void clearSelection() => state = state.copyWith(
+    selectedIds: <String>{},
+    nextCursor: state.nextCursor,
+  );
+
+  /// 선택된 사용자 일괄 승인 후 목록 재조회(새 state로 선택 초기화).
+  Future<void> bulkApprove() async {
+    if (state.selectedIds.isEmpty) return;
+    await ref.read(adminUsersBulkApproveProvider)(
+      state.selectedIds.map(int.parse).toList(),
+    );
+    await load();
+  }
 }
 
 final adminUsersProvider = NotifierProvider<UsersController, UsersState>(

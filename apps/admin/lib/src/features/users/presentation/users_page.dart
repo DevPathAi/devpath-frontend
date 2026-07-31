@@ -2,6 +2,7 @@ import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../widgets/bulk_action_bar.dart';
 import '../application/users_controller.dart';
 import '../data/admin_user_row.dart';
 import '../state/users_state.dart';
@@ -107,6 +108,18 @@ class _S extends ConsumerState<AdminUsersPage> {
               }
             },
           ),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 180),
+            child: s.selectedIds.isEmpty
+                ? const SizedBox.shrink()
+                : BulkActionBar(
+                    key: const Key('users-bulk-bar'),
+                    count: s.selectedIds.length,
+                    actionLabel: '승인',
+                    onAction: n.bulkApprove,
+                    onClear: n.clearSelection,
+                  ),
+          ),
           // 기존 body 내용
           Expanded(
             child: switch (s.phase) {
@@ -123,6 +136,8 @@ class _S extends ConsumerState<AdminUsersPage> {
               ),
               UsersPhase.loaded => DpDataTable(
                 minWidth: 720,
+                showCheckboxColumn: true,
+                onSelectAll: (v) => n.selectAll(v ?? false),
                 columns: [
                   DataColumn2(label: const Text('닉네임')),
                   DataColumn2(label: const Text('이메일')),
@@ -133,6 +148,8 @@ class _S extends ConsumerState<AdminUsersPage> {
                 rows: [
                   for (final r in s.rows)
                     DataRow2(
+                      selected: s.selectedIds.contains(r.id),
+                      onSelectChanged: (_) => n.toggleSelect(r.id),
                       cells: [
                         DataCell(Text(r.nickname)),
                         DataCell(Text(r.email)),
