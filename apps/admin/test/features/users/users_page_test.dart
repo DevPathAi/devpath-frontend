@@ -50,4 +50,46 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('영구 밴'), findsOneWidget);
   });
+
+  testWidgets('users_page: 행 선택 시 벌크바 등장', (tester) async {
+    tester.view.physicalSize = const Size(1400, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final c = ProviderContainer(
+      overrides: [
+        adminUsersFetchProvider.overrideWithValue(
+          ({String? cursor, String? status}) async => Page(
+            data: [
+              AdminUserRow(
+                id: 'u1',
+                nickname: '지수',
+                email: 'a@x',
+                role: UserRole.learner,
+                status: 'BETA_PENDING',
+              ),
+            ],
+            limit: 20,
+          ),
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: c,
+        child: MaterialApp(
+          theme: DpTheme.light(),
+          home: const AdminUsersPage(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('users-bulk-bar')), findsNothing);
+    await tester.tap(find.byType(Checkbox).last);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('users-bulk-bar')), findsOneWidget);
+  });
 }
