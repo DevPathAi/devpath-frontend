@@ -6,6 +6,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../ads/presentation/ad_slot_widget.dart';
 import 'progress_donut.dart';
+import 'progress_trend_card.dart';
+import 'weekly_activity_card.dart';
 
 /// 대시보드 성공 상태 본문. 폭별 Bento(staggered) 재배치.
 class DashboardBody extends StatelessWidget {
@@ -55,6 +57,14 @@ class DashboardBody extends StatelessWidget {
       StaggeredGridTile.fit(
         crossAxisCellCount: donutSpan,
         child: _DonutCard(percent: summary.progressPercent),
+      ),
+      StaggeredGridTile.fit(
+        crossAxisCellCount: donutSpan,
+        child: WeeklyActivityCard(activity: summary.weeklyActivity),
+      ),
+      StaggeredGridTile.fit(
+        crossAxisCellCount: donutSpan,
+        child: ProgressTrendCard(history: summary.progressHistory),
       ),
       if (summary.badges.isNotEmpty)
         StaggeredGridTile.fit(

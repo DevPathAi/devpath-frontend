@@ -27,6 +27,14 @@ const _summary = DashboardSummary(
   nextTaskTitle: '비동기 프로그래밍 기초',
   badges: ['첫걸음', '3일 연속'],
   completedContentCount: 12,
+  weeklyActivity: [
+    DailyActivity(date: '2026-07-30', completedCount: 1),
+    DailyActivity(date: '2026-07-31', completedCount: 3),
+  ],
+  progressHistory: [
+    ProgressPoint(date: '2026-07-30', percent: 40),
+    ProgressPoint(date: '2026-07-31', percent: 62),
+  ],
 );
 
 void main() {
@@ -59,5 +67,18 @@ void main() {
 
     expect(find.text('이어서 학습'), findsOneWidget);
     expect(find.text('62%'), findsOneWidget);
+  });
+
+  testWidgets('DashboardBody: 시계열 카드 2개 렌더(Expanded 폭)', (tester) async {
+    tester.view.physicalSize = const Size(1000, 1400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(_host(_summary));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('weekly-activity-card')), findsOneWidget);
+    expect(find.byKey(const Key('progress-trend-card')), findsOneWidget);
   });
 }

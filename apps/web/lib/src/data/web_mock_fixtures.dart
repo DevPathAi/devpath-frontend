@@ -260,6 +260,21 @@ final Map<String, MockFixture> webMockFixtures = {
       'progressPercent': 62,
       'nextTaskTitle': '비동기 기초',
       'badges': ['첫 경로', '7일 연속'],
+      'weeklyActivity': [
+        {'date': '2026-07-25', 'completedCount': 0},
+        {'date': '2026-07-26', 'completedCount': 2},
+        {'date': '2026-07-27', 'completedCount': 1},
+        {'date': '2026-07-28', 'completedCount': 3},
+        {'date': '2026-07-29', 'completedCount': 0},
+        {'date': '2026-07-30', 'completedCount': 2},
+        {'date': '2026-07-31', 'completedCount': 4},
+      ],
+      'progressHistory': [
+        {'date': '2026-07-28', 'percent': 40},
+        {'date': '2026-07-29', 'percent': 48},
+        {'date': '2026-07-30', 'percent': 55},
+        {'date': '2026-07-31', 'percent': 62},
+      ],
     },
   ),
   // 진단 API(비회원 guest 흐름)
