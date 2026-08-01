@@ -88,4 +88,42 @@ void main() {
     addTearDown(c.dispose);
     expect(quillToMarkdown(c).trim(), isEmpty);
   });
+
+  test('평문 구두점은 이스케이프되지 않는다 — 문장부호', () {
+    final c = _controllerOf(
+      (d) => d.insert(0, '리액트에서 useEffect가 두 번 실행됩니다. 왜 그럴까요?'),
+    );
+    addTearDown(c.dispose);
+    expect(quillToMarkdown(c).trim(), '리액트에서 useEffect가 두 번 실행됩니다. 왜 그럴까요?');
+  });
+
+  test('평문 구두점은 이스케이프되지 않는다 — 특수기호', () {
+    final c = _controllerOf((d) => d.insert(0, 'C# 과 C++ 차이'));
+    addTearDown(c.dispose);
+    expect(quillToMarkdown(c).trim(), 'C# 과 C++ 차이');
+  });
+
+  test('평문 구두점은 이스케이프되지 않는다 — 괄호/느낌표', () {
+    final c = _controllerOf((d) => d.insert(0, '안녕하세요. 질문 (있습니다)!'));
+    addTearDown(c.dispose);
+    expect(quillToMarkdown(c).trim(), '안녕하세요. 질문 (있습니다)!');
+  });
+
+  test('서식이 붙은 텍스트의 특수문자는 여전히 이스케이프된다', () {
+    final c = _controllerOf((d) {
+      d.insert(0, 'a*b');
+      d.format(0, 3, Attribute.bold);
+    });
+    addTearDown(c.dispose);
+    expect(quillToMarkdown(c).trim(), '**a\\*b**');
+  });
+
+  test('코드블록 → 마크다운 펜스', () {
+    final c = _controllerOf((d) {
+      d.insert(0, 'const x = 1;');
+      d.format(12, 1, Attribute.codeBlock);
+    });
+    addTearDown(c.dispose);
+    expect(quillToMarkdown(c).trim(), '```\nconst x = 1;\n```');
+  });
 }

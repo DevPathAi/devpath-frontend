@@ -1,3 +1,7 @@
+// QuillClipboardConfig.enableExternalRichPaste 는 flutter_quill 11.5.1에서
+// @experimental 로 표시돼 있지만, 웹 리치 붙여넣기 크래시(I-2)를 막는 유일한
+// 공개 API다. 라이브러리가 stable API로 승격하면 이 ignore 는 제거한다.
+// ignore_for_file: experimental_member_use
 import 'dart:async';
 
 import 'package:dp_core/dp_core.dart';
@@ -47,7 +51,20 @@ class _QuestionCreatePageState extends ConsumerState<QuestionCreatePage> {
     super.initState();
     final injected = widget.bodyController;
     _ownsBodyController = injected == null;
-    _bodyController = injected ?? QuillController.basic();
+    // 웹은 clipboard 의 HTML 을 읽어 <img> 를 image 임베드로 변환하는데(플랫폼
+    // 기본값 enableExternalRichPaste=true), QuillEditor.basic 에 embedBuilders 가
+    // 없어 렌더 시 UnimplementedError 로 크래시한다. 저장 계약이 마크다운
+    // 전용이라 서식 붙여넣기 자체가 무손실 표현 대상이 아니므로, 외부 리치
+    // 붙여넣기를 꺼서 평문으로 강등시킨다.
+    _bodyController =
+        injected ??
+        QuillController.basic(
+          config: const QuillControllerConfig(
+            clipboardConfig: QuillClipboardConfig(
+              enableExternalRichPaste: false,
+            ),
+          ),
+        );
   }
 
   @override
@@ -94,9 +111,9 @@ class _QuestionCreatePageState extends ConsumerState<QuestionCreatePage> {
       ).showSnackBar(const SnackBar(content: Text('제목과 본문을 입력해 주세요.')));
       return;
     }
-    final body = quillToMarkdown(_bodyController).trim();
     setState(() => _submitting = true);
     try {
+      final body = quillToMarkdown(_bodyController).trim();
       final created = await ref.read(questionCreateProvider)(
         title: title,
         bodyMd: body,
@@ -123,6 +140,15 @@ class _QuestionCreatePageState extends ConsumerState<QuestionCreatePage> {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _submitting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('본문을 변환하지 못했어요. 서식을 단순화한 뒤 다시 시도해 주세요.'),
+          ),
+        );
       }
     }
   }

@@ -268,4 +268,40 @@ void main() {
       reason: '유사질문 카드 조건부 삽입으로 본문 에디터가 재생성되면 안 된다(IME 연결 유실)',
     );
   });
+
+  testWidgets('유사질문 패널이 나타나도 본문 에디터의 FocusNode가 교체되지 않는다', (tester) async {
+    _wideView(tester);
+    final c = ProviderContainer(
+      overrides: [
+        similarQuestionsProvider.overrideWithValue(
+          (q) async => [const SimilarQuestion(questionId: 2, title: '비슷한 질문')],
+        ),
+        questionCreateProvider.overrideWithValue(
+          ({required title, required bodyMd, required tags}) async =>
+              _created(99),
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+    await tester.pumpWidget(_host(c));
+    await tester.pumpAndSettle();
+
+    final before = tester
+        .widget<QuillEditor>(find.byType(QuillEditor))
+        .focusNode;
+
+    await tester.enterText(find.byType(TextField).first, 'async');
+    await tester.pump(const Duration(milliseconds: 450));
+    await tester.pumpAndSettle();
+
+    expect(find.text('💡 비슷한 질문'), findsOneWidget); // 패널이 실제로 삽입됐는지 먼저 확인
+    final after = tester
+        .widget<QuillEditor>(find.byType(QuillEditor))
+        .focusNode;
+    expect(
+      identical(before, after),
+      isTrue,
+      reason: 'FocusNode가 교체되면 포커스·IME 연결이 끊긴다',
+    );
+  });
 }
