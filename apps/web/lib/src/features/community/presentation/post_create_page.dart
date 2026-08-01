@@ -113,7 +113,11 @@ class _PostCreatePageState extends ConsumerState<PostCreatePage> {
             style: TextStyle(color: context.dpColors.textSecondary),
           ),
           const SizedBox(height: DpSpacing.xs),
-          DpRichEditor(controller: _bodyController, enabled: !_submitting),
+          DpRichEditor(
+            key: const ValueKey('post-body-editor'),
+            controller: _bodyController,
+            enabled: !_submitting,
+          ),
           const SizedBox(height: DpSpacing.md),
           TextField(
             controller: _tagsCtrl,

@@ -233,4 +233,39 @@ void main() {
     expect(seenAttachedTo, 99); // 게시 응답 questionId
     expect(seenVisibility, 'answerers_only'); // 기본 노출범위
   });
+
+  testWidgets('유사질문 패널이 나타나도 본문 에디터가 재생성되지 않는다', (tester) async {
+    _wideView(tester);
+    final c = ProviderContainer(
+      overrides: [
+        similarQuestionsProvider.overrideWithValue(
+          (q) async => [const SimilarQuestion(questionId: 2, title: '비슷한 질문')],
+        ),
+        questionCreateProvider.overrideWithValue(
+          ({required title, required bodyMd, required tags}) async =>
+              _created(99),
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+    await tester.pumpWidget(_host(c));
+    await tester.pumpAndSettle();
+
+    // 유사질문 패널이 뜨기 전의 에디터 State
+    final before = tester.state(find.byType(QuillEditor));
+
+    await tester.enterText(find.byType(TextField).first, 'async');
+    await tester.pump(const Duration(milliseconds: 450)); // 디바운스 발화
+    await tester.pumpAndSettle();
+
+    expect(find.text('💡 비슷한 질문'), findsOneWidget); // 패널이 실제로 삽입됐는지
+    final after = tester.state(find.byType(QuillEditor));
+
+    // 재생성되면 IME 연결이 끊겨 "Range start N is out of text of length M" assertion 발생
+    expect(
+      identical(before, after),
+      isTrue,
+      reason: '유사질문 카드 조건부 삽입으로 본문 에디터가 재생성되면 안 된다(IME 연결 유실)',
+    );
+  });
 }

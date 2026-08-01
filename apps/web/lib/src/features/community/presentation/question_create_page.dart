@@ -183,7 +183,11 @@ class _QuestionCreatePageState extends ConsumerState<QuestionCreatePage> {
           const SizedBox(height: DpSpacing.md),
           Text('상황과 시도한 내용을 적어주세요', style: TextStyle(color: c.textSecondary)),
           const SizedBox(height: DpSpacing.xs),
-          DpRichEditor(controller: _bodyController, enabled: !_submitting),
+          DpRichEditor(
+            key: const ValueKey('question-body-editor'),
+            controller: _bodyController,
+            enabled: !_submitting,
+          ),
           const SizedBox(height: DpSpacing.md),
           TextField(
             controller: _tagsCtrl,
