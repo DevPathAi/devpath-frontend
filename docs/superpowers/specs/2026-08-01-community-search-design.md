@@ -15,7 +15,9 @@
 - **Elasticsearch 미도입**: `devpath-gitops`에 ES/OpenSearch 매니페스트 없음(배포 앱 13개 = admin·ai·community·gateway·lcs·learning·migration·notification·**ollama**·platform·redis·sandbox·web). `community-svc`에 ES 의존·docker-compose 없음.
 - **의미검색 자산은 Q&A에만 존재**: `community_questions.question_embedding`(768차원 pgvector) + `SimilarQuestionMatcher`(`.../seed/SimilarQuestionMatcher.java`, 코사인거리 `<=>`, 임계 0.20). 값은 **ai-svc가 Kafka `CommunitySeedReadyEvent`에 동봉**해 보내고 `CommunitySeedService.updateEmbedding()`이 저장한다. **자유글·피드백 글에는 임베딩이 없다.**
 - **community-svc는 임베딩을 스스로 만들 수 있다**: `EmbeddingClient`(`.../seed/EmbeddingClient.java`)가 있고 `/questions/similar`에서 검색어 임베딩을 동기 생성한다. 실패 시 `EmbeddingUnavailableException` → 빈 결과 폴백(`CommunityController:65-77`).
-- **Kafka 인프라 사용 중**: `KafkaConfig`·`CommunitySeedConsumer`·`StreakReachedConsumer` 존재.
+- **Kafka 인프라 사용 중**: `KafkaConfig`(컨슈머 에러 핸들러: 지수백오프 3회)·`CommunitySeedConsumer`·`StreakReachedConsumer` 존재.
+- **★이벤트 발행 표준 = Outbox 패턴**: `.../outbox/{OutboxEntry,OutboxRepository,OutboxRelay,OutboxRelayScheduler}.java`. 서비스가 트랜잭션 안에서 `OutboxEntry` 저장 → 스케줄러(`fixedDelay=2000`, `@Profile("!test")`)가 최대 100건씩 Kafka 발행. 실패 시 미발행 유지·다음 주기 재시도. 사용처 = `CollusionDetector`·`BadgeService`.
+- **빌드**: Gradle Kotlin DSL(`build.gradle.kts`), **Spring Boot 4**(`spring-boot-starter-webmvc`·`spring-boot-kafka` 등 신규 아티팩트명), JPA + `JdbcTemplate` 혼용, Lombok 사용. ES 관련 의존 **없음**.
 - **CI는 GitHub Actions `services:`로 의존 서비스 기동**: `.github/workflows/ci.yml:14-26`이 `pgvector/pgvector:pg17`을 띄운다. **Kafka는 CI에 없다.** Testcontainers 미사용.
 - **프론트**: 커뮤니티 홈은 보드 필터(SegmentedButton) + `?board=` URL 동기 + `DpListRow` 목록. `DpCommandPalette`(dp_design)는 **명령·이동 검색** 전용(`commands` 주입)이라 글 검색과 무관. dp_design에 검색 입력 위젯 없음.
 - 목록 응답은 **bare 배열**(`GET /community/posts` → `List<PostSummaryView>`, 페이지네이션 없음).
@@ -46,9 +48,12 @@
 
 ```
 글 작성/수정/삭제 (community-svc)
-        │  ① DB 저장 (community_posts)
+        │  ① 같은 트랜잭션에 DB 저장 + OutboxEntry 저장
         ▼
-   Kafka: community.post.changed  ── ② AFTER_COMMIT 발행
+   community_outbox  ── ② OutboxRelayScheduler(2초 주기)가 Kafka 발행
+        │
+        ▼
+   Kafka: community.post.changed
         │
         ▼
   PostIndexConsumer → PostIndexer  ── ③ ES upsert / delete
@@ -62,7 +67,12 @@
 
 ### 4.1 핵심 결정과 근거
 
-- **이벤트는 `AFTER_COMMIT`에 발행**한다. DB에 없는 글이 색인되는 역전을 막고, Kafka 장애가 **글쓰기를 막지 않는다**.
+- **이벤트 발행은 기존 Outbox 패턴을 그대로 쓴다**(2026-08-01 실측 정정 — 초안의 `AFTER_COMMIT` 직접 발행보다 견고하고, 이미 이 서비스의 표준이다).
+  - 구조: 서비스가 **트랜잭션 안에서** `OutboxEntry`(`aggregateType`·`aggregateId`·`eventType`=Kafka 토픽명·`payload` JSON) 저장 → `OutboxRelayScheduler`(`@Scheduled(fixedDelay=2000)`, `@Profile("!test")`)가 `OutboxRelay.relayOnce()`로 최대 100건씩 발행 후 `publishedAt` 기록. 발행 실패 시 미발행으로 남아 **다음 주기 자동 재시도**.
+  - 선례: `CollusionDetector`·`BadgeService`가 동일 방식 사용.
+  - 결과: DB 저장과 이벤트가 **원자적**이라 "DB에 없는 글이 색인되는" 역전이 구조적으로 불가능하고, Kafka 장애가 **글쓰기를 막지 않는다**.
+  - **대가: 색인 반영이 최대 2초 지연**된다(즉시 아님). 글 작성 직후 곧바로 검색하는 시나리오는 드물어 수용한다.
+  - **테스트 함의**: 스케줄러가 `@Profile("!test")`로 꺼져 있어 통합 테스트에서 outbox→Kafka 경로가 자동으로 돌지 않는다. 이는 아래 `PostIndexer` 분리 결정과 맞물려 **의도된 구조**다.
 - **ES 장애 시 검색 API는 명시적 에러**를 반환한다(빈 결과 아님). 0건과 장애를 구분하지 않으면 "검색해도 안 나온다"로 오인된다. 커뮤니티 **목록·글쓰기는 ES와 무관하게 계속 동작**한다.
 - **재색인 배치를 1단계에 포함**한다. 이벤트 유실·ES 재구축·기존 글 백필이 모두 이 하나로 해결된다. 없으면 한 번 어긋난 색인을 되돌릴 수단이 없다.
   - **트리거 = 관리자 전용 엔드포인트** `POST /admin/community/reindex`(ADMIN 권한). 스케줄러·CLI가 아니라 API인 이유: 운영 중 임의 시점에 필요하고, 기존 admin 경로(`platform-svc`의 `/admin/**` 패턴)와 인증 방식이 같아 추가 인프라가 없다.
@@ -154,7 +164,7 @@
 - **Fork 1 — 검색 엔진 = Elasticsearch**(사용자 선택). Postgres 하이브리드(pg_trgm+pgvector, 새 인프라 0) 대안을 제시했으나 설계서 §8.3 방향과 한국어 품질(nori)을 우선해 ES 채택. 대가 = 새 인프라 운영·색인 동기화 복잡도.
 - **Fork 2 — 도입 범위 = 로컬 구현·검증 + 매니페스트 작성**. AWS 정지 상태라 k3s 적용·실서버 스모크는 이월(비용 미발생).
 - **Fork 3 — 벡터 위치 = pgvector 유지**(ES `dense_vector` 미사용). ES에 통합하면 RRF를 ES가 공식 지원하지만 기존 유사질문 자산과 벡터가 중복 저장된다. 대신 **2단계에서 앱이 RRF 융합**을 구현한다.
-- **Fork 4 — 색인 동기화 = Kafka 경유**(사용자 선택). `AFTER_COMMIT` 동기 색인 대안 대비 재시도·순서 보장이 낫다. 대가 = 토픽·프로듀서·컨슈머 추가, 로컬 개발에 Kafka 필요 → **§4.1의 `PostIndexer` 분리로 CI 검증 가능성을 확보**.
+- **Fork 4 — 색인 동기화 = Kafka 경유, 발행은 기존 Outbox 패턴**(사용자 선택 + 2026-08-01 실측 정정). 동기 색인 대비 재시도·원자성이 낫다. 대가 = 토픽·컨슈머 추가 + **색인 반영 최대 2초 지연**, 로컬 개발에 Kafka 필요 → **§4.1의 `PostIndexer` 분리로 CI 검증 가능성을 확보**.
 - **Fork 5 — 색인 대상 = 글만**(답변·댓글 제외). 결과를 글 단위로 묶는 처리와 동기화 대상 증가를 피한다.
 - **Fork 6 — 하이라이팅 1단계 포함**. ES 기본 제공이고 "왜 검색됐는지"가 검색 신뢰의 핵심.
 - **Fork 7 — ES 장애 = 명시적 에러**(빈 결과 아님). 0건과 장애의 혼동 방지.
