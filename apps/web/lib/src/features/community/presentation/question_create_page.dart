@@ -1,19 +1,31 @@
+// QuillClipboardConfig.enableExternalRichPaste 는 flutter_quill 11.5.1에서
+// @experimental 로 표시돼 있지만, 웹 리치 붙여넣기 크래시(I-2)를 막는 유일한
+// 공개 API다. 라이브러리가 stable API로 승격하면 이 ignore 는 제거한다.
+// ignore_for_file: experimental_member_use
 import 'dart:async';
 
 import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../data/community_source.dart';
 import '../data/lcs_source.dart';
 import 'lcs_context.dart';
+import 'widgets/quill_markdown.dart';
+import 'widgets/rich_editor.dart';
 
 /// 질문 작성(FAB). `POST /community/questions {title, bodyMd, tags[]}` → 즉시 게시(AI 시드는 비동기).
 /// 제목 입력 중 유사질문(`GET /community/questions/similar?q=`)을 디바운스로 안내해 중복을 줄인다.
 class QuestionCreatePage extends ConsumerStatefulWidget {
-  const QuestionCreatePage({super.key});
+  const QuestionCreatePage({super.key, @visibleForTesting this.bodyController});
+
+  /// 테스트에서 본문 문서를 결정적으로 주입하기 위한 선택 파라미터.
+  /// null 이면 페이지가 직접 생성·해제한다.
+  @visibleForTesting
+  final QuillController? bodyController;
 
   @override
   ConsumerState<QuestionCreatePage> createState() => _QuestionCreatePageState();
@@ -21,8 +33,9 @@ class QuestionCreatePage extends ConsumerStatefulWidget {
 
 class _QuestionCreatePageState extends ConsumerState<QuestionCreatePage> {
   final _titleCtrl = TextEditingController();
-  final _bodyCtrl = TextEditingController();
   final _tagsCtrl = TextEditingController();
+  late final QuillController _bodyController;
+  late final bool _ownsBodyController;
 
   Timer? _debounce;
   List<SimilarQuestion> _similar = const [];
@@ -34,11 +47,32 @@ class _QuestionCreatePageState extends ConsumerState<QuestionCreatePage> {
   static const _debounceDelay = Duration(milliseconds: 400);
 
   @override
+  void initState() {
+    super.initState();
+    final injected = widget.bodyController;
+    _ownsBodyController = injected == null;
+    // 웹은 clipboard 의 HTML 을 읽어 <img> 를 image 임베드로 변환하는데(플랫폼
+    // 기본값 enableExternalRichPaste=true), QuillEditor.basic 에 embedBuilders 가
+    // 없어 렌더 시 UnimplementedError 로 크래시한다. 저장 계약이 마크다운
+    // 전용이라 서식 붙여넣기 자체가 무손실 표현 대상이 아니므로, 외부 리치
+    // 붙여넣기를 꺼서 평문으로 강등시킨다.
+    _bodyController =
+        injected ??
+        QuillController.basic(
+          config: const QuillControllerConfig(
+            clipboardConfig: QuillClipboardConfig(
+              enableExternalRichPaste: false,
+            ),
+          ),
+        );
+  }
+
+  @override
   void dispose() {
     _debounce?.cancel();
     _titleCtrl.dispose();
-    _bodyCtrl.dispose();
     _tagsCtrl.dispose();
+    if (_ownsBodyController) _bodyController.dispose();
     super.dispose();
   }
 
@@ -70,8 +104,8 @@ class _QuestionCreatePageState extends ConsumerState<QuestionCreatePage> {
 
   Future<void> _submit() async {
     final title = _titleCtrl.text.trim();
-    final body = _bodyCtrl.text.trim();
-    if (title.isEmpty || body.isEmpty) {
+    final isBodyEmpty = _bodyController.document.toPlainText().trim().isEmpty;
+    if (title.isEmpty || isBodyEmpty) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('제목과 본문을 입력해 주세요.')));
@@ -79,6 +113,7 @@ class _QuestionCreatePageState extends ConsumerState<QuestionCreatePage> {
     }
     setState(() => _submitting = true);
     try {
+      final body = quillToMarkdown(_bodyController).trim();
       final created = await ref.read(questionCreateProvider)(
         title: title,
         bodyMd: body,
@@ -105,6 +140,15 @@ class _QuestionCreatePageState extends ConsumerState<QuestionCreatePage> {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _submitting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('본문을 변환하지 못했어요. 서식을 단순화한 뒤 다시 시도해 주세요.'),
+          ),
+        );
       }
     }
   }
@@ -163,17 +207,12 @@ class _QuestionCreatePageState extends ConsumerState<QuestionCreatePage> {
             ),
           ],
           const SizedBox(height: DpSpacing.md),
-          TextField(
-            controller: _bodyCtrl,
+          Text('상황과 시도한 내용을 적어주세요', style: TextStyle(color: c.textSecondary)),
+          const SizedBox(height: DpSpacing.xs),
+          DpRichEditor(
+            key: const ValueKey('question-body-editor'),
+            controller: _bodyController,
             enabled: !_submitting,
-            minLines: 5,
-            maxLines: 12,
-            decoration: const InputDecoration(
-              labelText: '본문 (Markdown)',
-              hintText: '상황과 시도한 내용을 적어주세요',
-              border: OutlineInputBorder(),
-              alignLabelWithHint: true,
-            ),
           ),
           const SizedBox(height: DpSpacing.md),
           TextField(
