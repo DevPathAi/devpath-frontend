@@ -46,8 +46,10 @@
 
 ## 4. 아키텍처
 
+> **★2026-08-01 실측 정정 — 글 수정·삭제 기능은 이 코드베이스에 없다.** `QuestionService`·`PostService`·`CommunityController` 어디에도 삭제/수정 메서드·`@DeleteMapping`·`@PatchMapping`·`@PutMapping`이 없다(grep 확인). 따라서 색인 이벤트를 발행하는 지점은 **글 생성 2곳**(`QuestionService.create()` = QNA, `PostService.createPost()` = FREE/FEEDBACK)뿐이다. payload의 `deleted` 플래그와 컨슈머의 삭제 분기는 **향후 삭제 기능이 생길 때를 대비해 구현·테스트해 두는 것**이며, 지금은 발행되지 않는다. 아래 다이어그램의 "수정/삭제"는 미래 경로다.
+
 ```
-글 작성/수정/삭제 (community-svc)
+글 작성 (community-svc — 생성 2경로: QNA / FREE·FEEDBACK)
         │  ① 같은 트랜잭션에 DB 저장 + OutboxEntry 저장
         ▼
    community_outbox  ── ② OutboxRelayScheduler(2초 주기)가 Kafka 발행

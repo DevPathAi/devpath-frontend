@@ -6,7 +6,14 @@
 
 **Architecture:** `community-svc`가 Elasticsearch(nori 한국어 분석기)에 글을 색인한다. 색인 트리거는 **기존 Outbox 패턴**(트랜잭션 내 `OutboxEntry` 저장 → 2초 주기 릴레이 → Kafka → `PostIndexConsumer`)을 그대로 따른다. 검색은 ES에서 **매칭 id·하이라이트·총건수만** 받고, 화면에 표시할 `PostSummaryView`는 **DB에서 조립**한다(ES가 stale해도 표시 데이터는 항상 정확). 프론트는 커뮤니티 홈 상단 검색바에서 `?q=`를 URL에 동기해 결과를 기존 `DpListRow`로 렌더한다.
 
-**Tech Stack:** Java 21 · Spring Boot 4 · Gradle Kotlin DSL · Elasticsearch 8.x(+analysis-nori) · Spring Kafka · JPA + JdbcTemplate · JUnit 5 + AssertJ + MockMvc · Flutter Web · freezed · flutter_riverpod 3 · go_router · melos
+**Tech Stack:** Java 21 · Spring Boot 4 · Gradle Kotlin DSL · **Elasticsearch 9.2.8(+analysis-nori)** · Spring Kafka · JPA + JdbcTemplate · JUnit 5 + AssertJ + MockMvc · Flutter Web · freezed · flutter_riverpod 3 · go_router · melos
+
+> **★Task 1 실측 확정(2026-08-01) — 이후 Task는 이 값을 전제로 한다**
+> - 클라이언트: `org.springframework.boot:spring-boot-starter-data-elasticsearch`(Boot 4.0.7 관리) → 저수준 **`co.elastic.clients:elasticsearch-java:9.2.8`**. `ElasticsearchClient` 빈이 자동설정으로 주입된다.
+> - 서버 이미지: **`docker.elastic.co/elasticsearch/elasticsearch:9.2.8`** + `analysis-nori`(로컬 태그 `devpath-es:local`)
+> - 설정 프로퍼티: **`spring.elasticsearch.uris`**
+> - 인덱스 분석기: `nori_analyzer`(`{"type":"nori"}`) — `Analyzer.Builder.nori(...)`로 정의
+> - **초안이 가정한 "8.x"는 오류**였다. Spring Boot 4 세대는 Elastic 클라이언트 9.x를 가져온다.
 
 **참조 spec:** `devpath-frontend/docs/superpowers/specs/2026-08-01-community-search-design.md` (커밋 `8e9df80`)
 
@@ -1054,7 +1061,20 @@ class _CommunitySearchBarState extends State<CommunitySearchBar> {
 
 `_postRow`가 `CommunityPostSummary`를 받는다면, `CommunitySearchItem` → 표시용 변환 함수를 만들어 재사용하라. **`DpListRow`를 새로 만들지 말 것.**
 
-`highlight`는 `<em>` 태그를 포함하므로 그대로 텍스트로 출력하면 태그가 노출된다. **`<em>`을 굵게 렌더하거나 태그를 제거**해야 한다. 가장 단순한 처리는 태그를 제거하고 평문으로 보여주는 것이며, 강조 표시가 필요하면 `RichText`로 분해한다. **구현 시 선택하고 테스트로 고정하라** — 태그 문자열이 화면에 그대로 나오면 결함이다.
+### ⚠️ `highlight` 렌더링 — 보안 계약 (Task 3 리뷰에서 도출, 2026-08-01)
+
+`highlight`는 `<em>` 태그를 포함하므로 그대로 텍스트로 출력하면 태그가 노출된다. 그런데 **더 중요한 제약이 있다**:
+
+**ES 하이라이터는 매칭 토큰만 `<em>`으로 감쌀 뿐, 사용자가 쓴 본문의 `<`·`>`·`&`를 이스케이프하지 않는다.** 즉 어떤 글의 본문에 `<img src=x onerror=alert(1)>`가 들어 있고 그 글이 검색에 걸리면, **그 마크업이 `highlight` 필드에 그대로 담겨 응답으로 온다.**
+
+따라서 **`highlight`를 HTML로 해석해 렌더하는 방식(웹의 `dangerouslySetInnerHTML` 상당)은 금지**한다. 다음 중 하나로 구현하라:
+
+1. **권장 — 태그를 파싱해 `RichText`/`TextSpan`으로 분해**: `<em>`·`</em>`만 화이트리스트로 인식해 강조 스팬을 만들고, **그 사이의 텍스트는 평문으로 취급**한다. 다른 태그 문자열(`<img ...>` 등)은 강조 대상이 아니라 **문자 그대로 표시**된다.
+2. **최소 — 모든 태그를 제거하고 평문으로**: `<em>`도 함께 지워 강조 없이 보여준다. 안전하지만 "왜 검색됐는지"가 드러나지 않는다.
+
+**테스트로 고정하라**: `highlight`에 `<img src=x onerror=alert(1)>` 같은 문자열이 섞여 와도 **위젯 트리에 이미지·스크립트가 생기지 않고 문자 그대로 렌더**되는지 검증하는 케이스를 반드시 넣는다. 태그 문자열이 화면에 그대로 나오는 것도 결함이지만, **태그가 실제로 해석되는 것은 취약점**이다.
+
+> Flutter는 HTML을 자동 해석하지 않으므로 웹 브라우저 수준의 XSS로 직결되지는 않는다. 다만 `flutter_html` 같은 패키지를 쓰거나 향후 렌더 방식을 바꿀 때 위험이 현실화되므로, **화이트리스트 파싱을 계약으로 못박는다.**
 
 - [ ] **Step 6: 라우터에 `?q=` 추가**
 
