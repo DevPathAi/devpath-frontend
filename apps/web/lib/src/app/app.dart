@@ -1,5 +1,7 @@
 import 'package:dp_design/dp_design.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/theme_provider.dart';
@@ -19,6 +21,13 @@ class DevPathWebApp extends ConsumerWidget {
       theme: DpTheme.light(),
       darkTheme: DpTheme.dark(),
       themeMode: mode,
+      // flutter_quill 11.x 는 이 delegate 등록을 요구한다(에디터 툴팁·다이얼로그).
+      localizationsDelegates: const [
+        DefaultCupertinoLocalizations.delegate,
+        DefaultMaterialLocalizations.delegate,
+        DefaultWidgetsLocalizations.delegate,
+        FlutterQuillLocalizations.delegate,
+      ],
       routerConfig: router,
     );
   }
