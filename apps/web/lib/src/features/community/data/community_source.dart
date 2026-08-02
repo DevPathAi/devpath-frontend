@@ -161,6 +161,37 @@ final similarQuestionsProvider = Provider<SimilarQuestionsFetch>((ref) {
   };
 });
 
+/// 신고 접수 `POST /community/reports`.
+/// 409=이미 신고한 대상, 400=본인 콘텐츠·잘못된 값, 404=대상 없음.
+typedef CommunityReportSubmit =
+    Future<CommunityReportResult> Function({
+      required String targetType,
+      required int targetId,
+      required CommunityReportCategory category,
+      String? reason,
+    });
+
+final communityReportProvider = Provider<CommunityReportSubmit>((ref) {
+  final client = ref.watch(apiClientProvider);
+  return ({
+    required String targetType,
+    required int targetId,
+    required CommunityReportCategory category,
+    String? reason,
+  }) async {
+    final json = await client.post<Map<String, dynamic>>(
+      '/community/reports',
+      body: {
+        'targetType': targetType,
+        'targetId': targetId,
+        'category': category.wire,
+        'reason': ?reason,
+      },
+    );
+    return CommunityReportResult.fromJson(json);
+  };
+});
+
 final communitySearchProvider = Provider<CommunitySearchFetch>((ref) {
   final client = ref.watch(apiClientProvider);
   return ({

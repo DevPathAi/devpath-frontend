@@ -214,6 +214,8 @@ final Map<String, MockFixture> webMockFixtures = {
       {'id': 2, 'name': 'async', 'postCount': 8},
     ],
   ),
+  // 신고 접수(폴백 키). 목 프로토에서는 항상 성공한다 — 409/400 분기는 위젯 테스트가 덮는다.
+  'POST /community/reports': (201, {'id': 1, 'status': 'OPEN'}),
   // 검색(폴백 키 — q·페이지 무관). total > items.length 라 "더 보기"가 노출되는 상태다.
   // 두 번째 항목은 본문 매칭이 없어 highlight 가 비는 경우(→ excerpt 폴백)를 재현한다.
   'GET /community/search': (
