@@ -16,6 +16,7 @@ class DpListRow extends StatelessWidget {
     this.trailing,
     this.onTap,
     this.preview,
+    this.subtitle,
   });
 
   final String title;
@@ -26,6 +27,11 @@ class DpListRow extends StatelessWidget {
 
   /// 지정 시 제목 hover 미리보기 본문(웹 전용). 비어있으면 미표시.
   final String? preview;
+
+  /// 제목 아래에 **항상** 보이는 보조 영역. [preview] 가 hover 전용인 것과 대비된다 —
+  /// 검색 결과의 매칭 하이라이트처럼 행 스스로 근거를 드러내야 할 때 쓴다.
+  /// 서식이 필요할 수 있어 String 이 아니라 Widget 을 받는다.
+  final Widget? subtitle;
 
   @override
   Widget build(BuildContext context) {
@@ -69,6 +75,15 @@ class DpListRow extends StatelessWidget {
                             child: Text(title, style: text.titleSmall),
                           )
                         : Text(title, style: text.titleSmall),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: DpSpacing.xs),
+                      DefaultTextStyle.merge(
+                        style: text.bodySmall?.copyWith(
+                          color: context.dpColors.textSecondary,
+                        ),
+                        child: subtitle!,
+                      ),
+                    ],
                   ],
                 ),
               ),
