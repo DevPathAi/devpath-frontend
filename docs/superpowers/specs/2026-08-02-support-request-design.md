@@ -73,8 +73,11 @@ CREATE TABLE support_requests (
     CHECK (status IN ('OPEN','IN_PROGRESS','RESOLVED','WONTFIX'))
 );
 
-CREATE INDEX idx_support_requests_status_created
-  ON support_requests (status, created_at DESC);
+-- 관리자 목록 = status 필터 + 최신순 keyset. 정렬 키는 created_at 이 아니라 id 다
+-- (BIGSERIAL 이라 단조 증가 = 시간 순서이고, keyset cursor 로 쓰려면 유일해야 한다).
+-- 인덱스를 정렬 키와 같은 컬럼으로 맞춘다.
+CREATE INDEX idx_support_requests_status_id
+  ON support_requests (status, id DESC);
 
 CREATE TABLE support_request_failures (
   id          BIGSERIAL PRIMARY KEY,
@@ -178,7 +181,9 @@ CREATE INDEX idx_support_request_failures_request
 }
 ```
 
-keyset 페이지네이션. `nextCursor`는 꽉 찬 페이지일 때만 마지막 행 id, 아니면 null.
+keyset 페이지네이션 — **id 내림차순(최신순)**. `cursor`가 없으면 처음부터, 있으면 `id < cursor`인 행만. `nextCursor`는 꽉 찬 페이지일 때만 마지막 행 id, 아니면 null.
+
+> `AdminUserController`는 id **오름차순** keyset이다(사용자 목록은 가입 순이 자연스럽다). 제보 목록은 최신순이어야 하므로 방향만 반대로 두고 나머지 계약(`{data,nextCursor,limit}`)은 동일하게 맞춘다.
 
 ### 4.3 `GET /admin/support-requests/{id}` — 상세
 
