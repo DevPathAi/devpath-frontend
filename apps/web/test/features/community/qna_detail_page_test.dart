@@ -126,7 +126,12 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField), '새 답변입니다');
-    await tester.tap(find.widgetWithText(FilledButton, '답변 등록'));
+    // 답변 등록 버튼은 목록 아래에 있어 뷰포트(600px) 경계에 걸린다. 카드에 위젯이
+    // 하나만 늘어도 화면 밖으로 밀려 tap 이 빗나가므로 명시적으로 스크롤한다.
+    final submit = find.widgetWithText(FilledButton, '답변 등록');
+    await tester.ensureVisible(submit);
+    await tester.pumpAndSettle();
+    await tester.tap(submit);
     await tester.pumpAndSettle();
 
     expect(seenBody, '새 답변입니다');

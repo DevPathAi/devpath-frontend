@@ -3,10 +3,13 @@ import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../auth/application/auth_controller.dart';
+import '../../auth/state/auth_state.dart';
 import '../application/qna_detail_controller.dart';
 import '../data/community_source.dart';
 import '../state/qna_detail_state.dart';
 import 'lcs_context.dart';
+import 'widgets/report_menu_button.dart';
 
 class QnaDetailPage extends ConsumerStatefulWidget {
   const QnaDetailPage({super.key, required this.postId});
@@ -96,6 +99,14 @@ class _Loaded extends ConsumerWidget {
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
             ),
+            // QuestionDetailView 에는 작성자 id 가 없다(기존 계약) — 자기 글이어도 메뉴가
+            // 보이며, 그 경우 서버 400 을 전용 문구로 안내한다.
+            ReportMenuButton(
+              targetType: 'POST',
+              targetId: detail.id,
+              authorId: null,
+              currentUserId: _currentUserId(ref),
+            ),
           ],
         ),
         const SizedBox(height: DpSpacing.sm),
@@ -127,6 +138,7 @@ class _Loaded extends ConsumerWidget {
             answer: a,
             questionSolved: detail.solved,
             submitting: submitting,
+            currentUserId: _currentUserId(ref),
             onVote: (v) => notifier.vote(CommunityVoteTarget.answer, a.id, v),
             onAccept: () => notifier.accept(a.id),
           ),
@@ -146,11 +158,18 @@ class _Loaded extends ConsumerWidget {
   }
 }
 
+/// 현재 로그인 사용자 id(문자열). 미인증이면 null. 자기 콘텐츠 신고 메뉴를 감추는 데 쓴다.
+String? _currentUserId(WidgetRef ref) {
+  final auth = ref.watch(authControllerProvider);
+  return auth is AuthAuthenticated ? auth.user.id : null;
+}
+
 class _AnswerCard extends StatelessWidget {
   const _AnswerCard({
     required this.answer,
     required this.questionSolved,
     required this.submitting,
+    required this.currentUserId,
     required this.onVote,
     required this.onAccept,
   });
@@ -158,6 +177,7 @@ class _AnswerCard extends StatelessWidget {
   final CommunityAnswer answer;
   final bool questionSolved;
   final bool submitting;
+  final String? currentUserId;
   final ValueChanged<int> onVote;
   final VoidCallback onAccept;
 
@@ -211,6 +231,13 @@ class _AnswerCard extends StatelessWidget {
                     onPressed: submitting ? null : onAccept,
                     child: const Text('채택'),
                   ),
+                // AI 초안은 authorId 가 null 이라 항상 신고할 수 있다(서버도 허용한다).
+                ReportMenuButton(
+                  targetType: 'ANSWER',
+                  targetId: answer.id,
+                  authorId: answer.authorId,
+                  currentUserId: currentUserId,
+                ),
               ],
             ),
             const SizedBox(height: DpSpacing.xs),

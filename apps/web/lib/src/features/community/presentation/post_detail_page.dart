@@ -3,8 +3,11 @@ import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../auth/application/auth_controller.dart';
+import '../../auth/state/auth_state.dart';
 import '../application/post_detail_controller.dart';
 import '../state/post_detail_state.dart';
+import 'widgets/report_menu_button.dart';
 
 /// 일반 게시글(FREE/FEEDBACK) 상세 — 마크다운 본문·태그·추천·댓글 스레드.
 /// Q&A(qna_detail_page)와 달리 답변/채택 대신 댓글로 소통한다.
@@ -62,6 +65,10 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
         PostDetailPhase.loaded when s.detail != null => _Loaded(
           detail: s.detail!,
           submitting: s.submitting,
+          currentUserId: switch (ref.watch(authControllerProvider)) {
+            AuthAuthenticated(:final user) => user.id,
+            _ => null,
+          },
           commentCtrl: _commentCtrl,
           onUpvote: notifier.upvote,
           onComment: () {
@@ -81,6 +88,7 @@ class _Loaded extends StatelessWidget {
   const _Loaded({
     required this.detail,
     required this.submitting,
+    required this.currentUserId,
     required this.commentCtrl,
     required this.onUpvote,
     required this.onComment,
@@ -88,6 +96,9 @@ class _Loaded extends StatelessWidget {
 
   final CommunityPostDetail detail;
   final bool submitting;
+
+  /// 자기 콘텐츠 신고 메뉴를 감추는 데 쓴다. 미인증이면 null.
+  final String? currentUserId;
   final TextEditingController commentCtrl;
   final VoidCallback onUpvote;
   final VoidCallback onComment;
@@ -98,7 +109,22 @@ class _Loaded extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(DpSpacing.lg),
       children: [
-        Text(detail.title, style: Theme.of(context).textTheme.headlineSmall),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                detail.title,
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+            ),
+            ReportMenuButton(
+              targetType: 'POST',
+              targetId: detail.id,
+              authorId: detail.authorId,
+              currentUserId: currentUserId,
+            ),
+          ],
+        ),
         if (detail.tags.isNotEmpty) ...[
           const SizedBox(height: DpSpacing.sm),
           Wrap(
@@ -129,7 +155,8 @@ class _Loaded extends StatelessWidget {
           style: Theme.of(context).textTheme.titleMedium,
         ),
         const SizedBox(height: DpSpacing.sm),
-        for (final cm in detail.comments) _CommentCard(comment: cm),
+        for (final cm in detail.comments)
+          _CommentCard(comment: cm, currentUserId: currentUserId),
         const SizedBox(height: DpSpacing.lg),
         _CommentComposer(
           controller: commentCtrl,
@@ -142,9 +169,10 @@ class _Loaded extends StatelessWidget {
 }
 
 class _CommentCard extends StatelessWidget {
-  const _CommentCard({required this.comment});
+  const _CommentCard({required this.comment, required this.currentUserId});
 
   final CommunityComment comment;
+  final String? currentUserId;
 
   @override
   Widget build(BuildContext context) {
@@ -155,9 +183,21 @@ class _CommentCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              comment.authorId == null ? '익명' : '작성자 ${comment.authorId}',
-              style: TextStyle(color: c.textSecondary, fontSize: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    comment.authorId == null ? '익명' : '작성자 ${comment.authorId}',
+                    style: TextStyle(color: c.textSecondary, fontSize: 12),
+                  ),
+                ),
+                ReportMenuButton(
+                  targetType: 'COMMENT',
+                  targetId: comment.id,
+                  authorId: comment.authorId,
+                  currentUserId: currentUserId,
+                ),
+              ],
             ),
             const SizedBox(height: DpSpacing.xs),
             DpMarkdown(data: comment.bodyMd),
