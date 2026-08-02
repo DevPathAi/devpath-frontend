@@ -66,4 +66,40 @@ void main() {
 
     expect(find.text('본문 미리보기 요약 텍스트'), findsOneWidget); // hover 후 등장
   });
+
+  testWidgets('DpListRow: subtitle 은 hover 없이 항상 보인다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: DpTheme.light(),
+        home: const Scaffold(
+          body: DpListRow(title: '검색 결과 제목', subtitle: Text('매칭된 본문 조각')),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // preview(hover 전용)와 달리 마우스를 올리지 않아도 보여야 한다 — 검색 하이라이트처럼
+    // 행 자체가 근거를 드러내야 하는 용도다.
+    expect(find.text('검색 결과 제목'), findsOneWidget);
+    expect(find.text('매칭된 본문 조각'), findsOneWidget);
+  });
+
+  testWidgets('DpListRow: subtitle 과 preview 는 함께 쓸 수 있다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: DpTheme.light(),
+        home: const Scaffold(
+          body: DpListRow(
+            title: '제목',
+            subtitle: Text('항상 보이는 부제'),
+            preview: '호버해야 보이는 본문',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('항상 보이는 부제'), findsOneWidget);
+    expect(find.text('호버해야 보이는 본문'), findsNothing); // hover 전이므로 미표시
+  });
 }

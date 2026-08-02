@@ -6,13 +6,20 @@ import 'package:go_router/go_router.dart';
 
 import '../../ads/presentation/ad_slot_widget.dart';
 import '../application/community_controller.dart';
+import '../application/community_search_controller.dart';
+import '../state/community_search_state.dart';
 import '../state/community_state.dart';
+import 'widgets/community_search_bar.dart';
+import 'widgets/search_highlight.dart';
 
 class CommunityHomePage extends ConsumerStatefulWidget {
-  const CommunityHomePage({super.key, this.initialBoard});
+  const CommunityHomePage({super.key, this.initialBoard, this.initialQuery});
 
   /// URL 쿼리 `?board=`(QNA/FREE/FEEDBACK) 프리셋. null=전체.
   final String? initialBoard;
+
+  /// URL 쿼리 `?q=` 프리셋. 값이 있으면 진입 즉시 검색 결과를 보여준다(딥링크·새로고침).
+  final String? initialQuery;
 
   @override
   ConsumerState<CommunityHomePage> createState() => _CommunityHomePageState();
@@ -23,6 +30,7 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       final board = CommunityBoard.values.firstWhere(
         (b) => b.value == widget.initialBoard,
         orElse: () => CommunityBoard.all,
@@ -33,7 +41,34 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
       } else {
         notifier.selectBoard(board);
       }
+
+      // 검색어 변경 시 URL 을 갱신하므로 이 페이지가 다시 만들어질 수 있다. 이미 같은 검색어로
+      // 결과를 들고 있으면 재조회하지 않는다(타이핑마다 중복 호출 방지).
+      final q = widget.initialQuery?.trim() ?? '';
+      final search = ref.read(communitySearchControllerProvider);
+      if (q.isNotEmpty && search.query != q) {
+        ref
+            .read(communitySearchControllerProvider.notifier)
+            .search(q, board: board.value);
+      }
     });
+  }
+
+  /// 검색어를 컨트롤러와 URL 에 함께 반영한다. `go` 가 아니라 `replace` 인 이유: 타이핑마다
+  /// 히스토리에 쌓이면 뒤로가기가 글자 수만큼 눌러야 하는 화면이 된다.
+  void _onQueryChanged(String q, CommunityBoard board) {
+    ref
+        .read(communitySearchControllerProvider.notifier)
+        .search(q, board: board.value);
+    final params = <String, String>{
+      if (board.value != null) 'board': board.value!,
+      if (q.isNotEmpty) 'q': q,
+    };
+    final uri = Uri(
+      path: '/community',
+      queryParameters: params.isEmpty ? null : params,
+    );
+    context.replace(uri.toString());
   }
 
   /// FAB 스피드다이얼 — 질문/자유글/피드백 요청 3종 작성 진입.
@@ -81,6 +116,7 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
   Widget build(BuildContext context) {
     final s = ref.watch(communityControllerProvider);
     final notifier = ref.read(communityControllerProvider.notifier);
+    final search = ref.watch(communitySearchControllerProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('커뮤니티')),
@@ -94,17 +130,148 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
           PinnedHeaderSliver(
             child: ColoredBox(
               color: Theme.of(context).scaffoldBackgroundColor,
-              child: _BoardFilterBar(
-                current: s.board,
-                onSelect: (board) {
-                  notifier.selectBoard(board);
-                  context.go('/community?board=${board.value ?? ''}');
-                },
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      DpSpacing.lg,
+                      DpSpacing.md,
+                      DpSpacing.lg,
+                      0,
+                    ),
+                    child: CommunitySearchBar(
+                      initialQuery: widget.initialQuery ?? '',
+                      onChangedDebounced: (q) => _onQueryChanged(q, s.board),
+                    ),
+                  ),
+                  _BoardFilterBar(
+                    current: s.board,
+                    onSelect: (board) {
+                      notifier.selectBoard(board);
+                      // 검색 중이면 같은 검색어를 새 보드로 다시 조회한다.
+                      if (search.phase != CommunitySearchPhase.idle) {
+                        ref
+                            .read(communitySearchControllerProvider.notifier)
+                            .search(search.query, board: board.value);
+                      }
+                      context.go('/community?board=${board.value ?? ''}');
+                    },
+                  ),
+                ],
               ),
             ),
           ),
-          ..._bodySlivers(context, s, notifier),
+          ...search.phase == CommunitySearchPhase.idle
+              ? _bodySlivers(context, s, notifier)
+              : _searchSlivers(context, search, s.board),
         ],
+      ),
+    );
+  }
+
+  /// 검색 모드 본문. 목록 경로(`_bodySlivers`)와 상호 배타다.
+  List<Widget> _searchSlivers(
+    BuildContext context,
+    CommunitySearchState search,
+    CommunityBoard board,
+  ) {
+    switch (search.phase) {
+      case CommunitySearchPhase.idle:
+        return const [];
+      case CommunitySearchPhase.loading:
+        return const [SliverFillRemaining(child: DpLoading())];
+      case CommunitySearchPhase.failed:
+        return [
+          SliverFillRemaining(
+            key: const ValueKey('search-error'),
+            child: DpError(
+              message: search.error ?? '검색하지 못했어요',
+              onRetry: () => ref
+                  .read(communitySearchControllerProvider.notifier)
+                  .retry(board: board.value),
+            ),
+          ),
+        ];
+      case CommunitySearchPhase.loaded:
+        if (search.items.isEmpty) {
+          return [
+            SliverFillRemaining(
+              key: const ValueKey('search-empty'),
+              child: DpEmpty(
+                icon: DpIcons.search,
+                title: '검색 결과가 없어요',
+                message: '"${search.query}"와 맞는 글을 찾지 못했어요. 다른 낱말로 찾아보세요.',
+              ),
+            ),
+          ];
+        }
+        return [
+          SliverPadding(
+            padding: const EdgeInsets.all(DpSpacing.lg),
+            sliver: SliverList.separated(
+              itemCount: search.items.length + (search.hasMore ? 1 : 0),
+              separatorBuilder: (_, _) => const SizedBox(height: DpSpacing.sm),
+              itemBuilder: (_, i) {
+                if (i == search.items.length) {
+                  return Padding(
+                    padding: const EdgeInsets.only(top: DpSpacing.sm),
+                    child: OutlinedButton(
+                      key: const ValueKey('search-more'),
+                      onPressed: search.loadingMore
+                          ? null
+                          : () => ref
+                                .read(
+                                  communitySearchControllerProvider.notifier,
+                                )
+                                .loadMore(board: board.value),
+                      child: Text(
+                        search.loadingMore
+                            ? '불러오는 중…'
+                            : '더 보기 (${search.items.length}/${search.total})',
+                      ),
+                    ),
+                  );
+                }
+                return _searchRow(context, search.items[i]);
+              },
+            ),
+          ),
+        ];
+    }
+  }
+
+  /// 검색 결과 행. 목록 행(`_postRow`)과 같은 [DpListRow] 를 쓰되 매칭 근거(하이라이트)를
+  /// subtitle 로 항상 보여준다.
+  Widget _searchRow(BuildContext context, CommunitySearchItem item) {
+    final c = context.dpColors;
+    final isQna = item.boardType == 'QNA';
+    final accent = switch (item.boardType) {
+      'FREE' => c.border,
+      'FEEDBACK' => c.warning,
+      _ => c.primary,
+    };
+    final label = switch (item.boardType) {
+      'FREE' => '자유',
+      'FEEDBACK' => '피드백',
+      _ => 'Q&A',
+    };
+    // 본문 매칭이 없으면 highlight 가 비어 오므로 excerpt 로 폴백한다.
+    final body = item.highlight.isNotEmpty ? item.highlight : item.excerpt;
+    return DpListRow(
+      accentColor: accent,
+      title: item.title,
+      subtitle: body.isEmpty ? null : SearchHighlightText(body),
+      badges: [
+        _badgeChip(context, label),
+        if (isQna && item.solved) _badgeChip(context, '✓ 해결됨', tone: c.success),
+      ],
+      trailing: Text(
+        '${isQna ? '답변' : '댓글'} ${item.replyCount} · 추천 ${item.upvoteCount}',
+        style: TextStyle(color: c.textSecondary, fontSize: 12),
+      ),
+      onTap: () => context.go(
+        isQna ? '/community/${item.id}' : '/community/post/${item.id}',
       ),
     );
   }

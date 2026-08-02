@@ -214,6 +214,40 @@ final Map<String, MockFixture> webMockFixtures = {
       {'id': 2, 'name': 'async', 'postCount': 8},
     ],
   ),
+  // 검색(폴백 키 — q·페이지 무관). total > items.length 라 "더 보기"가 노출되는 상태다.
+  // 두 번째 항목은 본문 매칭이 없어 highlight 가 비는 경우(→ excerpt 폴백)를 재현한다.
+  'GET /community/search': (
+    200,
+    {
+      'items': [
+        {
+          'id': 1,
+          'title': 'async/await가 헷갈려요',
+          'boardType': 'QNA',
+          'authorId': 1,
+          'solved': false,
+          'upvoteCount': 3,
+          'replyCount': 2,
+          'excerpt': 'async/await에서 예외는 어디서 잡나요?',
+          'highlight': 'async/await에서 <em>예외</em>는 어디서 잡나요?',
+        },
+        {
+          'id': 10,
+          'title': '배포 자동화 팁 공유',
+          'boardType': 'FREE',
+          'authorId': 2,
+          'solved': false,
+          'upvoteCount': 5,
+          'replyCount': 1,
+          'excerpt': 'GitHub Actions로 배포를 자동화했습니다.',
+          'highlight': '',
+        },
+      ],
+      'total': 3,
+      'page': 0,
+      'size': 20,
+    },
+  ),
   // LCS(학습 맥락 자동 첨부) — gateway /lcs/** → lcs-svc(슬라이스 #9).
   // draft 미리보기(작성 폼 맥락 카드). draftId=snap_mock → commit 키와 매칭.
   'POST /lcs/snapshots/draft': (

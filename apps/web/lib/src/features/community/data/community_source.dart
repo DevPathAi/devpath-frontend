@@ -59,6 +59,19 @@ typedef SimilarQuestionsFetch =
 /// 태그 자동완성 `GET /community/tags?q=` → `List<TagView>`.
 typedef TagAutocomplete = Future<List<CommunityTag>> Function(String q);
 
+/// 검색 `GET /community/search?q=&board=&tag=&solved=&sort=&page=&size=` → `SearchResponse`.
+/// 목록과 달리 **envelope**(`items`·`total`·`page`·`size`)이며 페이지네이션이 있다.
+typedef CommunitySearchFetch =
+    Future<CommunitySearchResult> Function({
+      required String q,
+      String? board,
+      String? tag,
+      bool? solved,
+      String? sort,
+      int page,
+      int size,
+    });
+
 List<T> _list<T>(Object? data, T Function(Map<String, dynamic>) fromJson) =>
     (data as List? ?? const [])
         .map((e) => fromJson((e as Map).cast<String, dynamic>()))
@@ -145,6 +158,33 @@ final similarQuestionsProvider = Provider<SimilarQuestionsFetch>((ref) {
       query: {'q': q},
     );
     return _list(data, SimilarQuestion.fromJson);
+  };
+});
+
+final communitySearchProvider = Provider<CommunitySearchFetch>((ref) {
+  final client = ref.watch(apiClientProvider);
+  return ({
+    required String q,
+    String? board,
+    String? tag,
+    bool? solved,
+    String? sort,
+    int page = 0,
+    int size = 20,
+  }) async {
+    final json = await client.get<Map<String, dynamic>>(
+      '/community/search',
+      query: <String, dynamic>{
+        'q': q,
+        'board': ?board,
+        'tag': ?tag,
+        'solved': ?solved,
+        'sort': ?sort,
+        'page': page,
+        'size': size,
+      },
+    );
+    return CommunitySearchResult.fromJson(json);
   };
 });
 

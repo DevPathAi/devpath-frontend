@@ -113,6 +113,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/community',
             builder: (_, state) => CommunityHomePage(
               initialBoard: state.uri.queryParameters['board'],
+              initialQuery: state.uri.queryParameters['q'],
             ),
           ),
           // '/community/new'는 '/community/:id'보다 먼저 — 선언 순서 매칭에서 'new'가
