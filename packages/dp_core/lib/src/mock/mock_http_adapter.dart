@@ -19,9 +19,20 @@ class MockHttpAdapter implements HttpClientAdapter {
     final fixture = _resolve(options);
     if (fixture == null) {
       final key = '${options.method} ${options.path}';
+      // 사용자에게는 사람이 읽는 문장만 보인다. 개발자 원문은 debug 필드에만 둔다
+      // (프론트는 error.message 를 그대로 화면에 렌더한다).
+      assert(() {
+        // ignore: avoid_print
+        print('[MockHttpAdapter] 등록되지 않은 픽스처: $key');
+        return true;
+      }());
       return ResponseBody.fromString(
         jsonEncode({
-          'error': {'code': 'RESOURCE_NOT_FOUND', 'message': 'no mock: $key'},
+          'error': {
+            'code': 'RESOURCE_NOT_FOUND',
+            'message': '아직 준비되지 않은 화면이에요. 잠시 후 다시 시도해 주세요.',
+            'debug': 'no mock: $key',
+          },
         }),
         404,
         headers: {
