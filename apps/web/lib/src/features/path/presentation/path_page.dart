@@ -58,7 +58,7 @@ class _PathPageState extends ConsumerState<PathPage> {
     };
 
     return Scaffold(
-      appBar: AppBar(title: const Text('학습 경로 생성')),
+      appBar: AppBar(title: const Text('학습 경로')),
       body: body,
     );
   }

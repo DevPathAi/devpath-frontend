@@ -18,8 +18,6 @@ class PathPlanView extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(DpSpacing.lg),
       children: [
-        Text('학습 경로', style: text.headlineSmall),
-        const SizedBox(height: DpSpacing.sm),
         Container(
           padding: const EdgeInsets.all(DpSpacing.md),
           decoration: BoxDecoration(
