@@ -7,6 +7,61 @@ import 'package:dp_core/dp_core.dart';
 final Map<String, MockFixture> webMockFixtures = {
   // ④ 오류 신고·문의 접수. 목 모드 기본값이 true 라 이 픽스처가 없으면 제보가 404로 실패한다.
   'POST /support/requests': (201, {'id': 42}),
+  // 2026-08-03: 아래 셋이 없어 설정·마이페이지·학습 콘텐츠가 에러 화면으로 떴다.
+  // GET /consents/me — ConsentsView.fromJson(settings_models.dart:13).
+  // item.type 은 settings_page.dart 의 _consentMeta 키(TERMS/PRIVACY/MARKETING/
+  // LCS_ATTACH/ERROR_LOG)와 대조해 조회된다(itemOf). 목록에 없는 타입은 그냥
+  // 미동의(agreed=false)로 표시될 뿐 화면이 깨지지는 않는다.
+  'GET /consents/me': (
+    200,
+    {
+      'consentStatus': 'DONE',
+      'birthYear': 1998,
+      'items': [
+        {
+          'type': 'TERMS',
+          'agreed': true,
+          'version': '1.0',
+          'agreedAt': '2026-07-01T09:00:00Z',
+        },
+        {
+          'type': 'PRIVACY',
+          'agreed': true,
+          'version': '1.0',
+          'agreedAt': '2026-07-01T09:00:00Z',
+        },
+        {'type': 'MARKETING', 'agreed': false, 'version': '1.0', 'agreedAt': null},
+      ],
+    },
+  ),
+  // GET /users/me/profile — ProfileView(profile_view.g.dart:9), 전부 nullable.
+  // learningGoal/targetTrack 값은 mypage_page.dart 의 _goals/_tracks 드롭다운
+  // 목록에 실제로 존재하는 항목으로 맞췄다(목록에 없으면 화면이 null로 되돌려
+  // 드롭다운이 빈 채로 보인다 — 크래시는 아니지만 프로필 값이 반영 안 되어 보임).
+  'GET /users/me/profile': (
+    200,
+    {
+      'avatar': null,
+      'bio': '백엔드로 전향 중입니다.',
+      'learningGoal': 'CAREER_CHANGE',
+      'targetTrack': 'BACKEND_SPRING',
+      'experienceYears': 2,
+    },
+  ),
+  // POST /contents/c1/progress — ContentProgressUpdateResponse.fromJson은
+  // scrollPct(double)·dwellSec(int)를 nullable 아닌 필수 필드로 읽는다
+  // (learning_content.g.dart: `json['scrollPct'] as num`). {'ok': true}만
+  // 주면 파싱 시 널체크 예외로 콘텐츠 화면이 깨지므로, 기존
+  // POST /contents/future-async-await/progress 픽스처와 같은 형태로 채운다.
+  'POST /contents/c1/progress': (
+    200,
+    {
+      'scrollPct': 0.86,
+      'dwellSec': 46,
+      'completed': true,
+      'completedAt': '2026-06-21T10:00:00Z',
+    },
+  ),
   // OAuth 콜백 후 세션 복원 엔드포인트.
   // 최상위 필드: snake_case(access_token, refresh_token_cookie_set).
   // user 객체: camelCase(dp_core User.fromJson 기준).
