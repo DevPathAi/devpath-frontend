@@ -30,7 +30,12 @@ final Map<String, MockFixture> webMockFixtures = {
           'version': '1.0',
           'agreedAt': '2026-07-01T09:00:00Z',
         },
-        {'type': 'MARKETING', 'agreed': false, 'version': '1.0', 'agreedAt': null},
+        {
+          'type': 'MARKETING',
+          'agreed': false,
+          'version': '1.0',
+          'agreedAt': null,
+        },
       ],
     },
   ),

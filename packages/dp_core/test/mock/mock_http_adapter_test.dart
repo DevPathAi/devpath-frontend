@@ -12,8 +12,8 @@ void main() {
       null,
       null,
     );
-    final body = jsonDecode(await utf8.decodeStream(res.stream))
-        as Map<String, dynamic>;
+    final body =
+        jsonDecode(await utf8.decodeStream(res.stream)) as Map<String, dynamic>;
     final err = body['error'] as Map<String, dynamic>;
 
     expect(res.statusCode, 404);

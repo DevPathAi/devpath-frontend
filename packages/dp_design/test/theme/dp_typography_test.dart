@@ -36,8 +36,15 @@ void main() {
 
     test('모든 정의 스타일이 Pretendard 를 쓴다', () {
       for (final s in [
-        t.displaySmall, t.headlineSmall, t.titleLarge, t.titleMedium,
-        t.titleSmall, t.bodyMedium, t.bodySmall, t.labelLarge, t.labelMedium,
+        t.displaySmall,
+        t.headlineSmall,
+        t.titleLarge,
+        t.titleMedium,
+        t.titleSmall,
+        t.bodyMedium,
+        t.bodySmall,
+        t.labelLarge,
+        t.labelMedium,
       ]) {
         expect(s!.fontFamily, 'Pretendard');
       }

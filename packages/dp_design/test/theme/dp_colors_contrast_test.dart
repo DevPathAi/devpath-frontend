@@ -32,8 +32,14 @@ void main() {
       test('강조 텍스트는 4.5:1, strong 은 7:1 이상', () {
         expect(contrast(p.primaryText, p.bg), greaterThanOrEqualTo(4.5));
         expect(contrast(p.primaryText, p.surface), greaterThanOrEqualTo(4.5));
-        expect(contrast(p.primaryTextStrong, p.surface), greaterThanOrEqualTo(7.0));
-        expect(contrast(p.primaryText, p.accentSoft), greaterThanOrEqualTo(4.5));
+        expect(
+          contrast(p.primaryTextStrong, p.surface),
+          greaterThanOrEqualTo(7.0),
+        );
+        expect(
+          contrast(p.primaryText, p.accentSoft),
+          greaterThanOrEqualTo(4.5),
+        );
       });
 
       test('★채움 위 텍스트 4.5:1 — 다크는 onPrimary 가 어두운 색이다', () {
