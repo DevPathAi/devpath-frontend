@@ -49,6 +49,7 @@ abstract final class DpIcons {
 
   // 명령 팔레트 / 셸 토글 / 리스트 액션 (로드맵 §4.4)
   static const IconData search = Symbols.search_rounded;
+  static const IconData account = Symbols.account_circle_rounded;
   static const IconData moreVert = Symbols.more_vert_rounded;
   static const IconData star = Symbols.star_rounded;
   static const IconData menu = Symbols.menu_rounded;

@@ -67,7 +67,7 @@ class AppShellView extends StatelessWidget {
       onSelect: (i) => onSelect?.call(kShellDestinations[i].path),
       destinations: [
         for (final d in kShellDestinations)
-          (icon: d.icon, label: d.label, badgeCount: 0),
+          DpDestination(icon: d.icon, label: d.label),
       ],
       // DpAppShell.trailing 은 단일 위젯이라 두 버튼을 Row 로 묶는다.
       // DpAppShell 자체는 손대지 않는다.

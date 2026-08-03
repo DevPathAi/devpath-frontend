@@ -66,7 +66,7 @@ class AdminShellView extends StatelessWidget {
       onSelect: (i) => onSelect?.call(kAdminDestinations[i].path),
       destinations: [
         for (final d in kAdminDestinations)
-          (icon: d.icon, label: d.label, badgeCount: 0),
+          DpDestination(icon: d.icon, label: d.label),
       ],
       leading: const Padding(
         padding: EdgeInsets.all(DpSpacing.md),

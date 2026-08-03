@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const _dests = <DpDestination>[
-  (icon: Icons.dashboard, label: '대시보드', badgeCount: 0),
-  (icon: Icons.map, label: '경로', badgeCount: 3),
+  DpDestination(icon: Icons.dashboard, label: '대시보드'),
+  DpDestination(icon: Icons.map, label: '경로', badgeCount: 3),
 ];
 
 Widget _host(Widget child) => MaterialApp(theme: DpTheme.light(), home: child);
