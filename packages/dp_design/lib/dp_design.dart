@@ -12,6 +12,7 @@ export 'src/layout/dp_selectable.dart';
 export 'src/layout/dp_scrollbar.dart';
 export 'src/layout/dp_window_class.dart';
 export 'src/shell/dp_destination.dart';
+export 'src/shell/dp_nav_rail.dart';
 export 'src/shell/dp_app_shell.dart';
 export 'src/shell/dp_command.dart';
 export 'src/shell/dp_command_palette.dart';
