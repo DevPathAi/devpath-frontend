@@ -174,7 +174,6 @@ class _AccountMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.dpColors;
     return MenuAnchor(
       menuChildren: [
         MenuItemButton(
@@ -186,8 +185,11 @@ class _AccountMenu extends StatelessWidget {
           child: const Text('설정'),
         ),
       ],
+      // color를 명시하지 않는다 — 슬롯(DpNavRail은 railMuted, compact
+      // DpChromeBar는 textSecondary)이 공급하는 IconTheme을 상속해야
+      // 양쪽 배경 모두에서 대비가 유지된다(하드코딩 시 한쪽에서 WCAG 미달).
       builder: (context, controller, _) => IconButton(
-        icon: Icon(DpIcons.account, color: c.railMuted),
+        icon: const Icon(DpIcons.account),
         tooltip: '계정',
         onPressed: () =>
             controller.isOpen ? controller.close() : controller.open(),

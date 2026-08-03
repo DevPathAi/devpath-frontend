@@ -107,4 +107,35 @@ void main() {
     );
     expect(picked, '/community');
   });
+
+  // 계정 아이콘은 DpNavRail(다크 배경)과 DpChromeBar(밝은 배경, compact) 사이를
+  // 오가는 같은 위젯 인스턴스다. Icon.color를 하드코딩하면 한쪽 배경에서
+  // 대비가 무너진다 — 슬롯이 공급하는 IconTheme을 상속해야 한다.
+  testWidgets('compact 폭: 계정 아이콘은 색을 상속하고 크롬바의 textSecondary가 된다', (
+    tester,
+  ) async {
+    _setWidth(tester, 390);
+    await tester.pumpWidget(
+      _host(const AppShellView(location: '/dashboard', child: Text('본문'))),
+    );
+
+    final icon = tester.widget<Icon>(find.byIcon(DpIcons.account));
+    expect(icon.color, isNull, reason: '하드코딩된 색이면 배경에 따라 상속받지 못해 대비가 무너진다');
+
+    final context = tester.element(find.byIcon(DpIcons.account));
+    expect(IconTheme.of(context).color, DpColors.light.textSecondary);
+  });
+
+  testWidgets('비-compact 폭: 계정 아이콘은 색을 상속하고 레일의 railMuted가 된다', (tester) async {
+    _setWidth(tester, 1200);
+    await tester.pumpWidget(
+      _host(const AppShellView(location: '/dashboard', child: Text('본문'))),
+    );
+
+    final icon = tester.widget<Icon>(find.byIcon(DpIcons.account));
+    expect(icon.color, isNull, reason: '하드코딩된 색이면 배경에 따라 상속받지 못해 대비가 무너진다');
+
+    final context = tester.element(find.byIcon(DpIcons.account));
+    expect(IconTheme.of(context).color, DpColors.light.railMuted);
+  });
 }
