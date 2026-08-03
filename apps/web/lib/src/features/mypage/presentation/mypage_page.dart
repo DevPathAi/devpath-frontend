@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../application/mypage_controller.dart';
 import '../state/mypage_state.dart';
+import '../../support/presentation/supportable_error.dart';
 
 /// 마이페이지: 프로필 표시/편집 + 활동 집계(부분실패 내성) + 설정 진입.
 /// avatar 파일 선택 UI(웹 file picker)는 후속 — controller.uploadAvatar 배선은 완료.
@@ -41,7 +42,7 @@ class _MyPagePageState extends ConsumerState<MyPagePage> {
       ),
       body: switch (s) {
         MyPageLoading() => const DpLoading(),
-        MyPageFailed(:final message) => DpError(
+        MyPageFailed(:final message) => SupportableError(
           message: message,
           onRetry: () => ref.read(myPageControllerProvider.notifier).load(),
         ),

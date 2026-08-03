@@ -8,6 +8,7 @@ import '../../auth/state/auth_state.dart';
 import '../application/post_detail_controller.dart';
 import '../state/post_detail_state.dart';
 import 'widgets/report_menu_button.dart';
+import '../../support/presentation/supportable_error.dart';
 
 /// 일반 게시글(FREE/FEEDBACK) 상세 — 마크다운 본문·태그·추천·댓글 스레드.
 /// Q&A(qna_detail_page)와 달리 답변/채택 대신 댓글로 소통한다.
@@ -58,7 +59,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
       appBar: AppBar(title: const Text('게시글')),
       body: switch (s.phase) {
         PostDetailPhase.loading => const DpLoading(),
-        PostDetailPhase.failed => DpError(
+        PostDetailPhase.failed => SupportableError(
           message: s.error ?? '불러오지 못했어요',
           onRetry: notifier.load,
         ),

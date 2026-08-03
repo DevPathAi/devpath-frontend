@@ -7,6 +7,7 @@ import 'package:skeletonizer/skeletonizer.dart';
 import '../application/dashboard_controller.dart';
 import '../state/dashboard_state.dart';
 import 'widgets/dashboard_body.dart';
+import '../../support/presentation/supportable_error.dart';
 
 /// 로딩 스켈레톤이 실제 카드 구조를 반영하도록 DashboardBody에 주입하는 자리표시 요약.
 const _skeletonSummary = DashboardSummary(
@@ -46,7 +47,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
             key: ValueKey('loading'),
             child: DashboardBody(summary: _skeletonSummary),
           ),
-          DashFailed(:final message) => DpError(
+          DashFailed(:final message) => SupportableError(
             key: const ValueKey('error'),
             message: message,
             onRetry: () =>

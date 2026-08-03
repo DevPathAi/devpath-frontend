@@ -10,6 +10,7 @@ import '../data/community_source.dart';
 import '../state/qna_detail_state.dart';
 import 'lcs_context.dart';
 import 'widgets/report_menu_button.dart';
+import '../../support/presentation/supportable_error.dart';
 
 class QnaDetailPage extends ConsumerStatefulWidget {
   const QnaDetailPage({super.key, required this.postId});
@@ -56,7 +57,7 @@ class _QnaDetailPageState extends ConsumerState<QnaDetailPage> {
       appBar: AppBar(title: const Text('Q&A')),
       body: switch (s) {
         QnaLoading() => const DpLoading(),
-        QnaFailed(:final message) => DpError(message: message),
+        QnaFailed(:final message) => SupportableError(message: message),
         QnaLoaded(:final detail, :final submitting) => _Loaded(
           detail: detail,
           submitting: submitting,

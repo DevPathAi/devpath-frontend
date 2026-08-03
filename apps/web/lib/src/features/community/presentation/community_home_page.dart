@@ -11,6 +11,7 @@ import '../state/community_search_state.dart';
 import '../state/community_state.dart';
 import 'widgets/community_search_bar.dart';
 import 'widgets/search_highlight.dart';
+import '../../support/presentation/supportable_error.dart';
 
 class CommunityHomePage extends ConsumerStatefulWidget {
   const CommunityHomePage({super.key, this.initialBoard, this.initialQuery});
@@ -185,7 +186,7 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
         return [
           SliverFillRemaining(
             key: const ValueKey('search-error'),
-            child: DpError(
+            child: SupportableError(
               message: search.error ?? '검색하지 못했어요',
               onRetry: () => ref
                   .read(communitySearchControllerProvider.notifier)
@@ -287,7 +288,7 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
       case CommunityPhase.failed:
         return [
           SliverFillRemaining(
-            child: DpError(
+            child: SupportableError(
               message: s.error ?? '불러오지 못했어요',
               onRetry: notifier.load,
             ),
