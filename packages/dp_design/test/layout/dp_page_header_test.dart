@@ -75,4 +75,30 @@ void main() {
 
     expect(tester.takeException(), isNull);
   });
+
+  // Flexible 회귀: Expanded(제목)와 Flexible(액션)이 둘 다 기본 flex:1이라
+  // 자유 공간을 1:1로 나눠 액션이 헤더 한가운데쯤 뜨고 오른쪽이 텅 빈다.
+  // 액션은 상한 폭만 갖고 flex 자식이 아니어야 Expanded가 남는 공간을 전부
+  // 흡수해 액션이 우측 끝에 붙는다.
+  testWidgets('넉넉한 폭에서 좁은 액션 하나는 헤더 우측 끝에 붙는다', (tester) async {
+    tester.view.physicalSize = const Size(1000, 300);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      _host(
+        const DpPageHeader(
+          title: '대시보드',
+          actions: [
+            SizedBox(width: 100, key: ValueKey('act'), child: Text('실습')),
+          ],
+        ),
+      ),
+    );
+
+    final headerRight = tester.getRect(find.byType(DpPageHeader)).right;
+    final actionRight = tester.getRect(find.byKey(const ValueKey('act'))).right;
+    // 헤더의 우측 패딩(DpSpacing.lg = 16)만큼만 떨어져 있어야 한다.
+    expect(headerRight - actionRight, closeTo(16, 1.0));
+  });
 }
