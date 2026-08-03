@@ -2,8 +2,10 @@ import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-Widget _wrap(Widget child) =>
-    MaterialApp(theme: DpTheme.light(), home: Scaffold(body: child));
+Widget _wrap(Widget child) => MaterialApp(
+  theme: DpTheme.light(),
+  home: Scaffold(body: child),
+);
 
 void main() {
   group('DpError 보조 액션', () {

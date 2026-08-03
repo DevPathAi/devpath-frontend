@@ -14,16 +14,18 @@ class SupportController extends Notifier<AsyncValue<int?>> {
   Future<int> submit(SupportDraft draft, SupportContext context) async {
     state = const AsyncValue.loading();
     try {
-      final json = await ref.read(apiClientProvider).post<Map<String, dynamic>>(
-        '/support/requests',
-        body: {
-          'type': draft.type,
-          // 서버도 마스킹하지만 클라에서도 지운다 — 원문이 네트워크와 접근 로그를 지나지 않는다.
-          'title': SensitiveTextMasker.mask(draft.title),
-          'body': SensitiveTextMasker.mask(draft.body),
-          'context': context.toJson(),
-        },
-      );
+      final json = await ref
+          .read(apiClientProvider)
+          .post<Map<String, dynamic>>(
+            '/support/requests',
+            body: {
+              'type': draft.type,
+              // 서버도 마스킹하지만 클라에서도 지운다 — 원문이 네트워크와 접근 로그를 지나지 않는다.
+              'title': SensitiveTextMasker.mask(draft.title),
+              'body': SensitiveTextMasker.mask(draft.body),
+              'context': context.toJson(),
+            },
+          );
       final id = (json['id'] as num).toInt();
       state = AsyncValue.data(id);
       return id;

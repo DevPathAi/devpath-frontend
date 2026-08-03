@@ -10,6 +10,7 @@ import '../features/auth/state/auth_state.dart';
 import '../features/dashboard/presentation/dashboard_page.dart';
 import '../features/reports/presentation/reports_page.dart';
 import '../features/shell/presentation/admin_shell.dart';
+import '../features/support/presentation/support_page.dart';
 import '../features/users/presentation/users_page.dart';
 
 /// 가드: 미인증→/login, 비관리자→/forbidden, 관리자가 /login|/auth/callback이면→/dashboard.
@@ -53,6 +54,7 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(path: '/users', builder: (_, _) => const AdminUsersPage()),
           GoRoute(path: '/reports', builder: (_, _) => const ReportsPage()),
+          GoRoute(path: '/support', builder: (_, _) => const SupportPage()),
           GoRoute(path: '/ads', builder: (_, _) => const AdminAdsPage()),
         ],
       ),

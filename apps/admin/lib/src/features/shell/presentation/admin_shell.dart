@@ -8,6 +8,8 @@ const List<AdminDestination> kAdminDestinations = [
   (path: '/dashboard', icon: DpIcons.dashboard, label: '대시보드'),
   (path: '/users', icon: DpIcons.community, label: '사용자'),
   (path: '/reports', icon: DpIcons.error, label: '신고'),
+  // ③ 콘텐츠 신고와 ④ 서비스 오류·문의는 별개 기능이라 메뉴도 나눈다.
+  (path: '/support', icon: DpIcons.mentor, label: '문의'),
   (path: '/ads', icon: DpIcons.ads, label: '광고'),
 ];
 
