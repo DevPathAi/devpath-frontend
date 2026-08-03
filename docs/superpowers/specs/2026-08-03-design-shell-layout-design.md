@@ -243,6 +243,14 @@ admin은 같은 `DpNavRail`을 `section` 없이 써서 평면 목록 + 계정 �
 
 admin은 섹션이 없으므로 단일 세그먼트(`[사용자 관리]`)를 쓴다.
 
+### 7.1 ⚠️ 제목이 화면에 세 번 나온다
+
+브레드크럼 마지막 세그먼트(「대시보드」) · 헤더 제목(「대시보드」) · 레일 목적지 라벨(「대시보드」)이 **같은 문자열로 한 화면에 공존**한다.
+
+1단계가 고친 경로 화면의 제목 중복(앱바 + 본문에 같은 크기 제목 둘)과는 다르다. 셋은 크기와 역할이 분명히 다르다 — 12px 경로 표시 · 24px 페이지 제목 · 12px 내비 항목. 브레드크럼에서 현재 페이지를 빼면 「학습 ·」만 남아 오히려 어색하므로 **표준 관행대로 현재 페이지를 포함한다.**
+
+다만 **테스트에는 실질적 영향이 있다.** `find.text('대시보드')`가 셋을 모두 잡아 `findsOneWidget`이 깨진다. 셸을 포함해 렌더하는 테스트는 텍스트가 아니라 **위젯 타입 또는 `Key`로 특정**해야 한다.
+
 ## 8. 반응형 4클래스
 
 DESIGN.md §5의 기존 4-클래스를 그대로 따른다.
@@ -301,7 +309,8 @@ Scaffold(bg)
 
 **기존 테스트 갱신**
 
-- `find.byType(NavigationRail)` **12지점**: dp_design 3 · web 5 · admin 3 · `golden_path_t1_realapi_test` 1
+- `find.byType(NavigationRail)` **11지점**: dp_design 3 · web 5 · admin 3. (`golden_path_t1_realapi_test`의 것은 주석일 뿐 실제 의존이 아니다 — 실측으로 확인했다)
+- admin 셸 테스트의 `find.text('운영 콘솔')` — `leading` → `brand` 슬롯 이동에 따라 갱신
 - **`AppBar` 제목으로 화면을 찾는 테스트를 전수 조사해 갱신한다.** 17화면 이관의 최대 회귀 위험이며, 착수 시 `grep -rn "AppBar\|appBar" --include="*_test.dart"`로 목록을 먼저 확정한다
 - `kShellDestinations` 5→4 축소에 따른 인덱스 의존 테스트
 
