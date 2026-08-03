@@ -40,6 +40,7 @@ class DpChromeBar extends StatelessWidget {
     final c = context.dpColors;
 
     return Container(
+      key: const ValueKey('chrome-bar-root'),
       height: height,
       decoration: BoxDecoration(
         color: c.surface,
@@ -52,7 +53,7 @@ class DpChromeBar extends StatelessWidget {
           const SizedBox(width: DpSpacing.lg),
           if (!compact && onSearchTap != null)
             Flexible(flex: 2, child: _search(context, c))
-          else if (compact)
+          else if (compact && onSearchTap != null)
             IconButton(
               key: const ValueKey('chrome-search-icon'),
               icon: Icon(DpIcons.search, size: 20, color: c.textSecondary),
@@ -90,29 +91,33 @@ class DpChromeBar extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
       );
 
-      children.add(
-        crumb.path == null
-            ? label
-            : Semantics(
-                button: true,
-                label: crumb.label,
-                child: InkWell(
-                  onTap: () => onCrumbTap?.call(crumb.path!),
-                  borderRadius: BorderRadius.circular(DpRadius.button),
+      final crumbWidget = crumb.path == null
+          ? label
+          : Semantics(
+              button: true,
+              label: crumb.label,
+              child: InkWell(
+                onTap: () => onCrumbTap?.call(crumb.path!),
+                borderRadius: BorderRadius.circular(DpRadius.button),
+                // 46px 바 안에 44px 탭 타깃이 들어간다(바깥 Row가 세로
+                // center 정렬이라 여유가 있다) — DESIGN.md §6.
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 44),
                   child: Padding(
-                    // 크롬바 높이(46px)를 지키려 세로 44px 탭 타깃은 강제하지
-                    // 않는다. 대신 인라인 텍스트 링크로서 수평 패딩을 넉넉히
-                    // 주고(DpSpacing.sm) Semantics(button: true)로 스크린리더
-                    // 대상성을 보강한다.
                     padding: const EdgeInsets.symmetric(
                       horizontal: DpSpacing.sm,
-                      vertical: DpSpacing.xs,
                     ),
-                    child: label,
+                    child: Center(child: label),
                   ),
                 ),
               ),
-      );
+            );
+
+      // Flexible로 감싸 이 세그먼트가 자기 폭 제약을 받게 한다 — 감싸지
+      // 않으면 RenderFlex가 non-flex 자식을 무한 폭으로 측정해 ellipsis가
+      // 발동하지 않고 오버플로가 난다. 구분자(·)는 항상 온전히 보여야
+      // 하므로 감싸지 않는다.
+      children.add(Flexible(child: crumbWidget));
 
       if (!isLast) {
         children.add(
@@ -138,39 +143,48 @@ class DpChromeBar extends StatelessWidget {
           key: const ValueKey('chrome-search'),
           onTap: onSearchTap,
           borderRadius: BorderRadius.circular(DpRadius.input),
-          child: Container(
-            height: 28,
-            decoration: BoxDecoration(
-              color: c.surfaceMuted,
-              border: Border.all(color: c.border),
-              borderRadius: BorderRadius.circular(DpRadius.input),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: DpSpacing.sm),
-            child: Row(
-              children: [
-                Icon(DpIcons.search, size: 16, color: c.textSecondary),
-                const SizedBox(width: DpSpacing.xs),
-                Text(
-                  '검색',
-                  style: text.labelMedium?.copyWith(color: c.textSecondary),
+          // 히트 영역은 44px(DESIGN.md §6), 시각적 입력 상자는 28px을
+          // 유지해 밀도를 해치지 않는다 — 상자를 세로 중앙에 둔다.
+          child: SizedBox(
+            height: 44,
+            child: Center(
+              child: Container(
+                height: 28,
+                decoration: BoxDecoration(
+                  color: c.surfaceMuted,
+                  border: Border.all(color: c.border),
+                  borderRadius: BorderRadius.circular(DpRadius.input),
                 ),
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 4,
-                    vertical: 1,
-                  ),
-                  decoration: BoxDecoration(
-                    color: c.surface,
-                    border: Border.all(color: c.border),
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                  child: Text(
-                    'Ctrl K',
-                    style: text.labelSmall?.copyWith(color: c.textSecondary),
-                  ),
+                padding: const EdgeInsets.symmetric(horizontal: DpSpacing.sm),
+                child: Row(
+                  children: [
+                    Icon(DpIcons.search, size: 16, color: c.textSecondary),
+                    const SizedBox(width: DpSpacing.xs),
+                    Text(
+                      '검색',
+                      style: text.labelMedium?.copyWith(color: c.textSecondary),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 1,
+                      ),
+                      decoration: BoxDecoration(
+                        color: c.surface,
+                        border: Border.all(color: c.border),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                      child: Text(
+                        'Ctrl K',
+                        style: text.labelSmall?.copyWith(
+                          color: c.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),
