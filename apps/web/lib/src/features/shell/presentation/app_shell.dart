@@ -69,27 +69,25 @@ class AppShellView extends StatelessWidget {
         for (final d in kShellDestinations)
           DpDestination(icon: d.icon, label: d.label),
       ],
-      // DpAppShell.trailing 은 단일 위젯이라 두 버튼을 Row 로 묶는다.
-      // DpAppShell 자체는 손대지 않는다.
-      trailing: Builder(
-        builder: (context) => Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: const Icon(DpIcons.error),
-              tooltip: '오류 신고·문의',
-              onPressed: () => showSupportDialog(context),
-            ),
-            IconButton(
-              icon: const Icon(DpIcons.search),
-              tooltip: '명령 팔레트 (Ctrl/Cmd+K)',
-              onPressed: () =>
-                  Actions.invoke(context, const OpenCommandPaletteIntent()),
-            ),
-          ],
+      breadcrumb: [(label: kShellDestinations[_index].label, path: null)],
+      chromeActions: [
+        Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(DpIcons.error),
+            tooltip: '오류 신고·문의',
+            onPressed: () => showSupportDialog(context),
+          ),
         ),
-      ),
-      accountSlot: IconButton(
+        Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(DpIcons.search),
+            tooltip: '명령 팔레트 (Ctrl/Cmd+K)',
+            onPressed: () =>
+                Actions.invoke(context, const OpenCommandPaletteIntent()),
+          ),
+        ),
+      ],
+      account: IconButton(
         icon: const Icon(Icons.account_circle),
         tooltip: '마이페이지',
         onPressed: () => onSelect?.call('/mypage'),

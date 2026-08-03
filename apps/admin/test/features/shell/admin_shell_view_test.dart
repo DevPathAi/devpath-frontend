@@ -17,7 +17,7 @@ void main() {
     await tester.pumpWidget(
       _host(const AdminShellView(location: '/dashboard', child: Text('본문'))),
     );
-    final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
+    final rail = tester.widget<DpNavRail>(find.byType(DpNavRail));
     expect(rail.extended, isTrue);
     expect(find.text('운영 콘솔'), findsOneWidget);
   });
@@ -28,7 +28,7 @@ void main() {
       _host(const AdminShellView(location: '/dashboard', child: Text('본문'))),
     );
     expect(find.byType(NavigationBar), findsOneWidget);
-    expect(find.byType(NavigationRail), findsNothing);
+    expect(find.byType(DpNavRail), findsNothing);
   });
 
   testWidgets('목적지 선택 시 경로 콜백', (tester) async {

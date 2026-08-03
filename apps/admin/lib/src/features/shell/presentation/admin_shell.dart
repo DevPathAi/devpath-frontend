@@ -68,18 +68,18 @@ class AdminShellView extends StatelessWidget {
         for (final d in kAdminDestinations)
           DpDestination(icon: d.icon, label: d.label),
       ],
-      leading: const Padding(
-        padding: EdgeInsets.all(DpSpacing.md),
-        child: Text('운영 콘솔'),
-      ),
-      trailing: Builder(
-        builder: (context) => IconButton(
-          icon: const Icon(DpIcons.search),
-          tooltip: '명령 팔레트 (Ctrl/Cmd+K)',
-          onPressed: () =>
-              Actions.invoke(context, const OpenCommandPaletteIntent()),
+      brand: const Text('운영 콘솔'),
+      breadcrumb: [(label: kAdminDestinations[_index].label, path: null)],
+      chromeActions: [
+        Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(DpIcons.search),
+            tooltip: '명령 팔레트 (Ctrl/Cmd+K)',
+            onPressed: () =>
+                Actions.invoke(context, const OpenCommandPaletteIntent()),
+          ),
         ),
-      ),
+      ],
       body: child,
     );
   }

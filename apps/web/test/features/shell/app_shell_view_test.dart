@@ -20,7 +20,7 @@ void main() {
       _host(const AppShellView(location: '/dashboard', child: Text('본문'))),
     );
     expect(find.byType(NavigationBar), findsOneWidget);
-    expect(find.byType(NavigationRail), findsNothing);
+    expect(find.byType(DpNavRail), findsNothing);
   });
 
   testWidgets('넓은 폭(≥840)은 NavigationRail', (tester) async {
@@ -28,7 +28,7 @@ void main() {
     await tester.pumpWidget(
       _host(const AppShellView(location: '/dashboard', child: Text('본문'))),
     );
-    expect(find.byType(NavigationRail), findsOneWidget);
+    expect(find.byType(DpNavRail), findsOneWidget);
     expect(find.byType(NavigationBar), findsNothing);
   });
 
@@ -53,9 +53,9 @@ void main() {
     await tester.pumpWidget(
       _host(const AppShellView(location: '/dashboard', child: Text('본문'))),
     );
-    expect(find.byType(NavigationRail), findsOneWidget);
+    expect(find.byType(DpNavRail), findsOneWidget);
     expect(find.byType(NavigationBar), findsNothing);
-    final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
+    final rail = tester.widget<DpNavRail>(find.byType(DpNavRail));
     expect(rail.extended, isFalse);
   });
 
@@ -64,7 +64,7 @@ void main() {
     await tester.pumpWidget(
       _host(const AppShellView(location: '/dashboard', child: Text('본문'))),
     );
-    final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
+    final rail = tester.widget<DpNavRail>(find.byType(DpNavRail));
     expect(rail.extended, isTrue);
     expect(find.byType(DpMaxWidth), findsOneWidget);
   });
