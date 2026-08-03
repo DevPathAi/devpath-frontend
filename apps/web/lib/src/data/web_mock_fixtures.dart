@@ -53,6 +53,20 @@ final Map<String, MockFixture> webMockFixtures = {
       'experienceYears': 2,
     },
   ),
+  // PUT /users/me/profile — mypage_source.dart:35(myProfileUpdateProvider),
+  // 마이페이지 "저장" 버튼이 호출한다. 없으면 저장 시 ApiException으로
+  // "저장 실패" 스낵바가 뜬다. 응답은 ProfileView.fromJson과 같은 형태
+  // (전부 nullable)이며, 편집 폼 기본 선택값과 맞췄다.
+  'PUT /users/me/profile': (
+    200,
+    {
+      'avatar': null,
+      'bio': '백엔드로 전향 중입니다.',
+      'learningGoal': 'CAREER_CHANGE',
+      'targetTrack': 'BACKEND_SPRING',
+      'experienceYears': 2,
+    },
+  ),
   // POST /contents/c1/progress — ContentProgressUpdateResponse.fromJson은
   // scrollPct(double)·dwellSec(int)를 nullable 아닌 필수 필드로 읽는다
   // (learning_content.g.dart: `json['scrollPct'] as num`). {'ok': true}만
@@ -85,6 +99,26 @@ final Map<String, MockFixture> webMockFixtures = {
       'weeklyReportEmailEnabled': true,
     },
   ),
+  // PUT /notifications/prefs/me — settings_source.dart:28(updatePrefs), 알림 토글
+  // (학습 리마인더·주간 리포트 이메일)이 낙관적 반영 후 이 호출로 확정한다.
+  // 목 모드에서 이 픽스처가 없으면 토글은 화면에 즉시 반영되는 것처럼 보이다가
+  // ApiException으로 이전 값에 조용히 롤백된다. NotificationPrefs.fromJson과
+  // 같은 형태(4필드 전체)로 응답한다.
+  'PUT /notifications/prefs/me': (
+    200,
+    {
+      'timezone': 'Asia/Seoul',
+      'preferredTimeSlot': '09:00',
+      'reminderEnabled': true,
+      'weeklyReportEmailEnabled': true,
+    },
+  ),
+  // POST /consents/{type}/revoke — settings_source.dart:37(revokeConsent).
+  // MockHttpAdapter는 와일드카드 없이 'METHOD /path' 정확 일치만 지원하므로
+  // {type} 자리에 실제로 호출되는 값(MARKETING, GET /consents/me 픽스처에 있는
+  // 선택 동의 항목)을 그대로 키에 박아야 한다. 성공 시 컨트롤러가 load()로
+  // 재조회하므로 본문은 비워도 된다.
+  'POST /consents/MARKETING/revoke': (200, <String, dynamic>{}),
   // OAuth 콜백 후 세션 복원 엔드포인트.
   // 최상위 필드: snake_case(access_token, refresh_token_cookie_set).
   // user 객체: camelCase(dp_core User.fromJson 기준).
@@ -112,6 +146,13 @@ final Map<String, MockFixture> webMockFixtures = {
     200,
     mockContent('stream-subscription'),
   ),
+  // mockLearningPath()의 1주차 3번째 과제(퀴즈, contentSlug='async-error-handling')가
+  // 가리키는 콘텐츠. 이 픽스처가 없으면 "이번 주 과제" 목록에서 해당 항목을
+  // 누를 때 GET /contents/async-error-handling이 404로 떨어진다.
+  'GET /contents/async-error-handling': (
+    200,
+    mockContent('async-error-handling'),
+  ),
   'GET /contents/missing': (
     404,
     {
@@ -119,6 +160,15 @@ final Map<String, MockFixture> webMockFixtures = {
     },
   ),
   'POST /contents/future-async-await/progress': (
+    200,
+    {
+      'scrollPct': 0.86,
+      'dwellSec': 46,
+      'completed': true,
+      'completedAt': '2026-06-21T10:00:00Z',
+    },
+  ),
+  'POST /contents/async-error-handling/progress': (
     200,
     {
       'scrollPct': 0.86,

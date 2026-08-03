@@ -45,9 +45,27 @@ void main() {
         t.bodySmall,
         t.labelLarge,
         t.labelMedium,
+        t.labelSmall,
       ]) {
         expect(s!.fontFamily, 'Pretendard');
       }
+    });
+  });
+
+  group('labelSmall 추가', () {
+    final t = DpTypography.textTheme(Brightness.light);
+
+    test('정의돼 있다 — ad_slot_widget·path_plan_view 태그가 참조한다', () {
+      // 미정의 시 Material 기본 labelSmall(11/16, w400)이 쓰여 한글 행간이
+      // 적용되지 않는다. titleLarge/titleSmall/labelMedium을 추가한 것과
+      // 같은 근거로 labelSmall도 명시 정의한다.
+      expect(t.labelSmall, isNotNull);
+    });
+
+    test('DESIGN.md 근거 스케일과 일치한다 — 11/16, w500', () {
+      expect(t.labelSmall!.fontSize, 11);
+      expect(t.labelSmall!.fontWeight, FontWeight.w500);
+      expect(t.labelSmall!.height, closeTo(16 / 11, 0.001));
     });
   });
 }

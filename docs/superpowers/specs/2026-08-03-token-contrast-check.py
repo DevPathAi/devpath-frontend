@@ -17,6 +17,8 @@ L = {  # 라이트
     'success': '#15803D', 'warning': '#A16207', 'danger': '#B91C1C',
     'railBg': '#1A1815', 'railText': '#F2F0EC', 'railMuted': '#A9A298', 'railFaint': '#7D766C',
     'accentSoft': '#FDF1E0', 'tagBg': '#F2F0EC', 'tagText': '#524D45',
+    'chart1': '#B45309', 'chart2': '#B8863A', 'chart3': '#78350F',
+    'chart4': '#0F766E', 'chart5': '#8B857D',
 }
 D = {  # 다크
     'bg': '#0F0E0C', 'surface': '#1A1815', 'surfaceMuted': '#231F1B',
@@ -26,6 +28,8 @@ D = {  # 다크
     'success': '#4ADE80', 'warning': '#FCD34D', 'danger': '#F87171',
     'railBg': '#131210', 'railText': '#EAE7E2', 'railMuted': '#948D85', 'railFaint': '#6B655D',
     'accentSoft': '#2E2007', 'tagBg': '#231F1B', 'tagText': '#A09991',
+    'chart1': '#F59E0B', 'chart2': '#D9A653', 'chart3': '#FCD34D',
+    'chart4': '#2DD4BF', 'chart5': '#8B857D',
 }
 
 CHECKS = [
@@ -38,6 +42,11 @@ CHECKS = [
     ('success', 'surface', 4.5), ('warning', 'surface', 4.5), ('danger', 'surface', 4.5),
     ('railText', 'railBg', 4.5), ('railMuted', 'railBg', 4.5), ('railFaint', 'railBg', 3.0),
     ('primaryText', 'accentSoft', 4.5), ('tagText', 'tagBg', 4.5),
+    # 차트 토큰(UI 컴포넌트 기준 3:1) — 2026-08-03 재점검: chart2가 34건 대비
+    # 점검에서 빠져 있었고, 라이트 1.47:1·다크 1.95:1로 미달이었다.
+    ('chart1', 'surface', 3.0), ('chart2', 'surface', 3.0),
+    ('chart3', 'surface', 3.0), ('chart4', 'surface', 3.0),
+    ('chart5', 'surface', 3.0),
 ]
 
 for name, P in (('라이트', L), ('다크', D)):

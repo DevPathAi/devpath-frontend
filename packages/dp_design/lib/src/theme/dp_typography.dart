@@ -50,6 +50,12 @@ abstract final class DpTypography {
         height: 16 / 12,
         fontWeight: FontWeight.w600,
       ),
+      labelSmall: TextStyle(
+        fontFamily: f,
+        fontSize: 11,
+        height: 16 / 11,
+        fontWeight: FontWeight.w500,
+      ),
     );
   }
 }

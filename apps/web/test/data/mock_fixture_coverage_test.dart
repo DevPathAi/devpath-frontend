@@ -18,6 +18,7 @@ void main() {
     for (final key in [
       'GET /consents/me',
       'GET /users/me/profile',
+      'GET /notifications/prefs/me',
       'POST /contents/c1/progress',
     ]) {
       final (status, _) = webMockFixtures[key]!;

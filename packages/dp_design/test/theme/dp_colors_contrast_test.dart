@@ -65,6 +65,16 @@ void main() {
         expect(contrast(p.textFaint, p.bg), greaterThanOrEqualTo(3.0));
         expect(contrast(p.tagText, p.tagBg), greaterThanOrEqualTo(4.5));
       });
+
+      test('차트 토큰은 surface 위 3:1 이상 — UI 컴포넌트 기준', () {
+        // chart2가 라이트 1.47:1·다크 1.95:1로 미달이었다(2026-08-03 실측).
+        // 34건 대비 점검에 차트가 포함되지 않아 놓쳤던 회귀를 여기서 막는다.
+        expect(contrast(p.chart1, p.surface), greaterThanOrEqualTo(3.0));
+        expect(contrast(p.chart2, p.surface), greaterThanOrEqualTo(3.0));
+        expect(contrast(p.chart3, p.surface), greaterThanOrEqualTo(3.0));
+        expect(contrast(p.chart4, p.surface), greaterThanOrEqualTo(3.0));
+        expect(contrast(p.chart5, p.surface), greaterThanOrEqualTo(3.0));
+      });
     });
   }
 }
