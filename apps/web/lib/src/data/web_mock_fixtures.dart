@@ -495,6 +495,16 @@ final Map<String, MockFixture> webMockFixtures = {
     200,
     {'diagnosedLevel': 'MID', 'confidenceWeight': 0.8},
   ),
+  // 2026-08-03: assessment_api.dart의 회원 경로 중 claim()·result()가 누락돼
+  // 있었다 — 게스트로 진단을 시작한 뒤 로그인하면 diagnostic_controller.dart의
+  // claimAfterLogin()이 이 둘을 순서대로 호출한다(claim → assessmentId 확보 →
+  // result 조회; complete()는 이미 COMPLETED라 부르지 않는다). 없으면 그 흐름만
+  // 404로 끊긴다. AssessmentResult.fromJson과 같은 형태로 응답한다.
+  'POST /onboarding/assessments/claim': (200, {'assessmentId': 1}),
+  'GET /onboarding/assessments/1/result': (
+    200,
+    {'diagnosedLevel': 'MID', 'confidenceWeight': 0.8},
+  ),
   // AI 코드리뷰(REV-001) — 폴링 GET /reviews?sandboxSessionId={id}(F6-e 빌드 E).
   // MockHttpAdapter query-aware: 키 정렬 → 'GET /reviews?sandboxSessionId=1'
   'GET /reviews?sandboxSessionId=1': (
