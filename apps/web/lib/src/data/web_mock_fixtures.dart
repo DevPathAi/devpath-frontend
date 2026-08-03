@@ -5,6 +5,8 @@ import 'package:dp_core/dp_core.dart';
 /// user.onboardingStatus=PENDING → 게이트가 콜백 부트스트랩 후 온보딩으로 보냄(시연).
 /// ※ POST /auth/login은 실흐름에 없으므로 픽스처에서 제거됨(Task 4).
 final Map<String, MockFixture> webMockFixtures = {
+  // ④ 오류 신고·문의 접수. 목 모드 기본값이 true 라 이 픽스처가 없으면 제보가 404로 실패한다.
+  'POST /support/requests': (201, {'id': 42}),
   // OAuth 콜백 후 세션 복원 엔드포인트.
   // 최상위 필드: snake_case(access_token, refresh_token_cookie_set).
   // user 객체: camelCase(dp_core User.fromJson 기준).

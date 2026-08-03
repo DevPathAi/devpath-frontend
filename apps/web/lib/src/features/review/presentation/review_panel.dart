@@ -8,6 +8,7 @@ import '../../sandbox/application/run_controller.dart';
 import '../../sandbox/state/run_state.dart';
 import '../application/review_controller.dart';
 import '../state/review_state.dart';
+import '../../support/presentation/supportable_error.dart';
 
 /// SBX 3페인의 리뷰 칸. 상태별 렌더(요청/생성중/결과/점검/한도/실패).
 /// F6-e: RunDone.sandboxSessionId 감지 시 자동으로 pollForSession 트리거.
@@ -59,7 +60,7 @@ class _ReviewPanelState extends ConsumerState<ReviewPanel> {
       ReviewQuota(:final retryAfterSeconds) => DpQuota(
         retryAfterSeconds: retryAfterSeconds,
       ),
-      ReviewFailed(:final message) => DpError(
+      ReviewFailed(:final message) => SupportableError(
         message: message,
         onRetry: widget.onRequest,
       ),

@@ -2,6 +2,8 @@ import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../support/presentation/support_dialog.dart';
+
 /// 셸 목적지(경로·아이콘·라벨).
 typedef ShellDestination = ({String path, IconData icon, String label});
 
@@ -67,12 +69,24 @@ class AppShellView extends StatelessWidget {
         for (final d in kShellDestinations)
           (icon: d.icon, label: d.label, badgeCount: 0),
       ],
+      // DpAppShell.trailing 은 단일 위젯이라 두 버튼을 Row 로 묶는다.
+      // DpAppShell 자체는 손대지 않는다.
       trailing: Builder(
-        builder: (context) => IconButton(
-          icon: const Icon(DpIcons.search),
-          tooltip: '명령 팔레트 (Ctrl/Cmd+K)',
-          onPressed: () =>
-              Actions.invoke(context, const OpenCommandPaletteIntent()),
+        builder: (context) => Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(DpIcons.error),
+              tooltip: '오류 신고·문의',
+              onPressed: () => showSupportDialog(context),
+            ),
+            IconButton(
+              icon: const Icon(DpIcons.search),
+              tooltip: '명령 팔레트 (Ctrl/Cmd+K)',
+              onPressed: () =>
+                  Actions.invoke(context, const OpenCommandPaletteIntent()),
+            ),
+          ],
         ),
       ),
       accountSlot: IconButton(

@@ -7,6 +7,7 @@ import '../../auth/state/auth_state.dart';
 import '../application/path_controller.dart';
 import '../data/path_sse_source.dart';
 import 'path_plan_view.dart';
+import '../../support/presentation/supportable_error.dart';
 
 /// PATH-001. 진입 시 기존 경로를 먼저 조회하고, 없으면 생성한다.
 class PathPage extends ConsumerStatefulWidget {
@@ -42,8 +43,8 @@ class _PathPageState extends ConsumerState<PathPage> {
 
     final body = switch (s.phase) {
       PathPhase.complete when s.result != null => PathPlanView(plan: s.result!),
-      // F4: killSwitch/failed는 이어하기 불가 → DpError로(전용 DpKillSwitch/DpQuota 렌더는 P4c).
-      PathPhase.failed || PathPhase.killSwitch => DpError(
+      // F4: killSwitch/failed는 이어하기 불가 → SupportableError로(전용 DpKillSwitch/DpQuota 렌더는 P4c).
+      PathPhase.failed || PathPhase.killSwitch => SupportableError(
         message: s.error ?? '경로 생성에 실패했어요',
         onRetry: notifier.start,
       ),

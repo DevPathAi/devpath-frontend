@@ -23,10 +23,12 @@
 /// - `API_BASE_URL`: API 게이트웨이 베이스 URL (기본: 목 프로토 URL).
 /// - `USE_MOCK`: `true`이면 [MockApiClient]를 사용, `false`이면 실 HTTP 호출.
 ///   기본값은 `true`(목 프로토 유지 — 변경 시 회귀 주의).
+/// - `APP_VERSION`: 빌드 식별자(기본 `dev`). 오류 제보에 함께 전송된다.
 class AppConfig {
   const AppConfig({
     required this.baseUrl,
     required this.useMock,
+    this.appVersion = 'dev',
     this.sseTimeout = const Duration(seconds: 60),
   });
 
@@ -36,10 +38,15 @@ class AppConfig {
       defaultValue: 'https://mock.devpath.ai',
     ),
     useMock: bool.fromEnvironment('USE_MOCK', defaultValue: true),
+    appVersion: String.fromEnvironment('APP_VERSION', defaultValue: 'dev'),
   );
 
   final String baseUrl;
   final bool useMock;
+
+  /// 빌드 식별자. `--dart-define=APP_VERSION=0.1.0+42` 로 주입한다.
+  /// 미주입이면 'dev' — 제보에 "어느 빌드였는지"가 비지 않게 기본값을 둔다.
+  final String appVersion;
 
   /// SSE 무이벤트 타임아웃(D2). 초과 시 PathController가 partial로 전환.
   final Duration sseTimeout;

@@ -13,6 +13,7 @@ import '../../ads/presentation/ad_slot_widget.dart';
 import '../../dashboard/application/dashboard_controller.dart';
 import '../../path/application/path_controller.dart';
 import '../../../providers/api_providers.dart';
+import '../../support/presentation/supportable_error.dart';
 
 class ContentPage extends ConsumerStatefulWidget {
   const ContentPage({super.key, required this.contentId});
@@ -104,7 +105,7 @@ class _ContentPageState extends ConsumerState<ContentPage>
       ),
       body: switch (s) {
         ContentLoading() => const DpLoading(),
-        ContentFailed(:final message) => DpError(
+        ContentFailed(:final message) => SupportableError(
           message: message,
           onRetry: () => _contentController.load(widget.contentId),
         ),
