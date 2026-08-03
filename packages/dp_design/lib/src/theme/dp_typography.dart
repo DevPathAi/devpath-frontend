@@ -18,10 +18,22 @@ abstract final class DpTypography {
         height: 32 / 24,
         fontWeight: FontWeight.w600,
       ),
+      titleLarge: TextStyle(
+        fontFamily: f,
+        fontSize: 20,
+        height: 28 / 20,
+        fontWeight: FontWeight.w700,
+      ),
       titleMedium: TextStyle(
         fontFamily: f,
         fontSize: 16,
         height: 24 / 16,
+        fontWeight: FontWeight.w600,
+      ),
+      titleSmall: TextStyle(
+        fontFamily: f,
+        fontSize: 14,
+        height: 20 / 14,
         fontWeight: FontWeight.w600,
       ),
       bodyMedium: TextStyle(fontFamily: f, fontSize: 14, height: 1.6),
@@ -30,6 +42,12 @@ abstract final class DpTypography {
         fontFamily: f,
         fontSize: 14,
         height: 20 / 14,
+        fontWeight: FontWeight.w600,
+      ),
+      labelMedium: TextStyle(
+        fontFamily: f,
+        fontSize: 12,
+        height: 16 / 12,
         fontWeight: FontWeight.w600,
       ),
     );
