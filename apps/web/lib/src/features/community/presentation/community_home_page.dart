@@ -249,7 +249,7 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
     final isQna = item.boardType == 'QNA';
     final accent = switch (item.boardType) {
       'FREE' => c.border,
-      'FEEDBACK' => c.warning,
+      'FEEDBACK' => c.chart4,
       _ => c.primary,
     };
     final label = switch (item.boardType) {
@@ -335,7 +335,7 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
     final isQna = post.boardType == 'QNA';
     final accent = switch (post.boardType) {
       'FREE' => c.border,
-      'FEEDBACK' => c.warning,
+      'FEEDBACK' => c.chart4,
       _ => c.primary,
     };
     final label = switch (post.boardType) {

@@ -54,7 +54,7 @@ class PathPlanView extends StatelessWidget {
               for (final strength in diagnosis.strengthConcepts)
                 _Tag(label: strength, color: c.success),
               for (final weakness in diagnosis.weaknessConcepts)
-                _Tag(label: weakness, color: c.warning),
+                _Tag(label: weakness, color: c.chart4),
             ],
           ),
         ],

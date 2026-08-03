@@ -99,7 +99,7 @@ class _Progress extends StatelessWidget {
                 note!,
                 style: Theme.of(
                   context,
-                ).textTheme.bodySmall?.copyWith(color: c.warning),
+                ).textTheme.bodySmall?.copyWith(color: c.textSecondary),
               ),
             ],
             if (onRestart != null) ...[

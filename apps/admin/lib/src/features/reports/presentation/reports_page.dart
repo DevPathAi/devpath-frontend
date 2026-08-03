@@ -107,7 +107,7 @@ class _ReportCard extends StatelessWidget {
               children: [
                 _chip(context, r.targetTypeLabel),
                 const SizedBox(width: DpSpacing.xs),
-                _chip(context, r.categoryLabel, tone: c.warning),
+                _chip(context, r.categoryLabel, tone: c.chart4),
                 if (r.reportCount > 1) ...[
                   const SizedBox(width: DpSpacing.xs),
                   _chip(context, '${r.reportCount}명 신고', tone: c.danger),
