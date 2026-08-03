@@ -6,6 +6,7 @@ export 'src/error/api_exception.dart';
 export 'src/api/api_config.dart';
 export 'src/api/api_client.dart';
 export 'src/api/page.dart';
+export 'src/support/sensitive_text_masker.dart';
 export 'src/auth/token_store.dart';
 export 'src/auth/auth_interceptor.dart';
 export 'src/sse/sse_event.dart';
