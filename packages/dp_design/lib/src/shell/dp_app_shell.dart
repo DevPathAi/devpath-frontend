@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 
-import '../icons/dp_icons.dart';
 import '../layout/dp_max_width.dart';
 import '../layout/dp_window_class.dart';
-import '../theme/dp_spacing.dart';
-import '../theme/dp_tokens.dart';
+import 'dp_chrome_bar.dart';
 import 'dp_destination.dart';
+import 'dp_nav_rail.dart';
 
 /// 4-클래스 반응형 앱 셸(로드맵 §2.2 Layer 2). 라우팅 비의존 —
 /// 목적지 선택은 [onSelect]에 index로 통지, 경로 해석은 앱이 담당.
+///
+/// 구조: [DpNavRail](세로) + [DpChromeBar](가로) + body.
+/// [breadcrumb]이 비면 크롬바를 렌더하지 않는다.
+/// [account]는 폭에 따라 레일 하단 또는 크롬바 우측으로 간다 —
+/// 앱은 한 벌만 만들고 배치는 셸이 정한다.
 class DpAppShell extends StatelessWidget {
   const DpAppShell({
     super.key,
@@ -16,9 +20,12 @@ class DpAppShell extends StatelessWidget {
     required this.selectedIndex,
     required this.onSelect,
     required this.body,
-    this.leading,
-    this.trailing,
-    this.accountSlot,
+    this.brand,
+    this.account,
+    this.breadcrumb = const [],
+    this.onCrumbTap,
+    this.onSearchTap,
+    this.chromeActions = const [],
     this.railExtended,
     this.onToggleRail,
     this.constrainBodyAtLarge = true,
@@ -28,30 +35,54 @@ class DpAppShell extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onSelect;
   final Widget body;
-  final Widget? leading;
-  final Widget? trailing;
-  final Widget? accountSlot;
+  final Widget? brand;
+  final Widget? account;
+  final List<DpCrumb> breadcrumb;
+  final ValueChanged<String>? onCrumbTap;
+  final VoidCallback? onSearchTap;
+  final List<Widget> chromeActions;
   final bool? railExtended;
   final VoidCallback? onToggleRail;
   final bool constrainBodyAtLarge;
 
-  static Widget _icon(DpDestination d) => d.badgeCount > 0
-      ? Badge(label: Text('${d.badgeCount}'), child: Icon(d.icon))
-      : Icon(d.icon);
-
   @override
   Widget build(BuildContext context) {
     final wc = context.windowClass;
+    final compact = wc == DpWindowClass.compact;
 
-    if (wc == DpWindowClass.compact) {
+    final content = (constrainBodyAtLarge && wc == DpWindowClass.large)
+        ? DpMaxWidth(child: body)
+        : body;
+
+    final main = Column(
+      children: [
+        if (breadcrumb.isNotEmpty)
+          DpChromeBar(
+            breadcrumb: breadcrumb,
+            onCrumbTap: onCrumbTap,
+            onSearchTap: onSearchTap,
+            actions: chromeActions,
+            account: compact ? account : null,
+            compact: compact,
+          ),
+        Expanded(child: content),
+      ],
+    );
+
+    if (compact) {
       return Scaffold(
-        body: body,
+        body: main,
         bottomNavigationBar: NavigationBar(
           selectedIndex: selectedIndex,
           onDestinationSelected: onSelect,
           destinations: [
             for (final d in destinations)
-              NavigationDestination(icon: _icon(d), label: d.label),
+              NavigationDestination(
+                icon: d.badgeCount > 0
+                    ? Badge(label: Text('${d.badgeCount}'), child: Icon(d.icon))
+                    : Icon(d.icon),
+                label: d.label,
+              ),
           ],
         ),
       );
@@ -59,64 +90,22 @@ class DpAppShell extends StatelessWidget {
 
     // medium 기본 접힘, expanded/large 기본 펼침. railExtended가 오버라이드.
     final extended = railExtended ?? (wc != DpWindowClass.medium);
-    final content = (constrainBodyAtLarge && wc == DpWindowClass.large)
-        ? DpMaxWidth(child: body)
-        : body;
 
     return Scaffold(
       body: FocusTraversalGroup(
         child: Row(
           children: [
-            NavigationRail(
-              extended: extended,
-              minExtendedWidth: context.appTokens.railWidth,
-              labelType: extended ? null : NavigationRailLabelType.none,
+            DpNavRail(
+              destinations: destinations,
               selectedIndex: selectedIndex,
-              onDestinationSelected: onSelect,
-              leading: _buildLeading(extended),
-              trailing: _buildTrailing(),
-              destinations: [
-                for (final d in destinations)
-                  NavigationRailDestination(
-                    icon: _icon(d),
-                    label: Text(d.label),
-                  ),
-              ],
+              onSelect: onSelect,
+              brand: brand,
+              account: account,
+              extended: extended,
+              onToggle: onToggleRail,
             ),
-            const VerticalDivider(width: 1),
-            Expanded(child: content),
+            Expanded(child: main),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget? _buildLeading(bool extended) {
-    final items = <Widget>[
-      ?leading,
-      if (onToggleRail != null)
-        IconButton(
-          icon: Icon(extended ? DpIcons.menuOpen : DpIcons.menu),
-          tooltip: extended ? '메뉴 접기' : '메뉴 펼치기',
-          onPressed: onToggleRail,
-        ),
-    ];
-    if (items.isEmpty) return null;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: DpSpacing.sm),
-      child: Column(mainAxisSize: MainAxisSize.min, children: items),
-    );
-  }
-
-  Widget? _buildTrailing() {
-    final items = <Widget>[?trailing, ?accountSlot];
-    if (items.isEmpty) return null;
-    return Expanded(
-      child: Align(
-        alignment: Alignment.bottomCenter,
-        child: Padding(
-          padding: const EdgeInsets.only(bottom: DpSpacing.md),
-          child: Column(mainAxisSize: MainAxisSize.min, children: items),
         ),
       ),
     );
