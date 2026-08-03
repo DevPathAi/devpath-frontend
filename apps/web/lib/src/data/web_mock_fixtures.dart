@@ -449,22 +449,9 @@ final Map<String, MockFixture> webMockFixtures = {
     },
   ),
   // 진단 API(비회원 guest 흐름)
+  // ⚠️ next 는 고정 픽스처가 아니라 webMockSequences 에 있다 — 같은 문항이 반복되면
+  //    완료로 넘어가지 못하기 때문이다(파일 하단 주석 참고).
   'POST /onboarding/assessments/guest': (200, {'guestAssessmentId': 'g-mock'}),
-  'GET /onboarding/assessments/guest/g-mock/next': (
-    200,
-    {
-      'question': {
-        'id': 1,
-        'type': 'MCQ',
-        'content': '샘플 진단 문항',
-        'options': '["A","B"]',
-        'bloomLevel': 'UNDERSTAND',
-        'difficulty': 0.3,
-      },
-      'index': 1,
-      'total': 15,
-    },
-  ),
   'POST /onboarding/assessments/guest/g-mock/answer': (
     200,
     <String, dynamic>{},
@@ -473,23 +460,8 @@ final Map<String, MockFixture> webMockFixtures = {
     200,
     {'diagnosedLevel': 'MID', 'confidenceWeight': 0.8},
   ),
-  // 진단 API(회원 흐름)
+  // 진단 API(회원 흐름) — next 는 webMockSequences 참고.
   'POST /onboarding/assessments': (200, {'assessmentId': 1}),
-  'GET /onboarding/assessments/1/next': (
-    200,
-    {
-      'question': {
-        'id': 1,
-        'type': 'MCQ',
-        'content': '샘플 진단 문항',
-        'options': '["A","B"]',
-        'bloomLevel': 'UNDERSTAND',
-        'difficulty': 0.3,
-      },
-      'index': 1,
-      'total': 15,
-    },
-  ),
   'POST /onboarding/assessments/1/answer': (200, <String, dynamic>{}),
   'POST /onboarding/assessments/1/complete': (
     200,
@@ -609,3 +581,43 @@ Map<String, dynamic> mockLearningPath() => {
       },
   ],
 };
+
+/// 호출 순서에 따라 응답이 달라져야 하는 목 엔드포인트.
+///
+/// **왜 필요한가.** `AssessmentApi.next` 는 응답 본문이 null 일 때만 null 을 돌려주고,
+/// `DiagnosticController._advance()` 는 그때만 `complete()` 로 넘어간다. 고정 픽스처는
+/// 키 하나에 응답 하나라 "문항 → 문항 → 없음" 을 표현할 수 없어, 같은 문항이 무한
+/// 반복되고 진단이 **완주하지 못했다**(2026-08-03 사용자 실측으로 발견. 게스트 흐름도
+/// 같은 한계였다).
+///
+/// 목록이 소진되면 마지막 항목을 계속 돌려주므로, 마지막을 `(200, null)` 로 두면
+/// 완료 상태가 유지된다.
+final Map<String, MockSequence> webMockSequences = {
+  // 게스트: 문항 2개 → 종료
+  'GET /onboarding/assessments/guest/g-mock/next': [
+    (200, _question(1, '비동기 함수의 반환 타입은 무엇인가요?', 1, 2)),
+    (200, _question(2, 'Stream 구독을 해제하지 않으면 어떤 문제가 생기나요?', 2, 2)),
+    (200, null),
+  ],
+  // 회원: 문항 2개 → 종료
+  'GET /onboarding/assessments/1/next': [
+    (200, _question(1, '비동기 함수의 반환 타입은 무엇인가요?', 1, 2)),
+    (200, _question(2, 'Stream 구독을 해제하지 않으면 어떤 문제가 생기나요?', 2, 2)),
+    (200, null),
+  ],
+};
+
+/// NextQuestion.fromJson 계약에 맞춘 문항 한 건.
+Map<String, dynamic> _question(int id, String content, int index, int total) =>
+    {
+      'question': {
+        'id': id,
+        'type': 'MCQ',
+        'content': content,
+        'options': '["A","B"]',
+        'bloomLevel': 'UNDERSTAND',
+        'difficulty': 0.3,
+      },
+      'index': index,
+      'total': total,
+    };

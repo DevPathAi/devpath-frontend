@@ -203,8 +203,49 @@ void main() {
     // 문항이 렌더돼야 한다(회원 경로 픽스처 누락 시 이 지점에서 막힌다).
     await tester.tap(find.text('진단 시작하기'));
     await tester.pumpAndSettle();
-    expect(find.text('샘플 진단 문항'), findsOneWidget);
+    expect(find.text('비동기 함수의 반환 타입은 무엇인가요?'), findsOneWidget);
     expect(find.text('A'), findsOneWidget);
     expect(find.text('B'), findsOneWidget);
+  });
+
+  // ★이 테스트가 이번 작업의 존재 이유다★
+  // MockHttpAdapter 가 키 하나에 고정 응답 하나만 갖던 시절에는 next 가 늘 같은
+  // 문항을 돌려줘 진단이 **완주하지 못했다**(2026-08-03 사용자 실측). 완료 판정은
+  // next 의 본문이 null 일 때만 일어나므로(AssessmentApi.next → DiagnosticController
+  // ._advance), 시퀀스 없이는 이 흐름을 목으로 재현할 수 없다.
+  testWidgets('회원 진단이 문항 2개를 거쳐 완주한다', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authControllerProvider.overrideWith(_NoBootstrapAuthController.new),
+        ],
+        child: const DevPathWebApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('GitHub로 계속하기 (목)'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('진단 시작하기'));
+    await tester.pumpAndSettle();
+
+    // 1번 문항 → 답변 → 2번 문항으로 **넘어가야** 한다(같은 문항이 반복되면 실패).
+    expect(find.text('비동기 함수의 반환 타입은 무엇인가요?'), findsOneWidget);
+    await tester.tap(find.text('A'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Stream 구독을 해제하지 않으면 어떤 문제가 생기나요?'),
+      findsOneWidget,
+      reason: '두 번째 문항이 안 나오면 next 가 같은 응답을 반복하는 것이다',
+    );
+
+    // 2번 답변 → next 가 null → complete → 진단 화면을 벗어난다.
+    await tester.tap(find.text('A'));
+    await tester.pumpAndSettle();
+    expect(
+      find.byType(DiagnosticPage),
+      findsNothing,
+      reason: '완료 후에도 진단 화면이면 next 가 null 을 돌려주지 못한 것이다',
+    );
   });
 }
