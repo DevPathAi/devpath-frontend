@@ -23,7 +23,7 @@ void main() {
     expect(find.byType(DpNavRail), findsNothing);
   });
 
-  testWidgets('넓은 폭(≥840)은 NavigationRail', (tester) async {
+  testWidgets('넓은 폭(≥840)은 DpNavRail', (tester) async {
     _setWidth(tester, 1200);
     await tester.pumpWidget(
       _host(const AppShellView(location: '/dashboard', child: Text('본문'))),
@@ -44,7 +44,7 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.text('멘토'));
+    await tester.tap(find.text('AI 멘토'));
     expect(picked, '/mentor');
   });
 
@@ -67,5 +67,44 @@ void main() {
     final rail = tester.widget<DpNavRail>(find.byType(DpNavRail));
     expect(rail.extended, isTrue);
     expect(find.byType(DpMaxWidth), findsOneWidget);
+  });
+
+  // 순수 함수(breadcrumbFor) 테스트만으로는 배선이 끊겨도 통과한다 — 셸이
+  // 실제로 크롬바에 전달하는지, 세그먼트 탭이 실제로 콜백을 트리거하는지
+  // 위젯 테스트로 확인한다.
+  testWidgets('게시글 상세 위치는 크롬바에 3세그먼트 브레드크럼이 배선된다', (tester) async {
+    _setWidth(tester, 1200);
+    await tester.pumpWidget(
+      _host(
+        const AppShellView(location: '/community/post/12', child: Text('본문')),
+      ),
+    );
+
+    final chromeBar = tester.widget<DpChromeBar>(find.byType(DpChromeBar));
+    expect(chromeBar.breadcrumb, const [
+      (label: '커뮤니티', path: null),
+      (label: '게시판', path: '/community'),
+      (label: '게시글', path: null),
+    ]);
+  });
+
+  testWidgets('브레드크럼의 클릭 가능 세그먼트를 탭하면 해당 경로로 콜백', (tester) async {
+    _setWidth(tester, 1200);
+    String? picked;
+    await tester.pumpWidget(
+      _host(
+        AppShellView(
+          location: '/community/post/12',
+          onSelect: (p) => picked = p,
+          child: const Text('본문'),
+        ),
+      ),
+    );
+
+    // 레일 목적지 라벨도 "게시판"이라 크롬바 안으로 범위를 좁힌다.
+    await tester.tap(
+      find.descendant(of: find.byType(DpChromeBar), matching: find.text('게시판')),
+    );
+    expect(picked, '/community');
   });
 }
