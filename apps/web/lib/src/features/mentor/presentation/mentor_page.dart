@@ -105,7 +105,7 @@ class _MentorPageState extends ConsumerState<MentorPage> {
                       s.error ?? '연결이 끊겼어요. 부분답변을 받았어요.',
                       style: Theme.of(
                         context,
-                      ).textTheme.bodySmall?.copyWith(color: c.warning),
+                      ).textTheme.bodySmall?.copyWith(color: c.textSecondary),
                     ),
                   ),
                   const SizedBox(width: DpSpacing.sm),

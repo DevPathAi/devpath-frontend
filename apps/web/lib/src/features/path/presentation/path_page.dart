@@ -58,7 +58,7 @@ class _PathPageState extends ConsumerState<PathPage> {
     };
 
     return Scaffold(
-      appBar: AppBar(title: const Text('학습 경로 생성')),
+      appBar: AppBar(title: const Text('학습 경로')),
       body: body,
     );
   }
@@ -99,7 +99,7 @@ class _Progress extends StatelessWidget {
                 note!,
                 style: Theme.of(
                   context,
-                ).textTheme.bodySmall?.copyWith(color: c.warning),
+                ).textTheme.bodySmall?.copyWith(color: c.textSecondary),
               ),
             ],
             if (onRestart != null) ...[

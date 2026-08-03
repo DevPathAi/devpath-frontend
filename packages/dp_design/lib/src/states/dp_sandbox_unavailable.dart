@@ -12,7 +12,8 @@ class DpSandboxUnavailable extends StatelessWidget {
   @override
   Widget build(BuildContext context) => DpStateScaffold(
     icon: DpIcons.sandboxOff,
-    iconColor: context.dpColors.warning,
+    // 서비스 상태는 사용자 잘못도 위험도 아니다 → 중립. (경고색은 진짜 경고 전용)
+    iconColor: context.dpColors.textSecondary,
     title: '지금은 코드를 실행할 수 없어요',
     message: '편집은 계속할 수 있어요. 잠시 후 실행을 다시 시도해 주세요.',
     actionLabel: onDismiss == null ? null : '확인',

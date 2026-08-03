@@ -17,9 +17,9 @@ void main() {
         ),
       ),
     );
-    expect(c.primary, const Color(0xFF6366F1)); // fill 전용(DD1)
-    expect(c.primaryText, const Color(0xFF4F46E5)); // 텍스트/링크 ≥4.5:1
-    expect(c.bg, const Color(0xFFF8FAFC));
+    expect(c.primary, const Color(0xFFB45309)); // fill 전용(DD1)
+    expect(c.primaryText, const Color(0xFF92400E)); // 텍스트/링크 ≥4.5:1
+    expect(c.bg, const Color(0xFFFAF9F7));
   });
 
   testWidgets('다크 테마는 DpColors.dark을 주입한다', (tester) async {
@@ -35,8 +35,8 @@ void main() {
         ),
       ),
     );
-    expect(c.bg, const Color(0xFF0F172A));
-    expect(c.primaryText, const Color(0xFFA5B4FC)); // 다크 위 링크
+    expect(c.bg, const Color(0xFF0F0E0C));
+    expect(c.primaryText, const Color(0xFFFBBF24)); // 다크 위 링크
   });
 
   test('lerp는 동일 타입을 반환한다(ThemeExtension 계약)', () {

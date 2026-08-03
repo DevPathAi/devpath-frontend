@@ -176,4 +176,35 @@ void main() {
     expect(find.text('Stream 구독 실습'), findsOneWidget);
     expect(calls, 2);
   });
+
+  // 2026-08-03: 위 두 테스트는 assessmentApiProvider를 즉시완료 페이크로
+  // 덮어써서(next()가 항상 null) 회원 진단의 실제 목 픽스처 경로
+  // (POST /onboarding/assessments, GET .../{id}/next 등)를 전혀 거치지 않는다.
+  // 그 픽스처가 빠지면 회원(로그인) 사용자가 진단 화면에서 문항을 보지 못하는
+  // 회귀가 생기므로, assessmentApiProvider는 덮어쓰지 않고 실제
+  // webMockFixtures로만 검증한다.
+  testWidgets('회원(로그인) 진단: 실제 목 픽스처로 문항이 렌더된다', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authControllerProvider.overrideWith(_NoBootstrapAuthController.new),
+        ],
+        child: const DevPathWebApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 로그인(PENDING) → 진단 화면.
+    await tester.tap(find.text('GitHub로 계속하기 (목)'));
+    await tester.pumpAndSettle();
+    expect(find.byType(DiagnosticPage), findsOneWidget);
+
+    // 진단 시작 → 실제 픽스처(POST /onboarding/assessments → GET .../1/next)로
+    // 문항이 렌더돼야 한다(회원 경로 픽스처 누락 시 이 지점에서 막힌다).
+    await tester.tap(find.text('진단 시작하기'));
+    await tester.pumpAndSettle();
+    expect(find.text('샘플 진단 문항'), findsOneWidget);
+    expect(find.text('A'), findsOneWidget);
+    expect(find.text('B'), findsOneWidget);
+  });
 }

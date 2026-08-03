@@ -18,8 +18,6 @@ class PathPlanView extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(DpSpacing.lg),
       children: [
-        Text('학습 경로', style: text.headlineSmall),
-        const SizedBox(height: DpSpacing.sm),
         Container(
           padding: const EdgeInsets.all(DpSpacing.md),
           decoration: BoxDecoration(
@@ -46,17 +44,34 @@ class PathPlanView extends StatelessWidget {
           Text('진단 요약', style: text.titleMedium),
           const SizedBox(height: DpSpacing.sm),
           Text('현재 수준 ${diagnosis.diagnosedLevel}', style: text.bodyMedium),
-          const SizedBox(height: DpSpacing.xs),
-          Wrap(
-            spacing: DpSpacing.xs,
-            runSpacing: DpSpacing.xs,
-            children: [
-              for (final strength in diagnosis.strengthConcepts)
-                _Tag(label: strength, color: c.success),
-              for (final weakness in diagnosis.weaknessConcepts)
-                _Tag(label: weakness, color: c.warning),
-            ],
-          ),
+          // 색만으로 강점/약점을 구분하지 않는다(DESIGN.md §1) — 소제목 텍스트를
+          // 병행하고, 약점은 "위험"이 아니므로 중립(textSecondary)을 쓴다.
+          if (diagnosis.strengthConcepts.isNotEmpty) ...[
+            const SizedBox(height: DpSpacing.sm),
+            Text('강점', style: text.titleSmall),
+            const SizedBox(height: DpSpacing.xs),
+            Wrap(
+              spacing: DpSpacing.xs,
+              runSpacing: DpSpacing.xs,
+              children: [
+                for (final strength in diagnosis.strengthConcepts)
+                  _Tag(label: strength, color: c.success),
+              ],
+            ),
+          ],
+          if (diagnosis.weaknessConcepts.isNotEmpty) ...[
+            const SizedBox(height: DpSpacing.sm),
+            Text('보강할 점', style: text.titleSmall),
+            const SizedBox(height: DpSpacing.xs),
+            Wrap(
+              spacing: DpSpacing.xs,
+              runSpacing: DpSpacing.xs,
+              children: [
+                for (final weakness in diagnosis.weaknessConcepts)
+                  _Tag(label: weakness, color: c.textSecondary),
+              ],
+            ),
+          ],
         ],
         if (thisWeek != null) ...[
           const SizedBox(height: DpSpacing.xl),
