@@ -37,6 +37,7 @@ class DpNavRail extends StatelessWidget {
     final width = extended ? t.railWidth : t.railCollapsedWidth;
 
     return Container(
+      key: const ValueKey('rail-root'),
       width: width,
       decoration: BoxDecoration(
         color: c.railBg,
@@ -131,27 +132,22 @@ class DpNavRail extends StatelessWidget {
   Widget _item(BuildContext context, DpColors c, DpDestination d, int i) {
     final selected = i == selectedIndex;
     final text = Theme.of(context).textTheme;
+    final iconGlyph = Icon(
+      d.icon,
+      size: 20,
+      color: selected ? c.railText : c.railMuted,
+    );
     final icon = d.badgeCount > 0
-        ? Badge(
-            label: Text('${d.badgeCount}'),
-            child: Icon(
-              d.icon,
-              size: 20,
-              color: selected ? c.railText : c.railMuted,
-            ),
-          )
-        : Icon(d.icon, size: 20, color: selected ? c.railText : c.railMuted);
+        ? Badge(label: Text('${d.badgeCount}'), child: iconGlyph)
+        : iconGlyph;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: DpSpacing.sm,
-        vertical: 1,
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => onSelect(i),
-          borderRadius: BorderRadius.circular(DpRadius.button),
+    final content = Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => onSelect(i),
+        borderRadius: BorderRadius.circular(DpRadius.button),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 44),
           child: Container(
             key: ValueKey('rail-item-$i'),
             decoration: BoxDecoration(
@@ -191,6 +187,29 @@ class DpNavRail extends StatelessWidget {
           ),
         ),
       ),
+    );
+
+    // 스크린리더·키보드 사용자를 위해 목적지/선택 상태를 프로그램적으로 노출한다.
+    final withSemantics = Semantics(
+      key: ValueKey('rail-item-semantics-$i'),
+      button: true,
+      label: d.label,
+      selected: selected,
+      child: content,
+    );
+
+    // 접힘 상태는 라벨 텍스트가 안 보이므로 hover 대체 수단으로 툴팁을 단다.
+    // 펼침 상태는 라벨이 이미 보이므로 툴팁이 불필요하다.
+    final withTooltip = extended
+        ? withSemantics
+        : Tooltip(message: d.label, child: withSemantics);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: DpSpacing.sm,
+        vertical: 1,
+      ),
+      child: withTooltip,
     );
   }
 }

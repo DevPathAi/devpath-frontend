@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -111,5 +113,79 @@ void main() {
     );
     await tester.tap(find.byTooltip('메뉴 접기'));
     expect(toggled, isTrue);
+  });
+
+  testWidgets('레일 배경·우측 경계선 색이 토큰과 배선된다', (tester) async {
+    await tester.pumpWidget(
+      _host(
+        DpNavRail(destinations: _dests, selectedIndex: 0, onSelect: (_) {}),
+      ),
+    );
+    final root = tester.widget<Container>(
+      find.byKey(const ValueKey('rail-root')),
+    );
+    final deco = root.decoration! as BoxDecoration;
+    expect(deco.color, DpColors.light.railBg);
+    expect((deco.border! as Border).right.color, DpColors.light.railBorder);
+  });
+
+  testWidgets('섹션 레이블과 목적지 라벨 색이 토큰과 배선된다', (tester) async {
+    await tester.pumpWidget(
+      _host(
+        DpNavRail(destinations: _dests, selectedIndex: 1, onSelect: (_) {}),
+      ),
+    );
+
+    final sectionLabel = tester.widget<Text>(find.text('학습'));
+    expect(sectionLabel.style?.color, DpColors.light.railFaint);
+
+    final inactiveLabel = tester.widget<Text>(find.text('대시보드'));
+    expect(inactiveLabel.style?.color, DpColors.light.railMuted);
+
+    final activeLabel = tester.widget<Text>(find.text('학습 경로'));
+    expect(activeLabel.style?.color, DpColors.light.railText);
+  });
+
+  testWidgets('접힘 상태 항목에 접근 가능한 툴팁이 있다', (tester) async {
+    await tester.pumpWidget(
+      _host(
+        DpNavRail(
+          destinations: _dests,
+          selectedIndex: 0,
+          onSelect: (_) {},
+          extended: false,
+        ),
+      ),
+    );
+    expect(find.byType(Tooltip), findsNWidgets(_dests.length));
+    final tooltip = tester.widget<Tooltip>(find.byType(Tooltip).first);
+    expect(tooltip.message, _dests.first.label);
+  });
+
+  testWidgets('활성 항목은 44px 이상 탭 타깃과 selected 시맨틱스를 갖는다', (tester) async {
+    final handle = tester.ensureSemantics();
+    await tester.pumpWidget(
+      _host(
+        DpNavRail(destinations: _dests, selectedIndex: 1, onSelect: (_) {}),
+      ),
+    );
+
+    final size = tester.getSize(find.byKey(const ValueKey('rail-item-1')));
+    expect(size.height, greaterThanOrEqualTo(44));
+
+    final activeSemantics = tester.getSemantics(
+      find.byKey(const ValueKey('rail-item-semantics-1')),
+    );
+    expect(activeSemantics.flagsCollection.isSelected, ui.Tristate.isTrue);
+
+    final inactiveSemantics = tester.getSemantics(
+      find.byKey(const ValueKey('rail-item-semantics-0')),
+    );
+    expect(
+      inactiveSemantics.flagsCollection.isSelected,
+      isNot(ui.Tristate.isTrue),
+    );
+
+    handle.dispose();
   });
 }
