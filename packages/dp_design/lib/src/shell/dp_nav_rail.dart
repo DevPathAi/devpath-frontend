@@ -57,13 +57,26 @@ class DpNavRail extends StatelessWidget {
             Divider(height: 1, thickness: 1, color: c.railBorder),
             Padding(
               padding: const EdgeInsets.all(DpSpacing.sm),
-              child: account,
+              child: _withRailForeground(c.railMuted, account!),
             ),
           ],
         ],
       ),
     );
   }
+
+  /// [child]가 명시적으로 색을 주지 않았을 때만 적용되는 기본 전경색.
+  /// 다크 레일 배경 위에서 무스타일 텍스트/아이콘이 [DpTheme]의 본문
+  /// 색(라이트 테마 기준 textPrimary)으로 렌더돼 배경과 구별 불가능해지는
+  /// 결함을 막는다 — 하위 위젯이 색을 명시하면 그게 이긴다(merge).
+  static Widget _withRailForeground(Color color, Widget child) =>
+      IconTheme.merge(
+        data: IconThemeData(color: color),
+        child: DefaultTextStyle.merge(
+          style: TextStyle(color: color),
+          child: child,
+        ),
+      );
 
   Widget _buildTop(BuildContext context, DpColors c) => Padding(
     padding: const EdgeInsets.fromLTRB(
@@ -74,7 +87,8 @@ class DpNavRail extends StatelessWidget {
     ),
     child: Row(
       children: [
-        if (extended && brand != null) Expanded(child: brand!),
+        if (extended && brand != null)
+          Expanded(child: _withRailForeground(c.railText, brand!)),
         if (onToggle != null)
           IconButton(
             icon: Icon(

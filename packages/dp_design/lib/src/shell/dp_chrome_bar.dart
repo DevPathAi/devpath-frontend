@@ -61,11 +61,24 @@ class DpChromeBar extends StatelessWidget {
               onPressed: onSearchTap,
             ),
           const Spacer(),
-          ...actions,
-          if (account != null) ...[
-            const SizedBox(width: DpSpacing.sm),
-            account!,
-          ],
+          // 밝은 surface 배경 위이므로 무스타일 액션/계정 위젯도 textSecondary를
+          // 기본 전경색으로 받는다 — 하위 위젯이 색을 명시하면 그게 이긴다(merge).
+          IconTheme.merge(
+            data: IconThemeData(color: c.textSecondary),
+            child: DefaultTextStyle.merge(
+              style: TextStyle(color: c.textSecondary),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ...actions,
+                  if (account != null) ...[
+                    const SizedBox(width: DpSpacing.sm),
+                    account!,
+                  ],
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );

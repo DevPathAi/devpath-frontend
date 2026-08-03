@@ -138,6 +138,36 @@ void main() {
     expect(separator.style?.color, DpColors.light.textFaint);
   });
 
+  // Important 1: 밝은 surface 배경 위이므로 actions·account에 무스타일
+  // 위젯을 넣어도 textSecondary가 기본 전경색으로 공급돼야 한다(대비 확보).
+  testWidgets('actions·account 슬롯은 textSecondary를 기본 전경색으로 제공', (tester) async {
+    Color? actionsIconColor;
+    Color? accountTextColor;
+    await tester.pumpWidget(
+      _host(
+        DpChromeBar(
+          breadcrumb: _crumbs,
+          actions: [
+            Builder(
+              builder: (context) {
+                actionsIconColor = IconTheme.of(context).color;
+                return const Icon(Icons.notifications);
+              },
+            ),
+          ],
+          account: Builder(
+            builder: (context) {
+              accountTextColor = DefaultTextStyle.of(context).style.color;
+              return const Text('계정');
+            },
+          ),
+        ),
+      ),
+    );
+    expect(actionsIconColor, DpColors.light.textSecondary);
+    expect(accountTextColor, DpColors.light.textSecondary);
+  });
+
   testWidgets('검색 필드 배경은 surfaceMuted를 쓴다', (tester) async {
     await tester.pumpWidget(
       _host(DpChromeBar(breadcrumb: _crumbs, onSearchTap: () {})),

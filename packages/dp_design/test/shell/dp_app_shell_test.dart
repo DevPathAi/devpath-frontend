@@ -128,4 +128,49 @@ void main() {
     await tester.pumpWidget(_host(_shell()));
     expect(find.byType(Badge), findsOneWidget);
   });
+
+  // Important 2: 크롬바가 breadcrumb 유무만으로 렌더 여부를 정하면,
+  // compact + 빈 breadcrumb 조합에서 account(크롬바로 배치됨)가 어디에도
+  // 도달하지 못하고 조용히 사라진다.
+  testWidgets('compact + 빈 breadcrumb + account 지정 시 account가 렌더된다', (
+    tester,
+  ) async {
+    _setWidth(tester, 500);
+    await tester.pumpWidget(
+      _host(
+        DpAppShell(
+          destinations: _dests,
+          selectedIndex: 0,
+          onSelect: (_) {},
+          breadcrumb: const [],
+          account: const Text('계정'),
+          body: const Text('본문'),
+        ),
+      ),
+    );
+    expect(find.byType(DpChromeBar), findsOneWidget);
+    expect(find.text('계정'), findsOneWidget);
+  });
+
+  // 같은 결함이 chromeActions에도 적용된다(non-compact에서도 breadcrumb이
+  // 비면 발생) — DpNavRail에는 chromeActions를 넘길 슬롯이 없기 때문이다.
+  testWidgets('non-compact + 빈 breadcrumb + chromeActions 지정 시 actions가 렌더된다', (
+    tester,
+  ) async {
+    _setWidth(tester, 1000);
+    await tester.pumpWidget(
+      _host(
+        DpAppShell(
+          destinations: _dests,
+          selectedIndex: 0,
+          onSelect: (_) {},
+          breadcrumb: const [],
+          chromeActions: const [Text('액션')],
+          body: const Text('본문'),
+        ),
+      ),
+    );
+    expect(find.byType(DpChromeBar), findsOneWidget);
+    expect(find.text('액션'), findsOneWidget);
+  });
 }

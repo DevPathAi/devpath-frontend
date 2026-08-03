@@ -54,9 +54,18 @@ class DpAppShell extends StatelessWidget {
         ? DpMaxWidth(child: body)
         : body;
 
+    // 크롬바에 실제로 전달될 게 있을 때만 렌더한다. account는 compact에서만
+    // 크롬바로 가므로(그 외엔 레일로 간다) 그 경우만 여기 포함한다 — 안 그러면
+    // compact + 빈 breadcrumb 조합에서 account·chromeActions가 어디에도
+    // 도달하지 못하고 조용히 사라진다.
+    final showChromeBar =
+        breadcrumb.isNotEmpty ||
+        chromeActions.isNotEmpty ||
+        (compact && account != null);
+
     final main = Column(
       children: [
-        if (breadcrumb.isNotEmpty)
+        if (showChromeBar)
           DpChromeBar(
             breadcrumb: breadcrumb,
             onCrumbTap: onCrumbTap,

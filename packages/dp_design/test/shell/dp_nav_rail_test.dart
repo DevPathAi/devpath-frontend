@@ -99,6 +99,39 @@ void main() {
     expect(find.text('김개발'), findsOneWidget);
   });
 
+  // Important 1: 다크 레일 위에서 brand·account에 무스타일 위젯을 넣으면
+  // railBg와 같은 색(#1A1815 = textPrimary)으로 렌더돼 완전히 묻힌다.
+  // 레일이 자기 배경에 맞는 전경색을 기본값으로 공급해야 한다.
+  testWidgets('brand·account 슬롯은 각각 railText·railMuted를 기본 전경색으로 제공', (
+    tester,
+  ) async {
+    Color? brandTextColor;
+    Color? accountIconColor;
+    await tester.pumpWidget(
+      _host(
+        DpNavRail(
+          destinations: _dests,
+          selectedIndex: 0,
+          onSelect: (_) {},
+          brand: Builder(
+            builder: (context) {
+              brandTextColor = DefaultTextStyle.of(context).style.color;
+              return const Text('DevPath');
+            },
+          ),
+          account: Builder(
+            builder: (context) {
+              accountIconColor = IconTheme.of(context).color;
+              return const Icon(Icons.person);
+            },
+          ),
+        ),
+      ),
+    );
+    expect(brandTextColor, DpColors.light.railText);
+    expect(accountIconColor, DpColors.light.railMuted);
+  });
+
   testWidgets('onToggle 지정 시 토글 버튼 노출·호출', (tester) async {
     var toggled = false;
     await tester.pumpWidget(
