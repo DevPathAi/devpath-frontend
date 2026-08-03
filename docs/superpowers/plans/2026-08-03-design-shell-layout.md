@@ -1990,6 +1990,7 @@ git commit -m "feat(admin): adopt ink rail, chrome bar and page headers"
 - Modify: `apps/web/lib/src/features/beta/presentation/beta_pending_page.dart:66`
 - Modify: `apps/web/lib/src/features/consent/presentation/consent_page.dart:109`
 - Modify: `apps/web/lib/src/features/diagnostic/presentation/diagnostic_page.dart:47`
+- Create: `apps/web/lib/src/features/common/presentation/brand_row.dart`
 - Test: `apps/web/test/features/diagnostic/diagnostic_page_test.dart:50` (확인)
 
 **Interfaces:**
@@ -2039,7 +2040,7 @@ Expected: FAIL — `AppBar`가 아직 존재한다.
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,
               children: [
-                _brandRow(context),           // 로고 + DevPath (+ 로그인만 테마 버튼)
+                brandRow(context),           // 로고 + DevPath (+ 로그인만 테마 버튼)
                 const DpPageHeader(title: '로그인', description: 'GitHub 또는 Google 계정으로 시작하세요'),
                 // ... 기존 본문 그대로
               ],
@@ -2050,10 +2051,16 @@ Expected: FAIL — `AppBar`가 아직 존재한다.
     );
 ```
 
-`_brandRow`는 각 파일에 사설 위젯으로 둔다(4화면이 공유할 만큼 크지 않다 — 공용 컴포넌트로 올리는 것은 YAGNI):
+브랜드 행은 **`apps/web/lib/src/features/common/presentation/brand_row.dart`에 한 번만 만들고 4화면이 import한다.** 4곳에 같은 코드를 복제하지 않는다(`features/common/presentation/`은 이미 존재하는 디렉토리다). dp_design까지 올리지는 않는다 — web 전용이고 admin에는 대응 화면이 없다.
 
 ```dart
-Widget _brandRow(BuildContext context, {List<Widget> actions = const []}) {
+// apps/web/lib/src/features/common/presentation/brand_row.dart
+import 'package:dp_design/dp_design.dart';
+import 'package:flutter/material.dart';
+
+/// 셸 밖 화면(로그인·동의·진단·베타)의 상단 브랜드 행.
+/// 이 화면들엔 레일이 없어 제품 정체성을 보여줄 자리가 여기뿐이다.
+Widget brandRow(BuildContext context, {List<Widget> actions = const []}) {
   final c = context.dpColors;
   final text = Theme.of(context).textTheme;
   return Padding(
