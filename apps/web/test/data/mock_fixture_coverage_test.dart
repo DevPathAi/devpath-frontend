@@ -20,7 +20,9 @@ void main() {
   test('회원 진단 경로 픽스처가 전부 있다', () {
     expect(webMockFixtures.containsKey('POST /onboarding/assessments'), isTrue);
     expect(
-      webMockFixtures.containsKey('GET /onboarding/assessments/1/next'),
+      // next 는 고정 픽스처가 아니라 시퀀스다 — 같은 문항이 반복되면 완료로
+      // 넘어가지 못하기 때문이다(마지막이 null 이어야 complete 로 간다).
+      webMockSequences.containsKey('GET /onboarding/assessments/1/next'),
       isTrue,
     );
     expect(
@@ -48,7 +50,6 @@ void main() {
       'GET /notifications/prefs/me',
       'POST /contents/c1/progress',
       'POST /onboarding/assessments',
-      'GET /onboarding/assessments/1/next',
       'POST /onboarding/assessments/1/answer',
       'POST /onboarding/assessments/1/complete',
       'POST /onboarding/assessments/claim',
@@ -56,6 +57,37 @@ void main() {
     ]) {
       final (status, _) = webMockFixtures[key]!;
       expect(status, inInclusiveRange(200, 299), reason: key);
+    }
+  });
+
+  group('진단 시퀀스', () {
+    // 목 모드 진단이 완주하려면 next 가 마지막에 null 을 돌려줘야 한다
+    // (AssessmentApi.next 는 본문이 null 일 때만 null 을 반환하고,
+    //  DiagnosticController 는 그때만 complete() 로 넘어간다).
+    for (final key in [
+      'GET /onboarding/assessments/1/next',
+      'GET /onboarding/assessments/guest/g-mock/next',
+    ]) {
+      test('$key 는 문항 2개 뒤 null 로 끝난다', () {
+        final seq = webMockSequences[key];
+        expect(seq, isNotNull, reason: '$key 시퀀스가 없으면 진단이 시작조차 안 된다');
+        expect(
+          seq!.length,
+          greaterThanOrEqualTo(2),
+          reason: '문항이 최소 1개는 이어져야 한다',
+        );
+
+        // 마지막은 반드시 null — 이것이 완료 판정의 유일한 신호다.
+        final (lastStatus, lastBody) = seq.last;
+        expect(lastStatus, 200);
+        expect(lastBody, isNull, reason: '마지막이 null 이 아니면 같은 문항이 무한 반복된다');
+
+        // 그 앞은 전부 문항이어야 한다.
+        for (final (status, body) in seq.take(seq.length - 1)) {
+          expect(status, inInclusiveRange(200, 299));
+          expect((body as Map)['question'], isNotNull);
+        }
+      });
     }
   });
 }
