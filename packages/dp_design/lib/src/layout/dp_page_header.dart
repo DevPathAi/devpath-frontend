@@ -65,10 +65,12 @@ class DpPageHeader extends StatelessWidget {
               ),
               if (actions.isNotEmpty) ...[
                 const SizedBox(width: DpSpacing.md),
-                Wrap(
-                  spacing: DpSpacing.sm,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: actions,
+                Flexible(
+                  child: Wrap(
+                    spacing: DpSpacing.sm,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: actions,
+                  ),
                 ),
               ],
             ],

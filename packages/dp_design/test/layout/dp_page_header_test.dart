@@ -19,6 +19,8 @@ void main() {
     await tester.pumpWidget(_host(const DpPageHeader(title: '대시보드')));
     final widget = tester.widget<Text>(find.text('대시보드'));
     expect(widget.style?.fontSize, 24);
+    expect(widget.style?.fontWeight, FontWeight.w600);
+    expect(widget.style?.height, 32 / 24);
   });
 
   testWidgets('설명·액션·필터 슬롯을 렌더', (tester) async {
@@ -49,5 +51,28 @@ void main() {
 
     final description = tester.widget<Text>(find.text('요약 설명'));
     expect(description.style?.color, DpColors.light.textSecondary);
+  });
+
+  // DpChromeBar에서 실제로 확인된 것과 같은 결함 패턴: Row에서 제목만 Expanded이고
+  // actions의 Wrap이 non-flex 자식이면 무한 주축 제약으로 측정돼 줄바꿈하지 않고
+  // 오버플로한다. actions의 Wrap도 Flexible로 감싸야 좁은 폭에서 실제로 줄바꿈된다.
+  testWidgets('좁은 폭 + 넓은 액션 여러 개에서도 오버플로 없이 렌더된다', (tester) async {
+    tester.view.physicalSize = const Size(400, 300);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      _host(
+        DpPageHeader(
+          title: List.filled(20, '가').join(),
+          actions: List.generate(
+            3,
+            (i) => const SizedBox(width: 160, child: Text('액션 하나')),
+          ),
+        ),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
   });
 }
