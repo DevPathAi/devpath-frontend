@@ -7,6 +7,7 @@ void main() {
   test('사용자가 도달하는 주요 GET 은 픽스처가 있다', () {
     expect(webMockFixtures.containsKey('GET /consents/me'), isTrue);
     expect(webMockFixtures.containsKey('GET /users/me/profile'), isTrue);
+    expect(webMockFixtures.containsKey('GET /notifications/prefs/me'), isTrue);
   });
 
   test('콘텐츠 진행 저장 픽스처가 있다', () {

@@ -62,6 +62,24 @@ final Map<String, MockFixture> webMockFixtures = {
       'completedAt': '2026-06-21T10:00:00Z',
     },
   ),
+  // GET /notifications/prefs/me — NotificationPrefs.fromJson(settings_models.dart:68),
+  // settings_source.dart:23(fetchPrefs)이 호출한다. settings_controller.load()가
+  // fetchConsents()·fetchPrefs()를 한 try 블록에서 순차 호출하므로(부분 실패
+  // 관용 없음), 이 픽스처가 없으면 GET /consents/me가 있어도 fetchPrefs()가
+  // ApiException을 던져 설정 화면이 여전히 SettingsError로 뜬다(2026-08-03
+  // 재점검에서 발견).
+  // 필드는 전부 String?/bool? + 기본값(fromJson 내부 `?? ...`)이라 값이
+  // 없어도 크래시는 없지만, settings_page.dart의 두 SwitchListTile(학습
+  // 리마인더·주간 리포트 이메일)이 실제 값을 보여주도록 채운다.
+  'GET /notifications/prefs/me': (
+    200,
+    {
+      'timezone': 'Asia/Seoul',
+      'preferredTimeSlot': '09:00',
+      'reminderEnabled': true,
+      'weeklyReportEmailEnabled': true,
+    },
+  ),
   // OAuth 콜백 후 세션 복원 엔드포인트.
   // 최상위 필드: snake_case(access_token, refresh_token_cookie_set).
   // user 객체: camelCase(dp_core User.fromJson 기준).
