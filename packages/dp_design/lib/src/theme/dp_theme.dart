@@ -12,7 +12,7 @@ abstract final class DpTheme {
   static ThemeData _build(Brightness brightness, DpColors c) {
     final scheme =
         ColorScheme.fromSeed(
-          seedColor: const Color(0xFF4F46E5), // indigo-600 시드(DD1)
+          seedColor: const Color(0xFFB45309), // T2 앰버 액센트 시드
           brightness: brightness,
         ).copyWith(
           // P3-B: scheme.primary는 접근성 변형(primaryText, ≥4.5:1)으로 둔다.
