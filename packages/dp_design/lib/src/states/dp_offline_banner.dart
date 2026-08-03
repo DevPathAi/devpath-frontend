@@ -20,10 +20,10 @@ class DpOfflineBanner extends StatelessWidget {
           horizontal: DpSpacing.lg,
           vertical: DpSpacing.md,
         ),
-        color: c.warning.withValues(alpha: 0.12),
+        color: c.surfaceMuted,
         child: Row(
           children: [
-            Icon(DpIcons.offline, size: 18, color: c.warning),
+            Icon(DpIcons.offline, size: 18, color: c.textSecondary),
             const SizedBox(width: DpSpacing.sm),
             Expanded(
               child: Text(
