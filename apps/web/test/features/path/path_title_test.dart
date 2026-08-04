@@ -1,4 +1,7 @@
+import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
+import 'package:devpath_web/src/data/web_mock_fixtures.dart';
+import 'package:devpath_web/src/features/path/presentation/path_plan_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -8,14 +11,18 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
+    // 생성자 실측: PathPlanView({super.key, required this.plan})
+    // 목 데이터는 web_mock_fixtures.dart:410 의 mockLearningPath() 를 재사용한다.
+    final plan = LearningPath.fromJson(mockLearningPath());
+
     await tester.pumpWidget(
       MaterialApp(
         theme: DpTheme.light(),
         home: Scaffold(
           body: Column(
-            children: const [
-              DpPageHeader(title: '학습 경로'),
-              Expanded(child: SizedBox()),
+            children: [
+              const DpPageHeader(title: '학습 경로'),
+              Expanded(child: PathPlanView(plan: plan)),
             ],
           ),
         ),
