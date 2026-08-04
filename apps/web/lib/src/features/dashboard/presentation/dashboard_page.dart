@@ -38,26 +38,36 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   Widget build(BuildContext context) {
     final s = ref.watch(dashboardControllerProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('대시보드')),
-      body: AnimatedSwitcher(
-        key: const ValueKey('dash-switcher'),
-        duration: DpDurations.stageReveal,
-        child: switch (s) {
-          DashLoading() => const Skeletonizer(
-            key: ValueKey('loading'),
-            child: DashboardBody(summary: _skeletonSummary),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const DpPageHeader(
+            title: '대시보드',
+            description: '이번 주 학습 현황과 다음 과제를 한눈에 봅니다',
           ),
-          DashFailed(:final message) => SupportableError(
-            key: const ValueKey('error'),
-            message: message,
-            onRetry: () =>
-                ref.read(dashboardControllerProvider.notifier).load(),
+          Expanded(
+            child: AnimatedSwitcher(
+              key: const ValueKey('dash-switcher'),
+              duration: DpDurations.stageReveal,
+              child: switch (s) {
+                DashLoading() => const Skeletonizer(
+                  key: ValueKey('loading'),
+                  child: DashboardBody(summary: _skeletonSummary),
+                ),
+                DashFailed(:final message) => SupportableError(
+                  key: const ValueKey('error'),
+                  message: message,
+                  onRetry: () =>
+                      ref.read(dashboardControllerProvider.notifier).load(),
+                ),
+                DashLoaded(:final summary) => DashboardBody(
+                  key: const ValueKey('loaded'),
+                  summary: summary,
+                ),
+              },
+            ),
           ),
-          DashLoaded(:final summary) => DashboardBody(
-            key: const ValueKey('loaded'),
-            summary: summary,
-          ),
-        },
+        ],
       ),
     );
   }

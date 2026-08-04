@@ -58,8 +58,16 @@ class _PathPageState extends ConsumerState<PathPage> {
     };
 
     return Scaffold(
-      appBar: AppBar(title: const Text('학습 경로')),
-      body: body,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const DpPageHeader(
+            title: '학습 경로',
+            description: '진단 결과로 만든 12주 계획입니다',
+          ),
+          Expanded(child: body),
+        ],
+      ),
     );
   }
 }
