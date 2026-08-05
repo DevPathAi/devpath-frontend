@@ -10,7 +10,8 @@ import 'dp_nav_rail.dart';
 /// 목적지 선택은 [onSelect]에 index로 통지, 경로 해석은 앱이 담당.
 ///
 /// 구조: [DpNavRail](세로) + [DpChromeBar](가로) + body.
-/// [breadcrumb]이 비면 크롬바를 렌더하지 않는다.
+/// 크롬바는 [breadcrumb]·[chromeActions] 중 하나라도 있거나, compact 폭에서
+/// [account]가 있을 때 렌더된다(셋 다 없을 때만 렌더하지 않는다).
 /// [account]는 폭에 따라 레일 하단 또는 크롬바 우측으로 간다 —
 /// 앱은 한 벌만 만들고 배치는 셸이 정한다.
 class DpAppShell extends StatelessWidget {

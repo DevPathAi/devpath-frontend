@@ -24,7 +24,9 @@ const _crumbCommunity = (label: '커뮤니티', path: null);
 const _crumbBoard = (label: '게시판', path: '/community');
 
 /// 경로 → 브레드크럼. **긴 경로를 먼저 검사한다**(`/community/new/post`가
-/// `/community/new`보다 앞). 알 수 없는 경로는 빈 목록이라 크롬바가 렌더되지 않는다.
+/// `/community/new`보다 앞). 알 수 없는 경로는 빈 목록을 반환한다 — 다만 web은
+/// 오류 신고 액션(chromeActions)이 상시 있어 크롬바 자체는 계속 렌더된다
+/// (showChromeBar는 breadcrumb·chromeActions·compact account를 OR한다).
 List<DpCrumb> breadcrumbFor(String location) {
   const learning = (label: '학습', path: null);
   const account = (label: '계정', path: null);

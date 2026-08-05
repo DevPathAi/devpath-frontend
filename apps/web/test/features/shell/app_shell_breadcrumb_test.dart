@@ -31,7 +31,7 @@ void main() {
     ]);
   });
 
-  test('알 수 없는 경로는 빈 브레드크럼(크롬바 미렌더)', () {
+  test('알 수 없는 경로는 빈 브레드크럼(크롬바 렌더 여부는 셸이 chromeActions 등과 함께 결정)', () {
     expect(breadcrumbFor('/unknown'), isEmpty);
   });
 
