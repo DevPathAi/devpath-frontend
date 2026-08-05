@@ -31,6 +31,7 @@ void main() {
     expect(find.byType(AppBar), findsNothing);
     final header = tester.widget<DpPageHeader>(find.byType(DpPageHeader));
     expect(header.title, '마이페이지');
+    expect(header.description, '프로필과 활동 기록입니다');
     expect(header.actions, isEmpty);
     expect(find.byIcon(Icons.settings_outlined), findsNothing);
   });

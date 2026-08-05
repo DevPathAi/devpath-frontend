@@ -69,6 +69,11 @@ void main() {
 
     expect(find.textContaining('첫 질문'), findsOneWidget);
 
+    // T1: 페이지 헤더 배선 회귀 가드 — DpPageHeader(title: 'AI 멘토', ...)를
+    // 통째로 지워도 이 파일의 나머지 테스트는 버블·참고자료만 봐서 무커버였다.
+    final header = tester.widget<DpPageHeader>(find.byType(DpPageHeader));
+    expect(header.title, 'AI 멘토');
+
     await tester.enterText(find.byType(TextField), '비동기란?');
     await tester.tap(find.byTooltip('전송'));
     await tester.pumpAndSettle();
