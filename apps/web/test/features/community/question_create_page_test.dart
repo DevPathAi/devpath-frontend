@@ -93,6 +93,10 @@ void main() {
 
     expect(find.text('💡 비슷한 질문'), findsOneWidget);
     expect(find.text('비슷한 질문'), findsOneWidget);
+    expect(
+      tester.widget<DpPageHeader>(find.byType(DpPageHeader)).title,
+      '질문하기',
+    );
   });
 
   testWidgets('제목·본문 입력 후 게시하면 작성 API 호출 + 상세로 이동', (tester) async {

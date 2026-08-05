@@ -73,6 +73,7 @@ void main() {
     expect(find.text('채택됨'), findsOneWidget); // 채택된 답변
     // 이미 solved → 채택 버튼 없음
     expect(find.widgetWithText(TextButton, '채택'), findsNothing);
+    expect(tester.widget<DpPageHeader>(find.byType(DpPageHeader)).title, 'Q&A');
   });
 
   testWidgets('미해결 질문: 미채택 답변에 채택 버튼 노출 + 탭 시 채택 호출', (tester) async {

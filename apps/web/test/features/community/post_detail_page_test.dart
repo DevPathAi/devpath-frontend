@@ -45,6 +45,7 @@ void main() {
     expect(find.textContaining('본문입니다'), findsWidgets);
     expect(find.text('좋은 정리네요!'), findsOneWidget); // 댓글 본문
     expect(find.byType(TextField), findsOneWidget); // 댓글 입력
+    expect(tester.widget<DpPageHeader>(find.byType(DpPageHeader)).title, '게시글');
   });
 
   testWidgets('댓글 등록: 작성 시 commentCreate 호출 후 재조회', (tester) async {

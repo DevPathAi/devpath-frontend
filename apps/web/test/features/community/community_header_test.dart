@@ -19,6 +19,8 @@ void main() {
     expect(find.byType(AppBar), findsNothing);
     final header = tester.widget<DpPageHeader>(find.byType(DpPageHeader));
     expect(header.title, '커뮤니티');
+    expect(header.description, '질문하고 답하고 서로 피드백을 남깁니다');
+    expect(find.byType(PinnedHeaderSliver), findsOneWidget);
     expect(
       find.byType(FloatingActionButton),
       findsOneWidget,
