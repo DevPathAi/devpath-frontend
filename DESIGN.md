@@ -44,10 +44,8 @@
 | `textSecondary` | `#615C54` | `#A09991` | 보조(최다 사용) | 라이트 6.30:1 ✅ |
 | `textFaint` | `#918B81` | `#6F6961` | 메타·캡션 | 라이트 3.21:1 — UI 컴포넌트 기준(3:1) 통과, **본문 텍스트로 쓰지 않는다** |
 
-**사이드바 전용(현재 미소비)** — 본문과 다른 위계로 정의는 돼 있으나,
-`DpAppShell`(`packages/dp_design/lib/src/shell/dp_app_shell.dart`)이 아직 이
-토큰들을 색으로 배선하지 않고 `NavigationRail`/`NavigationBar`의 Material
-기본값을 그대로 쓴다. 후속 레이아웃 단계에서 셸에 배선한다.
+**사이드바 전용** — 본문과 다른 위계. `DpAppShell`(`packages/dp_design/lib/src/shell/dp_app_shell.dart`)이
+§9 셸 구조에서 배선한다.
 | 토큰 | 라이트 | 다크 | 용도 |
 |---|---|---|---|
 | `railBg` | `#1A1815` | `#131210` | 사이드바 배경 |
@@ -204,9 +202,10 @@ Loading/Empty/Error 외에 다음 전용 상태를 dp_design에 추가:
 - **`textFaint`는 구분자·비활성 아이콘 전용이다.** 대비 3.21:1(UI 컴포넌트 기준)이라 읽어야 하는
   텍스트에 쓰지 않는다 — 크롬바 브레드크럼의 `·` 구분자가 유일한 소비처다(§1 참고). 레일 섹션
   레이블처럼 **읽어야 하는 텍스트**는 전용 토큰(`railFaint`, ≥4.5:1)을 쓴다.
-- **화면은 `AppBar`를 만들지 않는다.** 제목 3중 노출(앱바 제목 + 브레드크럼 + 본문 제목)을 막기
-  위해 화면은 `DpPageHeader`로만 제목을 낸다. `Scaffold` 자체는 화면이 계속 쓸 수 있으나
-  `backgroundColor`를 별도로 지정하면 크롬바 아래 색이 셸과 어긋나므로 지정하지 않는다.
+- **셸을 쓰는 화면은 `AppBar`를 만들지 않는다.** 제목 3중 노출(앱바 제목 + 브레드크럼 + 본문 제목)을
+  막기 위해 화면은 `DpPageHeader`로만 제목을 낸다. `Scaffold` 자체는 화면이 계속 쓸 수 있으나
+  `backgroundColor`를 별도로 지정하면 크롬바 아래 색이 셸과 어긋나므로 지정하지 않는다. (`DpAppShell`을
+  쓰지 않는 `apps/mobile`은 이 규칙 밖이다 — 기존 `Scaffold.appBar`를 그대로 쓴다.)
 
 ## 10. 출처/샘플 매핑
 
