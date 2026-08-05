@@ -81,14 +81,14 @@ void main() {
     await tester.pumpWidget(_host(c));
     await tester.pumpAndSettle();
 
-    expect(find.text('자유글 작성'), findsOneWidget); // AppBar
+    expect(find.text('자유글 작성'), findsOneWidget); // 페이지 헤더
     // 본문이 QuillEditor 로 바뀌어 TextField 는 제목/태그 2개만 남는다.
     expect(find.byType(TextField), findsNWidgets(2));
     expect(find.byType(QuillEditor), findsOneWidget);
     expect(find.widgetWithText(FilledButton, '게시'), findsOneWidget);
   });
 
-  testWidgets('FEEDBACK 프리셋: AppBar 라벨이 "피드백 요청"', (tester) async {
+  testWidgets('FEEDBACK 프리셋: 페이지 헤더 라벨이 "피드백 요청"', (tester) async {
     _wideView(tester);
     final c = ProviderContainer(
       overrides: [

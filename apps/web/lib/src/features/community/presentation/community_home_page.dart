@@ -120,7 +120,6 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
     final search = ref.watch(communitySearchControllerProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('커뮤니티')),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openComposeSheet(context),
         icon: const Icon(DpIcons.edit),
@@ -128,6 +127,12 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
       ),
       body: CustomScrollView(
         slivers: [
+          const SliverToBoxAdapter(
+            child: DpPageHeader(
+              title: '커뮤니티',
+              description: '질문하고 답하고 서로 피드백을 남깁니다',
+            ),
+          ),
           PinnedHeaderSliver(
             child: ColoredBox(
               color: Theme.of(context).scaffoldBackgroundColor,
