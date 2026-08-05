@@ -5,6 +5,29 @@
 > 계획 `docs/superpowers/plans/2026-08-03-design-shell-layout.md` (12 Task)
 > 직전 핸드오프 `handoff-2026-08-03-design-phase2-shell-task6-done.md`
 
+## 0. ★먼저 읽어라 — 세션 종료 시점의 레포 상태★
+
+**`feat/design-phase2-shell`은 `develop`에 로컬 머지되고 삭제됐다**(merge commit `2289587`, `--no-ff`). 머지 결과에서 전 스위트 green을 확인했다.
+
+**⚠️ `origin`에 push하지 않았다.** 사용자가 「develop으로 로컬 머지」를 선택했고, push·PR은 하지 않기로 했다. 즉 **이 작업 전체가 로컬에만 있다** — 세션 시작 시 `git log origin/develop..develop`으로 앞선 커밋 수를 확인하라(세션 종료 시점 40).
+
+레포 규칙(`CLAUDE.md`·전역 git-branch-flow)은 `develop` 직접 push를 금지하고 PR을 거치도록 정한다. **원격에 올릴 방법은 아직 정해지지 않았다** — 다음 세션의 미결 사항이다. 선택지는 대략 셋:
+1. 머지 커밋을 되돌리고(`git reset --hard <merge-base>`는 위험 — reflog로 복구 가능하지만) 브랜치를 되살려 정식 PR로 올린다
+2. 현 상태를 그대로 push한다(규칙 예외를 한 번 더 인정)
+3. 로컬에 계속 두고 3단계 작업을 이어간 뒤 함께 올린다
+
+**사용자에게 확인 없이 push하지 마라.**
+
+`.superpowers/sdd/2026-08-03-design-shell-layout/` 워크스페이스(ledger·brief·리뷰 전문)는 정리 시 삭제됐다 — **이 문서가 그 요약본이다.** 다른 계획의 워크스페이스는 그대로 남아 있다.
+
+### 다음 세션이 할 일 (순서대로)
+
+1. **육안 확인**(아래 §2) — 아직 안 했고, §4.2 사건을 보면 실제로 필요하다
+2. **push·PR 방법 결정**(위)
+3. **3단계 착수** — 스펙의 「선행 수정」 절에 §3.1·§3.2·§3.3을 명시적으로 적고 시작
+
+---
+
 ## 1. 무엇이 끝났나
 
 **계획 12 Task 전부 완료** (1~6은 2026-08-03, 7~12는 2026-08-05) + 최종 whole-branch 리뷰 + fix wave 2회 = **35커밋**.
