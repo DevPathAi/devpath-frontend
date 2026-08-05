@@ -141,15 +141,21 @@ class AppShellView extends StatelessWidget {
             ),
           ),
           const SizedBox(width: DpSpacing.sm),
-          // color를 지정하지 않는다 — DpNavRail._withRailForeground
-          // (dp_nav_rail.dart:91)가 이미 레일 배경에 맞는 전경색(railText)을
-          // 공급한다. 여기서 다시 지정하면 그 공급을 무력화한다(admin의
-          // admin_shell.dart:80-83과 같은 형태로 맞춘다).
+          // color를 반드시 명시한다 — DpTheme.light()/.dark()가
+          // textTheme.apply(bodyColor: c.textPrimary)로 titleSmall에 이미
+          // non-null color(textPrimary)를 채워 넣는다(dp_theme.dart:32-34).
+          // Text는 style.inherit==true일 때 DefaultTextStyle.merge(style)을
+          // 하고, merge는 style의 non-null 필드를 우선한다 — 즉
+          // DpNavRail._withRailForeground(dp_nav_rail.dart:91)가 공급하는
+          // railText는 titleSmall이 이미 들고 있는 textPrimary에 진다.
+          // 라이트 테마에서 textPrimary(#1A1815)와 railBg(#1A1815)는 동일해
+          // color를 명시하지 않으면 브랜드 텍스트가 레일 배경에 완전히
+          // 묻힌다(대비 1.00:1) — 반드시 railText를 명시로 덮어써야 한다.
           Flexible(
             child: Text(
               'DevPath',
               overflow: TextOverflow.ellipsis,
-              style: text.titleSmall,
+              style: text.titleSmall?.copyWith(color: c.railText),
             ),
           ),
         ],
