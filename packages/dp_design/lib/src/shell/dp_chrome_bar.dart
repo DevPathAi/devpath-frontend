@@ -47,39 +47,56 @@ class DpChromeBar extends StatelessWidget {
         border: Border(bottom: BorderSide(color: c.border)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: DpSpacing.lg),
-      child: Row(
-        children: [
-          Flexible(child: _crumbs(context, c)),
-          const SizedBox(width: DpSpacing.lg),
-          if (!compact && onSearchTap != null)
-            Flexible(flex: 2, child: _search(context, c))
-          else if (compact && onSearchTap != null)
-            IconButton(
-              key: const ValueKey('chrome-search-icon'),
-              icon: Icon(DpIcons.search, size: 20, color: c.textSecondary),
-              tooltip: '검색 (Ctrl/Cmd+K)',
-              onPressed: onSearchTap,
-            ),
-          const Spacer(),
-          // 밝은 surface 배경 위이므로 무스타일 액션/계정 위젯도 textSecondary를
-          // 기본 전경색으로 받는다 — 하위 위젯이 색을 명시하면 그게 이긴다(merge).
-          IconTheme.merge(
-            data: IconThemeData(color: c.textSecondary),
-            child: DefaultTextStyle.merge(
-              style: TextStyle(color: c.textSecondary),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ...actions,
-                  if (account != null) ...[
-                    const SizedBox(width: DpSpacing.sm),
-                    account!,
-                  ],
-                ],
+      // I2: actions·account 그룹은 non-flex 자식이라 RenderFlex가 무한 주축
+      // 제약으로 먼저 측정한다 — actions가 늘어나면(스펙 §3.0 trailing
+      // 슬롯) 오버플로한다. _crumbs(:129-133 아래)·DpPageHeader.actions와
+      // 같은 함정, 이번이 세 번째 자리다. DpPageHeader.actions가 이미
+      // 검증한 해법(LayoutBuilder로 폭을 읽어 ConstrainedBox(maxWidth:
+      // 폭/2)로 상한을 건다)을 그대로 재사용한다 — Expanded로 crumbs와
+      // flex를 1:1로 나누면 group의 예산이 기존보다 오히려 줄어(항상
+      // 절반 고정) 실측상 더 좁은 폭에서부터 오버플로했다(actions 2개
+      // 이상에서 재현), 그래서 그 접근 대신 이 패턴을 쓴다.
+      child: LayoutBuilder(
+        builder: (context, constraints) => Row(
+          children: [
+            Flexible(child: _crumbs(context, c)),
+            const SizedBox(width: DpSpacing.lg),
+            if (!compact && onSearchTap != null)
+              Flexible(flex: 2, child: _search(context, c))
+            else if (compact && onSearchTap != null)
+              IconButton(
+                key: const ValueKey('chrome-search-icon'),
+                icon: Icon(DpIcons.search, size: 20, color: c.textSecondary),
+                tooltip: '검색 (Ctrl/Cmd+K)',
+                onPressed: onSearchTap,
+              ),
+            const Spacer(),
+            ConstrainedBox(
+              constraints: constraints.hasBoundedWidth
+                  ? BoxConstraints(maxWidth: constraints.maxWidth / 2)
+                  : const BoxConstraints(),
+              // 밝은 surface 배경 위이므로 무스타일 액션/계정 위젯도
+              // textSecondary를 기본 전경색으로 받는다 — 하위 위젯이 색을
+              // 명시하면 그게 이긴다(merge).
+              child: IconTheme.merge(
+                data: IconThemeData(color: c.textSecondary),
+                child: DefaultTextStyle.merge(
+                  style: TextStyle(color: c.textSecondary),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ...actions,
+                      if (account != null) ...[
+                        const SizedBox(width: DpSpacing.sm),
+                        account!,
+                      ],
+                    ],
+                  ),
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
