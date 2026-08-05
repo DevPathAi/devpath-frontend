@@ -40,6 +40,15 @@ class AdminShell extends StatelessWidget {
   }
 }
 
+/// 경로 → 화면 제목. 브레드크럼과 DpPageHeader가 같은 값을 쓴다.
+String _headerTitleFor(String path) => switch (path) {
+  '/users' => '사용자 관리',
+  '/reports' => '신고 처리',
+  '/support' => '오류 신고·문의',
+  '/ads' => '광고 관리',
+  _ => '운영 대시보드',
+};
+
 /// 표현부: go_router 비의존 — DpAppShell로 위임. admin은 웹 우선이라
 /// Large에서 기존 extended rail을 유지한다.
 class AdminShellView extends StatelessWidget {
@@ -69,17 +78,11 @@ class AdminShellView extends StatelessWidget {
           DpDestination(icon: d.icon, label: d.label),
       ],
       brand: const Text('운영 콘솔'),
-      breadcrumb: [(label: kAdminDestinations[_index].label, path: null)],
-      chromeActions: [
-        Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(DpIcons.search),
-            tooltip: '명령 팔레트 (Ctrl/Cmd+K)',
-            onPressed: () =>
-                Actions.invoke(context, const OpenCommandPaletteIntent()),
-          ),
-        ),
+      breadcrumb: [
+        (label: _headerTitleFor(kAdminDestinations[_index].path), path: null),
       ],
+      onSearchTap: () =>
+          Actions.invoke(context, const OpenCommandPaletteIntent()),
       body: child,
     );
   }

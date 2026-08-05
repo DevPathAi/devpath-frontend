@@ -59,7 +59,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // 목록이 비어있지 않아 DpEmpty가 없으므로 AppBar의 생성 버튼만 존재.
+    // 목록이 비어있지 않아 DpEmpty가 없으므로 헤더의 생성 버튼만 존재.
     await tester.tap(find.widgetWithText(FilledButton, '광고 생성'));
     await tester.pumpAndSettle();
     expect(find.text('링크 URL'), findsOneWidget); // 폼 필드 라벨
@@ -112,5 +112,28 @@ void main() {
     await tester.tap(find.byType(Checkbox).last);
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('ads-bulk-bar')), findsOneWidget);
+  });
+
+  testWidgets('DpPageHeader 제목은 "광고 관리" + 슬롯 필터가 filters 슬롯에 렌더', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1400, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          adsListProvider.overrideWithValue(({slot, status}) async => []),
+          adSettingsGetProvider.overrideWithValue(() async => false),
+        ],
+        child: MaterialApp(theme: DpTheme.light(), home: const AdminAdsPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final header = tester.widget<DpPageHeader>(find.byType(DpPageHeader));
+    expect(header.title, '광고 관리');
+    expect(find.byKey(const ValueKey('page-header-filters')), findsOneWidget);
   });
 }

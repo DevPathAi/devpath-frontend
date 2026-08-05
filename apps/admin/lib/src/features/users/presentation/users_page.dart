@@ -62,13 +62,12 @@ class _S extends ConsumerState<AdminUsersPage> {
     final n = ref.read(adminUsersProvider.notifier);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('사용자 관리'),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(48),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: DpSpacing.lg),
-            child: Row(
+      body: Column(
+        children: [
+          DpPageHeader(
+            title: '사용자 관리',
+            description: '가입 승인과 제재를 처리합니다',
+            filters: Row(
               children: [
                 const Text('상태:'),
                 const SizedBox(width: DpSpacing.sm),
@@ -91,10 +90,6 @@ class _S extends ConsumerState<AdminUsersPage> {
               ],
             ),
           ),
-        ),
-      ),
-      body: Column(
-        children: [
           // (변경 3) 사전승인 폼 — 화면 상단
           _PreApproveBar(
             emailCtrl: _emailCtrl,

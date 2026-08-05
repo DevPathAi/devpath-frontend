@@ -92,4 +92,37 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('users-bulk-bar')), findsOneWidget);
   });
+
+  testWidgets('DpPageHeader 제목은 "사용자 관리" + 상태 필터가 filters 슬롯에 렌더', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1400, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final c = ProviderContainer(
+      overrides: [
+        adminUsersFetchProvider.overrideWithValue(
+          ({String? cursor, String? status}) async =>
+              Page(data: const [], limit: 20),
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: c,
+        child: MaterialApp(
+          theme: DpTheme.light(),
+          home: const AdminUsersPage(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final header = tester.widget<DpPageHeader>(find.byType(DpPageHeader));
+    expect(header.title, '사용자 관리');
+    expect(find.byKey(const ValueKey('page-header-filters')), findsOneWidget);
+  });
 }

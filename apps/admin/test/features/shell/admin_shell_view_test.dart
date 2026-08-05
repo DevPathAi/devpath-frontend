@@ -12,7 +12,7 @@ void _setWidth(WidgetTester tester, double w) {
 }
 
 void main() {
-  testWidgets('Large 폭은 펼친 NavigationRail(extended)', (tester) async {
+  testWidgets('Large 폭은 펼친 DpNavRail + 브랜드', (tester) async {
     _setWidth(tester, 1400);
     await tester.pumpWidget(
       _host(const AdminShellView(location: '/dashboard', child: Text('본문'))),
@@ -20,6 +20,15 @@ void main() {
     final rail = tester.widget<DpNavRail>(find.byType(DpNavRail));
     expect(rail.extended, isTrue);
     expect(find.text('운영 콘솔'), findsOneWidget);
+  });
+
+  testWidgets('admin 브레드크럼은 단일 세그먼트', (tester) async {
+    _setWidth(tester, 1400);
+    await tester.pumpWidget(
+      _host(const AdminShellView(location: '/users', child: Text('본문'))),
+    );
+    final chrome = tester.widget<DpChromeBar>(find.byType(DpChromeBar));
+    expect(chrome.breadcrumb, const [(label: '사용자 관리', path: null)]);
   });
 
   testWidgets('compact 폭은 NavigationBar', (tester) async {

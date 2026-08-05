@@ -31,9 +31,12 @@ class ReportsPage extends ConsumerWidget {
     final current = s is ReportsLoaded ? s.status : 'OPEN';
 
     return Scaffold(
-      appBar: AppBar(title: const Text('신고 처리')),
       body: Column(
         children: [
+          const DpPageHeader(
+            title: '신고 처리',
+            description: '커뮤니티 신고를 검토하고 판정합니다',
+          ),
           Padding(
             padding: const EdgeInsets.fromLTRB(
               DpSpacing.lg,
