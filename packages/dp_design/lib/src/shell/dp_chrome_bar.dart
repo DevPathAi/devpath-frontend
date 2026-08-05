@@ -147,10 +147,19 @@ class DpChromeBar extends StatelessWidget {
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(minHeight: 44),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: DpSpacing.sm,
+                    // 탭 타깃 확보용 수평 여백. 첫 세그먼트에만 왼쪽을 빼서
+                    // 크롬바 좌측 정렬이 8px 밀리지 않게 한다. 이 여백은
+                    // 아래 구분자 패딩이 링크 쪽을 0으로 두어 상쇄한다.
+                    padding: EdgeInsets.only(
+                      left: i == 0 ? 0 : DpSpacing.sm,
+                      right: DpSpacing.sm,
                     ),
-                    child: Center(child: label),
+                    // widthFactor: 1 — 세로만 중앙 정렬한다. 기본 Center는
+                    // 부모가 주는 최대 폭까지 확장하는데, 이 세그먼트는
+                    // Flexible(loose)이라 flex 몫만큼 폭을 받는다. 그러면
+                    // 라벨이 그 넓은 폭의 한가운데로 밀려 구분자와의 간격이
+                    // 벌어진다('커뮤니티 · 게시판'에서 약 100px).
+                    child: Center(widthFactor: 1, child: label),
                   ),
                 ),
               ),
@@ -163,9 +172,16 @@ class DpChromeBar extends StatelessWidget {
       children.add(Flexible(child: crumbWidget));
 
       if (!isLast) {
+        // 구분자는 좌우 텍스트로부터 같은 거리(sm)에 있어야 한다. 링크
+        // 세그먼트는 이미 자체 패딩 sm을 갖고 있으므로 그쪽 변은 0으로 둬
+        // 상쇄한다 — 안 그러면 링크가 붙은 쪽만 두 배로 벌어진다(2단계 육안
+        // 확인에서 '커뮤니티 · 게시판'의 비대칭으로 드러났다).
         children.add(
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: DpSpacing.xs),
+            padding: EdgeInsets.only(
+              left: crumb.path == null ? DpSpacing.sm : 0,
+              right: items[i + 1].path == null ? DpSpacing.sm : 0,
+            ),
             // textFaint는 대비 3.21:1 — 텍스트가 아닌 구분자 글리프에만 쓴다.
             child: Text('·', style: style?.copyWith(color: c.textFaint)),
           ),

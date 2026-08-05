@@ -250,6 +250,31 @@ void main() {
     expect(barRight - actRight, closeTo(DpSpacing.lg, 1.0));
   });
 
+  // 링크 세그먼트만 탭 타깃 확보용 수평 패딩(sm)을 갖는 탓에 구분자가 한쪽으로
+  // 밀려 보였다 — 2단계 육안 확인의 커뮤니티 화면('커뮤니티 · 게시판')에서
+  // '·'가 왼쪽 라벨에 붙고 오른쪽만 벌어졌다. 구분자는 좌우 텍스트로부터 같은
+  // 거리에 있어야 한다(링크 여부와 무관).
+  //
+  // _crumbs는 비링크→링크(첫 구분자)와 링크→비링크(둘째 구분자)를 모두 포함해
+  // 두 조합을 한 번에 덮는다.
+  testWidgets('구분자는 링크 여부와 무관하게 좌우 같은 간격을 갖는다', (tester) async {
+    await tester.pumpWidget(_host(const DpChromeBar(breadcrumb: _crumbs)));
+
+    final dots = find.text('·');
+    expect(dots, findsNWidgets(2));
+
+    for (final (i, pair) in [('커뮤니티', '게시판'), ('게시판', '게시글')].indexed) {
+      final dot = tester.getRect(dots.at(i));
+      final gapBefore = dot.left - tester.getRect(find.text(pair.$1)).right;
+      final gapAfter = tester.getRect(find.text(pair.$2)).left - dot.right;
+      expect(
+        gapBefore,
+        closeTo(gapAfter, 0.5),
+        reason: '${pair.$1} · ${pair.$2} 구분자 간격이 좌우 비대칭이다',
+      );
+    }
+  });
+
   testWidgets('검색 필드 배경은 surfaceMuted를 쓴다', (tester) async {
     await tester.pumpWidget(
       _host(DpChromeBar(breadcrumb: _crumbs, onSearchTap: () {})),
