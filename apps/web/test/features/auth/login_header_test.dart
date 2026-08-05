@@ -18,7 +18,10 @@ void main() {
     expect(header.title, '로그인');
     expect(find.byTooltip('테마 전환'), findsOneWidget);
     // T3: brandRow(context) 호출 자체를 지워도 byTooltip 단언은 깨지지 않는다
-    // (버튼이 brandRow 밖으로 옮겨져도 통과한다) — 브랜드 텍스트 존재를 직접 단언.
+    // (버튼이 brandRow 밖으로 옮겨져도 통과한다) — brandRow의 key로 호출
+    // 자체를 직접 단언한다(find.text보다 brandRow 위젯 유무에 견고하다 —
+    // F4, 4화면 전부 이 형태로 통일).
+    expect(find.byKey(const ValueKey('brand-row')), findsOneWidget);
     expect(find.text('DevPath'), findsOneWidget);
   });
 }

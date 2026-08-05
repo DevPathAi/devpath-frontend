@@ -7,6 +7,7 @@ Widget brandRow(BuildContext context, {List<Widget> actions = const []}) {
   final c = context.dpColors;
   final text = Theme.of(context).textTheme;
   return Padding(
+    key: const ValueKey('brand-row'),
     padding: const EdgeInsets.fromLTRB(
       DpSpacing.lg,
       DpSpacing.lg,

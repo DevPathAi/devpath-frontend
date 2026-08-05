@@ -82,6 +82,10 @@ void main() {
           .first,
     );
     expect(constrainedBox.constraints.maxWidth, 880);
+    // F4 회귀 가드: brandRow(context) 호출을 지워도 위 단언들은 깨지지
+    // 않는다 — 셸 밖 화면의 유일한 제품 정체성 표시이므로 존재를 직접
+    // 단언한다(brand_row.dart의 key로, find.text보다 견고하다).
+    expect(find.byKey(const ValueKey('brand-row')), findsOneWidget);
   });
 
   testWidgets('DiagnosticQuestion: 진행 표시 + 문항 + 답안 제출 렌더', (tester) async {
