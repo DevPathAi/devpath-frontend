@@ -54,10 +54,17 @@ void main() {
         expect(contrast(p.danger, p.surface), greaterThanOrEqualTo(4.5));
       });
 
-      test('사이드바 대비 — 활성 4.5:1 · 섹션 레이블 3:1', () {
+      test('사이드바 대비 — railBg 위 목적지·섹션 레이블 4.5:1', () {
         expect(contrast(p.railText, p.railBg), greaterThanOrEqualTo(4.5));
         expect(contrast(p.railMuted, p.railBg), greaterThanOrEqualTo(4.5));
-        expect(contrast(p.railFaint, p.railBg), greaterThanOrEqualTo(3.0));
+        // railFaint(섹션 레이블)는 2026-08-05 Task 12에서 3:1→4.5:1로 상향.
+        // 기존 값(라이트 #7D766C·다크 #6B655D)이 텍스트 기준 미달이라 밝게 조정했다.
+        expect(contrast(p.railFaint, p.railBg), greaterThanOrEqualTo(4.5));
+      });
+
+      test('사이드바 대비 — railActive 위 목적지 라벨 4.5:1', () {
+        expect(contrast(p.railText, p.railActive), greaterThanOrEqualTo(4.5));
+        expect(contrast(p.railMuted, p.railActive), greaterThanOrEqualTo(4.5));
       });
 
       test('faint·태그', () {

@@ -82,7 +82,7 @@ DevPath의 색·타이포 토큰을 역할 기반으로 재구성하고, 팔레�
 | `railBg` | `#1A1815` | 사이드바 배경 |
 | `railText` | `#F2F0EC` | 사이드바 활성·브랜드 |
 | `railMuted` | `#A9A298` | 사이드바 비활성 항목 |
-| `railFaint` | `#7D766C` | 사이드바 섹션 레이블 |
+| `railFaint` | `#9C958B` | 사이드바 섹션 레이블 (대비 5.98:1 — 2026-08-05 Task 12에서 3.95:1→상향) |
 | `railActive` | `#2F2B24` | 사이드바 활성 배경 |
 | `railBorder` | `#2B2823` | 사이드바 내부 구분선 |
 | `primary`(=accent) | `#B45309` | 버튼 배경·진행바 (**면 전용**) |
@@ -119,7 +119,7 @@ DevPath의 색·타이포 토큰을 역할 기반으로 재구성하고, 팔레�
 | `railBg` | `#131210` |
 | `railText` | `#EAE7E2` |
 | `railMuted` | `#948D85` |
-| `railFaint` | `#6B655D` |
+| `railFaint` | `#8A837B` |
 | `railActive` | `#231F1B` |
 | `railBorder` | `#2A2621` |
 | `primary`(=accent) | `#F59E0B` |
