@@ -40,6 +40,24 @@ void main() {
     expect(find.byType(DpNavRail), findsNothing);
   });
 
+  testWidgets('검색 진입점 배선 — large 폭엔 크롬바 검색 필드가 렌더된다', (tester) async {
+    _setWidth(tester, 1400);
+    await tester.pumpWidget(
+      _host(const AdminShellView(location: '/dashboard', child: Text('본문'))),
+    );
+    final chrome = tester.widget<DpChromeBar>(find.byType(DpChromeBar));
+    expect(chrome.onSearchTap, isNotNull);
+    expect(find.byKey(const ValueKey('chrome-search')), findsOneWidget);
+  });
+
+  testWidgets('검색 진입점 배선 — compact 폭엔 크롬바 검색 아이콘이 렌더된다', (tester) async {
+    _setWidth(tester, 500);
+    await tester.pumpWidget(
+      _host(const AdminShellView(location: '/dashboard', child: Text('본문'))),
+    );
+    expect(find.byKey(const ValueKey('chrome-search-icon')), findsOneWidget);
+  });
+
   testWidgets('목적지 선택 시 경로 콜백', (tester) async {
     _setWidth(tester, 500);
     String? picked;

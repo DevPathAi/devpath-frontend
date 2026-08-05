@@ -77,7 +77,15 @@ class AdminShellView extends StatelessWidget {
         for (final d in kAdminDestinations)
           DpDestination(icon: d.icon, label: d.label),
       ],
-      brand: const Text('운영 콘솔'),
+      // web 셸(app_shell.dart)의 titleSmall 타이포를 맞추되, color:는 넣지
+      // 않는다 — DpNavRail._withRailForeground(dp_nav_rail.dart:91)가 이미
+      // 배경에 맞는 전경색을 공급한다(보강 B). web이 titleSmall에 color를
+      // 박고 있는 것은 별개 결함이라 admin에 옮기지 않는다.
+      brand: Text(
+        '운영 콘솔',
+        overflow: TextOverflow.ellipsis,
+        style: Theme.of(context).textTheme.titleSmall,
+      ),
       breadcrumb: [
         (label: _headerTitleFor(kAdminDestinations[_index].path), path: null),
       ],
