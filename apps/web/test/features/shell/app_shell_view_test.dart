@@ -126,6 +126,25 @@ void main() {
     expect(IconTheme.of(context).color, DpColors.light.textSecondary);
   });
 
+  // I1 회귀 가드: kShellDestinations가 5→4로 줄면서 /settings가 목적지에서
+  // 빠졌다. 예전 `_index`(매칭 실패 시 0 폴백)는 레일이 "대시보드"를 잘못
+  // 활성 표시했다 — 크롬바 브레드크럼은 "계정 · 설정"이라 셸 안 두 위치
+  // 표시가 서로 모순됐다. 지금은 매칭 실패 시 null(무강조)이어야 한다.
+  testWidgets('/settings 위치에서 레일은 어떤 항목도 활성 표시하지 않는다(대시보드 오표시 회귀 방지)', (
+    tester,
+  ) async {
+    _setWidth(tester, 1200);
+    await tester.pumpWidget(
+      _host(const AppShellView(location: '/settings', child: Text('본문'))),
+    );
+    final rail = tester.widget<DpNavRail>(find.byType(DpNavRail));
+    expect(
+      rail.selectedIndex,
+      isNull,
+      reason: '/settings는 kShellDestinations에 없다 — 0(대시보드)으로 폴백하면 잘못 강조된다',
+    );
+  });
+
   testWidgets('비-compact 폭: 계정 아이콘은 색을 상속하고 레일의 railMuted가 된다', (tester) async {
     _setWidth(tester, 1200);
     await tester.pumpWidget(
