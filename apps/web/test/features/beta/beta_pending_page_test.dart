@@ -4,6 +4,7 @@ import 'package:devpath_web/src/features/beta/presentation/beta_pending_page.dar
 import 'package:devpath_web/src/providers/api_providers.dart';
 import 'package:dio/dio.dart';
 import 'package:dp_core/dp_core.dart';
+import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -69,7 +70,10 @@ void main() {
             const AppConfig(baseUrl: 'http://x', useMock: false),
           ),
         ],
-        child: const MaterialApp(home: BetaPendingPage()),
+        child: MaterialApp(
+          theme: DpTheme.light(),
+          home: const BetaPendingPage(),
+        ),
       ),
     );
 
@@ -79,5 +83,33 @@ void main() {
     await tester.pump();
 
     expect(launcher.launched, contains('/oauth2/authorization/github'));
+  });
+
+  testWidgets('AppBar 없이 헤더로 대체', (tester) async {
+    final api = _StatusApiClient([
+      {'status': 'PENDING'},
+    ]);
+    final launcher = _CapturingLauncher();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          apiClientProvider.overrideWithValue(api),
+          oauthLauncherProvider.overrideWithValue(launcher),
+          appConfigProvider.overrideWithValue(
+            const AppConfig(baseUrl: 'http://x', useMock: false),
+          ),
+        ],
+        child: MaterialApp(
+          theme: DpTheme.light(),
+          home: const BetaPendingPage(),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byType(AppBar), findsNothing);
+    final header = tester.widget<DpPageHeader>(find.byType(DpPageHeader));
+    expect(header.title, '베타 대기');
+    expect(header.description, '승인되면 알려드립니다');
   });
 }

@@ -38,6 +38,16 @@ void main() {
     addTearDown(tester.view.reset);
   }
 
+  testWidgets('AppBar 없이 헤더로 대체', (tester) async {
+    bigView(tester);
+    await tester.pumpWidget(ProviderScope(child: _app()));
+
+    expect(find.byType(AppBar), findsNothing);
+    final header = tester.widget<DpPageHeader>(find.byType(DpPageHeader));
+    expect(header.title, '가입 전 동의');
+    expect(header.description, '서비스 이용에 필요한 항목입니다');
+  });
+
   testWidgets('제출 버튼은 항상 활성 — 조용한 비활성 금지', (tester) async {
     // 회귀 고정: 미충족 상태에서 버튼을 비활성으로 두면 사용자가 "무엇이
     // 부족한지" 알 수 없이 갇힌다(2026-07-27 운영에서 출생연도 미등록 상태로

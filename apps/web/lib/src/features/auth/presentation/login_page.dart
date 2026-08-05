@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../providers/api_providers.dart';
 import '../../../providers/theme_provider.dart';
+import '../../common/presentation/brand_row.dart';
 import '../application/auth_controller.dart';
 import '../state/auth_state.dart';
 
@@ -22,66 +23,74 @@ class LoginPage extends ConsumerWidget {
     final error = auth is AuthUnauthenticated ? auth.error : null;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('DevPath AI'),
-        actions: [
-          IconButton(
-            icon: Icon(
-              mode == ThemeMode.dark ? DpIcons.lightMode : DpIcons.darkMode,
-            ),
-            tooltip: '테마 전환',
-            onPressed: () => ref.read(themeModeProvider.notifier).toggle(),
-          ),
-        ],
-      ),
       body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 360),
-          child: Padding(
-            padding: const EdgeInsets.all(DpSpacing.xl),
+        child: SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  '학습을 시작해요',
-                  style: Theme.of(context).textTheme.headlineSmall,
+                brandRow(
+                  context,
+                  actions: [
+                    IconButton(
+                      icon: Icon(
+                        mode == ThemeMode.dark
+                            ? DpIcons.lightMode
+                            : DpIcons.darkMode,
+                      ),
+                      tooltip: '테마 전환',
+                      onPressed: () =>
+                          ref.read(themeModeProvider.notifier).toggle(),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: DpSpacing.sm),
-                Text(
-                  'GitHub 계정으로 계속하세요',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyMedium?.copyWith(color: c.textSecondary),
+                const DpPageHeader(
+                  title: '로그인',
+                  description: 'GitHub 또는 Google 계정으로 시작하세요',
                 ),
-                if (error != null) ...[
-                  const SizedBox(height: DpSpacing.lg),
-                  Text(
-                    error,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodySmall?.copyWith(color: c.danger),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: DpSpacing.xl),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (error != null) ...[
+                        Text(
+                          error,
+                          textAlign: TextAlign.center,
+                          style: Theme.of(
+                            context,
+                          ).textTheme.bodySmall?.copyWith(color: c.danger),
+                        ),
+                        const SizedBox(height: DpSpacing.lg),
+                      ],
+                      FilledButton(
+                        onPressed: () => useMock
+                            ? ref
+                                  .read(authControllerProvider.notifier)
+                                  .bootstrapFromCallback()
+                            : ref.read(authControllerProvider.notifier).login(),
+                        child: Text(
+                          useMock ? 'GitHub로 계속하기 (목)' : 'GitHub로 계속하기',
+                        ),
+                      ),
+                      const SizedBox(height: DpSpacing.sm),
+                      OutlinedButton(
+                        onPressed: () => useMock
+                            ? ref
+                                  .read(authControllerProvider.notifier)
+                                  .bootstrapFromCallback()
+                            : ref
+                                  .read(authControllerProvider.notifier)
+                                  .login(provider: 'google'),
+                        child: Text(
+                          useMock ? 'Google로 계속하기 (목)' : 'Google로 계속하기',
+                        ),
+                      ),
+                      const SizedBox(height: DpSpacing.xl),
+                    ],
                   ),
-                ],
-                const SizedBox(height: DpSpacing.xl),
-                FilledButton(
-                  onPressed: () => useMock
-                      ? ref
-                            .read(authControllerProvider.notifier)
-                            .bootstrapFromCallback()
-                      : ref.read(authControllerProvider.notifier).login(),
-                  child: Text(useMock ? 'GitHub로 계속하기 (목)' : 'GitHub로 계속하기'),
-                ),
-                const SizedBox(height: DpSpacing.sm),
-                OutlinedButton(
-                  onPressed: () => useMock
-                      ? ref
-                            .read(authControllerProvider.notifier)
-                            .bootstrapFromCallback()
-                      : ref
-                            .read(authControllerProvider.notifier)
-                            .login(provider: 'google'),
-                  child: Text(useMock ? 'Google로 계속하기 (목)' : 'Google로 계속하기'),
                 ),
               ],
             ),
