@@ -47,56 +47,51 @@ class DpChromeBar extends StatelessWidget {
         border: Border(bottom: BorderSide(color: c.border)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: DpSpacing.lg),
-      // I2: actions·account 그룹은 non-flex 자식이라 RenderFlex가 무한 주축
-      // 제약으로 먼저 측정한다 — actions가 늘어나면(스펙 §3.0 trailing
-      // 슬롯) 오버플로한다. _crumbs(:129-133 아래)·DpPageHeader.actions와
-      // 같은 함정, 이번이 세 번째 자리다. DpPageHeader.actions가 이미
-      // 검증한 해법(LayoutBuilder로 폭을 읽어 ConstrainedBox(maxWidth:
-      // 폭/2)로 상한을 건다)을 그대로 재사용한다 — Expanded로 crumbs와
-      // flex를 1:1로 나누면 group의 예산이 기존보다 오히려 줄어(항상
-      // 절반 고정) 실측상 더 좁은 폭에서부터 오버플로했다(actions 2개
-      // 이상에서 재현), 그래서 그 접근 대신 이 패턴을 쓴다.
-      child: LayoutBuilder(
-        builder: (context, constraints) => Row(
-          children: [
-            Flexible(child: _crumbs(context, c)),
-            const SizedBox(width: DpSpacing.lg),
-            if (!compact && onSearchTap != null)
-              Flexible(flex: 2, child: _search(context, c))
-            else if (compact && onSearchTap != null)
-              IconButton(
-                key: const ValueKey('chrome-search-icon'),
-                icon: Icon(DpIcons.search, size: 20, color: c.textSecondary),
-                tooltip: '검색 (Ctrl/Cmd+K)',
-                onPressed: onSearchTap,
-              ),
-            const Spacer(),
-            ConstrainedBox(
-              constraints: constraints.hasBoundedWidth
-                  ? BoxConstraints(maxWidth: constraints.maxWidth / 2)
-                  : const BoxConstraints(),
-              // 밝은 surface 배경 위이므로 무스타일 액션/계정 위젯도
-              // textSecondary를 기본 전경색으로 받는다 — 하위 위젯이 색을
-              // 명시하면 그게 이긴다(merge).
-              child: IconTheme.merge(
-                data: IconThemeData(color: c.textSecondary),
-                child: DefaultTextStyle.merge(
-                  style: TextStyle(color: c.textSecondary),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      ...actions,
-                      if (account != null) ...[
-                        const SizedBox(width: DpSpacing.sm),
-                        account!,
-                      ],
-                    ],
-                  ),
-                ),
+      // I2(이월, 3단계 확정): actions·account 그룹은 non-flex 자식이라
+      // RenderFlex가 무한 주축 제약으로 먼저 측정한다 — actions가 늘어나면
+      // (스펙 §3.0 trailing 슬롯) 오버플로한다. DpPageHeader.actions의
+      // LayoutBuilder+ConstrainedBox(maxWidth: 폭/2) 해법을 이식했던 적이
+      // 있었으나 되돌렸다 — DpPageHeader에서 그 패턴이 통하는 이유는 자식이
+      // Wrap이라 상한을 줄바꿈으로 흡수하기 때문이다(dp_page_header.dart:
+      // 72-86). 이 바의 자식은 Row(mainAxisSize.min)이고 높이가 46 고정이라
+      // 줄바꿈이 불가능해, 상한을 걸어도 오버플로가 바깥 Row에서 안쪽 Row로
+      // 이동할 뿐이다(임계 W<G+16 → W<2G로 오히려 넓어짐, G=그룹 자연폭).
+      // I2 해법은 crumbs flex 가중치·그룹 축약(overflow 메뉴) 설계와 함께
+      // 3단계에서 다룬다 — 여기서는 원본 구조로 되돌린다.
+      child: Row(
+        children: [
+          Flexible(child: _crumbs(context, c)),
+          const SizedBox(width: DpSpacing.lg),
+          if (!compact && onSearchTap != null)
+            Flexible(flex: 2, child: _search(context, c))
+          else if (compact && onSearchTap != null)
+            IconButton(
+              key: const ValueKey('chrome-search-icon'),
+              icon: Icon(DpIcons.search, size: 20, color: c.textSecondary),
+              tooltip: '검색 (Ctrl/Cmd+K)',
+              onPressed: onSearchTap,
+            ),
+          const Spacer(),
+          // 밝은 surface 배경 위이므로 무스타일 액션/계정 위젯도
+          // textSecondary를 기본 전경색으로 받는다 — 하위 위젯이 색을
+          // 명시하면 그게 이긴다(merge).
+          IconTheme.merge(
+            data: IconThemeData(color: c.textSecondary),
+            child: DefaultTextStyle.merge(
+              style: TextStyle(color: c.textSecondary),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ...actions,
+                  if (account != null) ...[
+                    const SizedBox(width: DpSpacing.sm),
+                    account!,
+                  ],
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

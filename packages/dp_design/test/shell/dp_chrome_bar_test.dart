@@ -168,48 +168,17 @@ void main() {
     expect(accountTextColor, DpColors.light.textSecondary);
   });
 
-  // I2: actions·account 그룹이 non-flex 자식이면 RenderFlex가 무한 주축
-  // 제약으로 먼저 측정한다(_crumbs·DpPageHeader.actions와 같은 함정, 이
-  // 파일에서 세 번째 자리). DpPageHeader.actions가 이미 쓰는 해법
-  // (LayoutBuilder + ConstrainedBox(maxWidth: 폭/2))을 재사용해 폭 상한을
-  // 준다.
-  //
-  // 폭=600은 실제 통합의 최소 재현폭이다 — DpAppShell은 window class
-  // compact(<600) 미만에서만 이 non-compact 크롬바 형태를 벗어나므로,
-  // 600은 이 컴포넌트가 이 형태로 실제 렌더되는 가장 좁은 경우다.
-  //
-  // ⚠️ 실측 주의: Flutter의 Flex는 형제 flex 위젯 사이에 미사용 여유를
-  // 재분배하지 않는다 — actions 그룹을 flex 참여자로 만들면(Expanded든
-  // ConstrainedBox(폭/2)든) crumbs와 폭을 나눠 갖게 되어, **고정 폭에서
-  // actions의 예산이 例전(non-flex 무제약 측정)보다 오히려 줄어든다**.
-  // 실측 결과 이 수정 전/후 어느 폭에서도 "수정 전엔 오버플로, 수정
-  // 후엔 안 됨"인 폭이 존재하지 않았다(수정 전 오버플로하는 폭은 수정
-  // 후에도 항상 오버플로했다 — 오히려 더 넓은 폭까지). 즉 이 테스트는
-  // red-repro가 아니라 **실제 도달 가능한 최소 폭에서 회귀가 없음**을
-  // 지키는 가드다. final-fix-report.md에 근거를 자세히 남겼다.
-  testWidgets('실제 최소 재현폭(600)에서 액션 4개도 오버플로 없이 렌더된다', (tester) async {
-    tester.view.physicalSize = const Size(600, 200);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.reset);
-
-    await tester.pumpWidget(
-      _host(
-        DpChromeBar(
-          breadcrumb: _crumbs,
-          actions: List.generate(
-            4,
-            (i) => IconButton(
-              icon: const Icon(Icons.notifications),
-              onPressed: () {},
-            ),
-          ),
-          account: const Icon(Icons.account_circle),
-        ),
-      ),
-    );
-
-    expect(tester.takeException(), isNull);
-  });
+  // I2(이월, 3단계 확정): 이전 fix wave가 여기 붙였던 "폭 600, 액션 4개도
+  // 오버플로 없음" 가드는 컨트롤러(2차 fix wave)의 지시로 제거했다 —
+  // 그 테스트는 자신의 주석에서 스스로 "수정 전에도 이미 안전한 폭이라
+  // red-repro가 아니다"라고 인정하고 있었다(actions 그룹을 flex 참여자로
+  // 만들면 오히려 예산이 줄어 더 좁은 폭에서 터진다는 실측까지 남겼다).
+  // 그 사이 원인이 된 LayoutBuilder+ConstrainedBox(maxWidth: 폭/2)도
+  // dp_chrome_bar.dart에서 원복했다(임계가 W<G+16 → W<2G로 오히려
+  // 넓어지는 회귀였다 — second-fix-report.md 참고). I2 자체(non-flex
+  // actions·account 그룹의 오버플로) 해법은 crumbs flex 가중치·그룹
+  // 축약(overflow 메뉴) 설계와 함께 3단계에서 다룬다. 지키지 못하는
+  // 가드를 지키는 것처럼 남기지 않기 위해 그냥 제거한다.
 
   // 역함정 가드: DpPageHeader에서 actions를 Flexible로 감쌌다가 형제
   // Expanded와 50/50으로 갈려 우측 정렬이 깨진 전례가 있다(dp_page_header.dart
