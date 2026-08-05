@@ -73,4 +73,57 @@ void main() {
     await tester.tap(find.text('광고'));
     expect(picked, '/ads');
   });
+
+  // F1/F2 회귀 가드(2차 fix wave): DpTheme의 titleSmall은 이미 non-null
+  // color(textPrimary)를 품고 있어(dp_theme.dart:32-34) Text.style에
+  // color를 명시하지 않으면 DefaultTextStyle.merge에서 DpNavRail이 공급하는
+  // railText를 이긴다. 라이트에서 textPrimary==railBg라 브랜드 텍스트가
+  // 완전히 묻힌다 — Text 위젯의 "실효 색"(DefaultTextStyle과의 병합
+  // 결과, Flutter Text가 실제로 렌더할 색)을 단언해 이 경로를 고정한다.
+  Color? effectiveTextColor(WidgetTester tester, Finder finder) {
+    final widget = tester.widget<Text>(finder);
+    final context = tester.element(finder);
+    final ambient = DefaultTextStyle.of(context).style;
+    final effective = widget.style == null
+        ? ambient
+        : ambient.merge(widget.style);
+    return effective.color;
+  }
+
+  testWidgets('레일 브랜드 텍스트의 실효 색은 라이트에서 railText다(레일 배경에 묻히지 않음)', (
+    tester,
+  ) async {
+    _setWidth(tester, 1400);
+    await tester.pumpWidget(
+      _host(const AdminShellView(location: '/dashboard', child: Text('본문'))),
+    );
+
+    final finder = find.descendant(
+      of: find.byType(DpNavRail),
+      matching: find.text('운영 콘솔'),
+    );
+    expect(
+      effectiveTextColor(tester, finder),
+      DpColors.light.railText,
+      reason:
+          'titleSmall이 이미 textPrimary를 품고 있어 color를 명시하지 않으면 '
+          'railText 대신 textPrimary로 렌더돼 라이트에서 railBg와 같은 색이 된다',
+    );
+  });
+
+  testWidgets('레일 브랜드 텍스트의 실효 색은 다크에서도 railText다', (tester) async {
+    _setWidth(tester, 1400);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: DpTheme.dark(),
+        home: const AdminShellView(location: '/dashboard', child: Text('본문')),
+      ),
+    );
+
+    final finder = find.descendant(
+      of: find.byType(DpNavRail),
+      matching: find.text('운영 콘솔'),
+    );
+    expect(effectiveTextColor(tester, finder), DpColors.dark.railText);
+  });
 }
