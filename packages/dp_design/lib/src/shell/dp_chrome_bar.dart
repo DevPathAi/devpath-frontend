@@ -57,21 +57,39 @@ class DpChromeBar extends StatelessWidget {
       // 줄바꿈이 불가능해, 상한을 걸어도 오버플로가 바깥 Row에서 안쪽 Row로
       // 이동할 뿐이다(임계 W<G+16 → W<2G로 오히려 넓어짐, G=그룹 자연폭).
       // I2 해법은 crumbs flex 가중치·그룹 축약(overflow 메뉴) 설계와 함께
-      // 3단계에서 다룬다 — 여기서는 원본 구조로 되돌린다.
+      // 3단계에서 다룬다. 아래 좌측 그룹의 Spacer→Expanded 전환은 우측 정렬
+      // 결함을 고친 것이고 I2를 해소하지는 않는다 — 다만 Spacer가 가져가던
+      // 고정 몫이 사라져 오버플로 임계는 넓어지지 않는다(악화 없음).
       child: Row(
         children: [
-          Flexible(child: _crumbs(context, c)),
-          const SizedBox(width: DpSpacing.lg),
-          if (!compact && onSearchTap != null)
-            Flexible(flex: 2, child: _search(context, c))
-          else if (compact && onSearchTap != null)
-            IconButton(
-              key: const ValueKey('chrome-search-icon'),
-              icon: Icon(DpIcons.search, size: 20, color: c.textSecondary),
-              tooltip: '검색 (Ctrl/Cmd+K)',
-              onPressed: onSearchTap,
+          // 좌측 그룹(crumbs+검색)을 Expanded로 묶어 남는 폭을 전부 흡수시킨다.
+          // 예전에는 이 자리에 Flexible들을 늘어놓고 뒤에 Spacer를 뒀는데,
+          // Spacer(Expanded=tight)는 freeSpace를 flex 비율로 나눈 자기 몫만
+          // 받는 반면 Flexible(loose fit)은 몫보다 적게 쓸 수 있다 — 그 잔여가
+          // Spacer로 재분배되지 않고 Row 끝(=actions 오른쪽)에 남아 우측 정렬이
+          // 깨졌다. 실제 앱 crumbs는 '학습 · 대시보드' 수준으로 짧아 항상 이
+          // 경로를 탔고, 2단계 육안 확인에서 1400폭 약 448px 여백으로 드러났다.
+          Expanded(
+            child: Row(
+              children: [
+                Flexible(child: _crumbs(context, c)),
+                const SizedBox(width: DpSpacing.lg),
+                if (!compact && onSearchTap != null)
+                  Flexible(flex: 2, child: _search(context, c))
+                else if (compact && onSearchTap != null)
+                  IconButton(
+                    key: const ValueKey('chrome-search-icon'),
+                    icon: Icon(
+                      DpIcons.search,
+                      size: 20,
+                      color: c.textSecondary,
+                    ),
+                    tooltip: '검색 (Ctrl/Cmd+K)',
+                    onPressed: onSearchTap,
+                  ),
+              ],
             ),
-          const Spacer(),
+          ),
           // 밝은 surface 배경 위이므로 무스타일 액션/계정 위젯도
           // textSecondary를 기본 전경색으로 받는다 — 하위 위젯이 색을
           // 명시하면 그게 이긴다(merge).

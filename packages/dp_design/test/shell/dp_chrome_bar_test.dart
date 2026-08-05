@@ -182,16 +182,13 @@ void main() {
 
   // 역함정 가드: DpPageHeader에서 actions를 Flexible로 감쌌다가 형제
   // Expanded와 50/50으로 갈려 우측 정렬이 깨진 전례가 있다(dp_page_header.dart
-  // 주석 참조). 여기서도 group을 flex 참여자로 바꾸면서 우측 정렬이
-  // 깨지지 않았는지 고정한다 — account가 바 우측 끝에서 패딩(16px)만큼만
-  // 떨어져 있어야 한다.
+  // 주석 참조). actions·account 그룹이 non-flex로 남아 우측 끝에 붙는지
+  // 고정한다 — account가 바 우측 끝에서 패딩(16px)만큼만 떨어져 있어야 한다.
   //
-  // crumbs는 자기 flex 몫을 다 쓸 만큼 긴 라벨을 쓴다 — 실측 결과 crumbs가
-  // 짧으면(예: 기본 _crumbs) Flexible(loose fit)이 자기 몫을 다 소비하지
-  // 않아 남는 공간이 Spacer 뒤로 재분배되지 않고 바 맨 끝에 그대로
-  // 남는다(이 파일의 Flexible(crumbs)+Spacer 구성 자체의 기존 특성 —
-  // 수정 전 원본 코드로도 동일하게 재현 확인, I2 범위 밖). 이 테스트는
-  // 그 사전 혼입 없이 group 자체의 우측 정렬만 검증한다.
+  // 이 케이스는 crumbs가 자기 폭 몫을 다 쓰는 경로를 덮는다(60자 라벨).
+  // crumbs가 짧아 몫을 남기는 경로는 아래 '실제 앱처럼 짧은 crumbs' 테스트가
+  // 따로 덮는다 — 예전 Flexible+Spacer 구성에서는 그 경로만 정렬이 깨졌고,
+  // 이 테스트는 긴 라벨을 써서 그 결함을 우회하고 있었다.
   testWidgets('넉넉한 폭 + 긴 crumbs에서 account는 바 우측 끝에 붙는다(우측 정렬 유지)', (
     tester,
   ) async {
@@ -212,6 +209,45 @@ void main() {
         .right;
     final acctRight = tester.getRect(find.byKey(const ValueKey('acct'))).right;
     expect(barRight - acctRight, closeTo(DpSpacing.lg, 1.0));
+  });
+
+  // 위 테스트가 60자짜리 crumbs를 쓴 이유가 바로 이 결함이다 — 짧은 crumbs로는
+  // 통과하지 못해서였다. 2단계 육안 확인(1000·1400폭 실빌드 캡처)에서 오류 신고
+  // 아이콘이 바 우측이 아니라 한참 왼쪽에 찍혔고, 폭이 커질수록 여백이 그만큼
+  // 커졌다(1000폭 약 148px → 1400폭 약 448px).
+  //
+  // 원인: Flexible(loose fit)은 자기 flex 몫보다 적게 쓸 수 있는데, 그 잔여는
+  // Spacer(Expanded=tight)로 재분배되지 않고 Row 끝에 그대로 남는다. Spacer는
+  // freeSpace * 1/totalFlex 만큼만 받으므로 crumbs·search가 몫을 남기면 그
+  // 잔여폭이 actions 그룹 오른쪽에 빈 공간으로 쌓인다. 실제 앱 crumbs는
+  // '학습 · 대시보드' 수준으로 짧아 항상 이 경로를 탄다.
+  testWidgets('실제 앱처럼 짧은 crumbs에서도 actions는 바 우측 끝에 붙는다', (tester) async {
+    tester.view.physicalSize = const Size(1000, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      _host(
+        DpChromeBar(
+          breadcrumb: const [
+            (label: '학습', path: null),
+            (label: '대시보드', path: null),
+          ],
+          onSearchTap: () {},
+          actions: const [
+            Icon(Icons.error_outline, key: ValueKey('act-error')),
+          ],
+        ),
+      ),
+    );
+
+    final barRight = tester
+        .getRect(find.byKey(const ValueKey('chrome-bar-root')))
+        .right;
+    final actRight = tester
+        .getRect(find.byKey(const ValueKey('act-error')))
+        .right;
+    expect(barRight - actRight, closeTo(DpSpacing.lg, 1.0));
   });
 
   testWidgets('검색 필드 배경은 surfaceMuted를 쓴다', (tester) async {
