@@ -36,15 +36,24 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Widget build(BuildContext context) {
     final state = ref.watch(settingsControllerProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('설정')),
-      body: switch (state) {
-        SettingsLoading() => const Center(child: CircularProgressIndicator()),
-        SettingsError(:final message) => _errorView(message),
-        SettingsReady(:final consents, :final prefs) => _readyView(
-          consents,
-          prefs,
-        ),
-      },
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const DpPageHeader(title: '설정', description: '알림·동의·계정을 관리합니다'),
+          Expanded(
+            child: switch (state) {
+              SettingsLoading() => const Center(
+                child: CircularProgressIndicator(),
+              ),
+              SettingsError(:final message) => _errorView(message),
+              SettingsReady(:final consents, :final prefs) => _readyView(
+                consents,
+                prefs,
+              ),
+            },
+          ),
+        ],
+      ),
     );
   }
 

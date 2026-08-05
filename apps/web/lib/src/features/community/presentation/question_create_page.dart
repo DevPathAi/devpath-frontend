@@ -157,80 +157,97 @@ class _QuestionCreatePageState extends ConsumerState<QuestionCreatePage> {
   Widget build(BuildContext context) {
     final c = context.dpColors;
     return Scaffold(
-      appBar: AppBar(title: const Text('질문하기')),
-      body: ListView(
-        padding: const EdgeInsets.all(DpSpacing.lg),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          TextField(
-            controller: _titleCtrl,
-            enabled: !_submitting,
-            onChanged: _onTitleChanged,
-            decoration: const InputDecoration(
-              labelText: '제목',
-              hintText: '무엇이 궁금한가요?',
-              border: OutlineInputBorder(),
-            ),
+          const DpPageHeader(
+            title: '질문하기',
+            description: '무엇을 시도했고 어디서 막혔는지 함께 적어주세요',
           ),
-          if (_similar.isNotEmpty) ...[
-            const SizedBox(height: DpSpacing.sm),
-            Card(
-              color: c.surface,
-              child: Padding(
-                padding: const EdgeInsets.all(DpSpacing.md),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '💡 비슷한 질문',
-                      style: TextStyle(
-                        color: c.textSecondary,
-                        fontWeight: FontWeight.w600,
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(DpSpacing.lg),
+              children: [
+                TextField(
+                  controller: _titleCtrl,
+                  enabled: !_submitting,
+                  onChanged: _onTitleChanged,
+                  decoration: const InputDecoration(
+                    labelText: '제목',
+                    hintText: '무엇이 궁금한가요?',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                if (_similar.isNotEmpty) ...[
+                  const SizedBox(height: DpSpacing.sm),
+                  Card(
+                    color: c.surface,
+                    child: Padding(
+                      padding: const EdgeInsets.all(DpSpacing.md),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '💡 비슷한 질문',
+                            style: TextStyle(
+                              color: c.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: DpSpacing.xs),
+                          for (final s in _similar)
+                            InkWell(
+                              onTap: () =>
+                                  context.go('/community/${s.questionId}'),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: DpSpacing.xs,
+                                ),
+                                child: Text(
+                                  s.title,
+                                  style: TextStyle(color: c.primaryText),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: DpSpacing.xs),
-                    for (final s in _similar)
-                      InkWell(
-                        onTap: () => context.go('/community/${s.questionId}'),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            vertical: DpSpacing.xs,
-                          ),
-                          child: Text(
-                            s.title,
-                            style: TextStyle(color: c.primaryText),
-                          ),
-                        ),
-                      ),
-                  ],
+                  ),
+                ],
+                const SizedBox(height: DpSpacing.md),
+                Text(
+                  '상황과 시도한 내용을 적어주세요',
+                  style: TextStyle(color: c.textSecondary),
                 ),
-              ),
+                const SizedBox(height: DpSpacing.xs),
+                DpRichEditor(
+                  key: const ValueKey('question-body-editor'),
+                  controller: _bodyController,
+                  enabled: !_submitting,
+                ),
+                const SizedBox(height: DpSpacing.md),
+                TextField(
+                  controller: _tagsCtrl,
+                  enabled: !_submitting,
+                  decoration: const InputDecoration(
+                    labelText: '태그',
+                    hintText: '쉼표 또는 공백으로 구분 (예: dart, async)',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: DpSpacing.md),
+                LcsContextCard(
+                  enabled: !_submitting,
+                  onChanged: (a) => _attach = a,
+                ),
+                const SizedBox(height: DpSpacing.lg),
+                FilledButton.icon(
+                  onPressed: _submitting ? null : _submit,
+                  icon: const Icon(DpIcons.send, size: 18),
+                  label: Text(_submitting ? '게시 중…' : '질문 게시'),
+                ),
+              ],
             ),
-          ],
-          const SizedBox(height: DpSpacing.md),
-          Text('상황과 시도한 내용을 적어주세요', style: TextStyle(color: c.textSecondary)),
-          const SizedBox(height: DpSpacing.xs),
-          DpRichEditor(
-            key: const ValueKey('question-body-editor'),
-            controller: _bodyController,
-            enabled: !_submitting,
-          ),
-          const SizedBox(height: DpSpacing.md),
-          TextField(
-            controller: _tagsCtrl,
-            enabled: !_submitting,
-            decoration: const InputDecoration(
-              labelText: '태그',
-              hintText: '쉼표 또는 공백으로 구분 (예: dart, async)',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: DpSpacing.md),
-          LcsContextCard(enabled: !_submitting, onChanged: (a) => _attach = a),
-          const SizedBox(height: DpSpacing.lg),
-          FilledButton.icon(
-            onPressed: _submitting ? null : _submit,
-            icon: const Icon(DpIcons.send, size: 18),
-            label: Text(_submitting ? '게시 중…' : '질문 게시'),
           ),
         ],
       ),

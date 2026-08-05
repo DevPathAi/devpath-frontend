@@ -82,7 +82,7 @@ DevPath의 색·타이포 토큰을 역할 기반으로 재구성하고, 팔레�
 | `railBg` | `#1A1815` | 사이드바 배경 |
 | `railText` | `#F2F0EC` | 사이드바 활성·브랜드 |
 | `railMuted` | `#A9A298` | 사이드바 비활성 항목 |
-| `railFaint` | `#7D766C` | 사이드바 섹션 레이블 |
+| `railFaint` | `#9C958B` | 사이드바 섹션 레이블 (대비 5.98:1 — 2026-08-05 Task 12에서 3.95:1→상향) |
 | `railActive` | `#2F2B24` | 사이드바 활성 배경 |
 | `railBorder` | `#2B2823` | 사이드바 내부 구분선 |
 | `primary`(=accent) | `#B45309` | 버튼 배경·진행바 (**면 전용**) |
@@ -119,7 +119,7 @@ DevPath의 색·타이포 토큰을 역할 기반으로 재구성하고, 팔레�
 | `railBg` | `#131210` |
 | `railText` | `#EAE7E2` |
 | `railMuted` | `#948D85` |
-| `railFaint` | `#6B655D` |
+| `railFaint` | `#8A837B` |
 | `railActive` | `#231F1B` |
 | `railBorder` | `#2A2621` |
 | `primary`(=accent) | `#F59E0B` |
@@ -208,7 +208,7 @@ danger 11 · primaryText 10 · warning 9 · textPrimary 4 · onPrimary 3 · bg 2
 
 ## 8. 테스트 전략
 
-- **대비 검증 테스트**(신규): 라이트·다크 각각에서 텍스트/배경 조합의 WCAG 대비를 계산해 단언한다. `textPrimary`/`textSecondary`/`primaryText` on `bg`·`surface`는 ≥4.5:1, `onPrimary` on `primary`는 ≥4.5:1, `textFaint`·`railFaint`는 ≥3:1. **다크의 `onPrimary`가 어두운 색이라는 반전**을 이 테스트가 지킨다.
+- **대비 검증 테스트**(신규): 라이트·다크 각각에서 텍스트/배경 조합의 WCAG 대비를 계산해 단언한다. `textPrimary`/`textSecondary`/`primaryText` on `bg`·`surface`는 ≥4.5:1, `onPrimary` on `primary`는 ≥4.5:1, `textFaint`는 ≥3:1(UI 컴포넌트 기준, 본문 텍스트로 쓰지 않는다), `railFaint`는 ≥4.5:1(2026-08-05 Task 12에서 3:1→상향, §3.2·§3.3 표 참조). **다크의 `onPrimary`가 어두운 색이라는 반전**을 이 테스트가 지킨다.
 
 > ✅ **이 팔레트는 실측으로 검증했다.** 스펙 작성 중 17개 조합 × 라이트·다크 = **34건을 계산해 미달 0건**을 확인했다(2026-08-03). 가장 여유가 적은 것은 라이트 `warning` on `surface` **4.92:1**, 다음이 `textFaint` on `bg` **3.21:1**이다. 이 둘은 값을 조정할 때 특히 주의한다. 최초 초안에 적었던 수치는 추정이었고 실측과 달라 전부 교체했다.
 - **토큰 3종 일관성 테스트**: `DpColors`의 필드 수와 `copyWith`·`lerp`가 다루는 필드 수가 같은지 단언한다(리플렉션 대신 명시적 목록 비교).

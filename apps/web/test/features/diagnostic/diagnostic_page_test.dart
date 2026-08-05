@@ -47,9 +47,45 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('실력 진단'), findsOneWidget); // AppBar 타이틀
+    expect(find.text('실력 진단'), findsOneWidget); // 페이지 헤더
     expect(find.text('실력 진단 15문항'), findsOneWidget);
     expect(find.text('진단 시작하기'), findsOneWidget);
+  });
+
+  testWidgets('AppBar 없이 헤더로 대체 + readableMaxWidth 사용', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authControllerProvider.overrideWith(_UnauthController.new),
+          diagnosticControllerProvider.overrideWith(
+            () => _FixedController(const DiagnosticIdle()),
+          ),
+        ],
+        child: MaterialApp(
+          theme: DpTheme.light(),
+          home: const DiagnosticPage(),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byType(AppBar), findsNothing);
+    final header = tester.widget<DpPageHeader>(find.byType(DpPageHeader));
+    expect(header.title, '실력 진단');
+    expect(header.description, '몇 문항으로 현재 수준을 파악합니다');
+    final constrainedBox = tester.widget<ConstrainedBox>(
+      find
+          .ancestor(
+            of: find.byType(DpPageHeader),
+            matching: find.byType(ConstrainedBox),
+          )
+          .first,
+    );
+    expect(constrainedBox.constraints.maxWidth, 880);
+    // F4 회귀 가드: brandRow(context) 호출을 지워도 위 단언들은 깨지지
+    // 않는다 — 셸 밖 화면의 유일한 제품 정체성 표시이므로 존재를 직접
+    // 단언한다(brand_row.dart의 key로, find.text보다 견고하다).
+    expect(find.byKey(const ValueKey('brand-row')), findsOneWidget);
   });
 
   testWidgets('DiagnosticQuestion: 진행 표시 + 문항 + 답안 제출 렌더', (tester) async {

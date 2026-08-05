@@ -54,16 +54,23 @@ class _QnaDetailPageState extends ConsumerState<QnaDetailPage> {
 
     final s = ref.watch(qnaDetailControllerProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Q&A')),
-      body: switch (s) {
-        QnaLoading() => const DpLoading(),
-        QnaFailed(:final message) => SupportableError(message: message),
-        QnaLoaded(:final detail, :final submitting) => _Loaded(
-          detail: detail,
-          submitting: submitting,
-          answerCtrl: _answerCtrl,
-        ),
-      },
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const DpPageHeader(title: 'Q&A'),
+          Expanded(
+            child: switch (s) {
+              QnaLoading() => const DpLoading(),
+              QnaFailed(:final message) => SupportableError(message: message),
+              QnaLoaded(:final detail, :final submitting) => _Loaded(
+                detail: detail,
+                submitting: submitting,
+                answerCtrl: _answerCtrl,
+              ),
+            },
+          ),
+        ],
+      ),
     );
   }
 }

@@ -25,9 +25,12 @@ class SupportPage extends ConsumerWidget {
     final current = s is SupportListLoaded ? s.status : 'OPEN';
 
     return Scaffold(
-      appBar: AppBar(title: const Text('오류 신고·문의')),
       body: Column(
         children: [
+          const DpPageHeader(
+            title: '오류 신고·문의',
+            description: '사용자가 보낸 오류와 문의를 처리합니다',
+          ),
           Padding(
             padding: const EdgeInsets.fromLTRB(
               DpSpacing.lg,

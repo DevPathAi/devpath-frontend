@@ -92,28 +92,43 @@ class _ContentPageState extends ConsumerState<ContentPage>
         _syncTracker(content);
       }
     });
+    final c = context.dpColors;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('학습 콘텐츠'),
-        actions: [
-          TextButton.icon(
-            onPressed: () => context.go('/sandbox'),
-            icon: const Icon(DpIcons.code),
-            label: const Text('실습'),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          DpPageHeader(
+            title: '학습 콘텐츠',
+            description: '읽고 나면 바로 실습으로 이어집니다',
+            actions: [
+              TextButton.icon(
+                key: const ValueKey('content-practice-action'),
+                onPressed: () => context.go('/sandbox'),
+                style: TextButton.styleFrom(
+                  backgroundColor: c.accentSoft,
+                  foregroundColor: c.primaryText,
+                  side: BorderSide(color: c.accentLine),
+                ),
+                icon: const Icon(DpIcons.code),
+                label: const Text('실습'),
+              ),
+            ],
+          ),
+          Expanded(
+            child: switch (s) {
+              ContentLoading() => const DpLoading(),
+              ContentFailed(:final message) => SupportableError(
+                message: message,
+                onRetry: () => _contentController.load(widget.contentId),
+              ),
+              ContentLoaded(:final content) => _ContentBody(
+                controller: _scrollController,
+                content: content,
+              ),
+            },
           ),
         ],
       ),
-      body: switch (s) {
-        ContentLoading() => const DpLoading(),
-        ContentFailed(:final message) => SupportableError(
-          message: message,
-          onRetry: () => _contentController.load(widget.contentId),
-        ),
-        ContentLoaded(:final content) => _ContentBody(
-          controller: _scrollController,
-          content: content,
-        ),
-      },
     );
   }
 

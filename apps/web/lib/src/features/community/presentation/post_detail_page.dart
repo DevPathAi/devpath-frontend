@@ -56,31 +56,38 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     final notifier = ref.read(postDetailControllerProvider(_id).notifier);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('게시글')),
-      body: switch (s.phase) {
-        PostDetailPhase.loading => const DpLoading(),
-        PostDetailPhase.failed => SupportableError(
-          message: s.error ?? '불러오지 못했어요',
-          onRetry: notifier.load,
-        ),
-        PostDetailPhase.loaded when s.detail != null => _Loaded(
-          detail: s.detail!,
-          submitting: s.submitting,
-          currentUserId: switch (ref.watch(authControllerProvider)) {
-            AuthAuthenticated(:final user) => user.id,
-            _ => null,
-          },
-          commentCtrl: _commentCtrl,
-          onUpvote: notifier.upvote,
-          onComment: () {
-            final body = _commentCtrl.text.trim();
-            if (body.isEmpty) return;
-            notifier.addComment(body);
-            _commentCtrl.clear();
-          },
-        ),
-        PostDetailPhase.loaded => const DpLoading(),
-      },
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const DpPageHeader(title: '게시글'),
+          Expanded(
+            child: switch (s.phase) {
+              PostDetailPhase.loading => const DpLoading(),
+              PostDetailPhase.failed => SupportableError(
+                message: s.error ?? '불러오지 못했어요',
+                onRetry: notifier.load,
+              ),
+              PostDetailPhase.loaded when s.detail != null => _Loaded(
+                detail: s.detail!,
+                submitting: s.submitting,
+                currentUserId: switch (ref.watch(authControllerProvider)) {
+                  AuthAuthenticated(:final user) => user.id,
+                  _ => null,
+                },
+                commentCtrl: _commentCtrl,
+                onUpvote: notifier.upvote,
+                onComment: () {
+                  final body = _commentCtrl.text.trim();
+                  if (body.isEmpty) return;
+                  notifier.addComment(body);
+                  _commentCtrl.clear();
+                },
+              ),
+              PostDetailPhase.loaded => const DpLoading(),
+            },
+          ),
+        ],
+      ),
     );
   }
 }

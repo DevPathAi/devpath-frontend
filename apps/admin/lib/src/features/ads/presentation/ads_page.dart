@@ -33,24 +33,24 @@ class _AdsPageState extends ConsumerState<AdminAdsPage> {
     final n = ref.read(adsProvider.notifier);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('광고 관리'),
-        actions: [
-          const Text('전역 노출'),
-          Switch(value: s.globalEnabled, onChanged: (v) => n.toggleGlobal(v)),
-          const SizedBox(width: DpSpacing.md),
-          FilledButton.icon(
-            icon: const Icon(DpIcons.edit),
-            label: const Text('광고 생성'),
-            onPressed: () => _openForm(context, n, null),
-          ),
-          const SizedBox(width: DpSpacing.lg),
-        ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(48),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: DpSpacing.lg),
-            child: Row(
+      body: Column(
+        children: [
+          DpPageHeader(
+            title: '광고 관리',
+            description: '하우스·스폰서 광고를 운영합니다',
+            actions: [
+              const Text('전역 노출'),
+              Switch(
+                value: s.globalEnabled,
+                onChanged: (v) => n.toggleGlobal(v),
+              ),
+              FilledButton.icon(
+                icon: const Icon(DpIcons.edit),
+                label: const Text('광고 생성'),
+                onPressed: () => _openForm(context, n, null),
+              ),
+            ],
+            filters: Row(
               children: [
                 const Text('슬롯:'),
                 const SizedBox(width: DpSpacing.sm),
@@ -66,10 +66,6 @@ class _AdsPageState extends ConsumerState<AdminAdsPage> {
               ],
             ),
           ),
-        ),
-      ),
-      body: Column(
-        children: [
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 180),
             child: s.selectedIds.isEmpty

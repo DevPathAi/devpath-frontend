@@ -44,16 +44,14 @@
 | `textSecondary` | `#615C54` | `#A09991` | 보조(최다 사용) | 라이트 6.30:1 ✅ |
 | `textFaint` | `#918B81` | `#6F6961` | 메타·캡션 | 라이트 3.21:1 — UI 컴포넌트 기준(3:1) 통과, **본문 텍스트로 쓰지 않는다** |
 
-**사이드바 전용(현재 미소비)** — 본문과 다른 위계로 정의는 돼 있으나,
-`DpAppShell`(`packages/dp_design/lib/src/shell/dp_app_shell.dart`)이 아직 이
-토큰들을 색으로 배선하지 않고 `NavigationRail`/`NavigationBar`의 Material
-기본값을 그대로 쓴다. 후속 레이아웃 단계에서 셸에 배선한다.
+**사이드바 전용** — 본문과 다른 위계. `DpAppShell`(`packages/dp_design/lib/src/shell/dp_app_shell.dart`)이
+§9 셸 구조에서 배선한다.
 | 토큰 | 라이트 | 다크 | 용도 |
 |---|---|---|---|
 | `railBg` | `#1A1815` | `#131210` | 사이드바 배경 |
 | `railText` | `#F2F0EC` | `#EAE7E2` | 사이드바 활성·브랜드 |
 | `railMuted` | `#A9A298` | `#948D85` | 사이드바 비활성 항목 |
-| `railFaint` | `#7D766C` | `#6B655D` | 사이드바 섹션 레이블 |
+| `railFaint` | `#9C958B` | `#8A837B` | 사이드바 섹션 레이블 |
 | `railActive` | `#2F2B24` | `#231F1B` | 사이드바 활성 배경 |
 | `railBorder` | `#2B2823` | `#2A2621` | 사이드바 내부 구분선 |
 
@@ -181,6 +179,34 @@ Loading/Empty/Error 외에 다음 전용 상태를 dp_design에 추가:
 
 각 상태는 **사용자가 보는 것** 기준으로 설계: 따뜻한 카피 + 단일 1차 행동 + 맥락. "결과 없음" 같은 빈 문구 금지.
 
-## 9. 출처/샘플 매핑
+## 9. 셸 구조
+
+화면마다 따로 만들던 `AppBar`를 **잉크 레일 + 크롬바 + 페이지 헤더** 3층 셸로 통일한다
+(`DpAppShell`, `packages/dp_design/lib/src/shell/dp_app_shell.dart`). **화면은 `Scaffold.appBar`를
+지정하지 않는다** — 제목·브레드크럼·검색·계정 메뉴는 전부 셸이 공급한다.
+
+**3종과 책임**
+| 컴포넌트 | 위치 | 책임 |
+|---|---|---|
+| `DpNavRail` | 좌측 고정 | 목적지 내비게이션. Expanded(256px)/Collapsed(72px) 두 상태, 브랜드·계정 메뉴 슬롯 |
+| `DpChromeBar` | 상단(46px) | 브레드크럼 + 검색 트리거 + 화면별 액션 슬롯 |
+| `DpPageHeader` | 본문 최상단 | 화면 제목(`headlineSmall`)·설명·1차 액션·필터 슬롯 |
+
+- **레일 섹션 그룹**: `DpNavRail.destinations`는 평면 `List<DpDestination>`이다. 별도 그룹 구조를
+  두지 않고, **연속으로 같은 `section` 값을 가진 항목끼리** 렌더 시점에 묶어 레이블을 붙인다
+  (`dp_nav_rail.dart`의 `_buildItems`). Expanded 상태는 섹션 레이블 텍스트(`railFaint`)를,
+  **Collapsed 상태는 레이블 대신 구분선**(`railBorder`)을 넣는다 — 이번 개편의 유일한 접힘 분기다.
+- **크롬바 검색은 명령 팔레트 트리거다.** `DpChromeBar`의 검색 필드는 `TextField`가 아니라
+  `onSearchTap`을 호출하는 버튼이며, 실제 입력은 기존 `DpCommandPalette`가 받는다. 입력 상태를
+  두 곳에서 관리하지 않기 위한 선택이다.
+- **`textFaint`는 구분자·비활성 아이콘 전용이다.** 대비 3.21:1(UI 컴포넌트 기준)이라 읽어야 하는
+  텍스트에 쓰지 않는다 — 크롬바 브레드크럼의 `·` 구분자가 유일한 소비처다(§1 참고). 레일 섹션
+  레이블처럼 **읽어야 하는 텍스트**는 전용 토큰(`railFaint`, ≥4.5:1)을 쓴다.
+- **셸을 쓰는 화면은 `AppBar`를 만들지 않는다.** 제목 3중 노출(앱바 제목 + 브레드크럼 + 본문 제목)을
+  막기 위해 화면은 `DpPageHeader`로만 제목을 낸다. `Scaffold` 자체는 화면이 계속 쓸 수 있으나
+  `backgroundColor`를 별도로 지정하면 크롬바 아래 색이 셸과 어긋나므로 지정하지 않는다. (`DpAppShell`을
+  쓰지 않는 `apps/mobile`은 이 규칙 밖이다 — 기존 `Scaffold.appBar`를 그대로 쓴다.)
+
+## 10. 출처/샘플 매핑
 
 `dp_design` 구현 시 적용할 Flutter 샘플(플랜 §7 참조): `Flutter_Material3_ThemeExtension_DesignToken`(토큰), `Flutter_EmptyState_빈상태`·`Flutter_Shimmer_Skeleton_Loader`·`Flutter_재사용_다이얼로그_Confirm_Error`(상태위젯).

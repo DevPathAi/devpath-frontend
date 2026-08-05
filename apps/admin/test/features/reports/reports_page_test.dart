@@ -127,4 +127,11 @@ void main() {
     expect(s, isA<ReportsLoaded>());
     expect((s as ReportsLoaded).status, 'REJECTED');
   });
+
+  testWidgets('DpPageHeader 제목은 "신고 처리"', (tester) async {
+    await _pump(tester, _container(_Fake([_r()])));
+
+    final header = tester.widget<DpPageHeader>(find.byType(DpPageHeader));
+    expect(header.title, '신고 처리');
+  });
 }

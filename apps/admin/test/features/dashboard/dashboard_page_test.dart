@@ -18,4 +18,18 @@ void main() {
     expect(find.textContaining('1280'), findsWidgets); // DAU
     expect(find.textContaining('신고'), findsWidgets);
   });
+
+  testWidgets('DpPageHeader 제목은 "운영 대시보드"', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: DpTheme.light(),
+          home: const AdminDashboardPage(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final header = tester.widget<DpPageHeader>(find.byType(DpPageHeader));
+    expect(header.title, '운영 대시보드');
+  });
 }

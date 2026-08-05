@@ -30,48 +30,55 @@ class _S extends ConsumerState<AdminDashboardPage> {
       'aiCalls': 'AI 호출',
     };
     return Scaffold(
-      appBar: AppBar(title: const Text('운영 대시보드')),
-      body: switch (s) {
-        AdminDashLoading() => const DpLoading(),
-        AdminDashFailed(:final message) => DpError(
-          message: message,
-          onRetry: () => ref.read(adminDashProvider.notifier).load(),
-        ),
-        AdminDashLoaded(:final stats) => GridView.count(
-          padding: const EdgeInsets.all(DpSpacing.lg),
-          crossAxisCount: 4,
-          childAspectRatio: 1.6,
-          mainAxisSpacing: DpSpacing.md,
-          crossAxisSpacing: DpSpacing.md,
-          children: [
-            for (final e in stats.entries)
-              Container(
+      body: Column(
+        children: [
+          const DpPageHeader(title: '운영 대시보드', description: '서비스 지표를 요약합니다'),
+          Expanded(
+            child: switch (s) {
+              AdminDashLoading() => const DpLoading(),
+              AdminDashFailed(:final message) => DpError(
+                message: message,
+                onRetry: () => ref.read(adminDashProvider.notifier).load(),
+              ),
+              AdminDashLoaded(:final stats) => GridView.count(
                 padding: const EdgeInsets.all(DpSpacing.lg),
-                decoration: BoxDecoration(
-                  color: context.dpColors.surface,
-                  border: Border.all(color: context.dpColors.border),
-                  borderRadius: BorderRadius.circular(DpRadius.card),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      '${e.value}',
-                      style: Theme.of(context).textTheme.displaySmall,
-                    ),
-                    Text(
-                      labels[e.key] ?? e.key,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: context.dpColors.textSecondary,
+                crossAxisCount: 4,
+                childAspectRatio: 1.6,
+                mainAxisSpacing: DpSpacing.md,
+                crossAxisSpacing: DpSpacing.md,
+                children: [
+                  for (final e in stats.entries)
+                    Container(
+                      padding: const EdgeInsets.all(DpSpacing.lg),
+                      decoration: BoxDecoration(
+                        color: context.dpColors.surface,
+                        border: Border.all(color: context.dpColors.border),
+                        borderRadius: BorderRadius.circular(DpRadius.card),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            '${e.value}',
+                            style: Theme.of(context).textTheme.displaySmall,
+                          ),
+                          Text(
+                            labels[e.key] ?? e.key,
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: context.dpColors.textSecondary,
+                                ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
+                ],
               ),
-          ],
-        ),
-      },
+            },
+          ),
+        ],
+      ),
     );
   }
 }

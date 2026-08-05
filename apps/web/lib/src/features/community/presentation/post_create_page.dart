@@ -120,45 +120,57 @@ class _PostCreatePageState extends ConsumerState<PostCreatePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(_pageTitle)),
-      body: ListView(
-        padding: const EdgeInsets.all(DpSpacing.lg),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          TextField(
-            controller: _titleCtrl,
-            enabled: !_submitting,
-            decoration: const InputDecoration(
-              labelText: '제목',
-              hintText: '제목을 입력하세요',
-              border: OutlineInputBorder(),
+          DpPageHeader(
+            title: _pageTitle,
+            description: '자유롭게 쓰거나 코드 피드백을 요청하세요',
+          ),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(DpSpacing.lg),
+              children: [
+                TextField(
+                  controller: _titleCtrl,
+                  enabled: !_submitting,
+                  decoration: const InputDecoration(
+                    labelText: '제목',
+                    hintText: '제목을 입력하세요',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: DpSpacing.md),
+                Text(
+                  _isFeedback
+                      ? '리뷰받고 싶은 코드/프로젝트와 궁금한 점을 적어주세요'
+                      : '나누고 싶은 이야기를 적어주세요',
+                  style: TextStyle(color: context.dpColors.textSecondary),
+                ),
+                const SizedBox(height: DpSpacing.xs),
+                DpRichEditor(
+                  key: const ValueKey('post-body-editor'),
+                  controller: _bodyController,
+                  enabled: !_submitting,
+                ),
+                const SizedBox(height: DpSpacing.md),
+                TextField(
+                  controller: _tagsCtrl,
+                  enabled: !_submitting,
+                  decoration: const InputDecoration(
+                    labelText: '태그',
+                    hintText: '쉼표 또는 공백으로 구분 (예: dart, flutter)',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: DpSpacing.lg),
+                FilledButton.icon(
+                  onPressed: _submitting ? null : _submit,
+                  icon: const Icon(DpIcons.send, size: 18),
+                  label: Text(_submitting ? '게시 중…' : '게시'),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: DpSpacing.md),
-          Text(
-            _isFeedback ? '리뷰받고 싶은 코드/프로젝트와 궁금한 점을 적어주세요' : '나누고 싶은 이야기를 적어주세요',
-            style: TextStyle(color: context.dpColors.textSecondary),
-          ),
-          const SizedBox(height: DpSpacing.xs),
-          DpRichEditor(
-            key: const ValueKey('post-body-editor'),
-            controller: _bodyController,
-            enabled: !_submitting,
-          ),
-          const SizedBox(height: DpSpacing.md),
-          TextField(
-            controller: _tagsCtrl,
-            enabled: !_submitting,
-            decoration: const InputDecoration(
-              labelText: '태그',
-              hintText: '쉼표 또는 공백으로 구분 (예: dart, flutter)',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: DpSpacing.lg),
-          FilledButton.icon(
-            onPressed: _submitting ? null : _submit,
-            icon: const Icon(DpIcons.send, size: 18),
-            label: Text(_submitting ? '게시 중…' : '게시'),
           ),
         ],
       ),

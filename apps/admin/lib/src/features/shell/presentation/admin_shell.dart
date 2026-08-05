@@ -40,6 +40,15 @@ class AdminShell extends StatelessWidget {
   }
 }
 
+/// 경로 → 화면 제목. 브레드크럼과 DpPageHeader가 같은 값을 쓴다.
+String _headerTitleFor(String path) => switch (path) {
+  '/users' => '사용자 관리',
+  '/reports' => '신고 처리',
+  '/support' => '오류 신고·문의',
+  '/ads' => '광고 관리',
+  _ => '운영 대시보드',
+};
+
 /// 표현부: go_router 비의존 — DpAppShell로 위임. admin은 웹 우선이라
 /// Large에서 기존 extended rail을 유지한다.
 class AdminShellView extends StatelessWidget {
@@ -61,25 +70,34 @@ class AdminShellView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.dpColors;
     return DpAppShell(
       selectedIndex: _index,
       onSelect: (i) => onSelect?.call(kAdminDestinations[i].path),
       destinations: [
         for (final d in kAdminDestinations)
-          (icon: d.icon, label: d.label, badgeCount: 0),
+          DpDestination(icon: d.icon, label: d.label),
       ],
-      leading: const Padding(
-        padding: EdgeInsets.all(DpSpacing.md),
-        child: Text('운영 콘솔'),
+      // web 셸(app_shell.dart)의 titleSmall 타이포를 맞추되, color를 반드시
+      // 명시한다 — DpTheme가 textTheme.apply(bodyColor: c.textPrimary)로
+      // titleSmall에 이미 non-null color를 채워 넣어(dp_theme.dart:32-34),
+      // DpNavRail._withRailForeground(dp_nav_rail.dart:91)가 공급하는
+      // railText가 DefaultTextStyle.merge에서 진다. 라이트 테마에서
+      // textPrimary(#1A1815)==railBg(#1A1815)라 color 미명시 시 브랜드
+      // 텍스트가 레일 배경에 완전히 묻힌다(web app_shell.dart와 같은 이유,
+      // 같은 수정).
+      brand: Text(
+        '운영 콘솔',
+        overflow: TextOverflow.ellipsis,
+        style: Theme.of(
+          context,
+        ).textTheme.titleSmall?.copyWith(color: c.railText),
       ),
-      trailing: Builder(
-        builder: (context) => IconButton(
-          icon: const Icon(DpIcons.search),
-          tooltip: '명령 팔레트 (Ctrl/Cmd+K)',
-          onPressed: () =>
-              Actions.invoke(context, const OpenCommandPaletteIntent()),
-        ),
-      ),
+      breadcrumb: [
+        (label: _headerTitleFor(kAdminDestinations[_index].path), path: null),
+      ],
+      onSearchTap: () =>
+          Actions.invoke(context, const OpenCommandPaletteIntent()),
       body: child,
     );
   }

@@ -30,24 +30,23 @@ class _MyPagePageState extends ConsumerState<MyPagePage> {
   Widget build(BuildContext context) {
     final s = ref.watch(myPageControllerProvider);
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('마이페이지'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            tooltip: '설정',
-            onPressed: () => context.go('/settings'),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const DpPageHeader(title: '마이페이지', description: '프로필과 활동 기록입니다'),
+          Expanded(
+            child: switch (s) {
+              MyPageLoading() => const DpLoading(),
+              MyPageFailed(:final message) => SupportableError(
+                message: message,
+                onRetry: () =>
+                    ref.read(myPageControllerProvider.notifier).load(),
+              ),
+              MyPageLoaded() => _Body(state: s),
+            },
           ),
         ],
       ),
-      body: switch (s) {
-        MyPageLoading() => const DpLoading(),
-        MyPageFailed(:final message) => SupportableError(
-          message: message,
-          onRetry: () => ref.read(myPageControllerProvider.notifier).load(),
-        ),
-        MyPageLoaded() => _Body(state: s),
-      },
     );
   }
 }

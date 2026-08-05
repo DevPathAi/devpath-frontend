@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../auth/application/auth_controller.dart';
 import '../../auth/state/auth_state.dart';
+import '../../common/presentation/brand_row.dart';
 import '../application/diagnostic_controller.dart';
 import '../state/diagnostic_state.dart';
 
@@ -44,45 +45,67 @@ class _DiagnosticPageState extends ConsumerState<DiagnosticPage> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('실력 진단')),
       body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 560),
-          child: Padding(
-            padding: const EdgeInsets.all(DpSpacing.xl),
-            child: switch (state) {
-              DiagnosticIdle() => _StartView(auth: auth, notifier: notifier),
-              DiagnosticLoading() => const Center(
-                child: CircularProgressIndicator(),
-              ),
-              DiagnosticQuestion(:final next) => _QuestionView(
-                next: next,
-                notifier: notifier,
-              ),
-              DiagnosticGateSignup() => Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '결과를 보려면 로그인하세요',
-                    style: Theme.of(context).textTheme.titleMedium,
+        child: SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: context.appTokens.readableMaxWidth,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                brandRow(context),
+                const DpPageHeader(
+                  title: '실력 진단',
+                  description: '몇 문항으로 현재 수준을 파악합니다',
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    DpSpacing.xl,
+                    0,
+                    DpSpacing.xl,
+                    DpSpacing.xl,
                   ),
-                  const SizedBox(height: DpSpacing.lg),
-                  FilledButton(
-                    onPressed: () =>
-                        ref.read(authControllerProvider.notifier).login(),
-                    child: const Text('GitHub로 로그인'),
-                  ),
-                ],
-              ),
-              DiagnosticResultState(:final result) => Text(
-                '진단 레벨: ${result.diagnosedLevel}',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              DiagnosticError(:final message) => Text(
-                message,
-                style: TextStyle(color: context.dpColors.danger),
-              ),
-            },
+                  child: switch (state) {
+                    DiagnosticIdle() => _StartView(
+                      auth: auth,
+                      notifier: notifier,
+                    ),
+                    DiagnosticLoading() => const Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                    DiagnosticQuestion(:final next) => _QuestionView(
+                      next: next,
+                      notifier: notifier,
+                    ),
+                    DiagnosticGateSignup() => Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '결과를 보려면 로그인하세요',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: DpSpacing.lg),
+                        FilledButton(
+                          onPressed: () =>
+                              ref.read(authControllerProvider.notifier).login(),
+                          child: const Text('GitHub로 로그인'),
+                        ),
+                      ],
+                    ),
+                    DiagnosticResultState(:final result) => Text(
+                      '진단 레벨: ${result.diagnosedLevel}',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    DiagnosticError(:final message) => Text(
+                      message,
+                      style: TextStyle(color: context.dpColors.danger),
+                    ),
+                  },
+                ),
+              ],
+            ),
           ),
         ),
       ),
