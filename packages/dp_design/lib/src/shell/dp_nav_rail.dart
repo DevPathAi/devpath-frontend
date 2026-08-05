@@ -23,7 +23,10 @@ class DpNavRail extends StatelessWidget {
   });
 
   final List<DpDestination> destinations;
-  final int selectedIndex;
+
+  /// null이면 어떤 항목도 활성 표시하지 않는다(호출부 위치가 레일 목적지
+  /// 어디에도 매칭되지 않는 경우 — I1: 잘못된 항목을 강조하는 대신 무강조).
+  final int? selectedIndex;
   final ValueChanged<int> onSelect;
   final Widget? brand;
   final Widget? account;

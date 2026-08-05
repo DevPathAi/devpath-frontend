@@ -32,7 +32,10 @@ class DpAppShell extends StatelessWidget {
   });
 
   final List<DpDestination> destinations;
-  final int selectedIndex;
+
+  /// null이면 어떤 목적지도 활성 표시하지 않는다. compact의 [NavigationBar]는
+  /// non-null `int`만 받으므로(Flutter 3.44) 그 분기에서만 0으로 클램프한다.
+  final int? selectedIndex;
   final ValueChanged<int> onSelect;
   final Widget body;
   final Widget? brand;
@@ -82,7 +85,9 @@ class DpAppShell extends StatelessWidget {
       return Scaffold(
         body: main,
         bottomNavigationBar: NavigationBar(
-          selectedIndex: selectedIndex,
+          // NavigationBar.selectedIndex는 Flutter 3.44에서 non-null int라
+          // 클램프한다 — DpNavRail과 달리 무강조를 표현할 수 없다.
+          selectedIndex: selectedIndex ?? 0,
           onDestinationSelected: onSelect,
           destinations: [
             for (final d in destinations)

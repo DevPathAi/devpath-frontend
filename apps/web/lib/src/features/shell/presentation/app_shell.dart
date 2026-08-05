@@ -108,9 +108,12 @@ class AppShellView extends StatelessWidget {
   final Widget child;
   final void Function(String path)? onSelect;
 
-  int get _index {
+  // I1: 매칭되는 목적지가 없으면 null(무강조)을 반환한다. kShellDestinations가
+  // 5→4로 줄면서 /settings·/mypage·/content/:id·/sandbox가 여기 없다 —
+  // 예전처럼 0(대시보드)으로 폴백하면 레일이 잘못된 항목을 활성 표시한다.
+  int? get _index {
     final i = kShellDestinations.indexWhere((d) => location.startsWith(d.path));
-    return i < 0 ? 0 : i;
+    return i < 0 ? null : i;
   }
 
   @override
@@ -136,11 +139,15 @@ class AppShellView extends StatelessWidget {
             ),
           ),
           const SizedBox(width: DpSpacing.sm),
+          // color를 지정하지 않는다 — DpNavRail._withRailForeground
+          // (dp_nav_rail.dart:91)가 이미 레일 배경에 맞는 전경색(railText)을
+          // 공급한다. 여기서 다시 지정하면 그 공급을 무력화한다(admin의
+          // admin_shell.dart:80-83과 같은 형태로 맞춘다).
           Flexible(
             child: Text(
               'DevPath',
               overflow: TextOverflow.ellipsis,
-              style: text.titleSmall?.copyWith(color: c.railText),
+              style: text.titleSmall,
             ),
           ),
         ],
