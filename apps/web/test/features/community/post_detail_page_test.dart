@@ -1,7 +1,9 @@
 import 'dart:async';
 
+import 'package:devpath_web/src/features/community/application/post_detail_controller.dart';
 import 'package:devpath_web/src/features/community/data/community_source.dart';
 import 'package:devpath_web/src/features/community/presentation/post_detail_page.dart';
+import 'package:devpath_web/src/features/community/state/post_detail_state.dart';
 import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
@@ -135,6 +137,25 @@ void main() {
     expect(find.text('오늘 배운 것'), findsOneWidget);
   });
 
+  // loaded인데 detail이 null인 폴백 분기(post_detail_page.dart의 마지막 case).
+  // fetch로는 만들 수 없는 상태라 컨트롤러를 직접 고정해 주입한다. 전환으로 이
+  // 분기도 sliver가 됐으므로, 비-sliver로 되돌리면 RenderViewport가 예외를 던진다.
+  testWidgets('loaded이지만 detail이 없으면 헤더와 로딩 표시로 폴백한다', (tester) async {
+    final c = ProviderContainer(
+      overrides: [
+        postDetailControllerProvider(
+          10,
+        ).overrideWith(() => _NullDetailController(10)),
+      ],
+    );
+    addTearDown(c.dispose);
+    await tester.pumpWidget(_host(c));
+    await tester.pump();
+
+    expect(tester.widget<DpPageHeader>(find.byType(DpPageHeader)).title, '게시글');
+    expect(find.byType(DpLoading), findsOneWidget);
+  });
+
   testWidgets('조회 실패 시 헤더와 에러 안내가 함께 렌더된다', (tester) async {
     final c = ProviderContainer(
       overrides: [
@@ -153,4 +174,16 @@ void main() {
     expect(tester.widget<DpPageHeader>(find.byType(DpPageHeader)).title, '게시글');
     expect(find.textContaining('불러오지 못했어요'), findsWidgets);
   });
+}
+
+/// loaded인데 detail이 null인 상태를 고정 주입한다(정상 흐름으로는 도달 불가).
+class _NullDetailController extends PostDetailController {
+  _NullDetailController(super.postId);
+
+  @override
+  PostDetailState build() =>
+      const PostDetailState(phase: PostDetailPhase.loaded);
+
+  @override
+  Future<void> load() async {}
 }

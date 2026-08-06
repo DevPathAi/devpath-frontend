@@ -244,6 +244,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('게시글'), findsWidgets);
+    _expectHeaderVisible(tester);
 
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -300));
     await tester.pump();
@@ -277,6 +278,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Q&A'), findsWidgets);
+    _expectHeaderVisible(tester);
 
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -300));
     await tester.pump();
@@ -314,6 +316,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('자유글 작성'), findsWidgets);
+    _expectHeaderVisible(tester);
 
     await _dragOutsideEditor(tester);
 
@@ -343,6 +346,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('질문하기'), findsWidgets);
+    _expectHeaderVisible(tester);
 
     await _dragOutsideEditor(tester);
 
@@ -382,14 +386,33 @@ Widget _createHost(ProviderContainer c, Widget page, String path) {
   );
 }
 
-/// 작성 화면은 본문 에디터가 **고정 높이(260px)의 자체 스크롤 영역**이라
-/// 그 위에서 시작한 수직 드래그는 페이지가 아니라 에디터가 소비한다(실제
-/// 앱에서도 같다 — 결함이 아니라 의도된 거동). 페이지 스크롤을 검증하려면
-/// 에디터 바깥에서 드래그해야 하므로, 상단 제목 입력 근처를 시작점으로 잡는다.
+/// 작성 2화면은 다른 5화면이 쓰는 `tester.drag(find.byType(CustomScrollView))`를
+/// **쓸 수 없다.** 실측으로 확인한 제약이 두 겹이다(800×400 기준):
+///
+/// 1. **파인더가 모호하다.** `DpRichEditor`의 `QuillSimpleToolbar`는
+///    `multiRowsDisplay: false`라 내부에 `CustomScrollView`를 하나 더 만든다
+///    (flutter_quill 11.5.1). 실측 매치 수 **2개** → `getCenter`가
+///    `Found 2 widgets`로 즉시 실패한다. 이게 1차 제약이다.
+/// 2. **중심점이 에디터 안이다.** 실측 에디터 rect top=**194**, 뷰포트 중심
+///    y=**200** → 중심에서 시작한 수직 드래그는 에디터(고정 높이 260px의
+///    자체 스크롤 영역)가 소비한다. 이는 전환 **이전**에도 같았다(에디터는
+///    그때도 `ListView` 자식으로 자체 세로 스크롤을 가졌다) — Task 11이
+///    만든 결함이 아니다.
+///
+/// 그래서 에디터 바깥의 평범한 실사용 지점(상단 제목 입력)을 시작점으로 잡는다.
+/// 특정 폭·특정 문자열에서만 통과하도록 값을 조작한 것이 아니다.
 Future<void> _dragOutsideEditor(WidgetTester tester) async {
   final start = tester.getCenter(find.byType(TextField).first);
   await tester.dragFrom(start, const Offset(0, -300));
   await tester.pump();
+}
+
+/// 드래그 **전에** 헤더가 실제로 보이는지 고정한다.
+/// 이 사전 조건이 없으면 「헤더가 아예 렌더되지 않는」 회귀를
+/// [_expectHeaderScrolledAway]가 findsNothing 경로로 조용히 통과시킨다.
+void _expectHeaderVisible(WidgetTester tester) {
+  expect(find.byType(DpPageHeader), findsOneWidget);
+  expect(tester.getBottomLeft(find.byType(DpPageHeader)).dy, greaterThan(0));
 }
 
 CommunityPostDetail _postDetail() => CommunityPostDetail(
