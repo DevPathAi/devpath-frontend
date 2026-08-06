@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../icons/dp_icons.dart';
 import '../theme/dp_colors.dart';
 import '../theme/dp_spacing.dart';
+import 'dp_chrome_action.dart';
 
 /// 브레드크럼 세그먼트. [path]가 null이면 비클릭(섹션명 등).
 ///
@@ -31,7 +32,7 @@ class DpChromeBar extends StatelessWidget {
   final List<DpCrumb> breadcrumb;
   final ValueChanged<String>? onCrumbTap;
   final VoidCallback? onSearchTap;
-  final List<Widget> actions;
+  final List<DpChromeAction> actions;
   final Widget? account;
   final bool compact;
 
@@ -47,68 +48,154 @@ class DpChromeBar extends StatelessWidget {
         border: Border(bottom: BorderSide(color: c.border)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: DpSpacing.lg),
-      // I2(이월, 3단계 확정): actions·account 그룹은 non-flex 자식이라
-      // RenderFlex가 무한 주축 제약으로 먼저 측정한다 — actions가 늘어나면
-      // (스펙 §3.0 trailing 슬롯) 오버플로한다. DpPageHeader.actions의
+      // I2(3단계 해소): actions·account 그룹은 non-flex 자식이라 RenderFlex가
+      // 무한 주축 제약으로 먼저 측정한다 — actions가 늘어나면(스펙 §3.0
+      // trailing 슬롯) 오버플로할 수 있었다. DpPageHeader.actions의
       // LayoutBuilder+ConstrainedBox(maxWidth: 폭/2) 해법을 이식했던 적이
       // 있었으나 되돌렸다 — DpPageHeader에서 그 패턴이 통하는 이유는 자식이
       // Wrap이라 상한을 줄바꿈으로 흡수하기 때문이다(dp_page_header.dart:
       // 72-86). 이 바의 자식은 Row(mainAxisSize.min)이고 높이가 46 고정이라
       // 줄바꿈이 불가능해, 상한을 걸어도 오버플로가 바깥 Row에서 안쪽 Row로
-      // 이동할 뿐이다(임계 W<G+16 → W<2G로 오히려 넓어짐, G=그룹 자연폭).
-      // I2 해법은 crumbs flex 가중치·그룹 축약(overflow 메뉴) 설계와 함께
-      // 3단계에서 다룬다. 아래 좌측 그룹의 Spacer→Expanded 전환은 우측 정렬
-      // 결함을 고친 것이고 I2를 해소하지는 않는다 — 다만 Spacer가 가져가던
-      // 고정 몫이 사라져 오버플로 임계는 넓어지지 않는다(악화 없음).
+      // 이동할 뿐이었다(임계 W<G+16 → W<2G로 오히려 넓어짐, G=그룹 자연폭).
+      //
+      // 지금은 줄바꿈이 아니라 넘치는 액션을 오버플로 메뉴(MenuAnchor)로
+      // 접는다. account는 접지 않는다(계정 진입점이 메뉴 뒤로 숨으면
+      // 접근성이 나빠진다). 캡을 얻는 방법이 관건이다 — _actionGroup을
+      // 그 자리(Row의 non-flex 두 번째 자식)에서 LayoutBuilder로 직접
+      // 감싸는 최초 시도는 실측에서 실패했다: RenderFlex가 non-flex
+      // 자식에게 주는 제약은 `BoxConstraints(maxHeight: ...)`뿐이라
+      // maxWidth가 항상 무한이다(hasBoundedWidth=false) — 즉 non-flex
+      // 위치에 놓인 LayoutBuilder는 자기 폭 상한을 절대 알 수 없다. 그
+      // 결과 접힘이 전혀 발동하지 않고 8액션이 그대로 자연폭을 요구해
+      // Expanded 좌측 그룹이 12px까지 짜부라지며 내부 crumbs Row가
+      // RenderFlex overflow로 죽었다(폭 500 테스트로 실측 확인).
+      //
+      // 해법: 바 컨테이너(패딩 적용 후) 전체를 감싸는 바깥 LayoutBuilder로
+      // 실제 사용 가능 폭을 먼저 얻고, 그 절반을 캡으로 _actionGroup에
+      // 명시적으로 넘긴다. 이러면 우측 그룹은 항상 바 폭의 최대 절반만
+      // 요구하도록 자기 검열하고(=account 포함 inline 액션 수를 캡 안에서
+      // 결정), 좌측 Expanded는 최소 절반을 보장받는다.
+      child: LayoutBuilder(
+        builder: (context, barConstraints) {
+          final barWidth = barConstraints.maxWidth;
+          final actionCap = barWidth.isFinite ? barWidth / 2 : double.infinity;
+
+          return Row(
+            children: [
+              // 좌측 그룹(crumbs+검색)을 Expanded로 묶어 남는 폭을 전부
+              // 흡수시킨다. 예전에는 이 자리에 Flexible들을 늘어놓고 뒤에
+              // Spacer를 뒀는데, Spacer(Expanded=tight)는 freeSpace를 flex
+              // 비율로 나눈 자기 몫만 받는 반면 Flexible(loose fit)은
+              // 몫보다 적게 쓸 수 있다 — 그 잔여가 Spacer로 재분배되지
+              // 않고 Row 끝(=actions 오른쪽)에 남아 우측 정렬이 깨졌다.
+              // 실제 앱 crumbs는 '학습 · 대시보드' 수준으로 짧아 항상 이
+              // 경로를 탔고, 2단계 육안 확인에서 1400폭 약 448px 여백으로
+              // 드러났다.
+              Expanded(
+                child: Row(
+                  children: [
+                    Flexible(child: _crumbs(context, c)),
+                    const SizedBox(width: DpSpacing.lg),
+                    if (!compact && onSearchTap != null)
+                      Flexible(flex: 2, child: _search(context, c))
+                    else if (compact && onSearchTap != null)
+                      IconButton(
+                        key: const ValueKey('chrome-search-icon'),
+                        icon: Icon(
+                          DpIcons.search,
+                          size: 20,
+                          color: c.textSecondary,
+                        ),
+                        tooltip: '검색 (Ctrl/Cmd+K)',
+                        onPressed: onSearchTap,
+                      ),
+                  ],
+                ),
+              ),
+              // 밝은 surface 배경 위이므로 무스타일 액션/계정 위젯도
+              // textSecondary를 기본 전경색으로 받는다 — 하위 위젯이 색을
+              // 명시하면 그게 이긴다(merge).
+              IconTheme.merge(
+                data: IconThemeData(color: c.textSecondary),
+                child: DefaultTextStyle.merge(
+                  style: TextStyle(color: c.textSecondary),
+                  child: _actionGroup(context, c, actionCap),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  /// 액션 그룹. [maxWidth](바 폭의 절반, build()가 바깥 LayoutBuilder로
+  /// 계산해 넘긴다)를 넘는 액션은 오버플로 메뉴로 접는다.
+  Widget _actionGroup(BuildContext context, DpColors c, double maxWidth) {
+    if (actions.isEmpty) {
+      return Row(mainAxisSize: MainAxisSize.min, children: [?account]);
+    }
+
+    const perAction = 48.0;
+    const overflowButton = 48.0;
+    final accountWidth = account != null ? 48.0 : 0.0;
+
+    final budget = maxWidth.isFinite
+        ? maxWidth - accountWidth
+        : double.infinity;
+    final fits = budget.isFinite
+        ? (budget / perAction).floor()
+        : actions.length;
+
+    final inline = fits >= actions.length
+        ? actions
+        : actions
+              .take(
+                ((budget - overflowButton) / perAction).floor().clamp(
+                  0,
+                  actions.length,
+                ),
+              )
+              .toList();
+    final overflow = actions.sublist(inline.length);
+
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: maxWidth),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // 좌측 그룹(crumbs+검색)을 Expanded로 묶어 남는 폭을 전부 흡수시킨다.
-          // 예전에는 이 자리에 Flexible들을 늘어놓고 뒤에 Spacer를 뒀는데,
-          // Spacer(Expanded=tight)는 freeSpace를 flex 비율로 나눈 자기 몫만
-          // 받는 반면 Flexible(loose fit)은 몫보다 적게 쓸 수 있다 — 그 잔여가
-          // Spacer로 재분배되지 않고 Row 끝(=actions 오른쪽)에 남아 우측 정렬이
-          // 깨졌다. 실제 앱 crumbs는 '학습 · 대시보드' 수준으로 짧아 항상 이
-          // 경로를 탔고, 2단계 육안 확인에서 1400폭 약 448px 여백으로 드러났다.
-          Expanded(
-            child: Row(
-              children: [
-                Flexible(child: _crumbs(context, c)),
-                const SizedBox(width: DpSpacing.lg),
-                if (!compact && onSearchTap != null)
-                  Flexible(flex: 2, child: _search(context, c))
-                else if (compact && onSearchTap != null)
-                  IconButton(
-                    key: const ValueKey('chrome-search-icon'),
-                    icon: Icon(
-                      DpIcons.search,
-                      size: 20,
-                      color: c.textSecondary,
-                    ),
-                    tooltip: '검색 (Ctrl/Cmd+K)',
-                    onPressed: onSearchTap,
+          for (final a in inline)
+            IconButton(
+              // 색을 명시한다 — IconButton은 자기 테마(IconButtonTheme)로
+              // 전경색을 결정해 ambient IconTheme.merge를 상속하지 않는다.
+              icon: Icon(a.icon, color: c.textSecondary),
+              tooltip: a.label,
+              // build()의 context를 넘긴다 — 크롬바 아래라 Navigator/
+              // Overlay에 접근할 수 있다.
+              onPressed: () => a.onPressed(context),
+            ),
+          if (overflow.isNotEmpty)
+            MenuAnchor(
+              key: const ValueKey('chrome-actions-overflow'),
+              menuChildren: [
+                for (final a in overflow)
+                  MenuItemButton(
+                    leadingIcon: Icon(a.icon),
+                    onPressed: () => a.onPressed(context),
+                    child: Text(a.label),
                   ),
               ],
-            ),
-          ),
-          // 밝은 surface 배경 위이므로 무스타일 액션/계정 위젯도
-          // textSecondary를 기본 전경색으로 받는다 — 하위 위젯이 색을
-          // 명시하면 그게 이긴다(merge).
-          IconTheme.merge(
-            data: IconThemeData(color: c.textSecondary),
-            child: DefaultTextStyle.merge(
-              style: TextStyle(color: c.textSecondary),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ...actions,
-                  if (account != null) ...[
-                    const SizedBox(width: DpSpacing.sm),
-                    account!,
-                  ],
-                ],
+              builder: (context, controller, _) => IconButton(
+                icon: const Icon(DpIcons.moreVert),
+                tooltip: '더 보기',
+                onPressed: () =>
+                    controller.isOpen ? controller.close() : controller.open(),
               ),
             ),
-          ),
+          if (account != null) ...[
+            const SizedBox(width: DpSpacing.sm),
+            account!,
+          ],
         ],
       ),
     );

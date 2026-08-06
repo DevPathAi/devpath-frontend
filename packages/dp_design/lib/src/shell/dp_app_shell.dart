@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../layout/dp_max_width.dart';
 import '../layout/dp_window_class.dart';
+import 'dp_chrome_action.dart';
 import 'dp_chrome_bar.dart';
 import 'dp_destination.dart';
 import 'dp_nav_rail.dart';
@@ -45,7 +46,7 @@ class DpAppShell extends StatelessWidget {
   final List<DpCrumb> breadcrumb;
   final ValueChanged<String>? onCrumbTap;
   final VoidCallback? onSearchTap;
-  final List<Widget> chromeActions;
+  final List<DpChromeAction> chromeActions;
   final bool? railExtended;
   final VoidCallback? onToggleRail;
   final bool constrainBodyAtLarge;

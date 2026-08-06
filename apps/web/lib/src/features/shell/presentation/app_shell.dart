@@ -145,12 +145,10 @@ class AppShellView extends StatelessWidget {
       onCrumbTap: (p) => onSelect?.call(p),
       onSearchTap: () => _openPalette(context),
       chromeActions: [
-        Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(DpIcons.error),
-            tooltip: '오류 신고·문의',
-            onPressed: () => showSupportDialog(context),
-          ),
+        DpChromeAction(
+          icon: DpIcons.error,
+          label: '오류 신고·문의',
+          onPressed: (context) => showSupportDialog(context),
         ),
       ],
       body: child,

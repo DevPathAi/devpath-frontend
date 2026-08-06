@@ -165,12 +165,14 @@ void main() {
           selectedIndex: 0,
           onSelect: (_) {},
           breadcrumb: const [],
-          chromeActions: const [Text('액션')],
+          chromeActions: [
+            DpChromeAction(icon: Icons.star, label: '액션', onPressed: (_) {}),
+          ],
           body: const Text('본문'),
         ),
       ),
     );
     expect(find.byType(DpChromeBar), findsOneWidget);
-    expect(find.text('액션'), findsOneWidget);
+    expect(find.byTooltip('액션'), findsOneWidget);
   });
 }

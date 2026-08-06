@@ -58,14 +58,16 @@ void main() {
   testWidgets('actions·account 슬롯을 렌더', (tester) async {
     await tester.pumpWidget(
       _host(
-        const DpChromeBar(
+        DpChromeBar(
           breadcrumb: _crumbs,
-          actions: [Text('액션')],
-          account: Text('계정'),
+          actions: [
+            DpChromeAction(icon: Icons.star, label: '액션', onPressed: (_) {}),
+          ],
+          account: const Text('계정'),
         ),
       ),
     );
-    expect(find.text('액션'), findsOneWidget);
+    expect(find.byTooltip('액션'), findsOneWidget);
     expect(find.text('계정'), findsOneWidget);
   });
 
@@ -138,21 +140,26 @@ void main() {
     expect(separator.style?.color, DpColors.light.textFaint);
   });
 
-  // Important 1: 밝은 surface 배경 위이므로 actions·account에 무스타일
-  // 위젯을 넣어도 textSecondary가 기본 전경색으로 공급돼야 한다(대비 확보).
-  testWidgets('actions·account 슬롯은 textSecondary를 기본 전경색으로 제공', (tester) async {
-    Color? actionsIconColor;
+  // Important 1: 밝은 surface 배경 위이므로 actions·account 모두 textSecondary가
+  // 기본 전경색으로 공급돼야 한다(대비 확보). actions는 이제 DpChromeBar가
+  // 직접 IconButton을 짓는 데이터형이라(3단계 I2) ambient IconTheme 상속을
+  // 검증할 수 없다 — IconButton은 자기 테마로 색을 정하고 ambient를
+  // 상속하지 않기 때문에, DpChromeBar가 명시적으로 textSecondary를 칠하는지
+  // 렌더된 Icon의 color 필드로 직접 확인한다. account는 여전히 호출부가
+  // 넘기는 무스타일 위젯이라 ambient DefaultTextStyle 상속을 그대로 검증한다.
+  testWidgets('actions는 textSecondary를 아이콘 색으로 쓰고, account는 ambient를 상속한다', (
+    tester,
+  ) async {
     Color? accountTextColor;
     await tester.pumpWidget(
       _host(
         DpChromeBar(
           breadcrumb: _crumbs,
           actions: [
-            Builder(
-              builder: (context) {
-                actionsIconColor = IconTheme.of(context).color;
-                return const Icon(Icons.notifications);
-              },
+            DpChromeAction(
+              icon: Icons.notifications,
+              label: '알림',
+              onPressed: (_) {},
             ),
           ],
           account: Builder(
@@ -164,7 +171,8 @@ void main() {
         ),
       ),
     );
-    expect(actionsIconColor, DpColors.light.textSecondary);
+    final actionIcon = tester.widget<Icon>(find.byIcon(Icons.notifications));
+    expect(actionIcon.color, DpColors.light.textSecondary);
     expect(accountTextColor, DpColors.light.textSecondary);
   });
 
@@ -199,7 +207,9 @@ void main() {
       _host(
         DpChromeBar(
           breadcrumb: longCrumbs,
-          actions: const [Text('액션')],
+          actions: [
+            DpChromeAction(icon: Icons.star, label: '액션', onPressed: (_) {}),
+          ],
           account: const Icon(Icons.account_circle, key: ValueKey('acct')),
         ),
       ),
@@ -234,8 +244,12 @@ void main() {
             (label: '대시보드', path: null),
           ],
           onSearchTap: () {},
-          actions: const [
-            Icon(Icons.error_outline, key: ValueKey('act-error')),
+          actions: [
+            DpChromeAction(
+              icon: Icons.error_outline,
+              label: '오류',
+              onPressed: (_) {},
+            ),
           ],
         ),
       ),
@@ -244,8 +258,12 @@ void main() {
     final barRight = tester
         .getRect(find.byKey(const ValueKey('chrome-bar-root')))
         .right;
+    // 액션은 이제 DpChromeBar가 짓는 IconButton(히트 타깃 포함)이라, 그
+    // 바깥 경계(IconButton 자체의 rect)로 정렬을 확인한다 — 안쪽 Icon
+    // 글리프나 Tooltip 위젯의 rect는 IconButton 내부 히트 영역 패딩만큼
+    // 안쪽으로 치우쳐 보여 실측이 4px 어긋난다(직접 확인).
     final actRight = tester
-        .getRect(find.byKey(const ValueKey('act-error')))
+        .getRect(find.widgetWithIcon(IconButton, Icons.error_outline))
         .right;
     expect(barRight - actRight, closeTo(DpSpacing.lg, 1.0));
   });
