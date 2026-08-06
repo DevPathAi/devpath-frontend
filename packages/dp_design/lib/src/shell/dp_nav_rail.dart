@@ -5,6 +5,7 @@ import '../theme/dp_colors.dart';
 import '../theme/dp_spacing.dart';
 import '../theme/dp_tokens.dart';
 import 'dp_destination.dart';
+import 'dp_rail_brand.dart';
 
 /// 잉크 사이드바(로드맵 Layer 2). 라우팅 비의존 — 선택은 index로 통지.
 ///
@@ -28,7 +29,7 @@ class DpNavRail extends StatelessWidget {
   /// 어디에도 매칭되지 않는 경우 — I1: 잘못된 항목을 강조하는 대신 무강조).
   final int? selectedIndex;
   final ValueChanged<int> onSelect;
-  final Widget? brand;
+  final DpRailBrand? brand;
   final Widget? account;
   final bool extended;
   final VoidCallback? onToggle;
@@ -81,29 +82,50 @@ class DpNavRail extends StatelessWidget {
         ),
       );
 
-  Widget _buildTop(BuildContext context, DpColors c) => Padding(
-    padding: const EdgeInsets.fromLTRB(
-      DpSpacing.md,
-      DpSpacing.md,
-      DpSpacing.sm,
-      DpSpacing.sm,
-    ),
-    child: Row(
-      children: [
-        if (extended && brand != null)
-          Expanded(child: _withRailForeground(c.railText, brand!)),
-        if (onToggle != null)
-          IconButton(
-            icon: Icon(
-              extended ? DpIcons.menuOpen : DpIcons.menu,
-              color: c.railMuted,
+  Widget _buildTop(BuildContext context, DpColors c) {
+    final b = brand;
+    final text = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        DpSpacing.md,
+        DpSpacing.md,
+        DpSpacing.sm,
+        DpSpacing.sm,
+      ),
+      child: Row(
+        children: [
+          if (b != null) ...[
+            // 마크는 접힘에서도 남는다 — 2단계에서는 extended 조건 안에
+            // 함께 묶여 있어 접히면 브랜드가 통째로 사라졌다.
+            b.mark,
+            if (extended) ...[
+              const SizedBox(width: DpSpacing.sm),
+              // Expanded(flex 참여)로 감싼다 — non-flex Text는 무한 주축
+              // 제약으로 측정되어 ellipsis가 발동하지 않는다.
+              Expanded(
+                child: Text(
+                  b.wordmark,
+                  overflow: TextOverflow.ellipsis,
+                  // 색을 여기서 확정한다. 앱은 문자열만 주므로 이 색이
+                  // merge에서 질 상대가 없다.
+                  style: text.titleSmall?.copyWith(color: c.railText),
+                ),
+              ),
+            ],
+          ],
+          if (onToggle != null)
+            IconButton(
+              icon: Icon(
+                extended ? DpIcons.menuOpen : DpIcons.menu,
+                color: c.railMuted,
+              ),
+              tooltip: extended ? '메뉴 접기' : '메뉴 펼치기',
+              onPressed: onToggle,
             ),
-            tooltip: extended ? '메뉴 접기' : '메뉴 펼치기',
-            onPressed: onToggle,
-          ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 
   List<Widget> _buildItems(BuildContext context, DpColors c) {
     final text = Theme.of(context).textTheme;

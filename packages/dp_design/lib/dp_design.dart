@@ -14,6 +14,7 @@ export 'src/layout/dp_window_class.dart';
 export 'src/layout/dp_page_header.dart';
 export 'src/shell/dp_destination.dart';
 export 'src/shell/dp_nav_rail.dart';
+export 'src/shell/dp_rail_brand.dart';
 export 'src/shell/dp_chrome_bar.dart';
 export 'src/shell/dp_app_shell.dart';
 export 'src/shell/dp_command.dart';

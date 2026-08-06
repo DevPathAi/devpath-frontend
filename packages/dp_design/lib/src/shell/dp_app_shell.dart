@@ -5,6 +5,7 @@ import '../layout/dp_window_class.dart';
 import 'dp_chrome_bar.dart';
 import 'dp_destination.dart';
 import 'dp_nav_rail.dart';
+import 'dp_rail_brand.dart';
 
 /// 4-클래스 반응형 앱 셸(로드맵 §2.2 Layer 2). 라우팅 비의존 —
 /// 목적지 선택은 [onSelect]에 index로 통지, 경로 해석은 앱이 담당.
@@ -39,7 +40,7 @@ class DpAppShell extends StatelessWidget {
   final int? selectedIndex;
   final ValueChanged<int> onSelect;
   final Widget body;
-  final Widget? brand;
+  final DpRailBrand? brand;
   final Widget? account;
   final List<DpCrumb> breadcrumb;
   final ValueChanged<String>? onCrumbTap;
