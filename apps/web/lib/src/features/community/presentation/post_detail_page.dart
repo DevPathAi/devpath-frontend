@@ -137,7 +137,7 @@ class _Loaded extends StatelessWidget {
           const SizedBox(height: DpSpacing.sm),
           Wrap(
             spacing: DpSpacing.xs,
-            children: [for (final t in detail.tags) Chip(label: Text('#$t'))],
+            children: [for (final t in detail.tags) DpTag(label: '#$t')],
           ),
         ],
         const SizedBox(height: DpSpacing.sm),

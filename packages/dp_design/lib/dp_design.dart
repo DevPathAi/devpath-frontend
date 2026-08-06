@@ -36,3 +36,4 @@ export 'src/content/dp_markdown.dart';
 export 'src/data/dp_kpi_card.dart';
 export 'src/data/dp_list_row.dart';
 export 'src/data/dp_data_table.dart';
+export 'src/data/dp_tag.dart';

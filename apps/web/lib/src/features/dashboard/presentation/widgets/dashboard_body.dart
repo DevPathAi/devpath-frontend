@@ -174,7 +174,7 @@ class _BadgeStrip extends StatelessWidget {
           Wrap(
             spacing: DpSpacing.sm,
             runSpacing: DpSpacing.xs,
-            children: [for (final b in badges) Chip(label: Text(b))],
+            children: [for (final b in badges) DpTag(label: b)],
           ),
         ],
       ),

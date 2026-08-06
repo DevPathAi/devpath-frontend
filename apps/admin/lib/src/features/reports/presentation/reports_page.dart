@@ -108,12 +108,12 @@ class _ReportCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                _chip(context, r.targetTypeLabel),
+                DpTag(label: r.targetTypeLabel),
                 const SizedBox(width: DpSpacing.xs),
-                _chip(context, r.categoryLabel, tone: c.chart4),
+                DpTag(label: r.categoryLabel, tone: c.chart4),
                 if (r.reportCount > 1) ...[
                   const SizedBox(width: DpSpacing.xs),
-                  _chip(context, '${r.reportCount}명 신고', tone: c.danger),
+                  DpTag(label: '${r.reportCount}명 신고', tone: c.danger),
                 ],
                 const Spacer(),
                 if (r.status != 'OPEN')
@@ -166,24 +166,6 @@ class _ReportCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _chip(BuildContext context, String text, {Color? tone}) {
-    final c = context.dpColors;
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: DpSpacing.xs,
-        vertical: 2,
-      ),
-      decoration: BoxDecoration(
-        color: c.border,
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(fontSize: 11, color: tone ?? c.textSecondary),
       ),
     );
   }
