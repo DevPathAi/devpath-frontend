@@ -145,6 +145,63 @@ void main() {
     expect(sentScrollPct.toDouble(), closeTo(0.5, 0.001));
   });
 
+  testWidgets('헤더가 스크롤로 트리에서 걷어내진 뒤에도 scrollPct 보정이 유지된다', (tester) async {
+    tester.view.physicalSize = const Size(900, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    // 서버가 준 기존 진행률 0.2 — 헤더 높이를 못 재 폴백으로 무너지면
+    // 이 값이 그대로 돌아오므로, 0.5 단언이 폴백 경로를 확실히 red로 만든다.
+    final adapter = _SequenceAdapter({
+      'GET /contents/future-async-await': [
+        (200, _contentJson(markdown: _longMarkdown(), scrollPct: 0.2)),
+      ],
+      'POST /contents/future-async-await/progress': [
+        (
+          200,
+          {
+            'scrollPct': 0.5,
+            'dwellSec': 6,
+            'completed': false,
+            'completedAt': null,
+          },
+        ),
+      ],
+    });
+
+    await tester.pumpWidget(_host(adapter));
+    await _pumpLoad(tester);
+
+    final headerHeight = tester.getSize(find.byType(DpPageHeader)).height;
+    final controller = tester
+        .widget<CustomScrollView>(find.byType(CustomScrollView))
+        .controller!;
+    final bodyMax = controller.position.maxScrollExtent - headerHeight;
+    expect(bodyMax, greaterThan(0));
+
+    await tester.pump(const Duration(seconds: 6)); // dwell 최소 조건 통과
+
+    // 1단계: 본문 30% 지점으로 이동 — 헤더(84px)가 뷰포트+캐시 익스텐트 밖으로
+    // 나가 sliver가 컬링된다. 실제 사용자가 글을 읽어 내려간 상태와 같다.
+    controller.jumpTo(headerHeight + bodyMax * 0.3);
+    for (var i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    // 전제 확인: 헤더가 정말 트리에서 걷어내졌다(이게 아니면 이 테스트는
+    // 위 '헤더 높이를 보정해 전송한다' 테스트와 같은 경로만 재검사하게 된다).
+    expect(find.byType(DpPageHeader), findsNothing);
+
+    // 2단계: 헤더가 이미 없는 상태에서 더 스크롤한다 — 이 flush의 scrollPct는
+    // 전적으로 "헤더가 트리에 없는 상태의 계산"으로 결정된다.
+    controller.jumpTo(headerHeight + bodyMax * 0.5);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(adapter.postBodies, isNotEmpty);
+    final sentScrollPct = (adapter.postBodies.last as Map)['scrollPct'] as num;
+    expect(sentScrollPct.toDouble(), closeTo(0.5, 0.001));
+  });
+
   testWidgets('끝까지 스크롤해도 scrollPct는 여전히 1.0이다(보정 후에도 완료 판정 불변)', (
     tester,
   ) async {
