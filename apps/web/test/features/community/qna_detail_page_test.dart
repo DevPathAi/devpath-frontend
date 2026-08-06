@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:devpath_web/src/features/community/data/community_source.dart';
 import 'package:devpath_web/src/features/community/data/lcs_source.dart';
 import 'package:devpath_web/src/features/community/presentation/qna_detail_page.dart';
@@ -170,5 +172,48 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('📚 작성자 학습 맥락'), findsNothing);
+  });
+
+  // 아래 두 건은 sliver 전환(Task 11)이 만든 로딩·실패 분기를 잠근다. 전환 전에는
+  // Expanded(child: ...)라 레이아웃이 자명했지만 지금은 SliverFillRemaining이라
+  // 헤더와 같은 스크롤 표면 위에서 렌더된다.
+  testWidgets('로딩 중에도 헤더와 로딩 표시가 함께 렌더된다', (tester) async {
+    final completer = Completer<CommunityQuestionDetail>();
+    final c = ProviderContainer(
+      overrides: [
+        qnaDetailFetchProvider.overrideWithValue((id) => completer.future),
+        lcsByQuestionProvider.overrideWithValue((qid) async => null),
+      ],
+    );
+    addTearDown(c.dispose);
+    await tester.pumpWidget(_host(c));
+    await tester.pump(); // load() 시작 → QnaLoading
+
+    expect(tester.widget<DpPageHeader>(find.byType(DpPageHeader)).title, 'Q&A');
+    expect(find.byType(DpLoading), findsOneWidget);
+
+    completer.complete(_detail(answers: const []));
+    await tester.pumpAndSettle();
+    expect(find.text('async 질문'), findsOneWidget);
+  });
+
+  testWidgets('조회 실패 시 헤더와 에러 안내가 함께 렌더된다', (tester) async {
+    final c = ProviderContainer(
+      overrides: [
+        qnaDetailFetchProvider.overrideWithValue(
+          (id) async => throw const ApiException(
+            code: ApiErrorCode.unknown,
+            message: '질문을 불러오지 못했어요',
+          ),
+        ),
+        lcsByQuestionProvider.overrideWithValue((qid) async => null),
+      ],
+    );
+    addTearDown(c.dispose);
+    await tester.pumpWidget(_host(c));
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<DpPageHeader>(find.byType(DpPageHeader)).title, 'Q&A');
+    expect(find.textContaining('질문을 불러오지 못했어요'), findsWidgets);
   });
 }

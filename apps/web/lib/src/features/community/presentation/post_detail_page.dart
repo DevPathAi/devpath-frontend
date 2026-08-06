@@ -55,37 +55,45 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     final s = ref.watch(postDetailControllerProvider(_id));
     final notifier = ref.read(postDetailControllerProvider(_id).notifier);
 
+    // 문서형 화면 — 헤더를 첫 sliver로 실어 본문과 함께 스크롤시킨다(DESIGN.md §9).
+    // 본문은 자체 스크롤을 갖지 않는다(중첩 스크롤이면 헤더가 밀려나지 않는다).
     return Scaffold(
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const DpPageHeader(title: '게시글'),
-          Expanded(
-            child: switch (s.phase) {
-              PostDetailPhase.loading => const DpLoading(),
-              PostDetailPhase.failed => SupportableError(
+      body: CustomScrollView(
+        slivers: [
+          const SliverToBoxAdapter(child: DpPageHeader(title: '게시글')),
+          switch (s.phase) {
+            PostDetailPhase.loading => const SliverFillRemaining(
+              hasScrollBody: false,
+              child: DpLoading(),
+            ),
+            PostDetailPhase.failed => SliverFillRemaining(
+              hasScrollBody: false,
+              child: SupportableError(
                 message: s.error ?? '불러오지 못했어요',
                 onRetry: notifier.load,
               ),
-              PostDetailPhase.loaded when s.detail != null => _Loaded(
-                detail: s.detail!,
-                submitting: s.submitting,
-                currentUserId: switch (ref.watch(authControllerProvider)) {
-                  AuthAuthenticated(:final user) => user.id,
-                  _ => null,
-                },
-                commentCtrl: _commentCtrl,
-                onUpvote: notifier.upvote,
-                onComment: () {
-                  final body = _commentCtrl.text.trim();
-                  if (body.isEmpty) return;
-                  notifier.addComment(body);
-                  _commentCtrl.clear();
-                },
-              ),
-              PostDetailPhase.loaded => const DpLoading(),
-            },
-          ),
+            ),
+            PostDetailPhase.loaded when s.detail != null => _Loaded(
+              detail: s.detail!,
+              submitting: s.submitting,
+              currentUserId: switch (ref.watch(authControllerProvider)) {
+                AuthAuthenticated(:final user) => user.id,
+                _ => null,
+              },
+              commentCtrl: _commentCtrl,
+              onUpvote: notifier.upvote,
+              onComment: () {
+                final body = _commentCtrl.text.trim();
+                if (body.isEmpty) return;
+                notifier.addComment(body);
+                _commentCtrl.clear();
+              },
+            ),
+            PostDetailPhase.loaded => const SliverFillRemaining(
+              hasScrollBody: false,
+              child: DpLoading(),
+            ),
+          },
         ],
       ),
     );
@@ -111,67 +119,71 @@ class _Loaded extends StatelessWidget {
   final VoidCallback onUpvote;
   final VoidCallback onComment;
 
+  /// 페이지의 `CustomScrollView`에 직접 실리는 **sliver**를 반환한다 —
+  /// 여기서 `ListView`를 쓰면 중첩 스크롤이 되어 헤더가 밀려나지 않는다.
   @override
   Widget build(BuildContext context) {
     final c = context.dpColors;
-    return ListView(
+    return SliverPadding(
       padding: const EdgeInsets.all(DpSpacing.lg),
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                detail.title,
-                style: Theme.of(context).textTheme.headlineSmall,
+      sliver: SliverList.list(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  detail.title,
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
               ),
-            ),
-            ReportMenuButton(
-              targetType: 'POST',
-              targetId: detail.id,
-              authorId: detail.authorId,
-              currentUserId: currentUserId,
+              ReportMenuButton(
+                targetType: 'POST',
+                targetId: detail.id,
+                authorId: detail.authorId,
+                currentUserId: currentUserId,
+              ),
+            ],
+          ),
+          if (detail.tags.isNotEmpty) ...[
+            const SizedBox(height: DpSpacing.sm),
+            Wrap(
+              spacing: DpSpacing.xs,
+              children: [for (final t in detail.tags) DpTag(label: '#$t')],
             ),
           ],
-        ),
-        if (detail.tags.isNotEmpty) ...[
           const SizedBox(height: DpSpacing.sm),
-          Wrap(
-            spacing: DpSpacing.xs,
-            children: [for (final t in detail.tags) DpTag(label: '#$t')],
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: const Icon(DpIcons.thumbUp, size: 18),
+                tooltip: '추천',
+                onPressed: submitting ? null : onUpvote,
+              ),
+              Text(
+                '${detail.upvoteCount}',
+                style: TextStyle(color: c.textSecondary),
+              ),
+            ],
+          ),
+          const SizedBox(height: DpSpacing.md),
+          DpMarkdown(data: detail.bodyMd),
+          const Divider(height: DpSpacing.xl),
+          Text(
+            '댓글 ${detail.comments.length}',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: DpSpacing.sm),
+          for (final cm in detail.comments)
+            _CommentCard(comment: cm, currentUserId: currentUserId),
+          const SizedBox(height: DpSpacing.lg),
+          _CommentComposer(
+            controller: commentCtrl,
+            submitting: submitting,
+            onSubmit: onComment,
           ),
         ],
-        const SizedBox(height: DpSpacing.sm),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: const Icon(DpIcons.thumbUp, size: 18),
-              tooltip: '추천',
-              onPressed: submitting ? null : onUpvote,
-            ),
-            Text(
-              '${detail.upvoteCount}',
-              style: TextStyle(color: c.textSecondary),
-            ),
-          ],
-        ),
-        const SizedBox(height: DpSpacing.md),
-        DpMarkdown(data: detail.bodyMd),
-        const Divider(height: DpSpacing.xl),
-        Text(
-          '댓글 ${detail.comments.length}',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        const SizedBox(height: DpSpacing.sm),
-        for (final cm in detail.comments)
-          _CommentCard(comment: cm, currentUserId: currentUserId),
-        const SizedBox(height: DpSpacing.lg),
-        _CommentComposer(
-          controller: commentCtrl,
-          submitting: submitting,
-          onSubmit: onComment,
-        ),
-      ],
+      ),
     );
   }
 }

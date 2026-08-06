@@ -4,6 +4,12 @@ import 'dart:typed_data';
 import 'package:devpath_web/src/features/ads/data/ads_source.dart';
 import 'package:devpath_web/src/features/auth/application/auth_controller.dart';
 import 'package:devpath_web/src/features/auth/state/auth_state.dart';
+import 'package:devpath_web/src/features/community/data/community_source.dart';
+import 'package:devpath_web/src/features/community/data/lcs_source.dart';
+import 'package:devpath_web/src/features/community/presentation/post_create_page.dart';
+import 'package:devpath_web/src/features/community/presentation/post_detail_page.dart';
+import 'package:devpath_web/src/features/community/presentation/qna_detail_page.dart';
+import 'package:devpath_web/src/features/community/presentation/question_create_page.dart';
 import 'package:devpath_web/src/features/content/presentation/content_page.dart';
 import 'package:devpath_web/src/features/dashboard/presentation/dashboard_page.dart';
 import 'package:devpath_web/src/features/mypage/application/mypage_controller.dart';
@@ -19,7 +25,9 @@ import 'package:devpath_web/src/providers/api_providers.dart';
 import 'package:dio/dio.dart';
 import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -210,7 +218,208 @@ void main() {
 
     _expectHeaderScrolledAway(tester);
   });
+
+  testWidgets('게시글 상세 화면에서 헤더가 스크롤과 함께 사라진다', (tester) async {
+    tester.view.physicalSize = const Size(800, 400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    // post_detail_page_test.dart의 provider override + host 패턴을 재사용.
+    final c = ProviderContainer(
+      overrides: [
+        postDetailFetchProvider.overrideWithValue((id) async => _postDetail()),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: c,
+        child: MaterialApp(
+          theme: DpTheme.light(),
+          home: const PostDetailPage(postId: '10'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('게시글'), findsWidgets);
+
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -300));
+    await tester.pump();
+
+    _expectHeaderScrolledAway(tester);
+  });
+
+  testWidgets('Q&A 상세 화면에서 헤더가 스크롤과 함께 사라진다', (tester) async {
+    tester.view.physicalSize = const Size(800, 400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    // qna_detail_page_test.dart의 provider override + host 패턴을 재사용.
+    final c = ProviderContainer(
+      overrides: [
+        qnaDetailFetchProvider.overrideWithValue((id) async => _qnaDetail()),
+        lcsByQuestionProvider.overrideWithValue((qid) async => null),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: c,
+        child: MaterialApp(
+          theme: DpTheme.light(),
+          home: const QnaDetailPage(postId: '1'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Q&A'), findsWidgets);
+
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -300));
+    await tester.pump();
+
+    _expectHeaderScrolledAway(tester);
+  });
+
+  testWidgets('자유글 작성 화면에서 헤더가 스크롤과 함께 사라진다', (tester) async {
+    tester.view.physicalSize = const Size(800, 400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    // post_create_page_test.dart의 host 패턴(GoRouter + Quill 로컬라이제이션)을 재사용.
+    final c = ProviderContainer(
+      overrides: [
+        postCreateProvider.overrideWithValue(
+          ({
+            required boardType,
+            required title,
+            required bodyMd,
+            required tags,
+          }) async => _postDetail(),
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    await tester.pumpWidget(
+      _createHost(
+        c,
+        const PostCreatePage(board: 'FREE'),
+        '/community/new/post',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('자유글 작성'), findsWidgets);
+
+    await _dragOutsideEditor(tester);
+
+    _expectHeaderScrolledAway(tester);
+  });
+
+  testWidgets('질문 작성 화면에서 헤더가 스크롤과 함께 사라진다', (tester) async {
+    tester.view.physicalSize = const Size(800, 400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    // question_create_page_test.dart의 host 패턴을 재사용.
+    final c = ProviderContainer(
+      overrides: [
+        similarQuestionsProvider.overrideWithValue((q) async => const []),
+        questionCreateProvider.overrideWithValue(
+          ({required title, required bodyMd, required tags}) async =>
+              _qnaDetail(),
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    await tester.pumpWidget(
+      _createHost(c, const QuestionCreatePage(), '/community/new'),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('질문하기'), findsWidgets);
+
+    await _dragOutsideEditor(tester);
+
+    _expectHeaderScrolledAway(tester);
+  });
 }
+
+/// 작성 2화면(`post_create`·`question_create`)용 호스트. `DpRichEditor`가
+/// `FlutterQuillLocalizations`를 요구하므로 delegate를 반드시 공급한다.
+Widget _createHost(ProviderContainer c, Widget page, String path) {
+  final router = GoRouter(
+    initialLocation: path,
+    routes: [
+      GoRoute(path: path, builder: (_, _) => page),
+      GoRoute(
+        path: '/community/post/:id',
+        builder: (_, state) => Text('상세: ${state.pathParameters['id']}'),
+      ),
+      GoRoute(
+        path: '/community/:id',
+        builder: (_, state) => Text('질문: ${state.pathParameters['id']}'),
+      ),
+    ],
+  );
+  return UncontrolledProviderScope(
+    container: c,
+    child: MaterialApp.router(
+      theme: DpTheme.light(),
+      localizationsDelegates: const [
+        DefaultCupertinoLocalizations.delegate,
+        DefaultMaterialLocalizations.delegate,
+        DefaultWidgetsLocalizations.delegate,
+        FlutterQuillLocalizations.delegate,
+      ],
+      routerConfig: router,
+    ),
+  );
+}
+
+/// 작성 화면은 본문 에디터가 **고정 높이(260px)의 자체 스크롤 영역**이라
+/// 그 위에서 시작한 수직 드래그는 페이지가 아니라 에디터가 소비한다(실제
+/// 앱에서도 같다 — 결함이 아니라 의도된 거동). 페이지 스크롤을 검증하려면
+/// 에디터 바깥에서 드래그해야 하므로, 상단 제목 입력 근처를 시작점으로 잡는다.
+Future<void> _dragOutsideEditor(WidgetTester tester) async {
+  final start = tester.getCenter(find.byType(TextField).first);
+  await tester.dragFrom(start, const Offset(0, -300));
+  await tester.pump();
+}
+
+CommunityPostDetail _postDetail() => CommunityPostDetail(
+  id: 10,
+  boardType: 'FREE',
+  title: '오늘 배운 것',
+  bodyMd: [for (var i = 0; i < 30; i++) '문단 $i: 본문을 충분히 길게 채운다.'].join('\n\n'),
+  upvoteCount: 5,
+  tags: const ['riverpod'],
+  comments: [
+    for (var i = 0; i < 8; i++)
+      CommunityComment(
+        id: 100 + i,
+        authorId: 42,
+        bodyMd: '댓글 $i',
+        createdAt: 'x',
+      ),
+  ],
+);
+
+CommunityQuestionDetail _qnaDetail() => CommunityQuestionDetail(
+  id: 1,
+  title: 'async 질문',
+  bodyMd: [for (var i = 0; i < 30; i++) '문단 $i: 본문을 충분히 길게 채운다.'].join('\n\n'),
+  solved: false,
+  answers: [
+    for (var i = 0; i < 5; i++)
+      CommunityAnswer(id: 10 + i, authorId: 7, bodyMd: '답변 $i'),
+  ],
+);
 
 /// settings_page_test.dart의 _ReadyController 승계.
 class _ReadySettingsController extends SettingsController {

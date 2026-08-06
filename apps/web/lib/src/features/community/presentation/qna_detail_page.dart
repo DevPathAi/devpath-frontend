@@ -53,22 +53,26 @@ class _QnaDetailPageState extends ConsumerState<QnaDetailPage> {
     });
 
     final s = ref.watch(qnaDetailControllerProvider);
+    // 문서형 화면 — 헤더를 첫 sliver로 실어 본문과 함께 스크롤시킨다(DESIGN.md §9).
     return Scaffold(
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const DpPageHeader(title: 'Q&A'),
-          Expanded(
-            child: switch (s) {
-              QnaLoading() => const DpLoading(),
-              QnaFailed(:final message) => SupportableError(message: message),
-              QnaLoaded(:final detail, :final submitting) => _Loaded(
-                detail: detail,
-                submitting: submitting,
-                answerCtrl: _answerCtrl,
-              ),
-            },
-          ),
+      body: CustomScrollView(
+        slivers: [
+          const SliverToBoxAdapter(child: DpPageHeader(title: 'Q&A')),
+          switch (s) {
+            QnaLoading() => const SliverFillRemaining(
+              hasScrollBody: false,
+              child: DpLoading(),
+            ),
+            QnaFailed(:final message) => SliverFillRemaining(
+              hasScrollBody: false,
+              child: SupportableError(message: message),
+            ),
+            QnaLoaded(:final detail, :final submitting) => _Loaded(
+              detail: detail,
+              submitting: submitting,
+              answerCtrl: _answerCtrl,
+            ),
+          },
         ],
       ),
     );
@@ -91,77 +95,82 @@ class _Loaded extends ConsumerWidget {
     final c = context.dpColors;
     final notifier = ref.read(qnaDetailControllerProvider.notifier);
 
-    return ListView(
+    // 페이지의 `CustomScrollView`에 직접 실리는 **sliver**를 반환한다 —
+    // 여기서 `ListView`를 쓰면 중첩 스크롤이 되어 헤더가 밀려나지 않는다.
+    return SliverPadding(
       padding: const EdgeInsets.all(DpSpacing.lg),
-      children: [
-        Row(
-          children: [
-            if (detail.solved)
-              Padding(
-                padding: const EdgeInsets.only(right: DpSpacing.xs),
-                child: Icon(DpIcons.stepDone, color: c.success),
+      sliver: SliverList.list(
+        children: [
+          Row(
+            children: [
+              if (detail.solved)
+                Padding(
+                  padding: const EdgeInsets.only(right: DpSpacing.xs),
+                  child: Icon(DpIcons.stepDone, color: c.success),
+                ),
+              Expanded(
+                child: Text(
+                  detail.title,
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
               ),
-            Expanded(
-              child: Text(
-                detail.title,
-                style: Theme.of(context).textTheme.headlineSmall,
+              // QuestionDetailView 에는 작성자 id 가 없다(기존 계약) — 자기 글이어도 메뉴가
+              // 보이며, 그 경우 서버 400 을 전용 문구로 안내한다.
+              ReportMenuButton(
+                targetType: 'POST',
+                targetId: detail.id,
+                authorId: null,
+                currentUserId: _currentUserId(ref),
               ),
-            ),
-            // QuestionDetailView 에는 작성자 id 가 없다(기존 계약) — 자기 글이어도 메뉴가
-            // 보이며, 그 경우 서버 400 을 전용 문구로 안내한다.
-            ReportMenuButton(
-              targetType: 'POST',
-              targetId: detail.id,
-              authorId: null,
-              currentUserId: _currentUserId(ref),
+            ],
+          ),
+          const SizedBox(height: DpSpacing.sm),
+          _VoteBar(
+            upvotes: detail.upvoteCount,
+            downvotes: detail.downvoteCount,
+            enabled: !submitting,
+            onVote: (v) =>
+                notifier.vote(CommunityVoteTarget.post, detail.id, v),
+          ),
+          const SizedBox(height: DpSpacing.md),
+          DpMarkdown(data: detail.bodyMd),
+          const SizedBox(height: DpSpacing.sm),
+          LcsAnswererPanel(questionId: detail.id),
+          if (detail.tags.isNotEmpty) ...[
+            const SizedBox(height: DpSpacing.md),
+            Wrap(
+              spacing: DpSpacing.xs,
+              children: [for (final t in detail.tags) Chip(label: Text('#$t'))],
             ),
           ],
-        ),
-        const SizedBox(height: DpSpacing.sm),
-        _VoteBar(
-          upvotes: detail.upvoteCount,
-          downvotes: detail.downvoteCount,
-          enabled: !submitting,
-          onVote: (v) => notifier.vote(CommunityVoteTarget.post, detail.id, v),
-        ),
-        const SizedBox(height: DpSpacing.md),
-        DpMarkdown(data: detail.bodyMd),
-        const SizedBox(height: DpSpacing.sm),
-        LcsAnswererPanel(questionId: detail.id),
-        if (detail.tags.isNotEmpty) ...[
-          const SizedBox(height: DpSpacing.md),
-          Wrap(
-            spacing: DpSpacing.xs,
-            children: [for (final t in detail.tags) Chip(label: Text('#$t'))],
+          const Divider(height: DpSpacing.xl),
+          Text(
+            '답변 ${detail.answers.length}',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: DpSpacing.sm),
+          for (final a in detail.answers)
+            _AnswerCard(
+              answer: a,
+              questionSolved: detail.solved,
+              submitting: submitting,
+              currentUserId: _currentUserId(ref),
+              onVote: (v) => notifier.vote(CommunityVoteTarget.answer, a.id, v),
+              onAccept: () => notifier.accept(a.id),
+            ),
+          const SizedBox(height: DpSpacing.lg),
+          _AnswerComposer(
+            controller: answerCtrl,
+            submitting: submitting,
+            onSubmit: () {
+              final body = answerCtrl.text.trim();
+              if (body.isEmpty) return;
+              notifier.submitAnswer(body);
+              answerCtrl.clear();
+            },
           ),
         ],
-        const Divider(height: DpSpacing.xl),
-        Text(
-          '답변 ${detail.answers.length}',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        const SizedBox(height: DpSpacing.sm),
-        for (final a in detail.answers)
-          _AnswerCard(
-            answer: a,
-            questionSolved: detail.solved,
-            submitting: submitting,
-            currentUserId: _currentUserId(ref),
-            onVote: (v) => notifier.vote(CommunityVoteTarget.answer, a.id, v),
-            onAccept: () => notifier.accept(a.id),
-          ),
-        const SizedBox(height: DpSpacing.lg),
-        _AnswerComposer(
-          controller: answerCtrl,
-          submitting: submitting,
-          onSubmit: () {
-            final body = answerCtrl.text.trim();
-            if (body.isEmpty) return;
-            notifier.submitAnswer(body);
-            answerCtrl.clear();
-          },
-        ),
-      ],
+      ),
     );
   }
 }

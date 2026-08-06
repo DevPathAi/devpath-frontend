@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:devpath_web/src/features/community/data/community_source.dart';
 import 'package:devpath_web/src/features/community/presentation/post_detail_page.dart';
 import 'package:dp_core/dp_core.dart';
@@ -108,5 +110,47 @@ void main() {
     expect(seenTarget, CommunityVoteTarget.post);
     expect(seenId, 10);
     expect(fetchCalls, 2); // load + upvote 후 재조회
+  });
+
+  // 아래 두 건은 sliver 전환(Task 11)이 만든 로딩·실패 분기를 잠근다. 전환 전에는
+  // Expanded(child: ...)라 레이아웃이 자명했지만 지금은 SliverFillRemaining이라
+  // 헤더와 같은 스크롤 표면 위에서 렌더된다 — 분기를 뒤바꾸거나 sliver가 아닌
+  // 위젯을 넣으면 렌더 예외가 나야 하고, 이 테스트가 그것을 적발한다.
+  testWidgets('로딩 중에도 헤더와 로딩 표시가 함께 렌더된다', (tester) async {
+    final completer = Completer<CommunityPostDetail>();
+    final c = ProviderContainer(
+      overrides: [
+        postDetailFetchProvider.overrideWithValue((id) => completer.future),
+      ],
+    );
+    addTearDown(c.dispose);
+    await tester.pumpWidget(_host(c));
+    await tester.pump(); // load() 시작 → loading 상태
+
+    expect(tester.widget<DpPageHeader>(find.byType(DpPageHeader)).title, '게시글');
+    expect(find.byType(DpLoading), findsOneWidget);
+
+    completer.complete(_detail());
+    await tester.pumpAndSettle();
+    expect(find.text('오늘 배운 것'), findsOneWidget);
+  });
+
+  testWidgets('조회 실패 시 헤더와 에러 안내가 함께 렌더된다', (tester) async {
+    final c = ProviderContainer(
+      overrides: [
+        postDetailFetchProvider.overrideWithValue(
+          (id) async => throw const ApiException(
+            code: ApiErrorCode.unknown,
+            message: '불러오지 못했어요',
+          ),
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+    await tester.pumpWidget(_host(c));
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<DpPageHeader>(find.byType(DpPageHeader)).title, '게시글');
+    expect(find.textContaining('불러오지 못했어요'), findsWidgets);
   });
 }
