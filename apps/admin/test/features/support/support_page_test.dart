@@ -23,7 +23,9 @@ class _Fake extends SupportListController {
 }
 
 void main() {
-  testWidgets('DpPageHeader 제목은 "오류 신고·문의"', (tester) async {
+  testWidgets('DpPageHeader 제목은 "오류 신고·문의" + 상태 필터가 filters 슬롯에 렌더', (
+    tester,
+  ) async {
     final c = ProviderContainer(
       overrides: [supportListProvider.overrideWith(() => _Fake(const []))],
     );
@@ -39,5 +41,6 @@ void main() {
 
     final header = tester.widget<DpPageHeader>(find.byType(DpPageHeader));
     expect(header.title, '오류 신고·문의');
+    expect(find.byKey(const ValueKey('page-header-filters')), findsOneWidget);
   });
 }

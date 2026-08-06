@@ -27,20 +27,11 @@ class SupportPage extends ConsumerWidget {
     return Scaffold(
       body: Column(
         children: [
-          const DpPageHeader(
+          DpPageHeader(
             title: '오류 신고·문의',
             description: '사용자가 보낸 오류와 문의를 처리합니다',
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              DpSpacing.lg,
-              DpSpacing.md,
-              DpSpacing.lg,
-              0,
-            ),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: SegmentedButton<String?>(
+            filters: [
+              SegmentedButton<String?>(
                 segments: [
                   for (final (label, value) in _statusFilters)
                     ButtonSegment(value: value, label: Text(label)),
@@ -49,7 +40,7 @@ class SupportPage extends ConsumerWidget {
                 showSelectedIcon: false,
                 onSelectionChanged: (sel) => n.load(status: sel.first),
               ),
-            ),
+            ],
           ),
           Expanded(
             child: switch (s) {

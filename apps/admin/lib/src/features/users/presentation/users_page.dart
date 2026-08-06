@@ -67,28 +67,22 @@ class _S extends ConsumerState<AdminUsersPage> {
           DpPageHeader(
             title: '사용자 관리',
             description: '가입 승인과 제재를 처리합니다',
-            filters: Row(
-              children: [
-                const Text('상태:'),
-                const SizedBox(width: DpSpacing.sm),
-                // (변경 1) BETA_PENDING을 첫 번째로 추가
-                for (final st in [
-                  'BETA_PENDING',
-                  'ACTIVE',
-                  'WARNED',
-                  'SUSPENDED',
-                  'BANNED',
-                ])
-                  Padding(
-                    padding: const EdgeInsets.only(right: DpSpacing.xs),
-                    child: ChoiceChip(
-                      label: Text(st),
-                      selected: s.statusFilter == st,
-                      onSelected: (_) => n.setStatusFilter(st),
-                    ),
-                  ),
-              ],
-            ),
+            filters: [
+              const Text('상태:'),
+              // (변경 1) BETA_PENDING을 첫 번째로 추가
+              for (final st in [
+                'BETA_PENDING',
+                'ACTIVE',
+                'WARNED',
+                'SUSPENDED',
+                'BANNED',
+              ])
+                ChoiceChip(
+                  label: Text(st),
+                  selected: s.statusFilter == st,
+                  onSelected: (_) => n.setStatusFilter(st),
+                ),
+            ],
           ),
           // (변경 3) 사전승인 폼 — 화면 상단
           _PreApproveBar(

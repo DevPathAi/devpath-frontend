@@ -128,10 +128,13 @@ void main() {
     expect((s as ReportsLoaded).status, 'REJECTED');
   });
 
-  testWidgets('DpPageHeader 제목은 "신고 처리"', (tester) async {
+  testWidgets('DpPageHeader 제목은 "신고 처리" + 상태 필터가 filters 슬롯에 렌더', (
+    tester,
+  ) async {
     await _pump(tester, _container(_Fake([_r()])));
 
     final header = tester.widget<DpPageHeader>(find.byType(DpPageHeader));
     expect(header.title, '신고 처리');
+    expect(find.byKey(const ValueKey('page-header-filters')), findsOneWidget);
   });
 }

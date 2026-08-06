@@ -30,7 +30,7 @@ void main() {
           title: '사용자 관리',
           description: '가입 승인과 제재를 처리합니다',
           actions: [Text('액션')],
-          filters: Text('필터'),
+          filters: [Text('필터')],
         ),
       ),
     );

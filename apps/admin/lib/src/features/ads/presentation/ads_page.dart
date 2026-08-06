@@ -50,21 +50,15 @@ class _AdsPageState extends ConsumerState<AdminAdsPage> {
                 onPressed: () => _openForm(context, n, null),
               ),
             ],
-            filters: Row(
-              children: [
-                const Text('슬롯:'),
-                const SizedBox(width: DpSpacing.sm),
-                for (final slot in _kSlots)
-                  Padding(
-                    padding: const EdgeInsets.only(right: DpSpacing.xs),
-                    child: ChoiceChip(
-                      label: Text(slot),
-                      selected: s.slotFilter == slot,
-                      onSelected: (sel) => n.setSlotFilter(sel ? slot : null),
-                    ),
-                  ),
-              ],
-            ),
+            filters: [
+              const Text('슬롯:'),
+              for (final slot in _kSlots)
+                ChoiceChip(
+                  label: Text(slot),
+                  selected: s.slotFilter == slot,
+                  onSelected: (sel) => n.setSlotFilter(sel ? slot : null),
+                ),
+            ],
           ),
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 180),

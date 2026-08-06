@@ -33,20 +33,11 @@ class ReportsPage extends ConsumerWidget {
     return Scaffold(
       body: Column(
         children: [
-          const DpPageHeader(
+          DpPageHeader(
             title: '신고 처리',
             description: '커뮤니티 신고를 검토하고 판정합니다',
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              DpSpacing.lg,
-              DpSpacing.md,
-              DpSpacing.lg,
-              0,
-            ),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: SegmentedButton<String?>(
+            filters: [
+              SegmentedButton<String?>(
                 segments: [
                   for (final (label, value) in _filters)
                     ButtonSegment(value: value, label: Text(label)),
@@ -55,7 +46,7 @@ class ReportsPage extends ConsumerWidget {
                 showSelectedIcon: false,
                 onSelectionChanged: (sel) => n.load(status: sel.first),
               ),
-            ),
+            ],
           ),
           Expanded(
             child: switch (s) {
