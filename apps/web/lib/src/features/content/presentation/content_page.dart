@@ -26,6 +26,11 @@ class ContentPage extends ConsumerStatefulWidget {
 class _ContentPageState extends ConsumerState<ContentPage>
     with WidgetsBindingObserver {
   final _scrollController = ScrollController();
+  // _scrollPct의 헤더 높이 보정에 쓴다 — DpPageHeader가 CustomScrollView의
+  // 첫 sliver로 실려 있어 _scrollController가 헤더+본문 전체 스크롤 범위를
+  // 관측한다(Task 10). 이 키로 헤더가 실제로 차지하는 박스 높이를 재서 서버로
+  // 보내는 진행률에서 빼낸다.
+  final _headerKey = GlobalKey();
   late final ContentController _contentController;
   late final ApiClient _apiClient;
   Timer? _dwellTimer;
@@ -102,6 +107,7 @@ class _ContentPageState extends ConsumerState<ContentPage>
         slivers: [
           SliverToBoxAdapter(
             child: DpPageHeader(
+              key: _headerKey,
               title: '학습 콘텐츠',
               description: '읽고 나면 바로 실습으로 이어집니다',
               actions: [
@@ -178,11 +184,41 @@ class _ContentPageState extends ConsumerState<ContentPage>
     if (flush != null) unawaited(_postProgress(flush));
   }
 
+  /// [_scrollController]가 붙는 [CustomScrollView]는 헤더+본문을 함께
+  /// 스크롤한다(Task 10) — `pixels`/`maxScrollExtent`를 보정 없이 쓰면 분자·
+  /// 분모 양쪽에 헤더 높이(headerH)가 똑같이 더해져, 서버로 보내는 진행률이
+  /// 실제(본문 기준)보다 **부풀려진다**(1에 더 가깝게 나온다) — 같은 상수를
+  /// 분자·분모에 더하면 원래 비율이 1보다 작을 때 그 비율은 항상 커진다.
+  ///
+  /// 예: 헤더 80px, 본문만 스크롤하던 옛 구조의 max가 1000px이라 하자.
+  /// 본문을 500px 스크롤한 지점은 옛 의미로 pctOld = 500/1000 = 0.5다.
+  /// 지금 구조에서 같은 본문 위치는 pixelsNew = 500+80 = 580,
+  /// maxNew = 1000+80 = 1080이라 보정 없이 580/1080 ≈ 0.537을 보낸다 —
+  /// 0.5가 아니라 그보다 큰 값이다. 끝까지 스크롤(pixelsNew==maxNew)할
+  /// 때만 우연히 1.0으로 맞아떨어지고(완료 판정은 안전), 그 전 모든
+  /// 중간값은 항상 실제보다 부풀려져 나간다(실측: 헤더 보정 없이 50%
+  /// 지점을 스크롤하면 약 0.514가 전송됨 — 아래 회귀 테스트 참조).
+  ///
+  /// headerH를 [_headerKey]로 실측해 양쪽에서 빼면 옛 의미가 그대로
+  /// 복원된다: pctOld = (pixelsNew - headerH) / (maxNew - headerH)
+  /// = (580-80)/(1080-80) = 500/1000 = 0.5. 헤더가 아직 레이아웃되지 않아
+  /// 높이를 잴 수 없으면(initState 직후 등) 서버가 마지막으로 보낸 값을
+  /// 그대로 폴백한다.
   double _scrollPct(double fallback) {
     if (!_scrollController.hasClients) return fallback;
     final position = _scrollController.position;
-    if (position.maxScrollExtent <= 0) return 1;
-    return (position.pixels / position.maxScrollExtent).clamp(0, 1).toDouble();
+    final headerHeight = _headerHeight;
+    if (headerHeight == null) return fallback;
+    final maxExtent = position.maxScrollExtent - headerHeight;
+    if (maxExtent <= 0) return 1;
+    final pixels = position.pixels - headerHeight;
+    return (pixels / maxExtent).clamp(0, 1).toDouble();
+  }
+
+  double? get _headerHeight {
+    final box = _headerKey.currentContext?.findRenderObject();
+    if (box is! RenderBox || !box.hasSize) return null;
+    return box.size.height;
   }
 
   Future<void> _postProgress(ContentProgressFlush flush) async {

@@ -99,8 +99,9 @@ void main() {
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -300));
     await tester.pump();
     // 소스의 설정 카드 ListTile-in-DecoratedBox 디버그 assertion 소비
-    // (mypage_page_test.dart와 동일 원인, 렌더 자체는 정상).
-    tester.takeException();
+    // (mypage_page_test.dart:67,89와 동일 원인·동일 방식: 타입까지 확인해
+    // 다른 원인의 예외가 섞여도 조용히 통과하지 않게 한다).
+    expect(tester.takeException(), isAssertionError);
 
     _expectHeaderScrolledAway(tester);
   });

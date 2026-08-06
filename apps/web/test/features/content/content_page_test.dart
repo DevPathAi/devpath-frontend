@@ -91,6 +91,103 @@ void main() {
     expect(adapter.count('GET /dashboard/me'), 1);
   });
 
+  testWidgets('스크롤 진행률(scrollPct)은 헤더 높이를 보정해 서버로 전송한다', (tester) async {
+    tester.view.physicalSize = const Size(900, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final adapter = _SequenceAdapter({
+      'GET /contents/future-async-await': [
+        (200, _contentJson(markdown: _longMarkdown(), scrollPct: 0)),
+      ],
+      'POST /contents/future-async-await/progress': [
+        (
+          200,
+          {
+            'scrollPct': 0.5,
+            'dwellSec': 6,
+            'completed': false,
+            'completedAt': null,
+          },
+        ),
+      ],
+    });
+
+    await tester.pumpWidget(_host(adapter));
+    await _pumpLoad(tester);
+
+    // 헤더도 CustomScrollView의 첫 sliver라 컨트롤러가 헤더+본문 전체
+    // 스크롤 범위를 관측한다(Task 10) — 보정 없이 pixels/maxScrollExtent를
+    // 쓰면 분모에 헤더 높이가 섞여 진행률이 실제보다 낮게 계산된다.
+    final headerHeight = tester.getSize(find.byType(DpPageHeader)).height;
+    final controller = tester
+        .widget<CustomScrollView>(find.byType(CustomScrollView))
+        .controller!;
+    final bodyMax = controller.position.maxScrollExtent - headerHeight;
+    // 80문단짜리 긴 마크다운이 900x700 뷰포트보다 충분히 길어야
+    // 아래 "본문 50% 지점" 계산이 의미를 갖는다.
+    expect(bodyMax, greaterThan(0));
+
+    await tester.pump(const Duration(seconds: 6)); // dwellSec=6(최소 5초 통과)
+
+    // "본문만 스크롤하던 옛 구조" 기준 정확히 50% 지점 = 지금 구조에서는
+    // 헤더 높이만큼 밀린 위치(headerHeight + bodyMax*0.5)로 점프한다.
+    // jumpTo는 리스너를 동기 호출해 정확히 이 위치 하나로만 flush를 낸다
+    // (드래그 제스처의 중간 프레임에 걸쳐 값이 흔들리는 것을 피한다).
+    controller.jumpTo(headerHeight + bodyMax * 0.5);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(adapter.postBodies, isNotEmpty);
+    final sentScrollPct = (adapter.postBodies.last as Map)['scrollPct'] as num;
+    // 보정 없이(옛 코드) 계산하면 이 값은 0.5보다 뚜렷이 커진다(분모에 헤더
+    // 높이가 섞여 pixels/maxScrollExtent > 실제 본문 스크롤 비율이 되므로).
+    expect(sentScrollPct.toDouble(), closeTo(0.5, 0.001));
+  });
+
+  testWidgets('끝까지 스크롤해도 scrollPct는 여전히 1.0이다(보정 후에도 완료 판정 불변)', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(900, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final adapter = _SequenceAdapter({
+      'GET /contents/future-async-await': [
+        (200, _contentJson(markdown: _longMarkdown(), scrollPct: 0)),
+      ],
+      'POST /contents/future-async-await/progress': [
+        (
+          200,
+          {
+            'scrollPct': 1.0,
+            'dwellSec': 6,
+            'completed': false,
+            'completedAt': null,
+          },
+        ),
+      ],
+    });
+
+    await tester.pumpWidget(_host(adapter));
+    await _pumpLoad(tester);
+
+    final controller = tester
+        .widget<CustomScrollView>(find.byType(CustomScrollView))
+        .controller!;
+    final maxExtent = controller.position.maxScrollExtent;
+
+    await tester.pump(const Duration(seconds: 6));
+
+    controller.jumpTo(maxExtent);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(adapter.postBodies, isNotEmpty);
+    final sentScrollPct = (adapter.postBodies.last as Map)['scrollPct'] as num;
+    expect(sentScrollPct.toDouble(), 1.0);
+  });
+
   testWidgets('retry button reloads', (tester) async {
     final adapter = _SequenceAdapter({
       'GET /contents/future-async-await': [
