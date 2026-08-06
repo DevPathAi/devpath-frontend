@@ -60,7 +60,8 @@ Future<void> _pump(WidgetTester tester, ProviderContainer c) async {
   await tester.pumpAndSettle();
 }
 
-ProviderContainer _container(_Fake fake) {
+/// 로딩·실패 상태를 고정하는 가짜도 받을 수 있도록 상위 타입으로 받는다.
+ProviderContainer _container(ReportsController fake) {
   final c = ProviderContainer(
     overrides: [reportsProvider.overrideWith(() => fake)],
   );
@@ -137,4 +138,52 @@ void main() {
     expect(header.title, '신고 처리');
     expect(find.byKey(const ValueKey('page-header-filters')), findsOneWidget);
   });
+
+  // 아래 두 건은 sliver 전환(Task 12)이 만든 로딩·실패 분기를 잠근다. 빈 목록
+  // 분기는 위 '빈 목록이면 안내를 보여준다'가 이미 커버한다. 전환 전에는
+  // Expanded(child: ...)라 레이아웃이 자명했지만 지금은 SliverFillRemaining이라
+  // 헤더와 같은 스크롤 표면 위에서 렌더된다 — 비-sliver를 넣으면 예외가 난다.
+  testWidgets('로딩 중에도 헤더와 로딩 표시가 함께 렌더된다', (tester) async {
+    // _pump 헬퍼는 pumpAndSettle을 쓰는데 DpLoading은 무한 애니메이션이라
+    // 정착하지 않는다(실측: pumpAndSettle timed out). 이 케이스만 pump 한 번.
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: _container(_LoadingReports()),
+        child: MaterialApp(theme: DpTheme.light(), home: const ReportsPage()),
+      ),
+    );
+    await tester.pump();
+
+    expect(
+      tester.widget<DpPageHeader>(find.byType(DpPageHeader)).title,
+      '신고 처리',
+    );
+    expect(find.byType(DpLoading), findsOneWidget);
+  });
+
+  testWidgets('조회 실패 시 헤더와 에러 안내가 함께 렌더된다', (tester) async {
+    await _pump(tester, _container(_FailedReports()));
+
+    expect(
+      tester.widget<DpPageHeader>(find.byType(DpPageHeader)).title,
+      '신고 처리',
+    );
+    expect(find.textContaining('신고를 불러오지 못했어요'), findsWidgets);
+  });
+}
+
+class _LoadingReports extends ReportsController {
+  @override
+  ReportsState build() => const ReportsLoading();
+
+  @override
+  Future<void> load({String? status = 'OPEN'}) async {}
+}
+
+class _FailedReports extends ReportsController {
+  @override
+  ReportsState build() => const ReportsFailed('신고를 불러오지 못했어요');
+
+  @override
+  Future<void> load({String? status = 'OPEN'}) async {}
 }

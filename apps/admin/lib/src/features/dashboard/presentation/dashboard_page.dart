@@ -29,19 +29,30 @@ class _S extends ConsumerState<AdminDashboardPage> {
       'openReports': '미처리 신고',
       'aiCalls': 'AI 호출',
     };
+    // 문서형 화면 — 헤더를 첫 sliver로 실어 본문과 함께 스크롤시킨다(DESIGN.md §9).
+    // 본문은 자체 스크롤을 갖지 않는다(중첩 스크롤이면 헤더가 밀려나지 않는다).
+    // users·ads·support는 DpDataTable이 자체 뷰포트를 가져 고정형으로 남는다.
     return Scaffold(
-      body: Column(
-        children: [
-          const DpPageHeader(title: '운영 대시보드', description: '서비스 지표를 요약합니다'),
-          Expanded(
-            child: switch (s) {
-              AdminDashLoading() => const DpLoading(),
-              AdminDashFailed(:final message) => DpError(
+      body: CustomScrollView(
+        slivers: [
+          const SliverToBoxAdapter(
+            child: DpPageHeader(title: '운영 대시보드', description: '서비스 지표를 요약합니다'),
+          ),
+          switch (s) {
+            AdminDashLoading() => const SliverFillRemaining(
+              hasScrollBody: false,
+              child: DpLoading(),
+            ),
+            AdminDashFailed(:final message) => SliverFillRemaining(
+              hasScrollBody: false,
+              child: DpError(
                 message: message,
                 onRetry: () => ref.read(adminDashProvider.notifier).load(),
               ),
-              AdminDashLoaded(:final stats) => GridView.count(
-                padding: const EdgeInsets.all(DpSpacing.lg),
+            ),
+            AdminDashLoaded(:final stats) => SliverPadding(
+              padding: const EdgeInsets.all(DpSpacing.lg),
+              sliver: SliverGrid.count(
                 crossAxisCount: 4,
                 childAspectRatio: 1.6,
                 mainAxisSpacing: DpSpacing.md,
@@ -75,8 +86,8 @@ class _S extends ConsumerState<AdminDashboardPage> {
                     ),
                 ],
               ),
-            },
-          ),
+            ),
+          },
         ],
       ),
     );

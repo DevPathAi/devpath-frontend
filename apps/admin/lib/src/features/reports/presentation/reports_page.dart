@@ -30,35 +30,48 @@ class ReportsPage extends ConsumerWidget {
     final n = ref.read(reportsProvider.notifier);
     final current = s is ReportsLoaded ? s.status : 'OPEN';
 
+    // 문서형 화면 — 헤더(필터 슬롯 포함)를 첫 sliver로 실어 본문과 함께
+    // 스크롤시킨다(DESIGN.md §9). 필터는 Task 9에서 이미 헤더 슬롯으로 옮겼다.
     return Scaffold(
-      body: Column(
-        children: [
-          DpPageHeader(
-            title: '신고 처리',
-            description: '커뮤니티 신고를 검토하고 판정합니다',
-            filters: [
-              SegmentedButton<String?>(
-                segments: [
-                  for (final (label, value) in _filters)
-                    ButtonSegment(value: value, label: Text(label)),
-                ],
-                selected: {current},
-                showSelectedIcon: false,
-                onSelectionChanged: (sel) => n.load(status: sel.first),
-              ),
-            ],
+      body: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: DpPageHeader(
+              title: '신고 처리',
+              description: '커뮤니티 신고를 검토하고 판정합니다',
+              filters: [
+                SegmentedButton<String?>(
+                  segments: [
+                    for (final (label, value) in _filters)
+                      ButtonSegment(value: value, label: Text(label)),
+                  ],
+                  selected: {current},
+                  showSelectedIcon: false,
+                  onSelectionChanged: (sel) => n.load(status: sel.first),
+                ),
+              ],
+            ),
           ),
-          Expanded(
-            child: switch (s) {
-              ReportsLoading() => const DpLoading(),
-              ReportsFailed(:final message) => DpError(
+          switch (s) {
+            ReportsLoading() => const SliverFillRemaining(
+              hasScrollBody: false,
+              child: DpLoading(),
+            ),
+            ReportsFailed(:final message) => SliverFillRemaining(
+              hasScrollBody: false,
+              child: DpError(
                 message: message,
                 onRetry: () => n.load(status: current),
               ),
-              ReportsLoaded(:final reports) when reports.isEmpty =>
-                const DpEmpty(icon: DpIcons.empty, title: '해당하는 신고가 없어요'),
-              ReportsLoaded(:final reports) => ListView(
-                padding: const EdgeInsets.all(DpSpacing.lg),
+            ),
+            ReportsLoaded(:final reports) when reports.isEmpty =>
+              const SliverFillRemaining(
+                hasScrollBody: false,
+                child: DpEmpty(icon: DpIcons.empty, title: '해당하는 신고가 없어요'),
+              ),
+            ReportsLoaded(:final reports) => SliverPadding(
+              padding: const EdgeInsets.all(DpSpacing.lg),
+              sliver: SliverList.list(
                 children: [
                   for (final r in reports)
                     _ReportCard(
@@ -68,8 +81,8 @@ class ReportsPage extends ConsumerWidget {
                     ),
                 ],
               ),
-            },
-          ),
+            ),
+          },
         ],
       ),
     );
