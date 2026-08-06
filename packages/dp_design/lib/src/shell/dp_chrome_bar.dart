@@ -72,9 +72,21 @@ class DpChromeBar extends StatelessWidget {
       //
       // 해법: 바 컨테이너(패딩 적용 후) 전체를 감싸는 바깥 LayoutBuilder로
       // 실제 사용 가능 폭을 먼저 얻고, 그 절반을 캡으로 _actionGroup에
-      // 명시적으로 넘긴다. 이러면 우측 그룹은 항상 바 폭의 최대 절반만
-      // 요구하도록 자기 검열하고(=account 포함 inline 액션 수를 캡 안에서
-      // 결정), 좌측 Expanded는 최소 절반을 보장받는다.
+      // 명시적으로 넘긴다. 이러면 우측 그룹은 캡 안에서 inline 액션 수를
+      // 결정하고(account·구분 간격까지 전부 예산에 포함 — _actionGroup의
+      // accountReserve 참고), 좌측 Expanded는 최소 절반을 보장받는다.
+      // "항상 절반만 요구"는 정확한 서술이 아니다 — account가 있고 캡이
+      // 매우 좁을 때(대략 overflowButton+accountReserve=104px 미만)는
+      // 더보기 버튼과 account만으로도 캡을 넘는 이론적 하한이 있다(코드
+      // 리뷰 실측으로 확인). 이 하한은 이 컴포넌트가 도달 가능한 실제
+      // 폭 범위 밖이라 별도로 방어하지 않았다.
+      //
+      // ★현재 조건 미도달★ — 이 축약은 web 오류 신고 액션 1개·admin
+      // 액션 0개인 지금 상태에서는 어떤 폭에서도 발동하지 않는다(둘 다
+      // perAction 1개분(48px)이 절반-캡을 넘기지 못한다). 이 작업은 스펙
+      // §3.0이 trailing 슬롯의 행선지로 지정한 자리가 액션 수가 늘어나도
+      // 안전하도록 미리 만들어 둔 것이지, 실제 화면에서 관찰된 결함을
+      // 고친 것이 아니다 — 8액션 시나리오는 테스트에서만 구성된다.
       child: LayoutBuilder(
         builder: (context, barConstraints) {
           final barWidth = barConstraints.maxWidth;
@@ -138,10 +150,16 @@ class DpChromeBar extends StatelessWidget {
 
     const perAction = 48.0;
     const overflowButton = 48.0;
-    final accountWidth = account != null ? 48.0 : 0.0;
+    // account가 있으면 실제 렌더(아래 Row)에서 액션그룹과 account 사이에
+    // SizedBox(width: DpSpacing.sm) 8px이 항상 붙는다(account는 절대 접지
+    // 않으므로 이 간격은 오버플로 여부와 무관하게 항상 소비된다). 이 8px을
+    // 예산에서 빠뜨리면 경계 폭에서 "오버플로 없음"으로 오판하고 실제
+    // 콘텐츠가 상한을 넘긴다(코드 리뷰 실측 재현: 폭 328·액션 2개·account
+    // 있는 조건에서 4px 오버플로 확인 — dp_chrome_bar_account_gap_test.dart).
+    final accountReserve = account != null ? 48.0 + DpSpacing.sm : 0.0;
 
     final budget = maxWidth.isFinite
-        ? maxWidth - accountWidth
+        ? maxWidth - accountReserve
         : double.infinity;
     final fits = budget.isFinite
         ? (budget / perAction).floor()
@@ -170,8 +188,8 @@ class DpChromeBar extends StatelessWidget {
               // 전경색을 결정해 ambient IconTheme.merge를 상속하지 않는다.
               icon: Icon(a.icon, color: c.textSecondary),
               tooltip: a.label,
-              // build()의 context를 넘긴다 — 크롬바 아래라 Navigator/
-              // Overlay에 접근할 수 있다.
+              // 바깥 LayoutBuilder 콜백의 context를 넘긴다 — 크롬바 아래라
+              // Navigator/Overlay에 접근할 수 있다.
               onPressed: () => a.onPressed(context),
             ),
           if (overflow.isNotEmpty)
