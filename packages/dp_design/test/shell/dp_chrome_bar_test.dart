@@ -298,16 +298,13 @@ void main() {
   testWidgets('마지막 crumb은 path가 있어도 비링크다', (tester) async {
     var tapped = 0;
     await tester.pumpWidget(
-      MaterialApp(
-        theme: DpTheme.light(),
-        home: Scaffold(
-          body: DpChromeBar(
-            breadcrumb: const [
-              (label: '커뮤니티', path: null),
-              (label: '게시판', path: '/community'),
-            ],
-            onCrumbTap: (_) => tapped++,
-          ),
+      _host(
+        DpChromeBar(
+          breadcrumb: const [
+            (label: '커뮤니티', path: null),
+            (label: '게시판', path: '/community'),
+          ],
+          onCrumbTap: (_) => tapped++,
         ),
       ),
     );
@@ -321,17 +318,14 @@ void main() {
   testWidgets('마지막이 아닌 crumb은 path가 있으면 링크다', (tester) async {
     var tappedPath = '';
     await tester.pumpWidget(
-      MaterialApp(
-        theme: DpTheme.light(),
-        home: Scaffold(
-          body: DpChromeBar(
-            breadcrumb: const [
-              (label: '커뮤니티', path: null),
-              (label: '게시판', path: '/community'),
-              (label: '게시글', path: null),
-            ],
-            onCrumbTap: (p) => tappedPath = p,
-          ),
+      _host(
+        DpChromeBar(
+          breadcrumb: const [
+            (label: '커뮤니티', path: null),
+            (label: '게시판', path: '/community'),
+            (label: '게시글', path: null),
+          ],
+          onCrumbTap: (p) => tappedPath = p,
         ),
       ),
     );
@@ -339,6 +333,62 @@ void main() {
     await tester.tap(find.text('게시판'));
     await tester.pump();
     expect(tappedPath, '/community');
+  });
+
+  // Important(리뷰 발견 1): dp_chrome_bar.dart의 구분자 패딩 상쇄 조건
+  // (`i + 1 == items.length - 1`)은 "마지막 항목이 path를 가진" 경우에만
+  // 의미가 갈린다. 위쪽 `_crumbs` 고정 픽스처는 마지막이 이미 path: null이라
+  // 이 분기를 통과하지 않는다 — 이 테스트가 그 경로를 전담해서 잠근다.
+  // (컨트롤러 리뷰로 이 조건을 제거하면 정확히 DpSpacing.sm(8px)만큼
+  // 비대칭이 재현됨을 실측 확인했다 — task-5-report.md 참고.)
+  testWidgets('마지막 crumb이 path를 가져도 구분자 간격은 대칭이다', (tester) async {
+    await tester.pumpWidget(
+      _host(
+        const DpChromeBar(
+          breadcrumb: [
+            (label: '커뮤니티', path: null),
+            (label: '게시판', path: '/community'),
+          ],
+        ),
+      ),
+    );
+
+    final dot = tester.getRect(find.text('·'));
+    final gapBefore = dot.left - tester.getRect(find.text('커뮤니티')).right;
+    final gapAfter = tester.getRect(find.text('게시판')).left - dot.right;
+    expect(
+      gapBefore,
+      closeTo(gapAfter, 0.5),
+      reason: '커뮤니티 · 게시판(마지막, path 있음) 구분자 간격이 좌우 비대칭이다',
+    );
+  });
+
+  // Minor(리뷰 발견 3): compact은 crumbs를 마지막 1개로 잘라 렌더한다
+  // (`_crumbs`의 `compact && breadcrumb.isNotEmpty ? [breadcrumb.last] : ...`).
+  // 그 단일 항목이 path를 가진 경우에도 비링크여야 한다 — 기존 compact
+  // 테스트(위 '검색 아이콘' 테스트)의 픽스처(게시글, path: null)는 이
+  // 조합을 우연히 피해간다.
+  testWidgets('compact에서 유일한(마지막) crumb이 path를 가져도 비링크다', (tester) async {
+    var tapped = 0;
+    await tester.pumpWidget(
+      _host(
+        DpChromeBar(
+          breadcrumb: const [
+            (label: '커뮤니티', path: null),
+            (label: '게시판', path: '/community'),
+          ],
+          compact: true,
+          onCrumbTap: (_) => tapped++,
+        ),
+      ),
+    );
+
+    expect(find.text('게시판'), findsOneWidget);
+    expect(find.text('커뮤니티'), findsNothing);
+
+    await tester.tap(find.text('게시판'));
+    await tester.pump();
+    expect(tapped, 0);
   });
 
   testWidgets('검색 필드 배경은 surfaceMuted를 쓴다', (tester) async {
