@@ -293,6 +293,54 @@ void main() {
     }
   });
 
+  // 3-A: 마지막 세그먼트는 현재 위치이므로 path가 있어도 비링크로 렌더해야
+  // 한다(브레드크럼 관례 — 자기 자신으로 가는 링크를 두지 않는다).
+  testWidgets('마지막 crumb은 path가 있어도 비링크다', (tester) async {
+    var tapped = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: DpTheme.light(),
+        home: Scaffold(
+          body: DpChromeBar(
+            breadcrumb: const [
+              (label: '커뮤니티', path: null),
+              (label: '게시판', path: '/community'),
+            ],
+            onCrumbTap: (_) => tapped++,
+          ),
+        ),
+      ),
+    );
+
+    // 현재 위치를 자기 자신에게 링크하지 않는다(브레드크럼 관례).
+    await tester.tap(find.text('게시판'));
+    await tester.pump();
+    expect(tapped, 0);
+  });
+
+  testWidgets('마지막이 아닌 crumb은 path가 있으면 링크다', (tester) async {
+    var tappedPath = '';
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: DpTheme.light(),
+        home: Scaffold(
+          body: DpChromeBar(
+            breadcrumb: const [
+              (label: '커뮤니티', path: null),
+              (label: '게시판', path: '/community'),
+              (label: '게시글', path: null),
+            ],
+            onCrumbTap: (p) => tappedPath = p,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('게시판'));
+    await tester.pump();
+    expect(tappedPath, '/community');
+  });
+
   testWidgets('검색 필드 배경은 surfaceMuted를 쓴다', (tester) async {
     await tester.pumpWidget(
       _host(DpChromeBar(breadcrumb: _crumbs, onSearchTap: () {})),

@@ -239,7 +239,11 @@ class DpChromeBar extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
       );
 
-      final crumbWidget = crumb.path == null
+      // 마지막 세그먼트는 현재 위치이므로 path가 있어도 링크하지 않는다
+      // (브레드크럼 관례 — 자기 자신으로 가는 링크를 두지 않는다).
+      // 앱은 crumb 데이터를 그대로 두면 된다: /community에서 마지막이
+      // '게시판'(path: '/community')이지만 여기서 비링크로 렌더된다.
+      final crumbWidget = (crumb.path == null || isLast)
           ? label
           : Semantics(
               button: true,
@@ -285,7 +289,10 @@ class DpChromeBar extends StatelessWidget {
           Padding(
             padding: EdgeInsets.only(
               left: crumb.path == null ? DpSpacing.sm : 0,
-              right: items[i + 1].path == null ? DpSpacing.sm : 0,
+              // 다음 세그먼트가 마지막이면 비링크이므로 자체 패딩이 없다.
+              right: (items[i + 1].path == null || i + 1 == items.length - 1)
+                  ? DpSpacing.sm
+                  : 0,
             ),
             // textFaint는 대비 3.21:1 — 텍스트가 아닌 구분자 글리프에만 쓴다.
             child: Text('·', style: style?.copyWith(color: c.textFaint)),
