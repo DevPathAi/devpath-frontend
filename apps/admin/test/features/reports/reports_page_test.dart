@@ -144,8 +144,12 @@ void main() {
   // Expanded(child: ...)라 레이아웃이 자명했지만 지금은 SliverFillRemaining이라
   // 헤더와 같은 스크롤 표면 위에서 렌더된다 — 비-sliver를 넣으면 예외가 난다.
   testWidgets('로딩 중에도 헤더와 로딩 표시가 함께 렌더된다', (tester) async {
-    // _pump 헬퍼는 pumpAndSettle을 쓰는데 DpLoading은 무한 애니메이션이라
-    // 정착하지 않는다(실측: pumpAndSettle timed out). 이 케이스만 pump 한 번.
+    // _pump 헬퍼는 pumpAndSettle을 쓰는데 이 케이스는 정착하지 않는다
+    // (실측: pumpAndSettle timed out). 원인은 DpLoading 자체가 아니라
+    // **로딩 상태를 영구 고정한 가짜 컨트롤러 + 그 안의 indeterminate
+    // CircularProgressIndicator(repeat)** 조합이다 — 같은 파일의 다른
+    // pumpAndSettle 테스트들이 멀쩡한 이유는 로딩이 일시적이라 인디케이터가
+    // 트리에서 사라지기 때문이다. 그래서 이 케이스만 pump 한 번으로 렌더한다.
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: _container(_LoadingReports()),

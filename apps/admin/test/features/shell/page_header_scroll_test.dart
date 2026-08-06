@@ -36,13 +36,21 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
-    // 기본 목 통계는 4개뿐이라 4열 그리드가 한 줄에 들어가 스크롤이 생기지 않는다.
-    // 지표를 12개 주입해 그리드를 3줄로 만들어 실제 스크롤 조건을 만든다.
+    // 기본 목 통계는 4개뿐이라 4열 그리드가 한 줄에 들어가 스크롤이 아예 없다
+    // (실측: metrics=4 -> maxScrollExtent=0.0). 지표를 주입해 조건을 만든다.
+    //
+    // ★지표 수를 줄이지 말 것★ — 필요 조건은 「줄 수」가 아니라
+    // **maxScrollExtent > 헤더 높이(84px)**다. 800×400에서 실측:
+    //   metrics=12(3행) -> max= 83.125  ← 84보다 작아 헤더가 0.875px 남는다
+    //   metrics=16(4행) -> max=209.5    ← 헤더가 실제로 컬링된다
+    // 12로 두면 안드로이드 overscroll stretch 잔상 덕에 단일 pump에서만
+    // 우연히 통과하고(bottom=-8.9), pumpAndSettle이나 stretch 없는 플랫폼에서는
+    // bottom=+0.875로 실패한다 — 즉 조건을 피해 가는 값이 된다.
     final c = ProviderContainer(
       overrides: [
         adminDashProvider.overrideWith(
           () => _FixedDashController({
-            for (var i = 0; i < 12; i++) 'metric$i': 100 + i,
+            for (var i = 0; i < 16; i++) 'metric$i': 100 + i,
           }),
         ),
       ],
