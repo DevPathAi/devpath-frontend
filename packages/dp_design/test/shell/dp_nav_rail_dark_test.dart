@@ -61,9 +61,9 @@ void main() {
     // 값이 다르기만 해서는 부족하다 — 육안으로 구별돼야 한다.
     final lumActive = DpColors.dark.railActive.computeLuminance();
     final lumBg = DpColors.dark.railBg.computeLuminance();
-    final contrast =
-        (lumActive > lumBg ? (lumActive + 0.05) / (lumBg + 0.05)
-                           : (lumBg + 0.05) / (lumActive + 0.05));
+    final contrast = (lumActive > lumBg
+        ? (lumActive + 0.05) / (lumBg + 0.05)
+        : (lumBg + 0.05) / (lumActive + 0.05));
     expect(contrast, greaterThan(1.2));
   });
 }
