@@ -85,6 +85,39 @@ class DpNavRail extends StatelessWidget {
   Widget _buildTop(BuildContext context, DpColors c) {
     final b = brand;
     final text = Theme.of(context).textTheme;
+
+    final toggleButton = onToggle == null
+        ? null
+        : IconButton(
+            icon: Icon(
+              extended ? DpIcons.menuOpen : DpIcons.menu,
+              color: c.railMuted,
+            ),
+            tooltip: extended ? '메뉴 접기' : '메뉴 펼치기',
+            onPressed: onToggle,
+          );
+
+    // 접힘 + 마크 + 토글은 가로로 나란히 놓을 자리가 없다: railCollapsedWidth
+    // (72) - 좌우 패딩(md+sm=20) = 가용 52px인데 mark(22) + IconButton(Material
+    // 최소 탭 타깃 48) = 70px이 필요해 19px RenderFlex 오버플로가 난다(실측,
+    // dp_nav_rail_test.dart의 red-repro). 44px 최소 탭 타깃(DD7)을 지키며
+    // 마크를 지우지 않는 조합이 이 폭에서 존재하지 않으므로(44+8=52가 이론
+    // 한계, 8px 마크는 무의미), 접힘 상태에서만 마크 위에 토글을 세로로
+    // 쌓는다 — 브랜드가 먼저 읽혀야 하므로 마크가 위. **이 분기를 가로
+    // Row로 되돌리지 말 것** — 위 수치대로 다시 오버플로한다.
+    if (!extended && b != null && toggleButton != null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: DpSpacing.sm,
+          vertical: DpSpacing.sm,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [b.mark, toggleButton],
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         DpSpacing.md,
@@ -113,15 +146,7 @@ class DpNavRail extends StatelessWidget {
               ),
             ],
           ],
-          if (onToggle != null)
-            IconButton(
-              icon: Icon(
-                extended ? DpIcons.menuOpen : DpIcons.menu,
-                color: c.railMuted,
-              ),
-              tooltip: extended ? '메뉴 접기' : '메뉴 펼치기',
-              onPressed: onToggle,
-            ),
+          ?toggleButton,
         ],
       ),
     );

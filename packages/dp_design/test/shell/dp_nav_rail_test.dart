@@ -148,6 +148,41 @@ void main() {
     expect(toggled, isTrue);
   });
 
+  // 접힘 + brand.mark + onToggle 동시 존재 회귀 가드. railCollapsedWidth(72) -
+  // _buildTop 좌우 패딩(md+sm=20) = 가용 52px인데, mark(22) + IconButton
+  // (Material 최소 탭 타깃 48) = 70px이 필요해 예전엔 19px RenderFlex
+  // 오버플로가 났다(2026-08-06 web Task 7에서 발견 — apps/web 코드 없이
+  // 이 구성만으로 격리 재현됨). 접힘 상태에서는 마크 위에 토글을 세로로
+  // 쌓아 이 결함을 해소한다 — 둘 다 렌더돼야 하고 오버플로가 없어야 한다.
+  testWidgets('접힘 + 마크 + 토글: 세로로 쌓여 오버플로 없이 둘 다 보인다', (tester) async {
+    await tester.pumpWidget(
+      _host(
+        DpNavRail(
+          destinations: _dests,
+          selectedIndex: 0,
+          onSelect: (_) {},
+          extended: false,
+          brand: DpRailBrand(
+            mark: const SizedBox(
+              key: ValueKey('brand-mark-collapsed-toggle-test'),
+              width: 22,
+              height: 22,
+            ),
+            wordmark: 'DevPath',
+          ),
+          onToggle: () {},
+        ),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(
+      find.byKey(const ValueKey('brand-mark-collapsed-toggle-test')),
+      findsOneWidget,
+    );
+    expect(find.byTooltip('메뉴 펼치기'), findsOneWidget);
+  });
+
   testWidgets('레일 배경·우측 경계선 색이 토큰과 배선된다', (tester) async {
     await tester.pumpWidget(
       _host(

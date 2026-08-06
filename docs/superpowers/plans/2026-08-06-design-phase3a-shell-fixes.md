@@ -1044,10 +1044,29 @@ git commit -m "fix(dp_design): compact 하단 바에서 무강조를 표현한�
 
 ## Task 7: web 레일 토글과 `brandRow` 오버플로
 
+> **★실행 중 발견된 계획 결함과 그 결정(2026-08-06)★**
+>
+> 이 Task를 그대로 구현하면 **접힘 레일에서 오버플로한다.** 구현자가 격리 probe로
+> 확인한 수치: `railCollapsedWidth` 72 − `_buildTop` 패딩 20 = **가용 52px**인데,
+> 마크 22 + `IconButton` 최소 탭 타깃 48 = **70px**가 필요하다. Task 1이 세운
+> 불변조건(「마크는 접힘에서도 남는다」)과 44px 탭 타깃(DESIGN §6)을 **동시에
+> 만족시키는 가로 배치가 수학적으로 존재하지 않는다.** 계획이 두 Task의 상호작용을
+> 예상하지 못한 결함이다.
+>
+> **사용자 결정: 접힘 상태에서 마크와 토글을 세로로 쌓는다.** `_buildTop`을
+> `extended`면 `Row`, 접힘이면 `Column`(마크 위, 토글 아래)으로 분기한다. 레일
+> 폭과 `DpRailBrand` 계약은 그대로 두고 변경을 `_buildTop` 한 곳에 국소화한다.
+> 따라서 이 Task는 `packages/dp_design/lib/src/shell/dp_nav_rail.dart` 수정을
+> **포함한다**(아래 Files 목록에 없던 파일).
+>
+> 검토한 대안: ①접힘에서 마크가 토글 역할(발견성 낮음·시맨틱스 변경) ②
+> `railCollapsedWidth` 확대(접힘의 의미 축소·기존 테스트 재검토) ③3-B 이월.
+
 **Files:**
 - Modify: `apps/web/lib/src/features/shell/presentation/app_shell.dart:101-180` (`AppShellView`를 Stateful로)
 - Modify: `apps/web/lib/src/features/common/presentation/brand_row.dart:28`
-- Test: `apps/web/test/features/shell/app_shell_rail_toggle_test.dart`
+- Modify: `packages/dp_design/lib/src/shell/dp_nav_rail.dart` `_buildTop` (위 결정 — 접힘 시 세로 배치)
+- Test: `apps/web/test/features/shell/app_shell_rail_toggle_test.dart` · `packages/dp_design/test/shell/` (접힘+토글 오버플로 red-repro)
 
 - [ ] **Step 1: 실패하는 테스트를 쓴다**
 

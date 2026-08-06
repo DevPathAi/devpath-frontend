@@ -98,7 +98,10 @@ class AppShell extends StatelessWidget {
 }
 
 /// 표현부: go_router 비의존 — DpAppShell(4-클래스 반응형)로 위임.
-class AppShellView extends StatelessWidget {
+///
+/// 레일 펼침 상태를 여기서 보유한다. 2단계에서는 onToggleRail을 넘기지
+/// 않아 medium(600~840)에서 접힘 고정이었다 — 사용자가 펼칠 방법이 없었다.
+class AppShellView extends StatefulWidget {
   const AppShellView({
     super.key,
     required this.location,
@@ -110,11 +113,22 @@ class AppShellView extends StatelessWidget {
   final Widget child;
   final void Function(String path)? onSelect;
 
+  @override
+  State<AppShellView> createState() => _AppShellViewState();
+}
+
+class _AppShellViewState extends State<AppShellView> {
+  /// null이면 DpAppShell의 폭 기반 기본값(medium 접힘 / 그 이상 펼침)을 따른다.
+  /// 사용자가 토글하면 그 값이 기본값을 덮는다.
+  bool? _railExtended;
+
   // I1: 매칭되는 목적지가 없으면 null(무강조)을 반환한다. kShellDestinations가
   // 5→4로 줄면서 /settings·/mypage·/content/:id·/sandbox가 여기 없다 —
   // 예전처럼 0(대시보드)으로 폴백하면 레일이 잘못된 항목을 활성 표시한다.
   int? get _index {
-    final i = kShellDestinations.indexWhere((d) => location.startsWith(d.path));
+    final i = kShellDestinations.indexWhere(
+      (d) => widget.location.startsWith(d.path),
+    );
     return i < 0 ? null : i;
   }
 
@@ -124,7 +138,7 @@ class AppShellView extends StatelessWidget {
 
     return DpAppShell(
       selectedIndex: _index,
-      onSelect: (i) => onSelect?.call(kShellDestinations[i].path),
+      onSelect: (i) => widget.onSelect?.call(kShellDestinations[i].path),
       destinations: [
         for (final d in kShellDestinations)
           DpDestination(icon: d.icon, label: d.label, section: d.section),
@@ -140,9 +154,9 @@ class AppShellView extends StatelessWidget {
         ),
         wordmark: 'DevPath',
       ),
-      account: _AccountMenu(onGo: onSelect),
-      breadcrumb: breadcrumbFor(location),
-      onCrumbTap: (p) => onSelect?.call(p),
+      account: _AccountMenu(onGo: widget.onSelect),
+      breadcrumb: breadcrumbFor(widget.location),
+      onCrumbTap: (p) => widget.onSelect?.call(p),
       onSearchTap: () => _openPalette(context),
       chromeActions: [
         DpChromeAction(
@@ -151,7 +165,15 @@ class AppShellView extends StatelessWidget {
           onPressed: (context) => showSupportDialog(context),
         ),
       ],
-      body: child,
+      railExtended: _railExtended,
+      onToggleRail: () => setState(() {
+        // 현재 실효 상태를 뒤집는다. 아직 토글한 적이 없으면 DpAppShell의
+        // 폭 기반 기본값(dp_app_shell.dart)과 같은 규칙으로 계산한다.
+        final wc = context.windowClass;
+        final current = _railExtended ?? (wc != DpWindowClass.medium);
+        _railExtended = !current;
+      }),
+      body: widget.child,
     );
   }
 
