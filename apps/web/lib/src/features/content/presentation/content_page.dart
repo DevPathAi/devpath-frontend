@@ -94,39 +94,48 @@ class _ContentPageState extends ConsumerState<ContentPage>
     });
     final c = context.dpColors;
     return Scaffold(
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          DpPageHeader(
-            title: '학습 콘텐츠',
-            description: '읽고 나면 바로 실습으로 이어집니다',
-            actions: [
-              TextButton.icon(
-                key: const ValueKey('content-practice-action'),
-                onPressed: () => context.go('/sandbox'),
-                style: TextButton.styleFrom(
-                  backgroundColor: c.accentSoft,
-                  foregroundColor: c.primaryText,
-                  side: BorderSide(color: c.accentLine),
+      body: CustomScrollView(
+        // 진행률 추적(_scrollPct)이 이 컨트롤러 하나로 헤더+본문 전체 스크롤
+        // 범위를 관측한다 — 본문에 별도 스크롤 위젯을 두면 중첩 스크롤이 되어
+        // 헤더가 스크롤과 함께 사라지지 않는다.
+        controller: _scrollController,
+        slivers: [
+          SliverToBoxAdapter(
+            child: DpPageHeader(
+              title: '학습 콘텐츠',
+              description: '읽고 나면 바로 실습으로 이어집니다',
+              actions: [
+                TextButton.icon(
+                  key: const ValueKey('content-practice-action'),
+                  onPressed: () => context.go('/sandbox'),
+                  style: TextButton.styleFrom(
+                    backgroundColor: c.accentSoft,
+                    foregroundColor: c.primaryText,
+                    side: BorderSide(color: c.accentLine),
+                  ),
+                  icon: const Icon(DpIcons.code),
+                  label: const Text('실습'),
                 ),
-                icon: const Icon(DpIcons.code),
-                label: const Text('실습'),
-              ),
-            ],
+              ],
+            ),
           ),
-          Expanded(
-            child: switch (s) {
-              ContentLoading() => const DpLoading(),
-              ContentFailed(:final message) => SupportableError(
+          switch (s) {
+            ContentLoading() => const SliverFillRemaining(
+              hasScrollBody: false,
+              child: DpLoading(),
+            ),
+            ContentFailed(:final message) => SliverFillRemaining(
+              hasScrollBody: false,
+              child: SupportableError(
                 message: message,
                 onRetry: () => _contentController.load(widget.contentId),
               ),
-              ContentLoaded(:final content) => _ContentBody(
-                controller: _scrollController,
-                content: content,
-              ),
-            },
-          ),
+            ),
+            ContentLoaded(:final content) => SliverPadding(
+              padding: const EdgeInsets.all(DpSpacing.lg),
+              sliver: SliverToBoxAdapter(child: _ContentBody(content: content)),
+            ),
+          },
         ],
       ),
     );
@@ -219,9 +228,8 @@ class _ContentPageState extends ConsumerState<ContentPage>
 }
 
 class _ContentBody extends StatelessWidget {
-  const _ContentBody({required this.controller, required this.content});
+  const _ContentBody({required this.content});
 
-  final ScrollController controller;
   final LearningContent content;
 
   @override
@@ -236,54 +244,49 @@ class _ContentBody extends StatelessWidget {
       if (content.difficulty != null) '난이도 ${content.difficulty}',
     ];
 
-    return SingleChildScrollView(
-      controller: controller,
-      padding: const EdgeInsets.all(DpSpacing.lg),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 840),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(content.title, style: text.headlineSmall),
-              const SizedBox(height: DpSpacing.sm),
-              if (meta.isNotEmpty)
-                Text(
-                  meta.join(' · '),
-                  style: text.bodySmall?.copyWith(color: colors.textSecondary),
-                ),
-              const SizedBox(height: DpSpacing.md),
-              Row(
-                children: [
-                  Expanded(
-                    child: LinearProgressIndicator(
-                      value: progress.scrollPct.clamp(0, 1).toDouble(),
-                    ),
-                  ),
-                  const SizedBox(width: DpSpacing.sm),
-                  Text(
-                    progress.completed ? '완료' : '$percent% 진행',
-                    style: text.labelMedium,
-                  ),
-                ],
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 840),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(content.title, style: text.headlineSmall),
+            const SizedBox(height: DpSpacing.sm),
+            if (meta.isNotEmpty)
+              Text(
+                meta.join(' · '),
+                style: text.bodySmall?.copyWith(color: colors.textSecondary),
               ),
-              if (content.conceptTags.isNotEmpty) ...[
-                const SizedBox(height: DpSpacing.md),
-                Wrap(
-                  spacing: DpSpacing.xs,
-                  runSpacing: DpSpacing.xs,
-                  children: [
-                    for (final tag in content.conceptTags)
-                      Chip(label: Text(tag)),
-                  ],
+            const SizedBox(height: DpSpacing.md),
+            Row(
+              children: [
+                Expanded(
+                  child: LinearProgressIndicator(
+                    value: progress.scrollPct.clamp(0, 1).toDouble(),
+                  ),
+                ),
+                const SizedBox(width: DpSpacing.sm),
+                Text(
+                  progress.completed ? '완료' : '$percent% 진행',
+                  style: text.labelMedium,
                 ),
               ],
-              const SizedBox(height: DpSpacing.xl),
-              DpMarkdown(data: content.markdown),
-              const SizedBox(height: DpSpacing.lg),
-              const AdSlotWidget(slot: 'CONTENT_PAGE'),
+            ),
+            if (content.conceptTags.isNotEmpty) ...[
+              const SizedBox(height: DpSpacing.md),
+              Wrap(
+                spacing: DpSpacing.xs,
+                runSpacing: DpSpacing.xs,
+                children: [
+                  for (final tag in content.conceptTags) Chip(label: Text(tag)),
+                ],
+              ),
             ],
-          ),
+            const SizedBox(height: DpSpacing.xl),
+            DpMarkdown(data: content.markdown),
+            const SizedBox(height: DpSpacing.lg),
+            const AdSlotWidget(slot: 'CONTENT_PAGE'),
+          ],
         ),
       ),
     );

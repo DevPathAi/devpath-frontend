@@ -75,9 +75,11 @@ void main() {
     await tester.pumpWidget(_host(adapter));
     await _pumpLoad(tester);
     await tester.pump(const Duration(seconds: 6));
+    // 헤더도 함께 스크롤되는 문서형 전환(Task 10)으로 화면 최상위 스크롤
+    // 컨테이너가 SingleChildScrollView에서 CustomScrollView로 바뀌었다.
     await tester.dragUntilVisible(
       find.textContaining('문단 70'),
-      find.byType(SingleChildScrollView),
+      find.byType(CustomScrollView),
       const Offset(0, -500),
     );
     await tester.pump();

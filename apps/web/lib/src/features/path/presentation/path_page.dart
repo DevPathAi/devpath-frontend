@@ -41,31 +41,48 @@ class _PathPageState extends ConsumerState<PathPage> {
     final s = ref.watch(pathControllerProvider);
     final notifier = ref.read(pathControllerProvider.notifier);
 
-    final body = switch (s.phase) {
-      PathPhase.complete when s.result != null => PathPlanView(plan: s.result!),
+    // 완료(PathPlanView)는 자체 콘텐츠를 SliverList로 헤더와 함께 스크롤한다.
+    // 그 외 상태(진행·중단·실패)는 화면 중앙에 고정하는 SliverFillRemaining.
+    final bodySliver = switch (s.phase) {
+      PathPhase.complete when s.result != null => SliverPadding(
+        padding: const EdgeInsets.all(DpSpacing.lg),
+        sliver: SliverList.list(
+          children: PathPlanView.children(context, s.result!),
+        ),
+      ),
       // F4: killSwitch/failed는 이어하기 불가 → SupportableError로(전용 DpKillSwitch/DpQuota 렌더는 P4c).
-      PathPhase.failed || PathPhase.killSwitch => SupportableError(
-        message: s.error ?? '경로 생성에 실패했어요',
-        onRetry: notifier.start,
+      PathPhase.failed || PathPhase.killSwitch => SliverFillRemaining(
+        hasScrollBody: false,
+        child: SupportableError(
+          message: s.error ?? '경로 생성에 실패했어요',
+          onRetry: notifier.start,
+        ),
       ),
-      PathPhase.partial => _Progress(
-        completed: s.completed,
-        current: s.current,
-        note: s.error ?? '연결이 끊겼어요',
-        onRestart: notifier.start,
+      PathPhase.partial => SliverFillRemaining(
+        hasScrollBody: false,
+        child: _Progress(
+          completed: s.completed,
+          current: s.current,
+          note: s.error ?? '연결이 끊겼어요',
+          onRestart: notifier.start,
+        ),
       ),
-      _ => _Progress(completed: s.completed, current: s.current),
+      _ => SliverFillRemaining(
+        hasScrollBody: false,
+        child: _Progress(completed: s.completed, current: s.current),
+      ),
     };
 
     return Scaffold(
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const DpPageHeader(
-            title: '학습 경로',
-            description: '진단 결과로 만든 12주 계획입니다',
+      body: CustomScrollView(
+        slivers: [
+          const SliverToBoxAdapter(
+            child: DpPageHeader(
+              title: '학습 경로',
+              description: '진단 결과로 만든 12주 계획입니다',
+            ),
           ),
-          Expanded(child: body),
+          bodySliver,
         ],
       ),
     );

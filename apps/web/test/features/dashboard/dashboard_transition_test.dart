@@ -53,7 +53,7 @@ GoRouter _router() => GoRouter(
 );
 
 void main() {
-  testWidgets('대시보드 로딩: Skeletonizer + AnimatedSwitcher 존재', (tester) async {
+  testWidgets('대시보드 로딩: Skeletonizer 존재', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [apiClientProvider.overrideWithValue(_NeverApiClient())],
@@ -65,9 +65,11 @@ void main() {
     );
     await tester.pump(); // load() 시작(완료 안 됨) → DashLoading 유지
 
-    expect(find.byKey(const ValueKey('dash-switcher')), findsOneWidget);
     // 로딩 골격 = Skeletonizer(key: 'loading'). skeletonizer 2.x는 public
     // Skeletonizer를 내부 _Skeletonizer로 렌더해 byType 매칭 불가 → key로 특정.
+    // 문서형 sliver 전환(Task 10)으로 AnimatedSwitcher 크로스페이드는
+    // 제거됐다 — 최상위 스크롤 컨테이너가 CustomScrollView가 되어
+    // AnimatedSwitcher(box 위젯)를 slivers에 직접 실을 수 없기 때문이다.
     expect(find.byKey(const ValueKey('loading')), findsOneWidget);
   });
 
