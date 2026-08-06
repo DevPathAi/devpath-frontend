@@ -2,6 +2,7 @@ import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../shell/presentation/admin_shell.dart';
 import '../application/reports_controller.dart';
 import '../data/report.dart';
 import '../state/reports_state.dart';
@@ -37,7 +38,8 @@ class ReportsPage extends ConsumerWidget {
         slivers: [
           SliverToBoxAdapter(
             child: DpPageHeader(
-              title: '신고 처리',
+              // 제목은 kAdminDestinations가 유일한 출처다(admin_shell.dart).
+              title: adminHeaderTitleFor('/reports'),
               description: '커뮤니티 신고를 검토하고 판정합니다',
               filters: [
                 SegmentedButton<String?>(

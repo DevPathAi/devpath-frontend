@@ -5,6 +5,7 @@ import 'package:devpath_admin/src/features/support/state/support_state.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:devpath_admin/src/features/shell/presentation/admin_shell.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// build 를 고정해 목 API 호출 없이 렌더만 검증하는 가짜 컨트롤러
@@ -41,6 +42,8 @@ void main() {
 
     final header = tester.widget<DpPageHeader>(find.byType(DpPageHeader));
     expect(header.title, '오류 신고·문의');
+    // 단일 출처(kAdminDestinations)와 어긋나면 red — 한쪽만 고치는 것을 막는다.
+    expect(header.title, adminHeaderTitleFor('/support'));
     expect(find.byKey(const ValueKey('page-header-filters')), findsOneWidget);
   });
 }

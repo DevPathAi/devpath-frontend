@@ -2,6 +2,7 @@ import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../shell/presentation/admin_shell.dart';
 import '../application/dashboard_controller.dart';
 import '../state/dashboard_state.dart';
 
@@ -35,8 +36,12 @@ class _S extends ConsumerState<AdminDashboardPage> {
     return Scaffold(
       body: CustomScrollView(
         slivers: [
-          const SliverToBoxAdapter(
-            child: DpPageHeader(title: '운영 대시보드', description: '서비스 지표를 요약합니다'),
+          SliverToBoxAdapter(
+            child: DpPageHeader(
+              // 제목은 kAdminDestinations가 유일한 출처다(admin_shell.dart).
+              title: adminHeaderTitleFor('/dashboard'),
+              description: '서비스 지표를 요약합니다',
+            ),
           ),
           switch (s) {
             AdminDashLoading() => const SliverFillRemaining(

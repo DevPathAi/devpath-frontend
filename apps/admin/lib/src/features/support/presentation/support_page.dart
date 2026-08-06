@@ -2,6 +2,7 @@ import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../shell/presentation/admin_shell.dart';
 import '../application/support_controller.dart';
 import '../data/support_request.dart';
 import '../state/support_state.dart';
@@ -28,7 +29,8 @@ class SupportPage extends ConsumerWidget {
       body: Column(
         children: [
           DpPageHeader(
-            title: '오류 신고·문의',
+            // 제목은 kAdminDestinations가 유일한 출처다(admin_shell.dart).
+            title: adminHeaderTitleFor('/support'),
             description: '사용자가 보낸 오류와 문의를 처리합니다',
             filters: [
               SegmentedButton<String?>(

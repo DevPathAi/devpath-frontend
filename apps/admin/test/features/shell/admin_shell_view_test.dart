@@ -29,6 +29,10 @@ void main() {
     );
     final chrome = tester.widget<DpChromeBar>(find.byType(DpChromeBar));
     expect(chrome.breadcrumb, const [(label: '사용자 관리', path: null)]);
+    // 브레드크럼도 화면 헤더와 같은 단일 출처를 쓴다(어긋나면 red).
+    expect(chrome.breadcrumb, [
+      (label: adminHeaderTitleFor('/users'), path: null),
+    ]);
   });
 
   testWidgets('compact 폭은 NavigationBar', (tester) async {

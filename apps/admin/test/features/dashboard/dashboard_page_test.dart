@@ -4,6 +4,7 @@ import 'package:devpath_admin/src/features/dashboard/state/dashboard_state.dart'
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:devpath_admin/src/features/shell/presentation/admin_shell.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -33,6 +34,8 @@ void main() {
     await tester.pumpAndSettle();
     final header = tester.widget<DpPageHeader>(find.byType(DpPageHeader));
     expect(header.title, '운영 대시보드');
+    // 단일 출처(kAdminDestinations)와 어긋나면 red — 한쪽만 고치는 것을 막는다.
+    expect(header.title, adminHeaderTitleFor('/dashboard'));
   });
 
   testWidgets('로딩 중에도 헤더와 로딩 표시가 함께 렌더된다', (tester) async {

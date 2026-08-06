@@ -4,6 +4,7 @@ import 'package:devpath_admin/src/features/ads/presentation/ads_page.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:devpath_admin/src/features/shell/presentation/admin_shell.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 AdRow _ad(int id, String title) => AdRow(
@@ -134,6 +135,8 @@ void main() {
 
     final header = tester.widget<DpPageHeader>(find.byType(DpPageHeader));
     expect(header.title, '광고 관리');
+    // 단일 출처(kAdminDestinations)와 어긋나면 red — 한쪽만 고치는 것을 막는다.
+    expect(header.title, adminHeaderTitleFor('/ads'));
     expect(find.byKey(const ValueKey('page-header-filters')), findsOneWidget);
   });
 }
