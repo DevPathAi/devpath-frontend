@@ -51,6 +51,9 @@ void main() {
     await tester.pumpWidget(host(DpColors.dark, theme, extended: true));
 
     final color = effectiveColorOf(tester, find.text('DevPath'));
+    // 주의: 다크 팔레트는 textPrimary == railText(#EAE7E2)라 이 단언은
+    // 현재 가드로서 무력하다 — 함정이 재발해도 통과한다. 라이트 분기가
+    // 실질 가드다. 다크 팔레트에서 두 값이 갈리면 이 주석을 지워라.
     expect(color, DpColors.dark.railText);
   });
 
