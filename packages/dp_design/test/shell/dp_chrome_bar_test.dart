@@ -142,11 +142,14 @@ void main() {
 
   // Important 1: 밝은 surface 배경 위이므로 actions·account 모두 textSecondary가
   // 기본 전경색으로 공급돼야 한다(대비 확보). actions는 이제 DpChromeBar가
-  // 직접 IconButton을 짓는 데이터형이라(3단계 I2) ambient IconTheme 상속을
-  // 검증할 수 없다 — IconButton은 자기 테마로 색을 정하고 ambient를
-  // 상속하지 않기 때문에, DpChromeBar가 명시적으로 textSecondary를 칠하는지
-  // 렌더된 Icon의 color 필드로 직접 확인한다. account는 여전히 호출부가
-  // 넘기는 무스타일 위젯이라 ambient DefaultTextStyle 상속을 그대로 검증한다.
+  // 직접 IconButton을 짓는 데이터형이라(3단계 I2), 여기서는 ambient 상속이 아니라
+  // **DpChromeBar가 명시적으로 textSecondary를 칠하는지**를 렌더된 Icon의 color
+  // 필드로 직접 확인한다.
+  // ※ M3 IconButton이 ambient IconTheme를 상속하지 **않는다**는 뜻이 아니다 —
+  //   실측하면 상속한다(icon_button.dart:1029-1044가 IconTheme.of를 읽어
+  //   foregroundColor로 승격). 명시 색이 언제나 이기므로 이 단언은 그대로 유효하다.
+  // account는 여전히 호출부가 넘기는 무스타일 위젯이라 ambient DefaultTextStyle
+  // 상속을 그대로 검증한다.
   testWidgets('actions는 textSecondary를 아이콘 색으로 쓰고, account는 ambient를 상속한다', (
     tester,
   ) async {

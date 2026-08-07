@@ -25,12 +25,14 @@ CommunityAnswer _ans(
 CommunityQuestionDetail _detail({
   bool solved = false,
   required List<CommunityAnswer> answers,
+  List<String> tags = const [],
 }) => CommunityQuestionDetail(
   id: 1,
   title: 'async 질문',
   bodyMd: '본문입니다',
   solved: solved,
   answers: answers,
+  tags: tags,
 );
 
 LcsSnapshotView _snap() => LcsSnapshotView(
@@ -76,6 +78,29 @@ void main() {
     // 이미 solved → 채택 버튼 없음
     expect(find.widgetWithText(TextButton, '채택'), findsNothing);
     expect(tester.widget<DpPageHeader>(find.byType(DpPageHeader)).title, 'Q&A');
+  });
+
+  // 3-A 최종 리뷰 I-1: 게시글 상세(post_detail_page.dart)는 DpTag를 쓰는데 이 화면만
+  // Material Chip으로 남아 **형제 화면끼리 태그 칩 색이 갈려 있었다**(스펙 §7.1의
+  // 배선 후보 조사에서 이 한 곳이 누락됐다). DpTag가 tag* 토큰의 유일한 배선
+  // 지점이라는 선언을 실제로 성립시킨다 — Chip으로 되돌리면 red다.
+  testWidgets('태그는 DpTag로 렌더된다 (게시글 상세와 같은 배선)', (tester) async {
+    final c = ProviderContainer(
+      overrides: [
+        qnaDetailFetchProvider.overrideWithValue(
+          (id) async =>
+              _detail(answers: [_ans(11)], tags: const ['dart', 'async']),
+        ),
+        lcsByQuestionProvider.overrideWithValue((qid) async => null),
+      ],
+    );
+    addTearDown(c.dispose);
+    await tester.pumpWidget(_host(c));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(DpTag), findsNWidgets(2));
+    expect(find.byType(Chip), findsNothing);
+    expect(find.text('#dart'), findsOneWidget);
   });
 
   testWidgets('미해결 질문: 미채택 답변에 채택 버튼 노출 + 탭 시 채택 호출', (tester) async {

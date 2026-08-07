@@ -184,8 +184,11 @@ class DpChromeBar extends StatelessWidget {
         children: [
           for (final a in inline)
             IconButton(
-              // 색을 명시한다 — IconButton은 자기 테마(IconButtonTheme)로
-              // 전경색을 결정해 ambient IconTheme.merge를 상속하지 않는다.
+              // 색을 명시해 상태(disabled 등)·주변 테마와 무관하게 고정한다.
+              // ※ M3 IconButton은 ambient IconTheme.color를 themeStyleOf에서
+              //   foregroundColor로 흡수하므로(icon_button.dart:1029-1044,
+              //   Flutter 3.44.1) 명시가 없어도 상속은 된다 — 실측 확인함.
+              //   여기서는 크롬바 밖 테마 변화에 흔들리지 않도록 못박는 쪽을 택한다.
               icon: Icon(a.icon, color: c.textSecondary),
               tooltip: a.label,
               // 바깥 LayoutBuilder 콜백의 context를 넘긴다 — 크롬바 아래라

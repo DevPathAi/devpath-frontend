@@ -140,7 +140,10 @@ class _Loaded extends ConsumerWidget {
             const SizedBox(height: DpSpacing.md),
             Wrap(
               spacing: DpSpacing.xs,
-              children: [for (final t in detail.tags) Chip(label: Text('#$t'))],
+              // 게시글 상세와 같은 요소이므로 같은 배선을 쓴다 — DpTag가 tag* 토큰의
+              // 유일한 배선 지점이다(3-A 스펙 §7.2). 조사 단계에서 이 한 곳이 누락돼
+              // 형제 화면끼리 태그 칩 색이 갈려 있었다.
+              children: [for (final t in detail.tags) DpTag(label: '#$t')],
             ),
           ],
           const Divider(height: DpSpacing.xl),

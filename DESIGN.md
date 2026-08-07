@@ -229,6 +229,10 @@ Loading/Empty/Error 외에 다음 전용 상태를 dp_design에 추가:
 - 로딩·실패 분기도 sliver 계약을 져야 한다(`SliverFillRemaining`). 비-sliver 자식을 넣으면
   `RenderViewport expected a child of type RenderSliver`로 터진다 — 회귀 테스트의 RED 근거로 쓸 수 있다.
 - 스크롤 진행률을 데이터로 쓰는 화면(`content`)은 헤더 높이만큼 축이 길어지므로 보정이 필요하다.
+- **`semanticChildCount`를 함께 옮긴다.** `ListView(children:)`·`GridView.count`는 이 값을 자동으로
+  채우지만 `CustomScrollView`는 기본 `null`이라, 전환하면 스크린리더가 읽던 「N개 중 X번째」가
+  조용히 사라진다. 시각 회귀가 0이라 육안 확인·위젯 테스트 어디에도 걸리지 않는다.
+  세는 대상은 화면마다 다르므로(리스트 항목 수 / 본문 1 / 카드 수) 일괄 상수로 때우지 않는다.
 - 헤더 스크롤을 검증하는 테스트는 **「본문이 헤더보다 길다」를 산술로 검산**한다.
   필요조건은 줄 수가 아니라 `maxScrollExtent > 헤더 높이`다. 드래그 **전에** 헤더가 실제로
   보이는지도 함께 고정한다 — 그러지 않으면 「헤더가 아예 렌더되지 않는」 회귀가
