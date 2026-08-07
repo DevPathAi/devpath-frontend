@@ -218,12 +218,9 @@ class _QuestionCreatePageState extends ConsumerState<QuestionCreatePage> {
                     ),
                   ),
                 ],
+                // 본문 안내 문구는 헤더 설명('무엇을 시도했고 어디서 막혔는지 함께
+                // 적어주세요')이 더 구체적이라 제거했다(3-A Task 14-3).
                 const SizedBox(height: DpSpacing.md),
-                Text(
-                  '상황과 시도한 내용을 적어주세요',
-                  style: TextStyle(color: c.textSecondary),
-                ),
-                const SizedBox(height: DpSpacing.xs),
                 DpRichEditor(
                   key: const ValueKey('question-body-editor'),
                   controller: _bodyController,

@@ -114,6 +114,57 @@ void main() {
     expect(find.text('final x = 1;'), findsOneWidget); // 입력 유지
   });
 
+  // 3-A Task 14-1: Column의 기본 crossAxisAlignment(center)가 SegmentedButton을
+  // 중앙에 놓아, 좌측 정렬된 페이지 헤더와 어긋났다.
+  //
+  // ★조건 성립 주의 — 이 파일의 _host로는 결함이 재현되지 않는다★
+  // _host는 SandboxLayout을 Scaffold.body에 직접 넣어 폭 제약이 loose다. 그러면
+  // Column의 폭이 가장 넓은 자식(세그먼트)에 맞춰져 중앙 정렬이 애초에 일어나지
+  // 않는다(실측 left=8.0 → 수정 전에도 통과해버린다). 실제 화면(sandbox_page.dart)은
+  // `Column(stretch) > Expanded(SandboxLayout)`이라 폭이 tight이고, 거기서 실측
+  // left=255.6으로 결함이 나타난다. 그래서 이 테스트만 실제 구조를 그대로 세운다.
+  //
+  // 단언은 「중앙이 아니다」가 아니라 「헤더 텍스트와 같은 좌측선」이다 — 전자는 폭이
+  // 바뀌면 우연히 통과한다. 헤더의 좌측 여백은 DpSpacing.lg(16)이므로 세그먼트의
+  // 가로 여백도 lg여야 선이 맞는다(sm=8이면 8px 어긋난 채로 남는다).
+  testWidgets('<1024: 세그먼트 탭이 페이지 헤더와 같은 좌측선에서 시작한다', (tester) async {
+    tester.view.physicalSize = const Size(800, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(size: Size(800, 900)),
+        child: MaterialApp(
+          theme: DpTheme.light(),
+          home: const Scaffold(
+            body: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                DpPageHeader(
+                  title: '실습 샌드박스',
+                  description: '코드를 작성하고 바로 실행해 봅니다',
+                ),
+                Expanded(
+                  child: SandboxLayout(
+                    editor: Text('EDITOR'),
+                    log: Text('LOG'),
+                    review: Text('REVIEW'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final segLeft = tester.getTopLeft(find.byType(SegmentedButton<int>)).dx;
+    final headerLeft = tester.getTopLeft(find.text('실습 샌드박스')).dx;
+    expect(segLeft, headerLeft, reason: '세그먼트가 페이지 헤더의 좌측선과 어긋난다');
+    expect(segLeft, DpSpacing.lg, reason: '좌측선은 헤더 패딩 값(lg=16)이다');
+  });
+
   // P3/D1 반영: 1024–1239 2페인 로그 접이 토글 — 접으면 LOG 페인 트리에서 제거.
   testWidgets('1024–1239: 로그 접이 토글로 LOG 페인 표시/숨김', (tester) async {
     tester.view.physicalSize = const Size(1100, 900);

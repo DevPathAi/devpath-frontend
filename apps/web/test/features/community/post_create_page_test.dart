@@ -109,6 +109,38 @@ void main() {
     expect(find.text('피드백 요청'), findsOneWidget);
   });
 
+  // 3-A Task 14-3: 헤더 설명과 본문 안내가 사실상 같은 말이었다(2단계 계획이 헤더
+  // 문구를 지정하면서 본문 수정을 금지해 생긴 결과). 더 눈에 띄는 자리인 헤더를
+  // 남기고 본문 안내를 지운다. 헤더 문구는 2단계 스펙 §5가 지정한 값이라 불변이다.
+  testWidgets('본문 안내가 헤더 설명과 중복되지 않는다 (FREE·FEEDBACK)', (tester) async {
+    _wideView(tester);
+    for (final board in ['FREE', 'FEEDBACK']) {
+      final c = ProviderContainer(
+        overrides: [
+          postCreateProvider.overrideWithValue(
+            ({
+              required boardType,
+              required title,
+              required bodyMd,
+              required tags,
+            }) async => _created(32, boardType),
+          ),
+        ],
+      );
+      addTearDown(c.dispose);
+      await tester.pumpWidget(_host(c, board: board));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.widget<DpPageHeader>(find.byType(DpPageHeader)).description,
+        '자유롭게 쓰거나 코드 피드백을 요청하세요',
+        reason: '2단계 스펙 §5가 지정한 헤더 설명은 불변이다 (board=$board)',
+      );
+      expect(find.text('나누고 싶은 이야기를 적어주세요'), findsNothing);
+      expect(find.text('리뷰받고 싶은 코드/프로젝트와 궁금한 점을 적어주세요'), findsNothing);
+    }
+  });
+
   testWidgets('제목·본문 입력 후 게시하면 postCreate(boardType) 호출 + 상세로 이동', (
     tester,
   ) async {
