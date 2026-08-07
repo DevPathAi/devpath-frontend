@@ -29,7 +29,8 @@ void main() {
     );
     final chrome = tester.widget<DpChromeBar>(find.byType(DpChromeBar));
     expect(chrome.breadcrumb, const [(label: '사용자 관리', path: null)]);
-    // 브레드크럼도 화면 헤더와 같은 단일 출처를 쓴다(어긋나면 red).
+    // 브레드크럼도 화면 헤더와 같은 함수를 통과한다는 확인이다. 값 변경 감지는 위
+    // 리터럴 단언의 몫이다(admin_title_source_test의 doc 주석 참조).
     expect(chrome.breadcrumb, [
       (label: adminHeaderTitleFor('/users'), path: null),
     ]);

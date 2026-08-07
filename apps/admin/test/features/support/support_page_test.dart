@@ -42,7 +42,9 @@ void main() {
 
     final header = tester.widget<DpPageHeader>(find.byType(DpPageHeader));
     expect(header.title, '오류 신고·문의');
-    // 단일 출처(kAdminDestinations)와 어긋나면 red — 한쪽만 고치는 것을 막는다.
+    // 화면이 실제로 adminHeaderTitleFor를 호출한다는 것만 확인한다(경로 인자 오타 등).
+    // 상수 값 변경 감지는 위 리터럴 단언의 몫이고, 화면이 같은 값의 리터럴로 퇴행하는
+    // 방향은 admin_title_source_test의 소스 검사가 막는다.
     expect(header.title, adminHeaderTitleFor('/support'));
     expect(find.byKey(const ValueKey('page-header-filters')), findsOneWidget);
   });

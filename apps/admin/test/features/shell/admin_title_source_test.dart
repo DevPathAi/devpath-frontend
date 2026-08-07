@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:devpath_admin/src/features/shell/presentation/admin_shell.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -5,8 +7,15 @@ import 'package:flutter_test/flutter_test.dart';
 ///
 /// 이전에는 셸의 private `_headerTitleFor`와 5화면의 문자열 리터럴이 따로
 /// 존재해, 한쪽만 고치면 브레드크럼과 페이지 헤더가 조용히 어긋났다.
-/// 각 화면 테스트도 리터럴 대신 [adminHeaderTitleFor]를 기대값으로 쓰므로,
-/// 상수만 바꾸고 화면을 안 고치면(또는 그 반대면) 그쪽에서 red가 난다.
+///
+/// **방어의 두 방향은 담당이 다르다:**
+/// - *상수를 바꾸고 화면을 안 고치는* 방향 → 각 화면 테스트의 **리터럴** 기대값이
+///   red를 낸다(`expect(header.title, '광고 관리')`).
+/// - *화면이 상수 대신 리터럴을 다시 박는* 방향 → 위젯 출력만 보는 단언으로는
+///   **잡히지 않는다.** 리터럴 값이 상수와 같으면 `header.title`과
+///   `adminHeaderTitleFor(...)`가 같은 값이라 두 단언 모두 green이다
+///   (실측: `ads_page`의 `title`을 `'광고 관리'` 리터럴로 되돌려도 `ads_page_test` 5/5 통과).
+///   이 방향은 아래 「화면 소스가 제목 리터럴을 직접 쓰지 않는다」가 소스 텍스트로 막는다.
 void main() {
   test('모든 admin 목적지가 headerTitle을 갖는다', () {
     for (final d in kAdminDestinations) {
@@ -33,6 +42,41 @@ void main() {
       adminHeaderTitleFor('/unknown'),
       kAdminDestinations.first.headerTitle,
     );
+  });
+
+  // ★배선 회귀 가드★ — 위 doc 주석 참조. 화면이 `adminHeaderTitleFor` 대신 같은
+  // 값의 리터럴을 다시 박으면 위젯 단언들은 전부 green이므로, 소스 텍스트에서 막는다.
+  test('화면 소스가 헤더 제목 리터럴을 직접 쓰지 않는다', () {
+    const pageSources = <String, String>{
+      '/dashboard':
+          'lib/src/features/dashboard/presentation/dashboard_page.dart',
+      '/users': 'lib/src/features/users/presentation/users_page.dart',
+      '/reports': 'lib/src/features/reports/presentation/reports_page.dart',
+      '/support': 'lib/src/features/support/presentation/support_page.dart',
+      '/ads': 'lib/src/features/ads/presentation/ads_page.dart',
+    };
+
+    // 목적지가 늘었는데 검사 대상을 안 늘리면 새 화면이 무방비로 남는다.
+    expect(
+      pageSources.keys.toSet(),
+      kAdminDestinations.map((d) => d.path).toSet(),
+      reason: '검사 대상 화면 목록이 kAdminDestinations와 어긋난다',
+    );
+
+    final titles = kAdminDestinations.map((d) => d.headerTitle).toList();
+    for (final e in pageSources.entries) {
+      final file = File(e.value);
+      // 경로가 틀리면 아무것도 검사하지 못한 채 통과한다 — 전제부터 잠근다.
+      expect(file.existsSync(), isTrue, reason: '${e.value}를 찾지 못했다');
+      final src = file.readAsStringSync();
+      for (final t in titles) {
+        expect(
+          src.contains("'$t'"),
+          isFalse,
+          reason: "${e.value}가 제목 리터럴 '$t'을 직접 쓴다 — adminHeaderTitleFor를 써라",
+        );
+      }
+    }
   });
 
   test('제목이 목적지 사이에서 중복되지 않는다', () {
