@@ -99,7 +99,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(DpTag), findsNWidgets(2));
-    expect(find.byType(Chip), findsNothing);
+    // Chip 부재는 **태그 Wrap 안으로 좁혀서** 단언한다. 화면 전체를 보면
+    // LcsAnswererPanel이 스냅샷이 있을 때 필드 라벨 Chip을 렌더하므로,
+    // 「픽스처가 그걸 null로 꺼둔 덕에 통과」하는 우연한 성립이 된다.
+    expect(
+      find.descendant(of: find.byType(Wrap), matching: find.byType(Chip)),
+      findsNothing,
+    );
     expect(find.text('#dart'), findsOneWidget);
   });
 
