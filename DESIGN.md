@@ -207,6 +207,33 @@ Loading/Empty/Error 외에 다음 전용 상태를 dp_design에 추가:
   `backgroundColor`를 별도로 지정하면 크롬바 아래 색이 셸과 어긋나므로 지정하지 않는다. (`DpAppShell`을
   쓰지 않는 `apps/mobile`은 이 규칙 밖이다 — 기존 `Scaffold.appBar`를 그대로 쓴다.)
 
+### 9.1 페이지 헤더의 스크롤 거동
+
+일관성의 기준은 「모든 화면 동일」이 아니라 **「화면 유형별 동일」** 이다.
+
+- **문서형** — 본문이 스크롤 축을 가지는 화면. 페이지 헤더도 `CustomScrollView`의
+  `SliverToBoxAdapter`로 실어 **본문과 함께 스크롤**한다. 크롬바(46px 고정)에
+  브레드크럼이 있으므로 헤더가 사라져도 위치를 잃지 않는다.
+  (web `dashboard`·`path`·`content`·`mypage`·`settings`, 커뮤니티 `home`·`post_detail`·
+  `qna_detail`·`post_create`·`question_create`, admin `dashboard`·`reports`)
+- **뷰포트 고정형** — 본문이 남은 높이를 꽉 채우는 화면. 헤더를 **고정**한다.
+  (web `mentor`(채팅 + 하단 입력창)·`sandbox`(탭 + 에디터),
+  admin `users`·`ads`·`support`(`DpDataTable` 자체 뷰포트))
+
+뷰포트 고정형에서 헤더를 `SliverFillRemaining`으로 감싸면 남은 높이를 전부 차지해
+**바깥 스크롤 여지가 0이 되므로 헤더는 결국 고정이다.** 코드만 복잡해지고 결과가 같으므로
+하지 않는다.
+
+**문서형으로 전환할 때 함께 지켜야 하는 것**
+
+- 로딩·실패 분기도 sliver 계약을 져야 한다(`SliverFillRemaining`). 비-sliver 자식을 넣으면
+  `RenderViewport expected a child of type RenderSliver`로 터진다 — 회귀 테스트의 RED 근거로 쓸 수 있다.
+- 스크롤 진행률을 데이터로 쓰는 화면(`content`)은 헤더 높이만큼 축이 길어지므로 보정이 필요하다.
+- 헤더 스크롤을 검증하는 테스트는 **「본문이 헤더보다 길다」를 산술로 검산**한다.
+  필요조건은 줄 수가 아니라 `maxScrollExtent > 헤더 높이`다. 드래그 **전에** 헤더가 실제로
+  보이는지도 함께 고정한다 — 그러지 않으면 「헤더가 아예 렌더되지 않는」 회귀가
+  `findsNothing` 경로로 조용히 통과한다.
+
 ## 10. 출처/샘플 매핑
 
 `dp_design` 구현 시 적용할 Flutter 샘플(플랜 §7 참조): `Flutter_Material3_ThemeExtension_DesignToken`(토큰), `Flutter_EmptyState_빈상태`·`Flutter_Shimmer_Skeleton_Loader`·`Flutter_재사용_다이얼로그_Confirm_Error`(상태위젯).

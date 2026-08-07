@@ -16,6 +16,11 @@ import 'package:flutter_test/flutter_test.dart';
 ///   `adminHeaderTitleFor(...)`가 같은 값이라 두 단언 모두 green이다
 ///   (실측: `ads_page`의 `title`을 `'광고 관리'` 리터럴로 되돌려도 `ads_page_test` 5/5 통과).
 ///   이 방향은 아래 「화면 소스가 제목 리터럴을 직접 쓰지 않는다」가 소스 텍스트로 막는다.
+///
+/// **소스 검사의 범위는 5개 화면 파일이다.** `admin_shell.dart`는 `kAdminDestinations`
+/// 정의부라 리터럴을 당연히 가지므로 스캔 대상이 아니고, 따라서 **셸의 브레드크럼
+/// 조립부(`AdminShellView.build`)는 이 가드가 덮지 않는다** — 그쪽은 `admin_shell_view_test`의
+/// 리터럴 단언(값 변경 방향)만 걸려 있다.
 void main() {
   test('모든 admin 목적지가 headerTitle을 갖는다', () {
     for (final d in kAdminDestinations) {
@@ -70,8 +75,12 @@ void main() {
       expect(file.existsSync(), isTrue, reason: '${e.value}를 찾지 못했다');
       final src = file.readAsStringSync();
       for (final t in titles) {
+        // 작은따옴표만 보면 `"광고 관리"`로 재도입했을 때 조용히 통과한다.
+        // `prefer_single_quotes`는 이 레포에서 비활성이고(admin·web·mobile 모두
+        // analysis_options.yaml에서 주석 처리) `dart format`도 따옴표를 정규화하지
+        // 않으므로, 그 경로는 실제로 열려 있다. 둘 다 막는다.
         expect(
-          src.contains("'$t'"),
+          src.contains("'$t'") || src.contains('"$t"'),
           isFalse,
           reason: "${e.value}가 제목 리터럴 '$t'을 직접 쓴다 — adminHeaderTitleFor를 써라",
         );

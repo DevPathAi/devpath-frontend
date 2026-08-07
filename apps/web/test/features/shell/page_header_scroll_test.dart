@@ -63,6 +63,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('설정'), findsWidgets);
+    _expectHeaderVisible(tester);
 
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -300));
     await tester.pump();
@@ -103,6 +104,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('마이페이지'), findsWidgets);
+    _expectHeaderVisible(tester);
 
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -300));
     await tester.pump();
@@ -139,6 +141,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('학습 경로'), findsWidgets);
+    _expectHeaderVisible(tester);
 
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -300));
     await tester.pump();
@@ -188,6 +191,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.text('학습 콘텐츠'), findsWidgets);
+    _expectHeaderVisible(tester);
 
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -300));
     await tester.pump();
@@ -212,6 +216,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('대시보드'), findsWidgets);
+    _expectHeaderVisible(tester);
 
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -300));
     await tester.pump();
