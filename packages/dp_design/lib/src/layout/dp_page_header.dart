@@ -13,13 +13,16 @@ class DpPageHeader extends StatelessWidget {
     required this.title,
     this.description,
     this.actions = const [],
-    this.filters,
+    this.filters = const [],
   });
 
   final String title;
   final String? description;
   final List<Widget> actions;
-  final Widget? filters;
+
+  /// 헤더 아래 필터 줄. 자식들은 Wrap의 형제로 배치되어 좁은 폭에서
+  /// 줄바꿈한다 — Row를 통째로 받으면 줄바꿈이 일어나지 않는다.
+  final List<Widget> filters;
 
   @override
   Widget build(BuildContext context) {
@@ -89,11 +92,16 @@ class DpPageHeader extends StatelessWidget {
               ],
             ),
           ),
-          if (filters != null) ...[
+          if (filters.isNotEmpty) ...[
             const SizedBox(height: DpSpacing.md),
             KeyedSubtree(
               key: const ValueKey('page-header-filters'),
-              child: filters!,
+              child: Wrap(
+                spacing: DpSpacing.sm,
+                runSpacing: DpSpacing.xs,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: filters,
+              ),
             ),
           ],
         ],

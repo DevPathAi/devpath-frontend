@@ -98,7 +98,10 @@ class AppShell extends StatelessWidget {
 }
 
 /// 표현부: go_router 비의존 — DpAppShell(4-클래스 반응형)로 위임.
-class AppShellView extends StatelessWidget {
+///
+/// 레일 펼침 상태를 여기서 보유한다. 2단계에서는 onToggleRail을 넘기지
+/// 않아 medium(600~840)에서 접힘 고정이었다 — 사용자가 펼칠 방법이 없었다.
+class AppShellView extends StatefulWidget {
   const AppShellView({
     super.key,
     required this.location,
@@ -110,70 +113,67 @@ class AppShellView extends StatelessWidget {
   final Widget child;
   final void Function(String path)? onSelect;
 
+  @override
+  State<AppShellView> createState() => _AppShellViewState();
+}
+
+class _AppShellViewState extends State<AppShellView> {
+  /// null이면 DpAppShell의 폭 기반 기본값(medium 접힘 / 그 이상 펼침)을 따른다.
+  /// 사용자가 토글하면 그 값이 기본값을 덮는다.
+  bool? _railExtended;
+
   // I1: 매칭되는 목적지가 없으면 null(무강조)을 반환한다. kShellDestinations가
   // 5→4로 줄면서 /settings·/mypage·/content/:id·/sandbox가 여기 없다 —
   // 예전처럼 0(대시보드)으로 폴백하면 레일이 잘못된 항목을 활성 표시한다.
   int? get _index {
-    final i = kShellDestinations.indexWhere((d) => location.startsWith(d.path));
+    final i = kShellDestinations.indexWhere(
+      (d) => widget.location.startsWith(d.path),
+    );
     return i < 0 ? null : i;
   }
 
   @override
   Widget build(BuildContext context) {
     final c = context.dpColors;
-    final text = Theme.of(context).textTheme;
 
     return DpAppShell(
       selectedIndex: _index,
-      onSelect: (i) => onSelect?.call(kShellDestinations[i].path),
+      onSelect: (i) => widget.onSelect?.call(kShellDestinations[i].path),
       destinations: [
         for (final d in kShellDestinations)
           DpDestination(icon: d.icon, label: d.label, section: d.section),
       ],
-      brand: Row(
-        children: [
-          Container(
-            width: 22,
-            height: 22,
-            decoration: BoxDecoration(
-              color: c.primary,
-              borderRadius: BorderRadius.circular(DpRadius.button),
-            ),
-          ),
-          const SizedBox(width: DpSpacing.sm),
-          // color를 반드시 명시한다 — DpTheme.light()/.dark()가
-          // textTheme.apply(bodyColor: c.textPrimary)로 titleSmall에 이미
-          // non-null color(textPrimary)를 채워 넣는다(dp_theme.dart:32-34).
-          // Text는 style.inherit==true일 때 DefaultTextStyle.merge(style)을
-          // 하고, merge는 style의 non-null 필드를 우선한다 — 즉
-          // DpNavRail._withRailForeground(dp_nav_rail.dart:91)가 공급하는
-          // railText는 titleSmall이 이미 들고 있는 textPrimary에 진다.
-          // 라이트 테마에서 textPrimary(#1A1815)와 railBg(#1A1815)는 동일해
-          // color를 명시하지 않으면 브랜드 텍스트가 레일 배경에 완전히
-          // 묻힌다(대비 1.00:1) — 반드시 railText를 명시로 덮어써야 한다.
-          Flexible(
-            child: Text(
-              'DevPath',
-              overflow: TextOverflow.ellipsis,
-              style: text.titleSmall?.copyWith(color: c.railText),
-            ),
-          ),
-        ],
-      ),
-      account: _AccountMenu(onGo: onSelect),
-      breadcrumb: breadcrumbFor(location),
-      onCrumbTap: (p) => onSelect?.call(p),
-      onSearchTap: () => _openPalette(context),
-      chromeActions: [
-        Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(DpIcons.error),
-            tooltip: '오류 신고·문의',
-            onPressed: () => showSupportDialog(context),
+      brand: DpRailBrand(
+        mark: Container(
+          width: 22,
+          height: 22,
+          decoration: BoxDecoration(
+            color: c.primary,
+            borderRadius: BorderRadius.circular(DpRadius.button),
           ),
         ),
+        wordmark: 'DevPath',
+      ),
+      account: _AccountMenu(onGo: widget.onSelect),
+      breadcrumb: breadcrumbFor(widget.location),
+      onCrumbTap: (p) => widget.onSelect?.call(p),
+      onSearchTap: () => _openPalette(context),
+      chromeActions: [
+        DpChromeAction(
+          icon: DpIcons.error,
+          label: '오류 신고·문의',
+          onPressed: (context) => showSupportDialog(context),
+        ),
       ],
-      body: child,
+      railExtended: _railExtended,
+      onToggleRail: () => setState(() {
+        // 현재 실효 상태를 뒤집는다. 아직 토글한 적이 없으면 DpAppShell의
+        // 폭 기반 기본값(dp_app_shell.dart)과 같은 규칙으로 계산한다.
+        final wc = context.windowClass;
+        final current = _railExtended ?? (wc != DpWindowClass.medium);
+        _railExtended = !current;
+      }),
+      body: widget.child,
     );
   }
 

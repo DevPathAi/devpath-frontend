@@ -2,6 +2,7 @@ import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../shell/presentation/admin_shell.dart';
 import '../../../widgets/bulk_action_bar.dart';
 import '../application/users_controller.dart';
 import '../data/admin_user_row.dart';
@@ -65,30 +66,25 @@ class _S extends ConsumerState<AdminUsersPage> {
       body: Column(
         children: [
           DpPageHeader(
-            title: '사용자 관리',
+            // 제목은 kAdminDestinations가 유일한 출처다(admin_shell.dart).
+            title: adminHeaderTitleFor('/users'),
             description: '가입 승인과 제재를 처리합니다',
-            filters: Row(
-              children: [
-                const Text('상태:'),
-                const SizedBox(width: DpSpacing.sm),
-                // (변경 1) BETA_PENDING을 첫 번째로 추가
-                for (final st in [
-                  'BETA_PENDING',
-                  'ACTIVE',
-                  'WARNED',
-                  'SUSPENDED',
-                  'BANNED',
-                ])
-                  Padding(
-                    padding: const EdgeInsets.only(right: DpSpacing.xs),
-                    child: ChoiceChip(
-                      label: Text(st),
-                      selected: s.statusFilter == st,
-                      onSelected: (_) => n.setStatusFilter(st),
-                    ),
-                  ),
-              ],
-            ),
+            filters: [
+              const Text('상태:'),
+              // (변경 1) BETA_PENDING을 첫 번째로 추가
+              for (final st in [
+                'BETA_PENDING',
+                'ACTIVE',
+                'WARNED',
+                'SUSPENDED',
+                'BANNED',
+              ])
+                ChoiceChip(
+                  label: Text(st),
+                  selected: s.statusFilter == st,
+                  onSelected: (_) => n.setStatusFilter(st),
+                ),
+            ],
           ),
           // (변경 3) 사전승인 폼 — 화면 상단
           _PreApproveBar(

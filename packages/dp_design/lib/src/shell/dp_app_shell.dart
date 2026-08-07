@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../layout/dp_max_width.dart';
 import '../layout/dp_window_class.dart';
+import '../theme/dp_colors.dart';
+import 'dp_chrome_action.dart';
 import 'dp_chrome_bar.dart';
 import 'dp_destination.dart';
 import 'dp_nav_rail.dart';
+import 'dp_rail_brand.dart';
 
 /// 4-클래스 반응형 앱 셸(로드맵 §2.2 Layer 2). 라우팅 비의존 —
 /// 목적지 선택은 [onSelect]에 index로 통지, 경로 해석은 앱이 담당.
@@ -39,12 +42,12 @@ class DpAppShell extends StatelessWidget {
   final int? selectedIndex;
   final ValueChanged<int> onSelect;
   final Widget body;
-  final Widget? brand;
+  final DpRailBrand? brand;
   final Widget? account;
   final List<DpCrumb> breadcrumb;
   final ValueChanged<String>? onCrumbTap;
   final VoidCallback? onSearchTap;
-  final List<Widget> chromeActions;
+  final List<DpChromeAction> chromeActions;
   final bool? railExtended;
   final VoidCallback? onToggleRail;
   final bool constrainBodyAtLarge;
@@ -83,22 +86,44 @@ class DpAppShell extends StatelessWidget {
     );
 
     if (compact) {
+      final c = context.dpColors;
+      // NavigationBar.selectedIndex는 Flutter 3.44에서 non-null int라
+      // 0으로 클램프할 수밖에 없다. DpNavRail처럼 무강조를 표현할 수 없으므로
+      // 인디케이터를 투명으로 만들고 선택 라벨/아이콘 색을 비선택과 같게 덮어
+      // 시각적 강조를 지운다 — 비-compact 레일의 무강조 거동과 일치시킨다.
+      final unselected = selectedIndex == null;
       return Scaffold(
         body: main,
-        bottomNavigationBar: NavigationBar(
-          // NavigationBar.selectedIndex는 Flutter 3.44에서 non-null int라
-          // 클램프한다 — DpNavRail과 달리 무강조를 표현할 수 없다.
-          selectedIndex: selectedIndex ?? 0,
-          onDestinationSelected: onSelect,
-          destinations: [
-            for (final d in destinations)
-              NavigationDestination(
-                icon: d.badgeCount > 0
-                    ? Badge(label: Text('${d.badgeCount}'), child: Icon(d.icon))
-                    : Icon(d.icon),
-                label: d.label,
-              ),
-          ],
+        bottomNavigationBar: NavigationBarTheme(
+          data: NavigationBarThemeData(
+            indicatorColor: unselected ? Colors.transparent : null,
+            iconTheme: unselected
+                ? WidgetStateProperty.all(IconThemeData(color: c.textSecondary))
+                : null,
+            labelTextStyle: unselected
+                ? WidgetStateProperty.all(TextStyle(color: c.textSecondary))
+                : null,
+          ),
+          // 한계: NavigationBar 내부 Semantics의 selected 플래그까지는 끄지
+          // 못한다(위젯이 selectedIndex로 직접 계산한다). 시각적 강조는
+          // 지워지지만 스크린리더는 여전히 0번을 선택으로 읽는다.
+          // 완전 해소는 하단 바 자체 구현이 필요해 범위 밖으로 둔다.
+          child: NavigationBar(
+            selectedIndex: selectedIndex ?? 0,
+            onDestinationSelected: onSelect,
+            destinations: [
+              for (final d in destinations)
+                NavigationDestination(
+                  icon: d.badgeCount > 0
+                      ? Badge(
+                          label: Text('${d.badgeCount}'),
+                          child: Icon(d.icon),
+                        )
+                      : Icon(d.icon),
+                  label: d.label,
+                ),
+            ],
+          ),
         ),
       );
     }

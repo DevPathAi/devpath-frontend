@@ -90,7 +90,14 @@ void main() {
           destinations: _dests,
           selectedIndex: 0,
           onSelect: (_) {},
-          brand: const Text('DevPath'),
+          brand: DpRailBrand(
+            mark: const SizedBox(
+              key: ValueKey('brand-mark-render-test'),
+              width: 20,
+              height: 20,
+            ),
+            wordmark: 'DevPath',
+          ),
           account: const Text('김개발'),
         ),
       ),
@@ -99,13 +106,13 @@ void main() {
     expect(find.text('김개발'), findsOneWidget);
   });
 
-  // Important 1: 다크 레일 위에서 brand·account에 무스타일 위젯을 넣으면
-  // railBg와 같은 색(#1A1815 = textPrimary)으로 렌더돼 완전히 묻힌다.
-  // 레일이 자기 배경에 맞는 전경색을 기본값으로 공급해야 한다.
-  testWidgets('brand·account 슬롯은 각각 railText·railMuted를 기본 전경색으로 제공', (
-    tester,
-  ) async {
-    Color? brandTextColor;
+  // Important 1: 다크 레일 위에서 account에 무스타일 위젯을 넣으면 railBg와
+  // 같은 색(#1A1815 = textPrimary)으로 렌더돼 완전히 묻힌다. 레일이 자기
+  // 배경에 맞는 전경색을 기본값으로 공급해야 한다.
+  // brand 워드마크는 DpRailBrand가 색을 직접 확정하므로(dp_rail_brand_test.dart
+  // 참고) 이 기본-전경색 메커니즘이 더 이상 적용되지 않는다 — 그래서 여기서는
+  // account만 검증한다.
+  testWidgets('account 슬롯은 railMuted를 기본 전경색으로 제공', (tester) async {
     Color? accountIconColor;
     await tester.pumpWidget(
       _host(
@@ -113,12 +120,6 @@ void main() {
           destinations: _dests,
           selectedIndex: 0,
           onSelect: (_) {},
-          brand: Builder(
-            builder: (context) {
-              brandTextColor = DefaultTextStyle.of(context).style.color;
-              return const Text('DevPath');
-            },
-          ),
           account: Builder(
             builder: (context) {
               accountIconColor = IconTheme.of(context).color;
@@ -128,7 +129,6 @@ void main() {
         ),
       ),
     );
-    expect(brandTextColor, DpColors.light.railText);
     expect(accountIconColor, DpColors.light.railMuted);
   });
 
@@ -146,6 +146,41 @@ void main() {
     );
     await tester.tap(find.byTooltip('메뉴 접기'));
     expect(toggled, isTrue);
+  });
+
+  // 접힘 + brand.mark + onToggle 동시 존재 회귀 가드. railCollapsedWidth(72) -
+  // _buildTop 좌우 패딩(md+sm=20) = 가용 52px인데, mark(22) + IconButton
+  // (Material 최소 탭 타깃 48) = 70px이 필요해 예전엔 19px RenderFlex
+  // 오버플로가 났다(2026-08-06 web Task 7에서 발견 — apps/web 코드 없이
+  // 이 구성만으로 격리 재현됨). 접힘 상태에서는 마크 위에 토글을 세로로
+  // 쌓아 이 결함을 해소한다 — 둘 다 렌더돼야 하고 오버플로가 없어야 한다.
+  testWidgets('접힘 + 마크 + 토글: 세로로 쌓여 오버플로 없이 둘 다 보인다', (tester) async {
+    await tester.pumpWidget(
+      _host(
+        DpNavRail(
+          destinations: _dests,
+          selectedIndex: 0,
+          onSelect: (_) {},
+          extended: false,
+          brand: DpRailBrand(
+            mark: const SizedBox(
+              key: ValueKey('brand-mark-collapsed-toggle-test'),
+              width: 22,
+              height: 22,
+            ),
+            wordmark: 'DevPath',
+          ),
+          onToggle: () {},
+        ),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(
+      find.byKey(const ValueKey('brand-mark-collapsed-toggle-test')),
+      findsOneWidget,
+    );
+    expect(find.byTooltip('메뉴 펼치기'), findsOneWidget);
   });
 
   testWidgets('레일 배경·우측 경계선 색이 토큰과 배선된다', (tester) async {

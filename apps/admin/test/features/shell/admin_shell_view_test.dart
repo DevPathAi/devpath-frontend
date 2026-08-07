@@ -29,6 +29,11 @@ void main() {
     );
     final chrome = tester.widget<DpChromeBar>(find.byType(DpChromeBar));
     expect(chrome.breadcrumb, const [(label: '사용자 관리', path: null)]);
+    // 브레드크럼도 화면 헤더와 같은 함수를 통과한다는 확인이다. 값 변경 감지는 위
+    // 리터럴 단언의 몫이다(admin_title_source_test의 doc 주석 참조).
+    expect(chrome.breadcrumb, [
+      (label: adminHeaderTitleFor('/users'), path: null),
+    ]);
   });
 
   testWidgets('compact 폭은 NavigationBar', (tester) async {
@@ -74,12 +79,14 @@ void main() {
     expect(picked, '/ads');
   });
 
-  // F1/F2 회귀 가드(2차 fix wave): DpTheme의 titleSmall은 이미 non-null
-  // color(textPrimary)를 품고 있어(dp_theme.dart:32-34) Text.style에
-  // color를 명시하지 않으면 DefaultTextStyle.merge에서 DpNavRail이 공급하는
-  // railText를 이긴다. 라이트에서 textPrimary==railBg라 브랜드 텍스트가
-  // 완전히 묻힌다 — Text 위젯의 "실효 색"(DefaultTextStyle과의 병합
-  // 결과, Flutter Text가 실제로 렌더할 색)을 단언해 이 경로를 고정한다.
+  // 3단계(DpRailBrand)부터는 앱이 Text를 직접 만들지 않는다 — brand:에
+  // DpRailBrand(mark:, wordmark:)를 넘기면 워드마크 Text는 DpNavRail 내부에서
+  // color: c.railText를 명시해 만들어진다(dp_nav_rail.dart). 즉 이 회귀는
+  // 이제 dp_design 쪽에서 구조적으로 막혀 있다(dp_rail_brand_test.dart·
+  // dp_nav_rail_test.dart). 여기서는 admin 셸이 실제로 DpRailBrand를 통해
+  // 배선했는지(과거처럼 raw Text/Widget을 brand:에 직접 넘기는 회귀가
+  // 없는지)를 앱 레벨에서 고정한다 — Text 위젯의 "실효 색"(DefaultTextStyle과의
+  // 병합 결과, Flutter Text가 실제로 렌더할 색)을 단언한다.
   Color? effectiveTextColor(WidgetTester tester, Finder finder) {
     final widget = tester.widget<Text>(finder);
     final context = tester.element(finder);

@@ -2,6 +2,7 @@ import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../shell/presentation/admin_shell.dart';
 import '../../../widgets/bulk_action_bar.dart';
 import '../application/ads_controller.dart';
 import '../data/ad_row.dart';
@@ -36,7 +37,8 @@ class _AdsPageState extends ConsumerState<AdminAdsPage> {
       body: Column(
         children: [
           DpPageHeader(
-            title: '광고 관리',
+            // 제목은 kAdminDestinations가 유일한 출처다(admin_shell.dart).
+            title: adminHeaderTitleFor('/ads'),
             description: '하우스·스폰서 광고를 운영합니다',
             actions: [
               const Text('전역 노출'),
@@ -50,21 +52,15 @@ class _AdsPageState extends ConsumerState<AdminAdsPage> {
                 onPressed: () => _openForm(context, n, null),
               ),
             ],
-            filters: Row(
-              children: [
-                const Text('슬롯:'),
-                const SizedBox(width: DpSpacing.sm),
-                for (final slot in _kSlots)
-                  Padding(
-                    padding: const EdgeInsets.only(right: DpSpacing.xs),
-                    child: ChoiceChip(
-                      label: Text(slot),
-                      selected: s.slotFilter == slot,
-                      onSelected: (sel) => n.setSlotFilter(sel ? slot : null),
-                    ),
-                  ),
-              ],
-            ),
+            filters: [
+              const Text('슬롯:'),
+              for (final slot in _kSlots)
+                ChoiceChip(
+                  label: Text(slot),
+                  selected: s.slotFilter == slot,
+                  onSelected: (sel) => n.setSlotFilter(sel ? slot : null),
+                ),
+            ],
           ),
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 180),

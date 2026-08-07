@@ -5,6 +5,7 @@ import '../theme/dp_colors.dart';
 import '../theme/dp_spacing.dart';
 import '../theme/dp_tokens.dart';
 import 'dp_destination.dart';
+import 'dp_rail_brand.dart';
 
 /// 잉크 사이드바(로드맵 Layer 2). 라우팅 비의존 — 선택은 index로 통지.
 ///
@@ -28,7 +29,7 @@ class DpNavRail extends StatelessWidget {
   /// 어디에도 매칭되지 않는 경우 — I1: 잘못된 항목을 강조하는 대신 무강조).
   final int? selectedIndex;
   final ValueChanged<int> onSelect;
-  final Widget? brand;
+  final DpRailBrand? brand;
   final Widget? account;
   final bool extended;
   final VoidCallback? onToggle;
@@ -81,29 +82,75 @@ class DpNavRail extends StatelessWidget {
         ),
       );
 
-  Widget _buildTop(BuildContext context, DpColors c) => Padding(
-    padding: const EdgeInsets.fromLTRB(
-      DpSpacing.md,
-      DpSpacing.md,
-      DpSpacing.sm,
-      DpSpacing.sm,
-    ),
-    child: Row(
-      children: [
-        if (extended && brand != null)
-          Expanded(child: _withRailForeground(c.railText, brand!)),
-        if (onToggle != null)
-          IconButton(
+  Widget _buildTop(BuildContext context, DpColors c) {
+    final b = brand;
+    final text = Theme.of(context).textTheme;
+
+    final toggleButton = onToggle == null
+        ? null
+        : IconButton(
             icon: Icon(
               extended ? DpIcons.menuOpen : DpIcons.menu,
               color: c.railMuted,
             ),
             tooltip: extended ? '메뉴 접기' : '메뉴 펼치기',
             onPressed: onToggle,
-          ),
-      ],
-    ),
-  );
+          );
+
+    // 접힘 + 마크 + 토글은 가로로 나란히 놓을 자리가 없다: railCollapsedWidth
+    // (72) - 좌우 패딩(md+sm=20) = 가용 52px인데 mark(22) + IconButton(Material
+    // 최소 탭 타깃 48) = 70px이 필요해 19px RenderFlex 오버플로가 난다(실측,
+    // dp_nav_rail_test.dart의 red-repro). 44px 최소 탭 타깃(DD7)을 지키며
+    // 마크를 지우지 않는 조합이 이 폭에서 존재하지 않으므로(44+8=52가 이론
+    // 한계, 8px 마크는 무의미), 접힘 상태에서만 마크 위에 토글을 세로로
+    // 쌓는다 — 브랜드가 먼저 읽혀야 하므로 마크가 위. **이 분기를 가로
+    // Row로 되돌리지 말 것** — 위 수치대로 다시 오버플로한다.
+    if (!extended && b != null && toggleButton != null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: DpSpacing.sm,
+          vertical: DpSpacing.sm,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [b.mark, toggleButton],
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        DpSpacing.md,
+        DpSpacing.md,
+        DpSpacing.sm,
+        DpSpacing.sm,
+      ),
+      child: Row(
+        children: [
+          if (b != null) ...[
+            // 마크는 접힘에서도 남는다 — 2단계에서는 extended 조건 안에
+            // 함께 묶여 있어 접히면 브랜드가 통째로 사라졌다.
+            b.mark,
+            if (extended) ...[
+              const SizedBox(width: DpSpacing.sm),
+              // Expanded(flex 참여)로 감싼다 — non-flex Text는 무한 주축
+              // 제약으로 측정되어 ellipsis가 발동하지 않는다.
+              Expanded(
+                child: Text(
+                  b.wordmark,
+                  overflow: TextOverflow.ellipsis,
+                  // 색을 여기서 확정한다. 앱은 문자열만 주므로 이 색이
+                  // merge에서 질 상대가 없다.
+                  style: text.titleSmall?.copyWith(color: c.railText),
+                ),
+              ),
+            ],
+          ],
+          ?toggleButton,
+        ],
+      ),
+    );
+  }
 
   List<Widget> _buildItems(BuildContext context, DpColors c) {
     final text = Theme.of(context).textTheme;

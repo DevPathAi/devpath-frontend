@@ -58,14 +58,16 @@ void main() {
   testWidgets('actions·account 슬롯을 렌더', (tester) async {
     await tester.pumpWidget(
       _host(
-        const DpChromeBar(
+        DpChromeBar(
           breadcrumb: _crumbs,
-          actions: [Text('액션')],
-          account: Text('계정'),
+          actions: [
+            DpChromeAction(icon: Icons.star, label: '액션', onPressed: (_) {}),
+          ],
+          account: const Text('계정'),
         ),
       ),
     );
-    expect(find.text('액션'), findsOneWidget);
+    expect(find.byTooltip('액션'), findsOneWidget);
     expect(find.text('계정'), findsOneWidget);
   });
 
@@ -138,21 +140,29 @@ void main() {
     expect(separator.style?.color, DpColors.light.textFaint);
   });
 
-  // Important 1: 밝은 surface 배경 위이므로 actions·account에 무스타일
-  // 위젯을 넣어도 textSecondary가 기본 전경색으로 공급돼야 한다(대비 확보).
-  testWidgets('actions·account 슬롯은 textSecondary를 기본 전경색으로 제공', (tester) async {
-    Color? actionsIconColor;
+  // Important 1: 밝은 surface 배경 위이므로 actions·account 모두 textSecondary가
+  // 기본 전경색으로 공급돼야 한다(대비 확보). actions는 이제 DpChromeBar가
+  // 직접 IconButton을 짓는 데이터형이라(3단계 I2), 여기서는 ambient 상속이 아니라
+  // **DpChromeBar가 명시적으로 textSecondary를 칠하는지**를 렌더된 Icon의 color
+  // 필드로 직접 확인한다.
+  // ※ M3 IconButton이 ambient IconTheme를 상속하지 **않는다**는 뜻이 아니다 —
+  //   실측하면 상속한다(icon_button.dart:1029-1044가 IconTheme.of를 읽어
+  //   foregroundColor로 승격). 명시 색이 언제나 이기므로 이 단언은 그대로 유효하다.
+  // account는 여전히 호출부가 넘기는 무스타일 위젯이라 ambient DefaultTextStyle
+  // 상속을 그대로 검증한다.
+  testWidgets('actions는 textSecondary를 아이콘 색으로 쓰고, account는 ambient를 상속한다', (
+    tester,
+  ) async {
     Color? accountTextColor;
     await tester.pumpWidget(
       _host(
         DpChromeBar(
           breadcrumb: _crumbs,
           actions: [
-            Builder(
-              builder: (context) {
-                actionsIconColor = IconTheme.of(context).color;
-                return const Icon(Icons.notifications);
-              },
+            DpChromeAction(
+              icon: Icons.notifications,
+              label: '알림',
+              onPressed: (_) {},
             ),
           ],
           account: Builder(
@@ -164,7 +174,8 @@ void main() {
         ),
       ),
     );
-    expect(actionsIconColor, DpColors.light.textSecondary);
+    final actionIcon = tester.widget<Icon>(find.byIcon(Icons.notifications));
+    expect(actionIcon.color, DpColors.light.textSecondary);
     expect(accountTextColor, DpColors.light.textSecondary);
   });
 
@@ -199,7 +210,9 @@ void main() {
       _host(
         DpChromeBar(
           breadcrumb: longCrumbs,
-          actions: const [Text('액션')],
+          actions: [
+            DpChromeAction(icon: Icons.star, label: '액션', onPressed: (_) {}),
+          ],
           account: const Icon(Icons.account_circle, key: ValueKey('acct')),
         ),
       ),
@@ -234,8 +247,12 @@ void main() {
             (label: '대시보드', path: null),
           ],
           onSearchTap: () {},
-          actions: const [
-            Icon(Icons.error_outline, key: ValueKey('act-error')),
+          actions: [
+            DpChromeAction(
+              icon: Icons.error_outline,
+              label: '오류',
+              onPressed: (_) {},
+            ),
           ],
         ),
       ),
@@ -244,8 +261,12 @@ void main() {
     final barRight = tester
         .getRect(find.byKey(const ValueKey('chrome-bar-root')))
         .right;
+    // 액션은 이제 DpChromeBar가 짓는 IconButton(히트 타깃 포함)이라, 그
+    // 바깥 경계(IconButton 자체의 rect)로 정렬을 확인한다 — 안쪽 Icon
+    // 글리프나 Tooltip 위젯의 rect는 IconButton 내부 히트 영역 패딩만큼
+    // 안쪽으로 치우쳐 보여 실측이 4px 어긋난다(직접 확인).
     final actRight = tester
-        .getRect(find.byKey(const ValueKey('act-error')))
+        .getRect(find.widgetWithIcon(IconButton, Icons.error_outline))
         .right;
     expect(barRight - actRight, closeTo(DpSpacing.lg, 1.0));
   });
@@ -273,6 +294,104 @@ void main() {
         reason: '${pair.$1} · ${pair.$2} 구분자 간격이 좌우 비대칭이다',
       );
     }
+  });
+
+  // 3-A: 마지막 세그먼트는 현재 위치이므로 path가 있어도 비링크로 렌더해야
+  // 한다(브레드크럼 관례 — 자기 자신으로 가는 링크를 두지 않는다).
+  testWidgets('마지막 crumb은 path가 있어도 비링크다', (tester) async {
+    var tapped = 0;
+    await tester.pumpWidget(
+      _host(
+        DpChromeBar(
+          breadcrumb: const [
+            (label: '커뮤니티', path: null),
+            (label: '게시판', path: '/community'),
+          ],
+          onCrumbTap: (_) => tapped++,
+        ),
+      ),
+    );
+
+    // 현재 위치를 자기 자신에게 링크하지 않는다(브레드크럼 관례).
+    await tester.tap(find.text('게시판'));
+    await tester.pump();
+    expect(tapped, 0);
+  });
+
+  testWidgets('마지막이 아닌 crumb은 path가 있으면 링크다', (tester) async {
+    var tappedPath = '';
+    await tester.pumpWidget(
+      _host(
+        DpChromeBar(
+          breadcrumb: const [
+            (label: '커뮤니티', path: null),
+            (label: '게시판', path: '/community'),
+            (label: '게시글', path: null),
+          ],
+          onCrumbTap: (p) => tappedPath = p,
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('게시판'));
+    await tester.pump();
+    expect(tappedPath, '/community');
+  });
+
+  // Important(리뷰 발견 1): dp_chrome_bar.dart의 구분자 패딩 상쇄 조건
+  // (`i + 1 == items.length - 1`)은 "마지막 항목이 path를 가진" 경우에만
+  // 의미가 갈린다. 위쪽 `_crumbs` 고정 픽스처는 마지막이 이미 path: null이라
+  // 이 분기를 통과하지 않는다 — 이 테스트가 그 경로를 전담해서 잠근다.
+  // (컨트롤러 리뷰로 이 조건을 제거하면 정확히 DpSpacing.sm(8px)만큼
+  // 비대칭이 재현됨을 실측 확인했다 — task-5-report.md 참고.)
+  testWidgets('마지막 crumb이 path를 가져도 구분자 간격은 대칭이다', (tester) async {
+    await tester.pumpWidget(
+      _host(
+        const DpChromeBar(
+          breadcrumb: [
+            (label: '커뮤니티', path: null),
+            (label: '게시판', path: '/community'),
+          ],
+        ),
+      ),
+    );
+
+    final dot = tester.getRect(find.text('·'));
+    final gapBefore = dot.left - tester.getRect(find.text('커뮤니티')).right;
+    final gapAfter = tester.getRect(find.text('게시판')).left - dot.right;
+    expect(
+      gapBefore,
+      closeTo(gapAfter, 0.5),
+      reason: '커뮤니티 · 게시판(마지막, path 있음) 구분자 간격이 좌우 비대칭이다',
+    );
+  });
+
+  // Minor(리뷰 발견 3): compact은 crumbs를 마지막 1개로 잘라 렌더한다
+  // (`_crumbs`의 `compact && breadcrumb.isNotEmpty ? [breadcrumb.last] : ...`).
+  // 그 단일 항목이 path를 가진 경우에도 비링크여야 한다 — 기존 compact
+  // 테스트(위 '검색 아이콘' 테스트)의 픽스처(게시글, path: null)는 이
+  // 조합을 우연히 피해간다.
+  testWidgets('compact에서 유일한(마지막) crumb이 path를 가져도 비링크다', (tester) async {
+    var tapped = 0;
+    await tester.pumpWidget(
+      _host(
+        DpChromeBar(
+          breadcrumb: const [
+            (label: '커뮤니티', path: null),
+            (label: '게시판', path: '/community'),
+          ],
+          compact: true,
+          onCrumbTap: (_) => tapped++,
+        ),
+      ),
+    );
+
+    expect(find.text('게시판'), findsOneWidget);
+    expect(find.text('커뮤니티'), findsNothing);
+
+    await tester.tap(find.text('게시판'));
+    await tester.pump();
+    expect(tapped, 0);
   });
 
   testWidgets('검색 필드 배경은 surfaceMuted를 쓴다', (tester) async {

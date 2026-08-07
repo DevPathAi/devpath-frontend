@@ -5,6 +5,7 @@ import 'package:devpath_admin/src/features/reports/state/reports_state.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:devpath_admin/src/features/shell/presentation/admin_shell.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 AdminReport _r({
@@ -60,7 +61,8 @@ Future<void> _pump(WidgetTester tester, ProviderContainer c) async {
   await tester.pumpAndSettle();
 }
 
-ProviderContainer _container(_Fake fake) {
+/// 로딩·실패 상태를 고정하는 가짜도 받을 수 있도록 상위 타입으로 받는다.
+ProviderContainer _container(ReportsController fake) {
   final c = ProviderContainer(
     overrides: [reportsProvider.overrideWith(() => fake)],
   );
@@ -128,10 +130,69 @@ void main() {
     expect((s as ReportsLoaded).status, 'REJECTED');
   });
 
-  testWidgets('DpPageHeader 제목은 "신고 처리"', (tester) async {
+  testWidgets('DpPageHeader 제목은 "신고 처리" + 상태 필터가 filters 슬롯에 렌더', (
+    tester,
+  ) async {
     await _pump(tester, _container(_Fake([_r()])));
 
     final header = tester.widget<DpPageHeader>(find.byType(DpPageHeader));
     expect(header.title, '신고 처리');
+    // 화면이 실제로 adminHeaderTitleFor를 호출한다는 것만 확인한다(경로 인자 오타 등).
+    // 상수 값 변경 감지는 위 리터럴 단언의 몫이고, 화면이 같은 값의 리터럴로 퇴행하는
+    // 방향은 admin_title_source_test의 소스 검사가 막는다.
+    expect(header.title, adminHeaderTitleFor('/reports'));
+    expect(find.byKey(const ValueKey('page-header-filters')), findsOneWidget);
   });
+
+  // 아래 두 건은 sliver 전환(Task 12)이 만든 로딩·실패 분기를 잠근다. 빈 목록
+  // 분기는 위 '빈 목록이면 안내를 보여준다'가 이미 커버한다. 전환 전에는
+  // Expanded(child: ...)라 레이아웃이 자명했지만 지금은 SliverFillRemaining이라
+  // 헤더와 같은 스크롤 표면 위에서 렌더된다 — 비-sliver를 넣으면 예외가 난다.
+  testWidgets('로딩 중에도 헤더와 로딩 표시가 함께 렌더된다', (tester) async {
+    // _pump 헬퍼는 pumpAndSettle을 쓰는데 이 케이스는 정착하지 않는다
+    // (실측: pumpAndSettle timed out). 원인은 DpLoading 자체가 아니라
+    // **로딩 상태를 영구 고정한 가짜 컨트롤러 + 그 안의 indeterminate
+    // CircularProgressIndicator(repeat)** 조합이다 — 같은 파일의 다른
+    // pumpAndSettle 테스트들이 멀쩡한 이유는 로딩이 일시적이라 인디케이터가
+    // 트리에서 사라지기 때문이다. 그래서 이 케이스만 pump 한 번으로 렌더한다.
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: _container(_LoadingReports()),
+        child: MaterialApp(theme: DpTheme.light(), home: const ReportsPage()),
+      ),
+    );
+    await tester.pump();
+
+    expect(
+      tester.widget<DpPageHeader>(find.byType(DpPageHeader)).title,
+      '신고 처리',
+    );
+    expect(find.byType(DpLoading), findsOneWidget);
+  });
+
+  testWidgets('조회 실패 시 헤더와 에러 안내가 함께 렌더된다', (tester) async {
+    await _pump(tester, _container(_FailedReports()));
+
+    expect(
+      tester.widget<DpPageHeader>(find.byType(DpPageHeader)).title,
+      '신고 처리',
+    );
+    expect(find.textContaining('신고를 불러오지 못했어요'), findsWidgets);
+  });
+}
+
+class _LoadingReports extends ReportsController {
+  @override
+  ReportsState build() => const ReportsLoading();
+
+  @override
+  Future<void> load({String? status = 'OPEN'}) async {}
+}
+
+class _FailedReports extends ReportsController {
+  @override
+  ReportsState build() => const ReportsFailed('신고를 불러오지 못했어요');
+
+  @override
+  Future<void> load({String? status = 'OPEN'}) async {}
 }

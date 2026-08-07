@@ -119,17 +119,21 @@ class _PostCreatePageState extends ConsumerState<PostCreatePage> {
 
   @override
   Widget build(BuildContext context) {
+    // 문서형 화면 — 헤더를 첫 sliver로 실어 폼과 함께 스크롤시킨다(DESIGN.md §9).
+    // 본문 에디터(DpRichEditor)는 고정 높이(260px)의 자체 스크롤 영역이라
+    // sliver 안에서도 높이가 유한하고, 페이지 스크롤과 경쟁하지 않는다.
     return Scaffold(
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          DpPageHeader(
-            title: _pageTitle,
-            description: '자유롭게 쓰거나 코드 피드백을 요청하세요',
+      body: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: DpPageHeader(
+              title: _pageTitle,
+              description: '자유롭게 쓰거나 코드 피드백을 요청하세요',
+            ),
           ),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(DpSpacing.lg),
+          SliverPadding(
+            padding: const EdgeInsets.all(DpSpacing.lg),
+            sliver: SliverList.list(
               children: [
                 TextField(
                   controller: _titleCtrl,
@@ -140,14 +144,9 @@ class _PostCreatePageState extends ConsumerState<PostCreatePage> {
                     border: OutlineInputBorder(),
                   ),
                 ),
+                // 본문 안내 문구는 헤더 설명과 같은 말이라 제거했다(3-A Task 14-3).
+                // 헤더가 더 눈에 띄는 자리이고, 2단계 스펙 §5가 그 문구를 지정했다.
                 const SizedBox(height: DpSpacing.md),
-                Text(
-                  _isFeedback
-                      ? '리뷰받고 싶은 코드/프로젝트와 궁금한 점을 적어주세요'
-                      : '나누고 싶은 이야기를 적어주세요',
-                  style: TextStyle(color: context.dpColors.textSecondary),
-                ),
-                const SizedBox(height: DpSpacing.xs),
                 DpRichEditor(
                   key: const ValueKey('post-body-editor'),
                   controller: _bodyController,

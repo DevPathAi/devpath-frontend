@@ -2,6 +2,7 @@ import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../shell/presentation/admin_shell.dart';
 import '../application/support_controller.dart';
 import '../data/support_request.dart';
 import '../state/support_state.dart';
@@ -27,20 +28,12 @@ class SupportPage extends ConsumerWidget {
     return Scaffold(
       body: Column(
         children: [
-          const DpPageHeader(
-            title: '오류 신고·문의',
+          DpPageHeader(
+            // 제목은 kAdminDestinations가 유일한 출처다(admin_shell.dart).
+            title: adminHeaderTitleFor('/support'),
             description: '사용자가 보낸 오류와 문의를 처리합니다',
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              DpSpacing.lg,
-              DpSpacing.md,
-              DpSpacing.lg,
-              0,
-            ),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: SegmentedButton<String?>(
+            filters: [
+              SegmentedButton<String?>(
                 segments: [
                   for (final (label, value) in _statusFilters)
                     ButtonSegment(value: value, label: Text(label)),
@@ -49,7 +42,7 @@ class SupportPage extends ConsumerWidget {
                 showSelectedIcon: false,
                 onSelectionChanged: (sel) => n.load(status: sel.first),
               ),
-            ),
+            ],
           ),
           Expanded(
             child: switch (s) {

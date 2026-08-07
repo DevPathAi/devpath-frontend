@@ -99,6 +99,32 @@ void main() {
     );
   });
 
+  // 3-A Task 14-3: 헤더 설명('무엇을 시도했고 어디서 막혔는지 함께 적어주세요')이
+  // 본문 안내('상황과 시도한 내용을 적어주세요')보다 구체적이라 본문 쪽을 지운다.
+  // 헤더 문구는 2단계 스펙 §5가 지정한 값이라 불변이다.
+  testWidgets('본문 안내가 헤더 설명과 중복되지 않는다', (tester) async {
+    _wideView(tester);
+    final c = ProviderContainer(
+      overrides: [
+        similarQuestionsProvider.overrideWithValue((q) async => const []),
+        questionCreateProvider.overrideWithValue(
+          ({required title, required bodyMd, required tags}) async =>
+              _created(98),
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+    await tester.pumpWidget(_host(c));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.widget<DpPageHeader>(find.byType(DpPageHeader)).description,
+      '무엇을 시도했고 어디서 막혔는지 함께 적어주세요',
+      reason: '2단계 스펙 §5가 지정한 헤더 설명은 불변이다',
+    );
+    expect(find.text('상황과 시도한 내용을 적어주세요'), findsNothing);
+  });
+
   testWidgets('제목·본문 입력 후 게시하면 작성 API 호출 + 상세로 이동', (tester) async {
     _wideView(tester);
     String? seenTitle, seenBody;

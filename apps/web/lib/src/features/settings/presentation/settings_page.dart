@@ -36,22 +36,25 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Widget build(BuildContext context) {
     final state = ref.watch(settingsControllerProvider);
     return Scaffold(
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const DpPageHeader(title: '설정', description: '알림·동의·계정을 관리합니다'),
-          Expanded(
-            child: switch (state) {
-              SettingsLoading() => const Center(
-                child: CircularProgressIndicator(),
-              ),
-              SettingsError(:final message) => _errorView(message),
-              SettingsReady(:final consents, :final prefs) => _readyView(
-                consents,
-                prefs,
-              ),
-            },
+      body: CustomScrollView(
+        slivers: [
+          const SliverToBoxAdapter(
+            child: DpPageHeader(title: '설정', description: '알림·동의·계정을 관리합니다'),
           ),
+          switch (state) {
+            SettingsLoading() => const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(child: CircularProgressIndicator()),
+            ),
+            SettingsError(:final message) => SliverFillRemaining(
+              hasScrollBody: false,
+              child: _errorView(message),
+            ),
+            SettingsReady(:final consents, :final prefs) => _readyView(
+              consents,
+              prefs,
+            ),
+          },
         ],
       ),
     );
@@ -73,38 +76,40 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   Widget _readyView(ConsentsView consents, NotificationPrefs prefs) {
     final notifier = ref.read(settingsControllerProvider.notifier);
-    return ListView(
+    return SliverPadding(
       padding: const EdgeInsets.symmetric(vertical: DpSpacing.md),
-      children: [
-        _header('동의 관리'),
-        for (final type in _consentMeta.keys)
-          _consentTile(type, consents.itemOf(type), notifier),
-        const Divider(),
-        _header('알림'),
-        SwitchListTile(
-          title: const Text('학습 리마인더'),
-          subtitle: const Text('선호 시간대에 학습 알림을 받아요.'),
-          value: prefs.reminderEnabled,
-          onChanged: notifier.setReminder,
-        ),
-        SwitchListTile(
-          title: const Text('주간 리포트 이메일'),
-          subtitle: const Text('한 주 학습 요약을 이메일로 받아요.'),
-          value: prefs.weeklyReportEmailEnabled,
-          onChanged: notifier.setWeeklyEmail,
-        ),
-        const Divider(),
-        _header('계정'),
-        ListTile(title: const Text('로그아웃'), onTap: () => notifier.logout()),
-        ListTile(
-          title: Text(
-            '계정 삭제',
-            style: TextStyle(color: context.dpColors.danger),
+      sliver: SliverList.list(
+        children: [
+          _header('동의 관리'),
+          for (final type in _consentMeta.keys)
+            _consentTile(type, consents.itemOf(type), notifier),
+          const Divider(),
+          _header('알림'),
+          SwitchListTile(
+            title: const Text('학습 리마인더'),
+            subtitle: const Text('선호 시간대에 학습 알림을 받아요.'),
+            value: prefs.reminderEnabled,
+            onChanged: notifier.setReminder,
           ),
-          subtitle: const Text('계정과 학습 데이터가 삭제됩니다(30일 유예).'),
-          onTap: _confirmDelete,
-        ),
-      ],
+          SwitchListTile(
+            title: const Text('주간 리포트 이메일'),
+            subtitle: const Text('한 주 학습 요약을 이메일로 받아요.'),
+            value: prefs.weeklyReportEmailEnabled,
+            onChanged: notifier.setWeeklyEmail,
+          ),
+          const Divider(),
+          _header('계정'),
+          ListTile(title: const Text('로그아웃'), onTap: () => notifier.logout()),
+          ListTile(
+            title: Text(
+              '계정 삭제',
+              style: TextStyle(color: context.dpColors.danger),
+            ),
+            subtitle: const Text('계정과 학습 데이터가 삭제됩니다(30일 유예).'),
+            onTap: _confirmDelete,
+          ),
+        ],
+      ),
     );
   }
 

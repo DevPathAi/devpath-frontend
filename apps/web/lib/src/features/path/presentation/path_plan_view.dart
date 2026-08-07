@@ -9,102 +9,107 @@ class PathPlanView extends StatelessWidget {
   final LearningPath plan;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListView(
+    padding: const EdgeInsets.all(DpSpacing.lg),
+    children: children(context, plan),
+  );
+
+  /// 문서형 화면(sliver) 배선용 — 이 위젯 자체(내부 [ListView])를 쓰지 않고,
+  /// 호출부의 CustomScrollView에 직접 [SliverList]로 실을 수 있도록 콘텐츠만
+  /// 노출한다. 중첩 스크롤(헤더가 사라지지 않는 결함)을 피하기 위함이다.
+  static List<Widget> children(BuildContext context, LearningPath plan) {
     final c = context.dpColors;
     final text = Theme.of(context).textTheme;
     final thisWeek = plan.milestones.isNotEmpty ? plan.milestones.first : null;
     final diagnosis = plan.diagnosis;
 
-    return ListView(
-      padding: const EdgeInsets.all(DpSpacing.lg),
-      children: [
-        Container(
-          padding: const EdgeInsets.all(DpSpacing.md),
-          decoration: BoxDecoration(
-            color: c.surface,
-            border: Border.all(color: c.border),
-            borderRadius: BorderRadius.circular(DpRadius.card),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(DpIcons.mentor, size: 18, color: c.primaryText),
-              const SizedBox(width: DpSpacing.sm),
-              Expanded(
-                child: Text(
-                  plan.rationale,
-                  style: text.bodyMedium?.copyWith(color: c.textSecondary),
-                ),
+    return [
+      Container(
+        padding: const EdgeInsets.all(DpSpacing.md),
+        decoration: BoxDecoration(
+          color: c.surface,
+          border: Border.all(color: c.border),
+          borderRadius: BorderRadius.circular(DpRadius.card),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(DpIcons.mentor, size: 18, color: c.primaryText),
+            const SizedBox(width: DpSpacing.sm),
+            Expanded(
+              child: Text(
+                plan.rationale,
+                style: text.bodyMedium?.copyWith(color: c.textSecondary),
               ),
+            ),
+          ],
+        ),
+      ),
+      if (diagnosis != null) ...[
+        const SizedBox(height: DpSpacing.xl),
+        Text('진단 요약', style: text.titleMedium),
+        const SizedBox(height: DpSpacing.sm),
+        Text('현재 수준 ${diagnosis.diagnosedLevel}', style: text.bodyMedium),
+        // 색만으로 강점/약점을 구분하지 않는다(DESIGN.md §1) — 소제목 텍스트를
+        // 병행하고, 약점은 "위험"이 아니므로 중립(textSecondary)을 쓴다.
+        if (diagnosis.strengthConcepts.isNotEmpty) ...[
+          const SizedBox(height: DpSpacing.sm),
+          Text('강점', style: text.titleSmall),
+          const SizedBox(height: DpSpacing.xs),
+          Wrap(
+            spacing: DpSpacing.xs,
+            runSpacing: DpSpacing.xs,
+            children: [
+              for (final strength in diagnosis.strengthConcepts)
+                _Tag(label: strength, color: c.success),
             ],
           ),
-        ),
-        if (diagnosis != null) ...[
-          const SizedBox(height: DpSpacing.xl),
-          Text('진단 요약', style: text.titleMedium),
-          const SizedBox(height: DpSpacing.sm),
-          Text('현재 수준 ${diagnosis.diagnosedLevel}', style: text.bodyMedium),
-          // 색만으로 강점/약점을 구분하지 않는다(DESIGN.md §1) — 소제목 텍스트를
-          // 병행하고, 약점은 "위험"이 아니므로 중립(textSecondary)을 쓴다.
-          if (diagnosis.strengthConcepts.isNotEmpty) ...[
-            const SizedBox(height: DpSpacing.sm),
-            Text('강점', style: text.titleSmall),
-            const SizedBox(height: DpSpacing.xs),
-            Wrap(
-              spacing: DpSpacing.xs,
-              runSpacing: DpSpacing.xs,
-              children: [
-                for (final strength in diagnosis.strengthConcepts)
-                  _Tag(label: strength, color: c.success),
-              ],
-            ),
-          ],
-          if (diagnosis.weaknessConcepts.isNotEmpty) ...[
-            const SizedBox(height: DpSpacing.sm),
-            Text('보강할 점', style: text.titleSmall),
-            const SizedBox(height: DpSpacing.xs),
-            Wrap(
-              spacing: DpSpacing.xs,
-              runSpacing: DpSpacing.xs,
-              children: [
-                for (final weakness in diagnosis.weaknessConcepts)
-                  _Tag(label: weakness, color: c.textSecondary),
-              ],
-            ),
-          ],
         ],
-        if (thisWeek != null) ...[
-          const SizedBox(height: DpSpacing.xl),
-          Text('이번 주 과제', style: text.titleMedium),
+        if (diagnosis.weaknessConcepts.isNotEmpty) ...[
           const SizedBox(height: DpSpacing.sm),
-          Text(thisWeek.expectedOutcome, style: text.bodySmall),
-          const SizedBox(height: DpSpacing.sm),
-          for (final t in thisWeek.tasks) _TaskTile(task: t),
+          Text('보강할 점', style: text.titleSmall),
+          const SizedBox(height: DpSpacing.xs),
+          Wrap(
+            spacing: DpSpacing.xs,
+            runSpacing: DpSpacing.xs,
+            children: [
+              for (final weakness in diagnosis.weaknessConcepts)
+                _Tag(label: weakness, color: c.textSecondary),
+            ],
+          ),
         ],
+      ],
+      if (thisWeek != null) ...[
         const SizedBox(height: DpSpacing.xl),
-        Text('12주 타임라인', style: text.titleMedium),
+        Text('이번 주 과제', style: text.titleMedium),
         const SizedBox(height: DpSpacing.sm),
-        for (final m in plan.milestones)
-          ListTile(
-            dense: true,
-            leading: CircleAvatar(
-              radius: 14,
-              backgroundColor: m.locked ? c.surface : c.primary,
-              child: Text(
-                '${m.weekNum}',
-                style: text.labelLarge?.copyWith(
-                  color: m.locked ? c.textSecondary : c.onPrimary,
-                ),
+        Text(thisWeek.expectedOutcome, style: text.bodySmall),
+        const SizedBox(height: DpSpacing.sm),
+        for (final t in thisWeek.tasks) _TaskTile(task: t),
+      ],
+      const SizedBox(height: DpSpacing.xl),
+      Text('12주 타임라인', style: text.titleMedium),
+      const SizedBox(height: DpSpacing.sm),
+      for (final m in plan.milestones)
+        ListTile(
+          dense: true,
+          leading: CircleAvatar(
+            radius: 14,
+            backgroundColor: m.locked ? c.surface : c.primary,
+            child: Text(
+              '${m.weekNum}',
+              style: text.labelLarge?.copyWith(
+                color: m.locked ? c.textSecondary : c.onPrimary,
               ),
             ),
-            title: Text(m.title, style: text.bodyMedium),
-            subtitle: Text(
-              '${m.goalDescription}\n${m.whyThisOrder}',
-              style: text.bodySmall?.copyWith(color: c.textSecondary),
-            ),
           ),
-      ],
-    );
+          title: Text(m.title, style: text.bodyMedium),
+          subtitle: Text(
+            '${m.goalDescription}\n${m.whyThisOrder}',
+            style: text.bodySmall?.copyWith(color: c.textSecondary),
+          ),
+        ),
+    ];
   }
 }
 

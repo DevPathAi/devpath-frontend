@@ -4,6 +4,7 @@ import 'package:devpath_admin/src/features/ads/presentation/ads_page.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:devpath_admin/src/features/shell/presentation/admin_shell.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 AdRow _ad(int id, String title) => AdRow(
@@ -134,6 +135,10 @@ void main() {
 
     final header = tester.widget<DpPageHeader>(find.byType(DpPageHeader));
     expect(header.title, '광고 관리');
+    // 화면이 실제로 adminHeaderTitleFor를 호출한다는 것만 확인한다(경로 인자 오타 등).
+    // 상수 값 변경 감지는 위 리터럴 단언의 몫이고, 화면이 같은 값의 리터럴로 퇴행하는
+    // 방향은 admin_title_source_test의 소스 검사가 막는다.
+    expect(header.title, adminHeaderTitleFor('/ads'));
     expect(find.byKey(const ValueKey('page-header-filters')), findsOneWidget);
   });
 }

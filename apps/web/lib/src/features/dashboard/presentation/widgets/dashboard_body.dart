@@ -15,7 +15,17 @@ class DashboardBody extends StatelessWidget {
   final DashboardSummary summary;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      SingleChildScrollView(child: content(context, summary));
+
+  /// 문서형 화면(sliver) 배선용 — 이 위젯 자체(내부 [SingleChildScrollView])를
+  /// 쓰지 않고, 호출부의 CustomScrollView에 직접 실을 수 있도록 콘텐츠만
+  /// 노출한다. 중첩 스크롤(헤더가 사라지지 않는 결함)을 피하기 위함이다.
+  static Widget content(
+    BuildContext context,
+    DashboardSummary summary, {
+    Key? key,
+  }) {
     final cross = switch (context.windowClass) {
       DpWindowClass.compact => 1,
       DpWindowClass.medium => 2,
@@ -74,10 +84,11 @@ class DashboardBody extends StatelessWidget {
     ];
 
     return Align(
+      key: key,
       alignment: Alignment.topCenter,
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: maxW),
-        child: SingleChildScrollView(
+        child: Padding(
           padding: const EdgeInsets.all(DpSpacing.lg),
           child: StaggeredGrid.count(
             crossAxisCount: cross,
@@ -174,7 +185,7 @@ class _BadgeStrip extends StatelessWidget {
           Wrap(
             spacing: DpSpacing.sm,
             runSpacing: DpSpacing.xs,
-            children: [for (final b in badges) Chip(label: Text(b))],
+            children: [for (final b in badges) DpTag(label: b)],
           ),
         ],
       ),

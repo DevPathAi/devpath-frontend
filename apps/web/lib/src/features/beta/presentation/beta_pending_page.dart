@@ -84,7 +84,7 @@ class _BetaPendingPageState extends ConsumerState<BetaPendingPage> {
                         _expired ? Icons.lock_clock : Icons.hourglass_top,
                         size: 48,
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: DpSpacing.lg),
                       Text(
                         _expired
                             ? '대기 세션이 만료되었어요. 승인 여부는 이메일로 안내됩니다. 다시 로그인해 확인하세요.'
@@ -92,16 +92,16 @@ class _BetaPendingPageState extends ConsumerState<BetaPendingPage> {
                         textAlign: TextAlign.center,
                       ),
                       if (_expired) ...[
-                        const SizedBox(height: 24),
+                        const SizedBox(height: DpSpacing.xl),
                         FilledButton(
                           onPressed: () => context.go('/login'),
                           child: const Text('다시 로그인'),
                         ),
                       ] else ...[
-                        const SizedBox(height: 24),
+                        const SizedBox(height: DpSpacing.xl),
                         const CircularProgressIndicator(),
                       ],
-                      const SizedBox(height: 24),
+                      const SizedBox(height: DpSpacing.xl),
                     ],
                   ),
                 ),

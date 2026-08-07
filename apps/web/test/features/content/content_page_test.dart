@@ -75,9 +75,11 @@ void main() {
     await tester.pumpWidget(_host(adapter));
     await _pumpLoad(tester);
     await tester.pump(const Duration(seconds: 6));
+    // 헤더도 함께 스크롤되는 문서형 전환(Task 10)으로 화면 최상위 스크롤
+    // 컨테이너가 SingleChildScrollView에서 CustomScrollView로 바뀌었다.
     await tester.dragUntilVisible(
       find.textContaining('문단 70'),
-      find.byType(SingleChildScrollView),
+      find.byType(CustomScrollView),
       const Offset(0, -500),
     );
     await tester.pump();
@@ -87,6 +89,160 @@ void main() {
     expect(adapter.postBodies.last, containsPair('dwellSec', 6));
     expect(adapter.count('GET /learning-paths/me'), 1);
     expect(adapter.count('GET /dashboard/me'), 1);
+  });
+
+  testWidgets('스크롤 진행률(scrollPct)은 헤더 높이를 보정해 서버로 전송한다', (tester) async {
+    tester.view.physicalSize = const Size(900, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final adapter = _SequenceAdapter({
+      'GET /contents/future-async-await': [
+        (200, _contentJson(markdown: _longMarkdown(), scrollPct: 0)),
+      ],
+      'POST /contents/future-async-await/progress': [
+        (
+          200,
+          {
+            'scrollPct': 0.5,
+            'dwellSec': 6,
+            'completed': false,
+            'completedAt': null,
+          },
+        ),
+      ],
+    });
+
+    await tester.pumpWidget(_host(adapter));
+    await _pumpLoad(tester);
+
+    // 헤더도 CustomScrollView의 첫 sliver라 컨트롤러가 헤더+본문 전체
+    // 스크롤 범위를 관측한다(Task 10) — 보정 없이 pixels/maxScrollExtent를
+    // 쓰면 분모에 헤더 높이가 섞여 진행률이 실제보다 낮게 계산된다.
+    final headerHeight = tester.getSize(find.byType(DpPageHeader)).height;
+    final controller = tester
+        .widget<CustomScrollView>(find.byType(CustomScrollView))
+        .controller!;
+    final bodyMax = controller.position.maxScrollExtent - headerHeight;
+    // 80문단짜리 긴 마크다운이 900x700 뷰포트보다 충분히 길어야
+    // 아래 "본문 50% 지점" 계산이 의미를 갖는다.
+    expect(bodyMax, greaterThan(0));
+
+    await tester.pump(const Duration(seconds: 6)); // dwellSec=6(최소 5초 통과)
+
+    // "본문만 스크롤하던 옛 구조" 기준 정확히 50% 지점 = 지금 구조에서는
+    // 헤더 높이만큼 밀린 위치(headerHeight + bodyMax*0.5)로 점프한다.
+    // jumpTo는 리스너를 동기 호출해 정확히 이 위치 하나로만 flush를 낸다
+    // (드래그 제스처의 중간 프레임에 걸쳐 값이 흔들리는 것을 피한다).
+    controller.jumpTo(headerHeight + bodyMax * 0.5);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(adapter.postBodies, isNotEmpty);
+    final sentScrollPct = (adapter.postBodies.last as Map)['scrollPct'] as num;
+    // 보정 없이(옛 코드) 계산하면 이 값은 0.5보다 뚜렷이 커진다(분모에 헤더
+    // 높이가 섞여 pixels/maxScrollExtent > 실제 본문 스크롤 비율이 되므로).
+    expect(sentScrollPct.toDouble(), closeTo(0.5, 0.001));
+  });
+
+  testWidgets('헤더가 스크롤로 트리에서 걷어내진 뒤에도 scrollPct 보정이 유지된다', (tester) async {
+    tester.view.physicalSize = const Size(900, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    // 서버가 준 기존 진행률 0.2 — 헤더 높이를 못 재 폴백으로 무너지면
+    // 이 값이 그대로 돌아오므로, 0.5 단언이 폴백 경로를 확실히 red로 만든다.
+    final adapter = _SequenceAdapter({
+      'GET /contents/future-async-await': [
+        (200, _contentJson(markdown: _longMarkdown(), scrollPct: 0.2)),
+      ],
+      'POST /contents/future-async-await/progress': [
+        (
+          200,
+          {
+            'scrollPct': 0.5,
+            'dwellSec': 6,
+            'completed': false,
+            'completedAt': null,
+          },
+        ),
+      ],
+    });
+
+    await tester.pumpWidget(_host(adapter));
+    await _pumpLoad(tester);
+
+    final headerHeight = tester.getSize(find.byType(DpPageHeader)).height;
+    final controller = tester
+        .widget<CustomScrollView>(find.byType(CustomScrollView))
+        .controller!;
+    final bodyMax = controller.position.maxScrollExtent - headerHeight;
+    expect(bodyMax, greaterThan(0));
+
+    await tester.pump(const Duration(seconds: 6)); // dwell 최소 조건 통과
+
+    // 1단계: 본문 30% 지점으로 이동 — 헤더(84px)가 뷰포트+캐시 익스텐트 밖으로
+    // 나가 sliver가 컬링된다. 실제 사용자가 글을 읽어 내려간 상태와 같다.
+    controller.jumpTo(headerHeight + bodyMax * 0.3);
+    for (var i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    // 전제 확인: 헤더가 정말 트리에서 걷어내졌다(이게 아니면 이 테스트는
+    // 위 '헤더 높이를 보정해 전송한다' 테스트와 같은 경로만 재검사하게 된다).
+    expect(find.byType(DpPageHeader), findsNothing);
+
+    // 2단계: 헤더가 이미 없는 상태에서 더 스크롤한다 — 이 flush의 scrollPct는
+    // 전적으로 "헤더가 트리에 없는 상태의 계산"으로 결정된다.
+    controller.jumpTo(headerHeight + bodyMax * 0.5);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(adapter.postBodies, isNotEmpty);
+    final sentScrollPct = (adapter.postBodies.last as Map)['scrollPct'] as num;
+    expect(sentScrollPct.toDouble(), closeTo(0.5, 0.001));
+  });
+
+  testWidgets('끝까지 스크롤해도 scrollPct는 여전히 1.0이다(보정 후에도 완료 판정 불변)', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(900, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final adapter = _SequenceAdapter({
+      'GET /contents/future-async-await': [
+        (200, _contentJson(markdown: _longMarkdown(), scrollPct: 0)),
+      ],
+      'POST /contents/future-async-await/progress': [
+        (
+          200,
+          {
+            'scrollPct': 1.0,
+            'dwellSec': 6,
+            'completed': false,
+            'completedAt': null,
+          },
+        ),
+      ],
+    });
+
+    await tester.pumpWidget(_host(adapter));
+    await _pumpLoad(tester);
+
+    final controller = tester
+        .widget<CustomScrollView>(find.byType(CustomScrollView))
+        .controller!;
+    final maxExtent = controller.position.maxScrollExtent;
+
+    await tester.pump(const Duration(seconds: 6));
+
+    controller.jumpTo(maxExtent);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(adapter.postBodies, isNotEmpty);
+    final sentScrollPct = (adapter.postBodies.last as Map)['scrollPct'] as num;
+    expect(sentScrollPct.toDouble(), 1.0);
   });
 
   testWidgets('retry button reloads', (tester) async {

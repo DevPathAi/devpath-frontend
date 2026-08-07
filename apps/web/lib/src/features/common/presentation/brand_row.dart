@@ -25,7 +25,15 @@ Widget brandRow(BuildContext context, {List<Widget> actions = const []}) {
           ),
         ),
         const SizedBox(width: DpSpacing.sm),
-        Text('DevPath', style: text.titleSmall?.copyWith(color: c.textPrimary)),
+        // Flexible로 감싼다 — Spacer(Expanded)와 같은 Row의 non-flex 자식은
+        // 무한 주축 제약으로 측정되어 ellipsis가 발동하지 않고 오버플로한다.
+        Flexible(
+          child: Text(
+            'DevPath',
+            overflow: TextOverflow.ellipsis,
+            style: text.titleSmall?.copyWith(color: c.textPrimary),
+          ),
+        ),
         const Spacer(),
         ...actions,
       ],

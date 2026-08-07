@@ -129,6 +129,19 @@ void main() {
     expect(find.byType(Badge), findsOneWidget);
   });
 
+  // Task 6 리뷰 minor(3-A Task 15 이월): 위 테스트는 폭 1000 = **레일 경로**만 덮는다.
+  // compact는 NavigationBar라 렌더 경로가 통째로 다르므로, 거기서 badge가 사라져도
+  // 아무 테스트도 red가 되지 않았다. 폭 400을 따로 잠근다 —
+  // NavigationBar 존재를 먼저 단언해 「compact 경로였다」는 전제부터 고정한다.
+  testWidgets('compact(NavigationBar) 경로에서도 badgeCount>0은 Badge 표시', (
+    tester,
+  ) async {
+    _setWidth(tester, 400);
+    await tester.pumpWidget(_host(_shell()));
+    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.byType(Badge), findsOneWidget);
+  });
+
   // Important 2: 크롬바가 breadcrumb 유무만으로 렌더 여부를 정하면,
   // compact + 빈 breadcrumb 조합에서 account(크롬바로 배치됨)가 어디에도
   // 도달하지 못하고 조용히 사라진다.
@@ -165,12 +178,14 @@ void main() {
           selectedIndex: 0,
           onSelect: (_) {},
           breadcrumb: const [],
-          chromeActions: const [Text('액션')],
+          chromeActions: [
+            DpChromeAction(icon: Icons.star, label: '액션', onPressed: (_) {}),
+          ],
           body: const Text('본문'),
         ),
       ),
     );
     expect(find.byType(DpChromeBar), findsOneWidget);
-    expect(find.text('액션'), findsOneWidget);
+    expect(find.byTooltip('액션'), findsOneWidget);
   });
 }

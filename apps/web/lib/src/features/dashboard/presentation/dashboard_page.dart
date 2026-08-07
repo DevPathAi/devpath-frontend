@@ -38,35 +38,42 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   Widget build(BuildContext context) {
     final s = ref.watch(dashboardControllerProvider);
     return Scaffold(
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const DpPageHeader(
-            title: '대시보드',
-            description: '이번 주 학습 현황과 다음 과제를 한눈에 봅니다',
-          ),
-          Expanded(
-            child: AnimatedSwitcher(
-              key: const ValueKey('dash-switcher'),
-              duration: DpDurations.stageReveal,
-              child: switch (s) {
-                DashLoading() => const Skeletonizer(
-                  key: ValueKey('loading'),
-                  child: DashboardBody(summary: _skeletonSummary),
-                ),
-                DashFailed(:final message) => SupportableError(
-                  key: const ValueKey('error'),
-                  message: message,
-                  onRetry: () =>
-                      ref.read(dashboardControllerProvider.notifier).load(),
-                ),
-                DashLoaded(:final summary) => DashboardBody(
-                  key: const ValueKey('loaded'),
-                  summary: summary,
-                ),
-              },
+      body: CustomScrollView(
+        slivers: [
+          const SliverToBoxAdapter(
+            child: DpPageHeader(
+              title: '대시보드',
+              description: '이번 주 학습 현황과 다음 과제를 한눈에 봅니다',
             ),
           ),
+          // 헤더가 본문과 함께 스크롤되는 문서형 전환(Task 10)으로 최상위
+          // 스크롤 컨테이너가 CustomScrollView가 되어 AnimatedSwitcher(box
+          // 위젯)를 slivers 목록에 직접 실을 수 없다 — 로딩↔완료 전환
+          // 크로스페이드는 이번 전환에서 제거한다.
+          switch (s) {
+            DashLoading() => SliverToBoxAdapter(
+              child: Skeletonizer(
+                key: const ValueKey('loading'),
+                child: DashboardBody.content(context, _skeletonSummary),
+              ),
+            ),
+            DashFailed(:final message) => SliverFillRemaining(
+              hasScrollBody: false,
+              child: SupportableError(
+                key: const ValueKey('error'),
+                message: message,
+                onRetry: () =>
+                    ref.read(dashboardControllerProvider.notifier).load(),
+              ),
+            ),
+            DashLoaded(:final summary) => SliverToBoxAdapter(
+              child: DashboardBody.content(
+                context,
+                summary,
+                key: const ValueKey('loaded'),
+              ),
+            ),
+          },
         ],
       ),
     );

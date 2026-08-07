@@ -68,7 +68,9 @@ void main() {
     // 진단 요약에 강점/약점 소제목이 추가되며 늘어난 높이 때문에 12주
     // 타임라인의 1주차 항목이 초기 뷰포트 밖으로 밀렸다(2026-08-03).
     // path_plan_view_test.dart와 같은 패턴으로 스크롤 후 확인한다.
-    await tester.drag(find.byType(ListView), const Offset(0, -500));
+    // 헤더도 함께 스크롤되는 문서형 전환(Task 10)으로 화면 최상위 스크롤
+    // 컨테이너가 ListView에서 CustomScrollView로 바뀌었다.
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -500));
     await tester.pumpAndSettle();
     expect(find.textContaining('비동기 기초'), findsWidgets); // week1 제목
   });
