@@ -245,6 +245,76 @@ void main() {
     expect(sentScrollPct.toDouble(), 1.0);
   });
 
+  testWidgets('화면을 떠날 때 마지막 flush 이후의 진행분이 유실되지 않는다', (tester) async {
+    tester.view.physicalSize = const Size(900, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final adapter = _SequenceAdapter({
+      'GET /contents/future-async-await': [
+        (200, _contentJson(markdown: _longMarkdown(), scrollPct: 0)),
+      ],
+      'POST /contents/future-async-await/progress': [
+        (
+          200,
+          {
+            'scrollPct': 0.5,
+            'dwellSec': 6,
+            'completed': false,
+            'completedAt': null,
+          },
+        ),
+        (
+          200,
+          {
+            'scrollPct': 0.55,
+            'dwellSec': 8,
+            'completed': false,
+            'completedAt': null,
+          },
+        ),
+      ],
+    });
+
+    await tester.pumpWidget(_host(adapter));
+    await _pumpLoad(tester);
+
+    final headerHeight = tester.getSize(find.byType(DpPageHeader)).height;
+    final controller = tester
+        .widget<CustomScrollView>(find.byType(CustomScrollView))
+        .controller!;
+    final bodyMax = controller.position.maxScrollExtent - headerHeight;
+    expect(bodyMax, greaterThan(0));
+
+    await tester.pump(const Duration(seconds: 6));
+
+    // 1) 50%까지 스크롤 — 임계(0.1)를 넘어 flush가 나간다.
+    controller.jumpTo(headerHeight + bodyMax * 0.5);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(adapter.postBodies, hasLength(1));
+
+    // 2) 55%까지 더 스크롤 — 증분 0.05는 임계 미달이라 **아직 전송되지 않는다.**
+    //    이 5%가 화면을 떠날 때 살아남아야 하는 진행분이다.
+    controller.jumpTo(headerHeight + bodyMax * 0.55);
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 2)); // dwellSec를 벌려 dispose flush를 유발
+    expect(adapter.postBodies, hasLength(1), reason: '임계 미달이라 아직 전송되면 안 된다');
+
+    // 3) 화면을 떠난다 — dispose flush가 남은 진행분을 보내야 한다.
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(adapter.postBodies, hasLength(2), reason: 'dispose에서 한 번 더 보내야 한다');
+    final sent = (adapter.postBodies.last as Map)['scrollPct'] as num;
+    // 버그(수정 전): dispose 시 hasClients=false라 _scrollPct가 폴백(서버 최종값
+    // 0.5)을 돌려주고, 그 값이 tracker의 최신 진행률(0.55)을 **덮어써** 0.5가 나갔다.
+    // 정기 flush 임계가 0.1이므로 매번 최대 10%가 이렇게 유실될 수 있고,
+    // 완료 임계(0.8) 근처에서는 완료 처리가 지연된다.
+    expect(sent.toDouble(), closeTo(0.55, 0.01));
+  });
+
   testWidgets('retry button reloads', (tester) async {
     final adapter = _SequenceAdapter({
       'GET /contents/future-async-await': [
