@@ -30,13 +30,15 @@ class ProgressDonut extends StatelessWidget {
                 sections: [
                   PieChartSectionData(
                     value: p,
-                    color: c.primary,
+                    color: c.chart1,
                     radius: 12,
                     showTitle: false,
                   ),
                   PieChartSectionData(
                     value: 100 - p,
-                    color: c.border,
+                    // 미완료는 **면**이다 — 경계선 토큰(border)을 면에 쓰던 오용을
+                    // 면 토큰으로 바로잡는다(3-B 스펙 §4).
+                    color: c.surfaceMuted,
                     radius: 12,
                     showTitle: false,
                   ),
