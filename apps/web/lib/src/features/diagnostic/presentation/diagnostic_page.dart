@@ -81,6 +81,8 @@ class _DiagnosticPageState extends ConsumerState<DiagnosticPage> {
                     ),
                     DiagnosticGateSignup() => Column(
                       mainAxisSize: MainAxisSize.min,
+                      // 같은 화면의 다른 분기(_StartView·_QuestionView)와 축을 맞춘다.
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           '결과를 보려면 로그인하세요',
@@ -123,6 +125,10 @@ class _StartView extends StatelessWidget {
     final isMember = auth is AuthAuthenticated;
     return Column(
       mainAxisSize: MainAxisSize.min,
+      // 헤더(DpPageHeader)가 좌측 정렬이므로 본문도 같은 축에 세운다.
+      // Column의 기본값(center)을 그대로 두면 넓은 폭에서 헤더는 왼쪽,
+      // 본문은 가운데로 시각 축이 둘로 갈린다(3-A 육안 확인 §4-1).
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('실력 진단 15문항', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: DpSpacing.lg),
