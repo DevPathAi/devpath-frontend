@@ -5,9 +5,11 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-Widget _host(Widget child) => MaterialApp(
+Widget _host(Widget child, {double? width}) => MaterialApp(
   theme: DpTheme.light(),
-  home: Scaffold(body: child),
+  home: Scaffold(
+    body: width == null ? child : SizedBox(width: width, child: child),
+  ),
 );
 
 WeeklyTask _task({required bool done}) =>
@@ -56,6 +58,47 @@ void main() {
 
     final chart = tester.widget<BarChart>(find.byType(BarChart));
     expect(chart.data.barGroups.first.barRods.first.toY, 0);
+  });
+
+  testWidgets('진행이 0%인 주차도 배경 트랙으로 존재를 보인다', (tester) async {
+    // ★육안 확인에서 잡은 결함★ 경로를 막 만든 사용자는 12주가 전부 0%다.
+    // 막대만 그리면 높이 0이라 화면에 **아무것도 보이지 않고**, 제목과 X축 숫자만
+    // 남아 「차트가 고장났다」로 읽힌다. 도넛이 미완료를 면으로 그리는 것과 같은
+    // 원칙으로(스펙 §4) 배경 트랙을 깐다.
+    final milestones = [
+      for (var w = 1; w <= 3; w++) _ms(w, [_task(done: false)]),
+    ];
+
+    await tester.pumpWidget(
+      _host(MilestoneProgressCard(milestones: milestones)),
+    );
+    await tester.pumpAndSettle();
+
+    final chart = tester.widget<BarChart>(find.byType(BarChart));
+    for (final g in chart.data.barGroups) {
+      final rod = g.barRods.first;
+      expect(rod.toY, 0);
+      expect(rod.backDrawRodData.show, isTrue);
+      expect(rod.backDrawRodData.toY, 100);
+      expect(rod.backDrawRodData.color, DpColors.light.surfaceMuted);
+    }
+  });
+
+  testWidgets('12주 경로를 좁은 폭에서도 오버플로 없이 렌더한다', (tester) async {
+    // 목 픽스처도 12주지만 **캡처는 넓은 폭 위주라 좁은 폭의 밀집도를 보지 못한다.**
+    // 막대 12개가 360px에 들어가는지와 오버플로 부재를 여기서 잠근다.
+    final milestones = [
+      for (var w = 1; w <= 12; w++) _ms(w, [_task(done: w <= 4)]),
+    ];
+
+    await tester.pumpWidget(
+      _host(MilestoneProgressCard(milestones: milestones), width: 360),
+    );
+    await tester.pumpAndSettle();
+
+    final chart = tester.widget<BarChart>(find.byType(BarChart));
+    expect(chart.data.barGroups.length, 12);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('마일스톤이 없으면 안내 문구를 렌더한다', (tester) async {
