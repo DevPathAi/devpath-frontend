@@ -31,7 +31,7 @@ void main() {
     expect(rod.color, DpColors.light.chart1);
   });
 
-  testWidgets('도넛은 완료 chart1 · 미완료 surfaceMuted를 쓴다', (tester) async {
+  testWidgets('도넛은 완료 chart1 · 미완료 border를 쓴다', (tester) async {
     await tester.pumpWidget(_host(const ProgressDonut(percent: 62)));
     await tester.pumpAndSettle();
 
@@ -39,8 +39,9 @@ void main() {
     final sections = chart.data.sections;
     expect(sections.length, 2);
     expect(sections[0].color, DpColors.light.chart1);
-    // 경계선 토큰(border)을 데이터 면에 쓰던 오용을 면 토큰으로 바로잡는다.
-    expect(sections[1].color, DpColors.light.surfaceMuted);
-    expect(sections[1].color, isNot(DpColors.light.border));
+    // 미완료 트랙은 c.border를 쓴다. 면에는 면 토큰(surfaceMuted)이 의미론상 맞지만,
+    // 실측하면 카드 대비가 라이트 1.14:1 · 다크 1.08:1로 border(1.34 · 1.32)보다 낮아
+    // 조각이 **오히려 덜 보인다**(육안 확인에서 발견 → 스펙 §4 철회).
+    expect(sections[1].color, DpColors.light.border);
   });
 }

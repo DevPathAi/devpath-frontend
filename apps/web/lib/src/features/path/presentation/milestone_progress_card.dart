@@ -96,12 +96,12 @@ class MilestoneProgressCard extends StatelessWidget {
                     top: Radius.circular(2),
                   ),
                   // 경로를 막 만든 사용자는 12주가 전부 0%다. 막대만 그리면 높이 0이라
-                  // 화면에 아무것도 남지 않아 「차트가 고장났다」로 읽힌다. 도넛이
-                  // 미완료를 면으로 그리는 것과 같은 원칙으로 트랙을 깐다(스펙 §4).
+                  // 화면에 아무것도 남지 않아 「차트가 고장났다」로 읽힌다.
+                  // 색은 도넛 미완료와 같은 c.border다 — 실측 대비가 면 토큰보다 높다.
                   backDrawRodData: BackgroundBarChartRodData(
                     show: true,
                     toY: 100,
-                    color: c.surfaceMuted,
+                    color: c.border,
                   ),
                 ),
               ],

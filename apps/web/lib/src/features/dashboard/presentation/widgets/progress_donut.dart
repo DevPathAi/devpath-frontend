@@ -36,9 +36,11 @@ class ProgressDonut extends StatelessWidget {
                   ),
                   PieChartSectionData(
                     value: 100 - p,
-                    // 미완료는 **면**이다 — 경계선 토큰(border)을 면에 쓰던 오용을
-                    // 면 토큰으로 바로잡는다(3-B 스펙 §4).
-                    color: c.surfaceMuted,
+                    // 미완료 트랙. 면에는 면 토큰(surfaceMuted)이 의미론상 맞지만,
+                    // 실측하면 카드 대비가 라이트 1.14:1 · 다크 1.08:1로 border
+                    // (1.34 · 1.32)보다 낮아 조각이 **오히려 덜 보인다.**
+                    // 육안 확인에서 발견해 스펙 §4의 교체 지시를 철회했다.
+                    color: c.border,
                     radius: 12,
                     showTitle: false,
                   ),

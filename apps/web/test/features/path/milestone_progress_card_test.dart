@@ -80,7 +80,8 @@ void main() {
       expect(rod.toY, 0);
       expect(rod.backDrawRodData.show, isTrue);
       expect(rod.backDrawRodData.toY, 100);
-      expect(rod.backDrawRodData.color, DpColors.light.surfaceMuted);
+      // 도넛 미완료와 같은 토큰을 쓴다 — 실측 대비가 더 높은 border다(스펙 §4 철회).
+      expect(rod.backDrawRodData.color, DpColors.light.border);
     }
   });
 
