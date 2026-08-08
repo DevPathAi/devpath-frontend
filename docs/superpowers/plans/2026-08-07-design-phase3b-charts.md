@@ -933,7 +933,7 @@ git -C D:/workspace/dpa/devpath-frontend commit -m "feat(dp_design): 차트 범�
   덮어쓰지 말고 병합한다.** 기존 2건은 `const ProgressTrendCard(history: [...])`로 렌더 여부만 본다:
   ① 「데이터 있으면 LineChart 렌더」는 아래 신규 1번이 더 강하게 덮으므로 **지운다**.
   ② 「빈 배열이면 빈 상태 안내」는 아래 신규 4번과 **완전히 같은 것을 검사한다** — 신규 4번을 쓰지 말고
-  **기존 것을 그대로 남긴다**(같은 검사를 두 벌 두지 않는다). 결과적으로 이 파일은 **2 + 3 = 5건**이 된다.
+  **기존 것을 그대로 남긴다**(같은 검사를 두 벌 두지 않는다). 결과적으로 이 파일은 **1 + 3 = 4건**이 된다.
 
 **Interfaces:**
 - Consumes: Task 6의 `ProgressPoint.byType` · Task 7의 `DpChartLegend`
@@ -1126,8 +1126,16 @@ const _series = <({String key, String label})>[
 cd apps/web && flutter test test/features/dashboard/
 ```
 
-Expected: 이 파일이 **5건**(기존 「빈 배열」 1건 유지 + 신규 3건 + 기존 「LineChart 렌더」를 대체한 신규 1번) green.
+Expected: 이 파일이 **4건**(기존 「빈 배열」 1건 유지 + 신규 3건) green.
 web 전체는 기준선 346 → Task 3의 +2 → 여기서 **+2**(3건 추가, 흡수된 1건 삭제) = **350**.
+
+**★신규 2·3번은 그대로 쓰면 구현 전에도 통과한다(실측).★** 현재 구현이 「항상 선 1개」라
+`lineBarsData.length == 1`이 이미 성립하기 때문이다. 구별력을 주려면 다음을 함께 단언한다:
+
+- 2번(1종): `expect(find.byType(DpChartLegend), findsOneWidget)` — 구현 전에는 범례가 아예 없다
+- 3번(byType 빔): `expect(chart.data.lineBarsData[0].color, DpColors.light.chart1)` — 구현 전은 `c.primary`다
+
+이걸 빼면 RED가 1건뿐이라 「무엇이 red였는지」가 흐려진다.
 
 - [ ] **Step 5: 커밋**
 

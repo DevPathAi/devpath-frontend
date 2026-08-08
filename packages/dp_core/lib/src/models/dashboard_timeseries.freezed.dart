@@ -281,7 +281,7 @@ as int,
 /// @nodoc
 mixin _$ProgressPoint {
 
- String get date; int get percent;
+ String get date; int get percent; Map<String, int> get byType;
 /// Create a copy of ProgressPoint
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -294,16 +294,16 @@ $ProgressPointCopyWith<ProgressPoint> get copyWith => _$ProgressPointCopyWithImp
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is ProgressPoint&&(identical(other.date, date) || other.date == date)&&(identical(other.percent, percent) || other.percent == percent));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ProgressPoint&&(identical(other.date, date) || other.date == date)&&(identical(other.percent, percent) || other.percent == percent)&&const DeepCollectionEquality().equals(other.byType, byType));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,date,percent);
+int get hashCode => Object.hash(runtimeType,date,percent,const DeepCollectionEquality().hash(byType));
 
 @override
 String toString() {
-  return 'ProgressPoint(date: $date, percent: $percent)';
+  return 'ProgressPoint(date: $date, percent: $percent, byType: $byType)';
 }
 
 
@@ -314,7 +314,7 @@ abstract mixin class $ProgressPointCopyWith<$Res>  {
   factory $ProgressPointCopyWith(ProgressPoint value, $Res Function(ProgressPoint) _then) = _$ProgressPointCopyWithImpl;
 @useResult
 $Res call({
- String date, int percent
+ String date, int percent, Map<String, int> byType
 });
 
 
@@ -331,11 +331,12 @@ class _$ProgressPointCopyWithImpl<$Res>
 
 /// Create a copy of ProgressPoint
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? date = null,Object? percent = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? date = null,Object? percent = null,Object? byType = null,}) {
   return _then(_self.copyWith(
 date: null == date ? _self.date : date // ignore: cast_nullable_to_non_nullable
 as String,percent: null == percent ? _self.percent : percent // ignore: cast_nullable_to_non_nullable
-as int,
+as int,byType: null == byType ? _self.byType : byType // ignore: cast_nullable_to_non_nullable
+as Map<String, int>,
   ));
 }
 
@@ -420,10 +421,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String date,  int percent)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String date,  int percent,  Map<String, int> byType)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _ProgressPoint() when $default != null:
-return $default(_that.date,_that.percent);case _:
+return $default(_that.date,_that.percent,_that.byType);case _:
   return orElse();
 
 }
@@ -441,10 +442,10 @@ return $default(_that.date,_that.percent);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String date,  int percent)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String date,  int percent,  Map<String, int> byType)  $default,) {final _that = this;
 switch (_that) {
 case _ProgressPoint():
-return $default(_that.date,_that.percent);case _:
+return $default(_that.date,_that.percent,_that.byType);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -461,10 +462,10 @@ return $default(_that.date,_that.percent);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String date,  int percent)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String date,  int percent,  Map<String, int> byType)?  $default,) {final _that = this;
 switch (_that) {
 case _ProgressPoint() when $default != null:
-return $default(_that.date,_that.percent);case _:
+return $default(_that.date,_that.percent,_that.byType);case _:
   return null;
 
 }
@@ -476,11 +477,18 @@ return $default(_that.date,_that.percent);case _:
 @JsonSerializable()
 
 class _ProgressPoint implements ProgressPoint {
-  const _ProgressPoint({required this.date, this.percent = 0});
+  const _ProgressPoint({required this.date, this.percent = 0, final  Map<String, int> byType = const <String, int>{}}): _byType = byType;
   factory _ProgressPoint.fromJson(Map<String, dynamic> json) => _$ProgressPointFromJson(json);
 
 @override final  String date;
 @override@JsonKey() final  int percent;
+ final  Map<String, int> _byType;
+@override@JsonKey() Map<String, int> get byType {
+  if (_byType is EqualUnmodifiableMapView) return _byType;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableMapView(_byType);
+}
+
 
 /// Create a copy of ProgressPoint
 /// with the given fields replaced by the non-null parameter values.
@@ -495,16 +503,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ProgressPoint&&(identical(other.date, date) || other.date == date)&&(identical(other.percent, percent) || other.percent == percent));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ProgressPoint&&(identical(other.date, date) || other.date == date)&&(identical(other.percent, percent) || other.percent == percent)&&const DeepCollectionEquality().equals(other._byType, _byType));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,date,percent);
+int get hashCode => Object.hash(runtimeType,date,percent,const DeepCollectionEquality().hash(_byType));
 
 @override
 String toString() {
-  return 'ProgressPoint(date: $date, percent: $percent)';
+  return 'ProgressPoint(date: $date, percent: $percent, byType: $byType)';
 }
 
 
@@ -515,7 +523,7 @@ abstract mixin class _$ProgressPointCopyWith<$Res> implements $ProgressPointCopy
   factory _$ProgressPointCopyWith(_ProgressPoint value, $Res Function(_ProgressPoint) _then) = __$ProgressPointCopyWithImpl;
 @override @useResult
 $Res call({
- String date, int percent
+ String date, int percent, Map<String, int> byType
 });
 
 
@@ -532,11 +540,12 @@ class __$ProgressPointCopyWithImpl<$Res>
 
 /// Create a copy of ProgressPoint
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? date = null,Object? percent = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? date = null,Object? percent = null,Object? byType = null,}) {
   return _then(_ProgressPoint(
 date: null == date ? _self.date : date // ignore: cast_nullable_to_non_nullable
 as String,percent: null == percent ? _self.percent : percent // ignore: cast_nullable_to_non_nullable
-as int,
+as int,byType: null == byType ? _self._byType : byType // ignore: cast_nullable_to_non_nullable
+as Map<String, int>,
   ));
 }
 

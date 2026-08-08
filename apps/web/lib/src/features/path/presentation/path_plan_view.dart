@@ -3,6 +3,8 @@ import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import 'milestone_progress_card.dart';
+
 /// 완료된 경로: 멘토 rationale + 이번 주 과제 + 12주 타임라인.
 class PathPlanView extends StatelessWidget {
   const PathPlanView({super.key, required this.plan});
@@ -87,6 +89,9 @@ class PathPlanView extends StatelessWidget {
         const SizedBox(height: DpSpacing.sm),
         for (final t in thisWeek.tasks) _TaskTile(task: t),
       ],
+      // 「이번 주」에서 「전체 주차」로 시야가 넓어지는 순서로 둔다.
+      const SizedBox(height: DpSpacing.xl),
+      MilestoneProgressCard(milestones: plan.milestones),
       const SizedBox(height: DpSpacing.xl),
       Text('12주 타임라인', style: text.titleMedium),
       const SizedBox(height: DpSpacing.sm),

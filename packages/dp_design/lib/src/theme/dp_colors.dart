@@ -96,7 +96,13 @@ class DpColors extends ThemeExtension<DpColors> {
   final Color tagBg;
   final Color tagText;
 
-  /// 차트 팔레트. chart4 는 앰버의 대비 계열(틸)이라 구분용 색으로도 쓴다.
+  /// 차트 팔레트. 데이터 **계열** 색은 [chart1]~[chart3], **구분용 보조색**은
+  /// [chart4](틸)·[chart5](중립 회색)다.
+  ///
+  /// **계열 색은 브랜드에서 분리돼 있다** — 액센트는 [primary](앰버)가, 데이터는
+  /// chart* 가 쓴다. 3-B 이전에는 chart1 이 primary 와 값이 같아 「차트를 chart1 로
+  /// 이관」해도 픽셀이 하나도 바뀌지 않았다. 값을 바꿀 때는
+  /// `docs/superpowers/specs/2026-08-07-chart-palette-check.py` 를 통과해야 한다.
   final Color chart1;
   final Color chart2;
   final Color chart3;
@@ -132,9 +138,9 @@ class DpColors extends ThemeExtension<DpColors> {
     danger: Color(0xFFB91C1C),
     tagBg: Color(0xFFF2F0EC),
     tagText: Color(0xFF524D45),
-    chart1: Color(0xFFB45309),
-    chart2: Color(0xFFB8863A),
-    chart3: Color(0xFF78350F),
+    chart1: Color(0xFF1D4ED8),
+    chart2: Color(0xFFBE185D),
+    chart3: Color(0xFF7E22CE),
     chart4: Color(0xFF0F766E),
     chart5: Color(0xFF8B857D),
     codeEditorBg: Color(0xFF1E1E1E),
@@ -168,9 +174,9 @@ class DpColors extends ThemeExtension<DpColors> {
     danger: Color(0xFFF87171),
     tagBg: Color(0xFF231F1B),
     tagText: Color(0xFFA09991),
-    chart1: Color(0xFFF59E0B),
-    chart2: Color(0xFFD9A653),
-    chart3: Color(0xFFFCD34D),
+    chart1: Color(0xFF60A5FA),
+    chart2: Color(0xFFF472B6),
+    chart3: Color(0xFFD8B4FE),
     chart4: Color(0xFF2DD4BF),
     chart5: Color(0xFF8B857D),
     codeEditorBg: Color(0xFF1E1E1E),

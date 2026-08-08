@@ -96,7 +96,7 @@ class WeeklyActivityCard extends StatelessWidget {
               barRods: [
                 BarChartRodData(
                   toY: activity[i].completedCount.toDouble(),
-                  color: c.primary,
+                  color: c.chart1,
                   width: 14,
                   borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(4),

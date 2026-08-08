@@ -22,7 +22,16 @@ _ProgressPoint _$ProgressPointFromJson(Map<String, dynamic> json) =>
     _ProgressPoint(
       date: json['date'] as String,
       percent: (json['percent'] as num?)?.toInt() ?? 0,
+      byType:
+          (json['byType'] as Map<String, dynamic>?)?.map(
+            (k, e) => MapEntry(k, (e as num).toInt()),
+          ) ??
+          const <String, int>{},
     );
 
 Map<String, dynamic> _$ProgressPointToJson(_ProgressPoint instance) =>
-    <String, dynamic>{'date': instance.date, 'percent': instance.percent};
+    <String, dynamic>{
+      'date': instance.date,
+      'percent': instance.percent,
+      'byType': instance.byType,
+    };

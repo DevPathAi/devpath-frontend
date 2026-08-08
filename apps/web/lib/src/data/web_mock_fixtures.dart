@@ -440,11 +440,30 @@ final Map<String, MockFixture> webMockFixtures = {
         {'date': '2026-07-30', 'completedCount': 2},
         {'date': '2026-07-31', 'completedCount': 4},
       ],
+      // byType은 백엔드가 실제로 보내는 필드다(learning-svc ProgressPoint).
+      // 유형마다 값이 갈려 있어야 목 모드에서도 3계열 추세가 그대로 보인다 —
+      // 한 유형만 넣으면 「계열이 1개인 화면」을 정상이라고 오판하게 된다.
       'progressHistory': [
-        {'date': '2026-07-28', 'percent': 40},
-        {'date': '2026-07-29', 'percent': 48},
-        {'date': '2026-07-30', 'percent': 55},
-        {'date': '2026-07-31', 'percent': 62},
+        {
+          'date': '2026-07-28',
+          'percent': 40,
+          'byType': {'READ': 55, 'PRACTICE': 28, 'QUIZ': 20},
+        },
+        {
+          'date': '2026-07-29',
+          'percent': 48,
+          'byType': {'READ': 62, 'PRACTICE': 35, 'QUIZ': 30},
+        },
+        {
+          'date': '2026-07-30',
+          'percent': 55,
+          'byType': {'READ': 70, 'PRACTICE': 42, 'QUIZ': 38},
+        },
+        {
+          'date': '2026-07-31',
+          'percent': 62,
+          'byType': {'READ': 80, 'PRACTICE': 48, 'QUIZ': 45},
+        },
       ],
     },
   ),

@@ -18,7 +18,7 @@ L = {  # 라이트
     'railBg': '#1A1815', 'railText': '#F2F0EC', 'railMuted': '#A9A298', 'railFaint': '#9C958B',
     'railActive': '#2F2B24',
     'accentSoft': '#FDF1E0', 'tagBg': '#F2F0EC', 'tagText': '#524D45',
-    'chart1': '#B45309', 'chart2': '#B8863A', 'chart3': '#78350F',
+    'chart1': '#1D4ED8', 'chart2': '#BE185D', 'chart3': '#7E22CE',
     'chart4': '#0F766E', 'chart5': '#8B857D',
 }
 D = {  # 다크
@@ -30,7 +30,7 @@ D = {  # 다크
     'railBg': '#221E1A', 'railText': '#EAE7E2', 'railMuted': '#A09991', 'railFaint': '#9A938A',
     'railActive': '#332E28',
     'accentSoft': '#2E2007', 'tagBg': '#231F1B', 'tagText': '#A09991',
-    'chart1': '#F59E0B', 'chart2': '#D9A653', 'chart3': '#FCD34D',
+    'chart1': '#60A5FA', 'chart2': '#F472B6', 'chart3': '#D8B4FE',
     'chart4': '#2DD4BF', 'chart5': '#8B857D',
 }
 

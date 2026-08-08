@@ -30,12 +30,16 @@ class ProgressDonut extends StatelessWidget {
                 sections: [
                   PieChartSectionData(
                     value: p,
-                    color: c.primary,
+                    color: c.chart1,
                     radius: 12,
                     showTitle: false,
                   ),
                   PieChartSectionData(
                     value: 100 - p,
+                    // 미완료 트랙. 면에는 면 토큰(surfaceMuted)이 의미론상 맞지만,
+                    // 실측하면 카드 대비가 라이트 1.14:1 · 다크 1.08:1로 border
+                    // (1.34 · 1.32)보다 낮아 조각이 **오히려 덜 보인다.**
+                    // 육안 확인에서 발견해 스펙 §4의 교체 지시를 철회했다.
                     color: c.border,
                     radius: 12,
                     showTitle: false,
