@@ -92,16 +92,48 @@ cd ../devpath-learning-svc && ./gradlew test
 
 ## 4. 남은 백로그
 
-| 항목 | 출처 | 메모 |
+### 4.1 처리 완료 (PR #112, merge `e56f3b7`)
+
+| 항목 | 결과 |
+|---|---|
+| admin 목 모드 세션 복원 픽스처 부재 | `POST /auth/refresh` 추가 + **픽스처-계약 일치 테스트** 신설. 기존 `bootstrap_callback_test`는 자체 목 어댑터를 써서 픽스처가 비어 있어도 green이었다 |
+| 작성 화면 「게시」 버튼 폭 | 재현하니 **1368px**. `Align(centerLeft)`로 감쌌다(자유글·질문 2화면) |
+
+### 4.2 남은 것
+
+| 항목 | 출처 | 실측 결과 |
 |---|---|---|
-| 작성 화면 에디터 위 휠 스크롤 무반응 | 3-A §6 | `DpRichEditor`(고정 260px)가 흡수. 전환 이전에도 동일 |
-| 작성 화면 「게시」 버튼이 콘텐츠 폭을 꽉 채운다 | 3-A 보고서 §4-2 | 1400폭에서 약 1110px. 디자인 의도라는 근거는 문서에 없다 |
-| admin 목 모드에 세션 복원 픽스처 부재 | 3-A 보고서 §4-2 | 육안 확인 때마다 임시 픽스처로 우회 중. 항구적으로 추가하는 편이 낫다 |
-| 목 마일스톤이 전부 0% | 3-B 보고서 §6 | 진행분 있는 막대를 캡처로 못 본다. 위젯 테스트가 100/50/0%를 덮는다 |
-| 2단계 이월(구조적 함정·I2·compact 오표시 등) | 2단계 | 3-A·3-B에서 다루지 않았다. 유효한지 먼저 실측할 것 |
+| 작성 화면 에디터 위 휠 스크롤 무반응 | 3-A §6 | `rich_editor.dart`가 `height: 260` 고정 `SizedBox` 안에 `QuillEditor.basic`을 넣고 자체 `ScrollController`를 준다. **flutter_quill 내부 스크롤 전파 동작 조사가 선행**돼야 해 분리했다 |
+| 목 마일스톤이 전부 0% | 3-B 보고서 §6 | 진행분 있는 막대를 캡처로 못 본다. 위젯 테스트가 100/50/0%를 덮으므로 캡처 편의 성격이다 |
+
+### 4.3 ★2단계 이월 5건 — 실측 결과 즉시 처리할 실질 결함이 없다★
+
+`handoff-2026-08-05-design-phase2-shell-complete.md` §3이 3단계로 넘긴 항목들을 하나씩 확인했다.
+**막연히 「이월 5건」으로 남겨두면 다음 세션이 같은 조사를 반복한다.**
+
+| 항목 | 상태 |
+|---|---|
+| §3.1 구조적 함정(앱이 `textTheme.*`를 Layer 2 슬롯에 넘기면 슬롯의 전경색이 진다) | 원칙 문제. **현재 실해 사례가 확인되지 않는다.** 새 슬롯을 만들 때 설계 지침으로 쓸 것 |
+| §3.2 I2 — `DpChromeBar` 우측 그룹 오버플로 | **현재 도달 불가**(web 액션 1개·admin 0개). 좌측 그룹은 `Expanded`로 개선돼 있다. actions가 늘어나는 시점에 red-repro부터 세울 것 |
+| §3.3 I1 잔여 — compact 하단 탭 오표시 | **시각적 부분은 이미 해결**(`dp_app_shell.dart:92-105`가 인디케이터를 투명으로, 아이콘·라벨 색을 비선택과 같게 덮는다). 남은 건 스크린리더 `selected` 플래그뿐이고, 코드 주석대로 **하단 바 자체 구현이 필요**해 범위가 크다 |
+| §3.4 문서·주석 정확성 | 핵심이던 **admin 제목 단일 출처는 3-A Task 13에서 해결**됐다(`admin_shell.dart`가 `headerTitle`을 레코드로 갖는다). 남은 줄번호·주석 문구는 사소하다 |
+
+**2단계 스펙 §3의 「`tag*`·`chart*` 3단계 이월」도 3-A(tag)·3-B(chart)에서 전부 소비됐다.**
 
 ## 5. 다음 세션 시작 방법
 
-1. `gh pr view 111 --repo DevPathAi/devpath-frontend` — CI 녹색이면 머지하고 develop을 pull
-2. §4에서 고르거나 새 영역으로 간다
+1. `git -C devpath-frontend pull` — PR #111·#112 모두 머지됐다(`7ea8fc3`·`e56f3b7`)
+2. **§4.2의 2건 외에는 ①디자인 백로그가 비어 있다.** 새 영역으로 가도 된다
 3. **어떤 항목이든 착수 전에 재현부터 한다** — §2가 보여주듯 앞 단계의 서술은 자주 범위가 어긋난다
+
+### 5.1 검증 명령 (CI와 동일하게)
+
+```bash
+dart pub global run melos run analyze
+dart pub global run melos run format   # ★ dart format --output=none 이 아니라 이것으로 확인할 것
+dart pub global run melos run test
+```
+
+**`dart format --output=none --set-exit-if-changed`는 검사만 한다** — 출력의 `(1 changed)`는
+「고쳤다」가 아니라 「아직 어긋나 있다」는 뜻이다. 이번에 그걸 통과로 오독해 CI format 게이트를
+한 번 red로 만들었다. CI가 쓰는 `melos run format`으로 확인하고 **0 changed를 눈으로 본다.**
