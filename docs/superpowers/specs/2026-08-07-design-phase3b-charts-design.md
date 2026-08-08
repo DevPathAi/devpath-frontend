@@ -62,7 +62,9 @@
 
 ### 2.6 스키마는 이미 충분하다
 
-`path_weekly_tasks`에 `task_type VARCHAR(20) CHECK (READ/PRACTICE/QUIZ)`와 `completed_at TIMESTAMPTZ`가 있다(`V202606181006__learning_path_schema.sql`). **마이그레이션도 `devpath-shared` 발행도 불필요하다.**
+`path_weekly_tasks`에 `task_type VARCHAR(20) **NOT NULL** CHECK (READ/PRACTICE/QUIZ)`와 `completed_at TIMESTAMPTZ`(nullable)가 있다. **마이그레이션도 `devpath-shared` 발행도 불필요하다.**
+
+정의 파일은 **`devpath-shared`** 소재다(`devpath-shared/src/main/resources/db/migration/V202606181006__learning_path_schema.sql:62,65`) — learning-svc 안에는 없다. `task_type`이 NOT NULL이라 유형별 집계에서 **null 키를 방어할 필요가 없다**(실측 확인).
 
 ## 3. 팔레트 재설계
 
@@ -82,7 +84,7 @@
 | 3 | 계열 간 hue차 | **≥ 40°** | 색상으로 갈린다 |
 | 4 | `primary`와의 dE76 | **≥ 25** | 액센트와 데이터의 역할 분리 |
 | 5 | 계열 간 명도 대비 | **기록만**(필수 아님) | §2.3 — 기준 1과 동시 충족 불가 |
-| 6 | **의미 토큰·보조색과의 dE76** | `success`·`warning`·`danger`·`chart4` 각각 **≥ 25** | 아래 |
+| 6 | **의미 토큰·보조색과의 dE76** | `success`·`warning`·`danger`·`chart4`·`chart5` 각각 **≥ 25** | 아래 |
 
 라이트·다크 **각각** 통과해야 한다.
 
@@ -96,6 +98,8 @@
 이것은 3-A가 문제 삼은 `chart1 == primary` 중복과 **같은 부류의 결함**이다 — 「성공 상태」와 「실습 계열」이 같은 색이면 사용자가 의미를 분간할 수 없다. 기준 1~5만으로는 이 충돌이 걸러지지 않는다(전부 통과했다). 기준 6이 그것을 막는다.
 
 `chart4`는 계열이 아니지만 같은 화면에 함께 나올 수 있으므로 포함한다.
+
+**`chart5`(`#8B857D`, 라이트·다크 동일)도 포함한다** — 이 스펙 초안이 토큰의 **존재 자체를 빠뜨렸다**(구현 계획 검토 중 `dp_colors.dart:139,175`에서 발견). 지금은 어느 화면에도 배선돼 있지 않아 실해가 없고, 아래 후보값과 dE76 **50.5~101.7**로 여유 있게 통과한다(실측). 그래도 기준에 넣어 두는 이유는 배선되는 순간 §3.2.1이 말하는 바로 그 충돌 후보가 되기 때문이다.
 
 ### 3.3 후보와 알려진 문제
 

@@ -48,7 +48,7 @@
   3) 계열 간 hue차 >= 40도
   4) primary와의 dE76 >= 25
   5) 계열 간 명도 대비 — 기록만(합격 판정에 쓰지 않는다)
-  6) success·warning·danger·chart4와의 dE76 >= 25
+  6) success·warning·danger·chart4·chart5와의 dE76 >= 25
 """
 import colorsys
 import math
@@ -59,16 +59,20 @@ PALETTE = {
     'light': {
         'bg': '#FAF9F7', 'surface': '#FFFFFF', 'primary': '#B45309',
         'success': '#15803D', 'warning': '#A16207', 'danger': '#B91C1C',
-        'chart1': '#1D4ED8', 'chart2': '#BE185D', 'chart3': '#7E22CE', 'chart4': '#0F766E',
+        'chart1': '#1D4ED8', 'chart2': '#BE185D', 'chart3': '#7E22CE',
+        'chart4': '#0F766E', 'chart5': '#8B857D',
     },
     'dark': {
         'bg': '#0F0E0C', 'surface': '#1A1815', 'primary': '#F59E0B',
         'success': '#4ADE80', 'warning': '#FCD34D', 'danger': '#F87171',
-        'chart1': '#60A5FA', 'chart2': '#F472B6', 'chart3': '#D8B4FE', 'chart4': '#2DD4BF',
+        'chart1': '#60A5FA', 'chart2': '#F472B6', 'chart3': '#D8B4FE',
+        'chart4': '#2DD4BF', 'chart5': '#8B857D',
     },
 }
 SERIES = ['chart1', 'chart2', 'chart3']
-RESERVED = ['success', 'warning', 'danger', 'chart4']
+# chart5(#8B857D, 라이트·다크 동일)는 스펙 초안이 빠뜨린 실재 토큰이다.
+# 지금은 어느 화면에도 배선돼 있지 않지만, 배선되는 순간 기준6의 대상이 된다.
+RESERVED = ['success', 'warning', 'danger', 'chart4', 'chart5']
 
 
 def rgb(h):
@@ -236,6 +240,7 @@ void main() {
         expect(series, isNot(c.warning));
         expect(series, isNot(c.danger));
         expect(series, isNot(c.chart4));
+        expect(series, isNot(c.chart5)); // 스펙 초안이 빠뜨린 실재 토큰
       }
     }
   });
@@ -551,6 +556,16 @@ cd D:/workspace/dpa/devpath-learning-svc && ./gradlew test --tests "*DashboardTi
 
 Expected: 컴파일 실패 — `progressHistory(LocalDate, ActivePathCompletions)` 시그니처와 `ProgressPoint.byType()`이 없다.
 
+**★주의: 이 시점의 컴파일 실패는 신규 테스트만의 것이 아니다.★** 계약을 바꾸면 **기존 테스트 3곳이 함께 깨진다**(실측 확인):
+
+| 위치 | 깨지는 이유 |
+|---|---|
+| `DashboardTimeseriesTest.java:37` | `progressHistory(TODAY, 4, done)` — 3-인자 호출 |
+| `DashboardTimeseriesTest.java:47` | `progressHistory(TODAY, 0, List.of())` — 3-인자 호출 |
+| `DashboardSummaryJsonTest.java:17` | `new ProgressPoint("2026-07-31", 42)` — **2-인자 생성자** |
+
+따라서 RED 신호가 섞인다. **신규 테스트의 실패만 골라 읽지 말고, 위 3곳이 그리고 오직 그 3곳만 함께 깨졌는지 확인한다.** 고치는 것은 Step 6이다.
+
 - [ ] **Step 3: `ProgressPoint`를 확장한다**
 
 ```java
@@ -608,17 +623,53 @@ import에 `java.util.LinkedHashMap`과 `ai.devpath.learning.content.ContentProgr
     List<ProgressPoint> progressHistory = DashboardTimeseries.progressHistory(today, pc);
 ```
 
-(`pc`는 42-43행에서 이미 얻고 있다.)
+(`pc`는 42-43행에서 이미 얻고 있다. `DashboardService`의 `progressHistory` **변수** 사용처
+2곳(`:50`·`:65`)은 `DashboardSummary` 생성자 인자라 **시그니처 변경의 영향을 받지 않는다** — 손대지 않는다.)
 
-- [ ] **Step 6: 테스트 통과 확인**
+- [ ] **Step 6: 계약 변경으로 깨진 기존 테스트 3곳을 고친다**
+
+Step 2에서 확인한 3곳이다. **숫자만 맞추지 말고 각 테스트가 무엇을 지키던 것인지 유지한다.**
+
+`DashboardTimeseriesTest.java` — 두 호출을 새 record로 감싼다. 기존 단언(누적 50%·75%, 빈 배열)은
+**그대로 둔다**. 유형별 단언은 이 Task의 신규 테스트가 따로 담당한다.
+
+```java
+    var pc = new ContentProgressRepository.ActivePathCompletions(
+        4, done, Map.of("READ", 4), Map.of("READ", done));
+
+    List<ProgressPoint> out = DashboardTimeseries.progressHistory(TODAY, pc);
+```
+
+```java
+    var empty = new ContentProgressRepository.ActivePathCompletions(
+        0, List.of(), Map.of(), Map.of());
+    assertThat(DashboardTimeseries.progressHistory(TODAY, empty)).isEmpty();
+```
+
+`ai.devpath.learning.content.ContentProgressRepository` import를 추가한다.
+
+`DashboardSummaryJsonTest.java:17` — 계약 **직렬화** 검증이다. 새 필드가 JSON에 나가는지
+여기서 함께 잠근다(그러지 않으면 `byType`이 전송 계약에 들어갔는지 아무도 검사하지 않는다):
+
+```java
+        List.of(new ProgressPoint("2026-07-31", 42, Map.of("READ", 42))));
+```
+
+```java
+    assertThat(json).contains("\"byType\"").contains("\"READ\":42");
+```
+
+`java.util.Map` import를 추가한다.
+
+- [ ] **Step 7: 테스트 통과 확인**
 
 ```
 cd D:/workspace/dpa/devpath-learning-svc && ./gradlew test
 ```
 
-Expected: 신규 2건 포함 전부 green. **기존 `progressHistory` 테스트가 있으면 새 시그니처로 함께 고친다.**
+Expected: 신규 2건 포함 전부 green.
 
-- [ ] **Step 7: 커밋**
+- [ ] **Step 8: 커밋**
 
 ```bash
 git -C D:/workspace/dpa/devpath-learning-svc add src
@@ -878,7 +929,11 @@ git -C D:/workspace/dpa/devpath-frontend commit -m "feat(dp_design): 차트 범�
 
 **Files:**
 - Modify: `apps/web/lib/src/features/dashboard/presentation/widgets/progress_trend_card.dart`
-- Test: `apps/web/test/features/dashboard/progress_trend_card_test.dart` (있으면 수정, 없으면 생성)
+- Test: `apps/web/test/features/dashboard/progress_trend_card_test.dart` — **이미 존재한다(38줄·2건).
+  덮어쓰지 말고 병합한다.** 기존 2건은 `const ProgressTrendCard(history: [...])`로 렌더 여부만 본다:
+  ① 「데이터 있으면 LineChart 렌더」는 아래 신규 1번이 더 강하게 덮으므로 **지운다**.
+  ② 「빈 배열이면 빈 상태 안내」는 아래 신규 4번과 **완전히 같은 것을 검사한다** — 신규 4번을 쓰지 말고
+  **기존 것을 그대로 남긴다**(같은 검사를 두 벌 두지 않는다). 결과적으로 이 파일은 **2 + 3 = 5건**이 된다.
 
 **Interfaces:**
 - Consumes: Task 6의 `ProgressPoint.byType` · Task 7의 `DpChartLegend`
@@ -924,7 +979,9 @@ void main() {
     expect(chart.data.lineBarsData[1].color, DpColors.light.chart2);
     expect(chart.data.lineBarsData[2].color, DpColors.light.chart3);
     // 채움은 제거했다 — 반투명 면 3장이 겹치면 계열 판별이 나빠진다.
-    expect(chart.data.lineBarsData.every((b) => b.belowBarData.show), isFalse);
+    // ★`every(...) == isFalse`로 쓰지 마라 — 그것은 「셋 중 하나만 꺼도」 통과한다.
+    // 3선 **전부**를 잠그려면 any로 쓴다(스펙 §7.2: 테스트가 조건을 피해 가지 않게).
+    expect(chart.data.lineBarsData.any((b) => b.belowBarData.show), isFalse);
 
     expect(find.byType(DpChartLegend), findsOneWidget);
     expect(find.text('읽기'), findsOneWidget);
@@ -956,15 +1013,13 @@ void main() {
     expect(find.byType(DpChartLegend), findsNothing);
   });
 
-  testWidgets('히스토리가 비면 안내 문구를 렌더한다', (tester) async {
-    await tester.pumpWidget(_host(const ProgressTrendCard(history: [])));
-    await tester.pumpAndSettle();
-
-    expect(find.text('아직 학습 기록이 없어요'), findsOneWidget);
-    expect(find.byType(LineChart), findsNothing);
-  });
+  // 「빈 배열이면 빈 상태 안내」는 여기 새로 쓰지 않는다 — 기존 파일에 이미 있고
+  // 같은 것을 검사한다(Files 절 참조). 기존 것을 그대로 남긴다.
 }
 ```
+
+**병합 주의:** 기존 파일에도 같은 이름의 `_host` 헬퍼가 있다(줄바꿈만 다르고 기능은 같다).
+**하나만 남긴다.** 기존 파일의 import에는 `fl_chart`·`dp_design`이 이미 있다.
 
 - [ ] **Step 2: 실패 확인**
 
@@ -1071,7 +1126,8 @@ const _series = <({String key, String label})>[
 cd apps/web && flutter test test/features/dashboard/
 ```
 
-Expected: 신규 4건 포함 green.
+Expected: 이 파일이 **5건**(기존 「빈 배열」 1건 유지 + 신규 3건 + 기존 「LineChart 렌더」를 대체한 신규 1번) green.
+web 전체는 기준선 346 → Task 3의 +2 → 여기서 **+2**(3건 추가, 흡수된 1건 삭제) = **350**.
 
 - [ ] **Step 5: 커밋**
 
@@ -1305,7 +1361,22 @@ class MilestoneProgressCard extends StatelessWidget {
 cd apps/web && flutter test
 ```
 
-Expected: 신규 3건 포함 web green. `path_plan_view_test.dart`·`path_page_test.dart`가 타임라인 항목 개수를 세고 있으면 카드 추가로 깨질 수 있다 — 깨지면 **그 테스트가 무엇을 지키려던 것인지 읽고** 고친다(숫자만 올리지 마라).
+Expected: 신규 3건 포함 web green.
+
+**★깨질 지점은 「항목 개수」가 아니라 「드래그 거리」다(실측).★** 두 테스트가 **고정 `-500` 드래그**로
+스크롤한 뒤 그 아래 항목을 찾는다:
+
+| 위치 | 코드 | 그 뒤에 찾는 것 |
+|---|---|---|
+| `path_plan_view_test.dart:89` | `tester.drag(find.byType(ListView), const Offset(0, -500))` | `find.text('트랜잭션 심화')`(2주차 타임라인) |
+| `path_page_test.dart:73` | `tester.drag(find.byType(CustomScrollView), const Offset(0, -500))` | (파일을 열어 확인) |
+
+이 카드는 타임라인 **앞**에 들어가고 높이가 **≈216px**(패딩 32 + 제목 ~24 + 간격 8 + 차트 140 + 뒤 간격 12)다.
+즉 같은 -500 드래그로 도달하던 지점이 216px만큼 밀린다. 여유가 그보다 적으면 실패한다.
+
+깨지면 **드래그 값을 키워 해결한다**(그 테스트의 의도는 「스크롤하면 뒤쪽 주차가 보인다」이지
+「500px가 정확한 거리다」가 아니다). 개수를 세는 단언이 아니므로 숫자 조작 위험은 없다.
+깨지지 않아도 **실행 결과로 확인하고 넘어간다** — 「안 깨졌을 것이다」로 넘기지 않는다.
 
 - [ ] **Step 6: 커밋**
 
