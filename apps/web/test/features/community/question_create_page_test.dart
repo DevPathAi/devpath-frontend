@@ -125,6 +125,28 @@ void main() {
     expect(find.text('상황과 시도한 내용을 적어주세요'), findsNothing);
   });
 
+  testWidgets('질문 게시 버튼이 콘텐츠 폭을 꽉 채우지 않는다', (tester) async {
+    // SliverList.list의 직접 자식은 가로로 늘어난다(자유글 작성에서 실측 1368px).
+    // 파인더로 콘텐츠 폭을 재려 해도 flutter_quill 툴바가 CustomScrollView를
+    // 하나 더 만들어 표준 파인더를 쓸 수 없으므로 절대값으로 본다.
+    _wideView(tester);
+    final c = ProviderContainer(
+      overrides: [
+        similarQuestionsProvider.overrideWithValue((q) async => const []),
+        questionCreateProvider.overrideWithValue(
+          ({required title, required bodyMd, required tags}) async =>
+              _created(98),
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+    await tester.pumpWidget(_host(c));
+    await tester.pumpAndSettle();
+
+    final button = tester.getSize(find.widgetWithText(FilledButton, '질문 게시'));
+    expect(button.width, lessThan(300), reason: '늘어나면 콘텐츠 폭 전체를 차지한다');
+  });
+
   testWidgets('제목·본문 입력 후 게시하면 작성 API 호출 + 상세로 이동', (tester) async {
     _wideView(tester);
     String? seenTitle, seenBody;

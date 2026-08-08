@@ -242,10 +242,15 @@ class _QuestionCreatePageState extends ConsumerState<QuestionCreatePage> {
                   onChanged: (a) => _attach = a,
                 ),
                 const SizedBox(height: DpSpacing.lg),
-                FilledButton.icon(
-                  onPressed: _submitting ? null : _submit,
-                  icon: const Icon(DpIcons.send, size: 18),
-                  label: Text(_submitting ? '게시 중…' : '질문 게시'),
+                // SliverList.list의 직접 자식은 가로로 늘어난다 — 감싸지 않으면
+                // 넓은 화면에서 버튼 하나가 콘텐츠 폭 전체를 차지한다.
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilledButton.icon(
+                    onPressed: _submitting ? null : _submit,
+                    icon: const Icon(DpIcons.send, size: 18),
+                    label: Text(_submitting ? '게시 중…' : '질문 게시'),
+                  ),
                 ),
               ],
             ),

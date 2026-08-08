@@ -88,6 +88,38 @@ void main() {
     expect(find.widgetWithText(FilledButton, '게시'), findsOneWidget);
   });
 
+  testWidgets('게시 버튼이 콘텐츠 폭을 꽉 채우지 않는다', (tester) async {
+    // FilledButton.icon이 SliverList.list의 직접 자식이면 가로로 늘어나
+    // 넓은 화면에서 버튼 하나가 콘텐츠 폭 전체를 차지한다(3-A 보고서 §4-2:
+    // 1400폭에서 약 1110px). 액션 버튼은 자기 콘텐츠 크기여야 한다.
+    _wideView(tester);
+    final c = ProviderContainer(
+      overrides: [
+        postCreateProvider.overrideWithValue(
+          ({
+            required boardType,
+            required title,
+            required bodyMd,
+            required tags,
+          }) async => _created(30, boardType),
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+    await tester.pumpWidget(_host(c));
+    await tester.pumpAndSettle();
+
+    // 콘텐츠 폭과 비교하려 해도 `find.byType(CustomScrollView)`는 쓸 수 없다 —
+    // flutter_quill 툴바가 내부에 하나 더 만들어 2개가 매치된다(3-A Task 11 실측).
+    // 아이콘+「게시」 두 글자짜리 버튼이므로 절대값으로 충분히 갈린다.
+    final button = tester.getSize(find.widgetWithText(FilledButton, '게시'));
+    expect(
+      button.width,
+      lessThan(300),
+      reason: '늘어나면 콘텐츠 폭 전체(3-A 실측 약 1110px)를 차지한다',
+    );
+  });
+
   testWidgets('FEEDBACK 프리셋: 페이지 헤더 라벨이 "피드백 요청"', (tester) async {
     _wideView(tester);
     final c = ProviderContainer(
