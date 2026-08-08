@@ -188,6 +188,7 @@ Material 3 타입 스케일(Pretendard 적용):
 - **키보드**: 전체 포커스 순서·가시 포커스 링(2px `primaryText` + 2px offset)·skip-to-content. **Monaco는 포커스 트랩 → `Esc`로 에디터 탈출** 명시.
 - **스크린리더**: 시맨틱 랜드마크(`nav`/`main`/`complementary`), `lang="ko"`. **SSE 실시간 업데이트는 `aria-live="polite"` 영역**(경로생성 단계·실행로그·멘토 스트리밍)에서 고지. 로딩 `aria-busy`, 에러 즉시 announce.
 - **상태 전달**: 색만으로 의미 전달 금지(텍스트 레이블 병행).
+- **`semanticChildCount`**: `ListView`/`GridView.count`는 자동으로 채우지만 **`CustomScrollView`는 기본 `null`**이다. 스크린리더의 「N개 중 M번째」에 쓰이므로 **동적 목록 화면에는 지정하고, 문서형·폼·정적 섹션(`SliverList.list`)에는 지정하지 않는다.** 지정할 때는 `itemCount`가 아니라 **콘텐츠 항목 수**를 센다 — 광고 슬롯·「더 보기」 버튼은 `itemCount`에 들어가지만 목록 항목이 아니다. **틀린 개수는 없는 것보다 나쁘다.**
 - **reduced-motion**: `prefers-reduced-motion` 존중 — 스트리밍 shimmer·entrance 모션 비활성화, 즉시 표시로 대체.
 
 ## 7. 모션

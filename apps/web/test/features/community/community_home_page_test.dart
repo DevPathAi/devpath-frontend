@@ -1,3 +1,4 @@
+import 'package:devpath_web/src/features/ads/presentation/ad_slot_widget.dart';
 import 'package:devpath_web/src/features/community/data/community_source.dart';
 import 'package:devpath_web/src/features/community/presentation/community_home_page.dart';
 import 'package:devpath_web/src/features/community/state/community_state.dart';
@@ -59,6 +60,37 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('async 질문'), findsOneWidget);
     expect(find.textContaining('답변 1'), findsOneWidget);
+  });
+
+  testWidgets('semanticChildCount는 광고를 제외한 게시글 수다', (tester) async {
+    // 광고 슬롯은 5번째 게시글 뒤에 끼어들어 itemCount를 1 늘린다.
+    // 스크린리더가 읽는 「N개 중 M번째」의 N은 **목록 항목만** 세야 한다 —
+    // 틀린 개수는 없는 것보다 나쁘다.
+    //
+    // SliverList는 lazy라 기본 뷰포트에서는 6번째 항목(광고)이 빌드되지 않는다.
+    // 아래 「광고가 실제로 끼어들었는가」 검산이 성립하도록 세로를 넉넉히 준다.
+    tester.view.physicalSize = const Size(900, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final c = ProviderContainer(
+      overrides: [
+        communityListProvider.overrideWithValue(
+          ({String? board, String? tag, String? sort}) async => [
+            for (var i = 1; i <= 6; i++) _p(i),
+          ],
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+    await tester.pumpWidget(_host(c));
+    await tester.pumpAndSettle();
+
+    // 조건 성립 검산: 광고가 실제로 끼어든 상태인가(6 >= 임계 5).
+    expect(find.byType(AdSlotWidget), findsOneWidget);
+
+    final view = tester.widget<CustomScrollView>(find.byType(CustomScrollView));
+    expect(view.semanticChildCount, 6);
   });
 
   testWidgets('빈 목록은 작성 CTA를 보인다', (tester) async {

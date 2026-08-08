@@ -159,6 +159,20 @@ void main() {
       'GET /contents/future-async-await': [
         (200, _contentJson(markdown: _longMarkdown())),
       ],
+      // 이 테스트는 스크롤 후 화면을 떠나므로 dispose flush가 진행률을 보낸다.
+      // 픽스처가 없으면 그 요청이 완료되지 못해 「Timer is still pending」으로
+      // 테스트가 깨진다(진행률 유실 수정 이전에는 flush 자체가 안 나가 몰랐다).
+      'POST /contents/future-async-await/progress': [
+        (
+          200,
+          {
+            'scrollPct': 0.3,
+            'dwellSec': 0,
+            'completed': false,
+            'completedAt': null,
+          },
+        ),
+      ],
     });
     final client = ApiClient.create(
       const ApiConfig(baseUrl: 'https://t/api/v1'),
@@ -197,6 +211,12 @@ void main() {
     await tester.pump();
 
     _expectHeaderScrolledAway(tester);
+
+    // 스크롤한 뒤 화면을 떠나면 dispose flush가 진행률을 보낸다. 그 비동기 요청을
+    // **본문 안에서** 소진해야 한다 — 테스트 본문이 끝난 뒤의 자동 dispose로는
+    // 요청이 미완료로 남아 「Timer is still pending」으로 깨진다.
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 100));
   });
 
   testWidgets('대시보드 화면에서 헤더가 스크롤과 함께 사라진다', (tester) async {

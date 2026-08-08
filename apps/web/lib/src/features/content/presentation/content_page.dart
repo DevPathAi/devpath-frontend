@@ -40,6 +40,10 @@ class _ContentPageState extends ConsumerState<ContentPage>
   int _dwellSec = 0;
   bool _posting = false;
 
+  /// 마지막으로 실측에 성공한 스크롤 진행률. dispose 시점에는 스크롤 위치를
+  /// 잴 수 없어(자식 먼저 unmount → `hasClients == false`) 이 값이 필요하다.
+  double? _lastObservedScrollPct;
+
   @override
   void initState() {
     super.initState();
@@ -167,6 +171,8 @@ class _ContentPageState extends ConsumerState<ContentPage>
     _trackedContentKey = null;
     _dwellSec = 0;
     _posting = false;
+    // 다른 콘텐츠로 넘어가면 이전 글의 진행률이 새어나가면 안 된다.
+    _lastObservedScrollPct = null;
   }
 
   void _maybeFlushProgress({bool force = false}) {
@@ -204,15 +210,27 @@ class _ContentPageState extends ConsumerState<ContentPage>
   /// = (580-80)/(1080-80) = 500/1000 = 0.5. 헤더가 아직 레이아웃되지 않아
   /// 높이를 잴 수 없으면(initState 직후 등) 서버가 마지막으로 보낸 값을
   /// 그대로 폴백한다.
+  /// ★dispose 경로에서는 이 함수가 실제 위치를 잴 수 없다.★ Element 트리는
+  /// 자식부터 unmount되므로 [dispose]가 도는 시점에는 `Scrollable`이 이미
+  /// 정리돼 `hasClients == false`다. 그때 서버가 마지막으로 준 값을 폴백으로
+  /// 돌려주면, 그 값이 [ContentProgressTracker.record]를 거치며 tracker에
+  /// 쌓여 있던 **최신 진행률을 덮어쓴다**(정기 flush 임계가 0.1이라 최대 10%가
+  /// 매번 유실되고, 완료 임계 0.8 근처에서는 완료 처리가 지연된다).
+  /// 그래서 마지막으로 **실측에 성공한** 값을 [_lastObservedScrollPct]에 남겨
+  /// 폴백보다 먼저 쓴다.
   double _scrollPct(double fallback) {
-    if (!_scrollController.hasClients) return fallback;
+    if (!_scrollController.hasClients) {
+      return _lastObservedScrollPct ?? fallback;
+    }
     final position = _scrollController.position;
     final headerHeight = _headerHeight;
-    if (headerHeight == null) return fallback;
+    if (headerHeight == null) return _lastObservedScrollPct ?? fallback;
     final maxExtent = position.maxScrollExtent - headerHeight;
     if (maxExtent <= 0) return 1;
     final pixels = position.pixels - headerHeight;
-    return (pixels / maxExtent).clamp(0, 1).toDouble();
+    final pct = (pixels / maxExtent).clamp(0, 1).toDouble();
+    _lastObservedScrollPct = pct;
+    return pct;
   }
 
   double? get _headerHeight {
