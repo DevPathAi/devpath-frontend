@@ -298,7 +298,9 @@ void main() {
     //    이 5%가 화면을 떠날 때 살아남아야 하는 진행분이다.
     controller.jumpTo(headerHeight + bodyMax * 0.55);
     await tester.pump();
-    await tester.pump(const Duration(seconds: 2)); // dwellSec를 벌려 dispose flush를 유발
+    await tester.pump(
+      const Duration(seconds: 2),
+    ); // dwellSec를 벌려 dispose flush를 유발
     expect(adapter.postBodies, hasLength(1), reason: '임계 미달이라 아직 전송되면 안 된다');
 
     // 3) 화면을 떠난다 — dispose flush가 남은 진행분을 보내야 한다.
