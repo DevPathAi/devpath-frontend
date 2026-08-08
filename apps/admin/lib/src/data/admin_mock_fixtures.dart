@@ -16,6 +16,30 @@ final Map<String, MockFixture> adminMockFixtures = {
       },
     },
   ),
+  // OAuth 콜백 후 세션 복원(`AdminAuthController.bootstrapFromCallback`).
+  //
+  // **목 모드에서는 이 픽스처가 유일한 진입 경로다.** 로그인 화면의 버튼은
+  // 외부 OAuth 제공자로 나가므로 목 환경에서는 끝까지 갈 수 없고,
+  // `#/auth/callback` 으로 직접 들어와 여기서 세션을 복원해야 한다.
+  // 이것이 없으면 `/login` 에서 더 나아갈 수 없어 admin 화면을 하나도 볼 수 없다.
+  //
+  // ★키가 snake_case다★ — 위 `POST /admin/auth/login` 은 camelCase(accessToken)라
+  // 그대로 베끼면 `data['access_token']` 파싱이 깨진다. 계약은
+  // `bootstrap_callback_test.dart` 가 잠근다.
+  'POST /auth/refresh': (
+    200,
+    {
+      'access_token': 'admin-access',
+      'user': {
+        'id': 'admin-1',
+        'email': 'admin@devpath.ai',
+        'nickname': '운영자',
+        'role': 'ADMIN',
+        'onboardingStatus': 'DONE',
+        'consentStatus': 'DONE',
+      },
+    },
+  ),
   // 사용자 목록(A-002) — 단일 페이지(목 한계: query 무시, P4f와 동일)
   'GET /admin/users': (
     200,
