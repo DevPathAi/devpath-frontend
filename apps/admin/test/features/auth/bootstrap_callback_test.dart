@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:devpath_admin/src/data/admin_mock_fixtures.dart';
 import 'package:devpath_admin/src/features/auth/application/auth_controller.dart';
 import 'package:devpath_admin/src/features/auth/state/auth_state.dart';
 import 'package:devpath_admin/src/providers/api_providers.dart';
@@ -124,5 +125,29 @@ void main() {
         expect(container.read(adminAuthProvider), isA<AdminUnauthed>());
       },
     );
+  });
+
+  group('목 픽스처', () {
+    test('POST /auth/refresh가 bootstrapFromCallback 계약을 만족한다', () {
+      // 목 모드에서는 외부 OAuth로 나갈 수 없어 `#/auth/callback` 직접 진입이
+      // 유일한 경로다. 이 픽스처가 없으면 /login 에서 더 나아갈 수 없어
+      // **admin 화면을 하나도 볼 수 없다**(3-A 육안 확인 때 임시 픽스처로
+      // 우회해야 했다). 위 테스트들은 자체 목 어댑터를 쓰므로 픽스처가
+      // 비어 있어도 green이었다 — 그래서 이 검사가 따로 필요하다.
+      final fixture = adminMockFixtures['POST /auth/refresh'];
+      expect(fixture, isNotNull, reason: '없으면 목 모드로 admin을 볼 수 없다');
+
+      final (status, body) = fixture!;
+      expect(status, 200);
+
+      final map = (body as Map).cast<String, dynamic>();
+      // ★키가 snake_case다★ — 같은 파일의 `POST /admin/auth/login` 픽스처는
+      // camelCase(accessToken)라 그대로 베끼면 파싱이 깨진다.
+      expect(map['access_token'], isA<String>());
+      expect(
+        () => User.fromJson((map['user']! as Map).cast<String, dynamic>()),
+        returnsNormally,
+      );
+    });
   });
 }
