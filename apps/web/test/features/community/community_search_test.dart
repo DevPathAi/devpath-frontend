@@ -129,6 +129,40 @@ void main() {
     expect(find.text('목록 글 1'), findsNothing, reason: '검색 중에는 기본 목록을 감춘다');
   });
 
+  testWidgets('검색 결과의 semanticChildCount는 「더 보기」를 제외한 결과 수다', (tester) async {
+    final c = _containerWith(
+      search:
+          ({
+            required String q,
+            String? board,
+            String? tag,
+            bool? solved,
+            String? sort,
+            int page = 0,
+            int size = 20,
+          }) async => CommunitySearchResult(
+            items: [
+              _s(1, title: '첫 결과'),
+              _s(2, title: '둘째 결과'),
+            ],
+            // items(2) < total(5) → hasMore → itemCount에 「더 보기」가 하나 더 붙는다.
+            total: 5,
+          ),
+    );
+    await tester.pumpWidget(_host(c));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(_searchField, '검색어');
+    await tester.pump(const Duration(milliseconds: 450));
+    await tester.pumpAndSettle();
+
+    // 조건 성립 검산: 「더 보기」가 실제로 붙은 상태인가.
+    expect(find.byKey(const ValueKey('search-more')), findsOneWidget);
+
+    final view = tester.widget<CustomScrollView>(find.byType(CustomScrollView));
+    expect(view.semanticChildCount, 2, reason: '버튼은 목록 항목이 아니다');
+  });
+
   testWidgets('검색어를 지우면 기본 목록으로 돌아간다', (tester) async {
     var searchCalls = 0;
     final c = _containerWith(

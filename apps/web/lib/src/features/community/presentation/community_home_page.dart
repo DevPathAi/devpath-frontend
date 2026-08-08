@@ -126,6 +126,15 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
         label: const Text('새 글'),
       ),
       body: CustomScrollView(
+        // 스크린리더가 「N개 중 M번째」를 읽을 수 있게 목록 항목 수를 알린다.
+        // `CustomScrollView`는 `ListView`와 달리 이 값을 자동으로 채우지 않는다.
+        //
+        // **`itemCount`가 아니라 콘텐츠 수를 센다** — 피드의 광고 슬롯과 검색의
+        // 「더 보기」 버튼은 itemCount에는 들어가지만 목록 항목이 아니다.
+        // 틀린 개수는 없는 것보다 나쁘다.
+        semanticChildCount: search.phase == CommunitySearchPhase.idle
+            ? s.posts.length
+            : search.items.length,
         slivers: [
           const SliverToBoxAdapter(
             child: DpPageHeader(
