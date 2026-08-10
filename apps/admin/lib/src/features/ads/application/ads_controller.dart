@@ -2,6 +2,7 @@ import 'package:dp_core/dp_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/ad_row.dart';
+import '../data/ad_slot_config_row.dart';
 import '../data/ads_source.dart';
 import '../state/ads_state.dart';
 
@@ -15,6 +16,7 @@ class AdsController extends Notifier<AdsState> {
       slotFilter: state.slotFilter,
       statusFilter: state.statusFilter,
       globalEnabled: state.globalEnabled,
+      slotConfigs: state.slotConfigs,
     );
     try {
       final rows = await ref.read(adsListProvider)(
@@ -22,16 +24,36 @@ class AdsController extends Notifier<AdsState> {
         status: state.statusFilter,
       );
       final enabled = await ref.read(adSettingsGetProvider)();
+      // 슬롯 설정은 부가 기능이다. 조회 실패가 광고 목록 화면 전체를 무너뜨리지
+      // 않게 여기서 흡수한다(백엔드 미배포·권한·네트워크).
+      List<AdSlotConfigRow> configs = const [];
+      try {
+        configs = await ref.read(adSlotConfigListProvider)();
+      } on ApiException {
+        configs = const [];
+      }
       state = AdsState(
         rows: rows,
         phase: AdsPhase.loaded,
         slotFilter: state.slotFilter,
         statusFilter: state.statusFilter,
         globalEnabled: enabled,
+        slotConfigs: configs,
       );
     } on ApiException catch (e) {
       state = state.copyWith(phase: AdsPhase.failed, error: e.message);
     }
+  }
+
+  /// 슬롯 설정 1행을 저장하고 목록을 갱신한다.
+  Future<void> saveSlotConfig(AdSlotConfigRow row) async {
+    final saved = await ref.read(adSlotConfigSaveProvider)(row);
+    state = state.copyWith(
+      slotConfigs: [
+        for (final c in state.slotConfigs)
+          if (c.slot == saved.slot) saved else c,
+      ],
+    );
   }
 
   Future<void> setSlotFilter(String? slot) async {
@@ -40,6 +62,7 @@ class AdsController extends Notifier<AdsState> {
       slotFilter: slot,
       statusFilter: state.statusFilter,
       globalEnabled: state.globalEnabled,
+      slotConfigs: state.slotConfigs,
     );
     await load();
   }
@@ -50,6 +73,7 @@ class AdsController extends Notifier<AdsState> {
       slotFilter: state.slotFilter,
       statusFilter: status,
       globalEnabled: state.globalEnabled,
+      slotConfigs: state.slotConfigs,
     );
     await load();
   }

@@ -35,10 +35,10 @@ AdSenseHandle createAdSenseHandle({
       ..style.width = '100%'
       // 확장 전에는 0높이 박스 밖으로 광고가 삐져나오지 않게 잘라둔다.
       ..style.overflow = 'hidden';
-    final cb =
-        ((JSString status, JSNumber height) =>
-                onResolved(status.toDart, height.toDartDouble))
-            .toJS;
+    final cb = ((JSString status, JSNumber height) => onResolved(
+      status.toDart,
+      height.toDartDouble,
+    )).toJS;
     jsHandle = _createDevpathAdUnit(container, slotId, cb);
     return container;
   });

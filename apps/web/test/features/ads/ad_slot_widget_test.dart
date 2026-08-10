@@ -49,7 +49,9 @@ void main() {
   testWidgets('fetch→HouseAd renders title and 광고 label', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [adFetchProvider.overrideWithValue((slot) async => _house())],
+        overrides: [
+          adFetchProvider.overrideWithValue((slot) async => _house()),
+        ],
         child: MaterialApp(
           theme: DpTheme.light(),
           home: const Scaffold(body: AdSlotWidget(slot: 'DASHBOARD_TOP')),
@@ -111,9 +113,7 @@ void main() {
     expect(find.text('광고'), findsNothing);
   });
 
-  testWidgets('애드센스 가지는 노출·클릭 이벤트를 전혀 보내지 않는다 (구글 정책)', (
-    tester,
-  ) async {
+  testWidgets('애드센스 가지는 노출·클릭 이벤트를 전혀 보내지 않는다 (구글 정책)', (tester) async {
     final events = <String>[];
     await tester.pumpWidget(
       ProviderScope(

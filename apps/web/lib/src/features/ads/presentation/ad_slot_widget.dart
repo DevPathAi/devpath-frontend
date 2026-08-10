@@ -52,7 +52,9 @@ class _AdSlotWidgetState extends ConsumerState<AdSlotWidget> {
     return switch (_content) {
       null => const SizedBox.shrink(),
       // 애드센스에는 측정을 붙이지 않는다(구글 정책). VisibilityDetector도 없다.
-      AdsenseUnit(:final adsenseSlotId) => AdSenseUnitView(slotId: adsenseSlotId),
+      AdsenseUnit(:final adsenseSlotId) => AdSenseUnitView(
+        slotId: adsenseSlotId,
+      ),
       HouseAd(:final ad) => _houseCard(context, ad),
     };
   }
