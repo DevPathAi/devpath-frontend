@@ -4,8 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
 import '../application/ad_link_opener.dart';
+import '../data/ad_slot_content.dart';
 import '../data/ad_view.dart';
 import '../data/ads_source.dart';
+import 'adsense_unit_view.dart';
 
 /// 슬롯 공용 광고 위젯. fail-silent: 광고 없으면 아무것도 그리지 않는다.
 class AdSlotWidget extends ConsumerStatefulWidget {
@@ -17,7 +19,7 @@ class AdSlotWidget extends ConsumerStatefulWidget {
 }
 
 class _AdSlotWidgetState extends ConsumerState<AdSlotWidget> {
-  AdView? _ad;
+  AdSlotContent? _content;
   bool _impressed = false;
 
   @override
@@ -27,40 +29,45 @@ class _AdSlotWidgetState extends ConsumerState<AdSlotWidget> {
   }
 
   Future<void> _fetch() async {
-    final ad = await ref.read(adFetchProvider)(widget.slot);
+    final content = await ref.read(adFetchProvider)(widget.slot);
     if (!mounted) return;
-    setState(() => _ad = ad);
+    setState(() => _content = content);
   }
 
-  void _onVisible(double fraction) {
-    if (_impressed || _ad == null) return;
+  void _onVisible(AdView ad, double fraction) {
+    if (_impressed) return;
     if (fraction >= 0.5) {
       _impressed = true;
-      ref.read(adEventProvider)(_ad!.id, 'IMPRESSION');
+      ref.read(adEventProvider)(ad.id, 'IMPRESSION');
     }
   }
 
-  void _onTap() {
-    final ad = _ad;
-    if (ad == null) return;
+  void _onTap(AdView ad) {
     ref.read(adEventProvider)(ad.id, 'CLICK');
     ref.read(adLinkOpenerProvider).open(ad.linkUrl);
   }
 
   @override
   Widget build(BuildContext context) {
-    final ad = _ad;
-    if (ad == null) return const SizedBox.shrink();
+    return switch (_content) {
+      null => const SizedBox.shrink(),
+      // 애드센스에는 측정을 붙이지 않는다(구글 정책). VisibilityDetector도 없다.
+      AdsenseUnit(:final adsenseSlotId) => AdSenseUnitView(slotId: adsenseSlotId),
+      HouseAd(:final ad) => _houseCard(context, ad),
+    };
+  }
+
+  Widget _houseCard(BuildContext context, AdView ad) {
     final c = context.dpColors;
     final text = Theme.of(context).textTheme;
 
     return VisibilityDetector(
       key: Key('ad-${widget.slot}-${ad.id}'),
-      onVisibilityChanged: (info) => _onVisible(info.visibleFraction),
+      onVisibilityChanged: (info) => _onVisible(ad, info.visibleFraction),
       child: Card(
         margin: const EdgeInsets.symmetric(vertical: DpSpacing.sm),
         child: InkWell(
-          onTap: _onTap,
+          onTap: () => _onTap(ad),
           child: Padding(
             padding: const EdgeInsets.all(DpSpacing.md),
             child: Row(
