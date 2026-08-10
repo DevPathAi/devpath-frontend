@@ -1,4 +1,5 @@
 import '../data/ad_row.dart';
+import '../data/ad_slot_config_row.dart';
 
 enum AdsPhase { loading, loaded, failed }
 
@@ -11,6 +12,7 @@ class AdsState {
     this.globalEnabled = false,
     this.error,
     this.selectedIds = const {},
+    this.slotConfigs = const [],
   });
 
   final List<AdRow> rows;
@@ -20,6 +22,7 @@ class AdsState {
   final bool globalEnabled;
   final String? error;
   final Set<int> selectedIds;
+  final List<AdSlotConfigRow> slotConfigs;
 
   AdsState copyWith({
     List<AdRow>? rows,
@@ -29,6 +32,7 @@ class AdsState {
     bool? globalEnabled,
     String? error,
     Set<int>? selectedIds,
+    List<AdSlotConfigRow>? slotConfigs,
   }) => AdsState(
     rows: rows ?? this.rows,
     phase: phase ?? this.phase,
@@ -37,5 +41,6 @@ class AdsState {
     globalEnabled: globalEnabled ?? this.globalEnabled,
     error: error,
     selectedIds: selectedIds ?? this.selectedIds,
+    slotConfigs: slotConfigs ?? this.slotConfigs,
   );
 }

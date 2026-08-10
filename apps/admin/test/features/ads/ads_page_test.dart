@@ -1,4 +1,5 @@
 import 'package:devpath_admin/src/features/ads/data/ad_row.dart';
+import 'package:devpath_admin/src/features/ads/data/ad_slot_config_row.dart';
 import 'package:devpath_admin/src/features/ads/data/ads_source.dart';
 import 'package:devpath_admin/src/features/ads/presentation/ads_page.dart';
 import 'package:dp_design/dp_design.dart';
@@ -19,6 +20,12 @@ AdRow _ad(int id, String title) => AdRow(
   endsAt: null,
 );
 
+List<AdSlotConfigRow> _configs() => const [
+  AdSlotConfigRow(slot: 'COMMUNITY_FEED', source: 'HOUSE', adsenseSlotId: null),
+  AdSlotConfigRow(slot: 'CONTENT_PAGE', source: 'HOUSE', adsenseSlotId: null),
+  AdSlotConfigRow(slot: 'DASHBOARD_TOP', source: 'HOUSE', adsenseSlotId: null),
+];
+
 void main() {
   testWidgets('renders ad rows and global switch', (tester) async {
     tester.view.physicalSize = const Size(1400, 1000);
@@ -32,6 +39,7 @@ void main() {
             ({slot, status}) async => [_ad(1, '첫 배너')],
           ),
           adSettingsGetProvider.overrideWithValue(() async => true),
+          adSlotConfigListProvider.overrideWithValue(() async => _configs()),
         ],
         child: MaterialApp(theme: DpTheme.light(), home: const AdminAdsPage()),
       ),
@@ -54,6 +62,7 @@ void main() {
             ({slot, status}) async => [_ad(1, '기존 배너')],
           ),
           adSettingsGetProvider.overrideWithValue(() async => false),
+          adSlotConfigListProvider.overrideWithValue(() async => _configs()),
         ],
         child: MaterialApp(theme: DpTheme.light(), home: const AdminAdsPage()),
       ),
@@ -78,6 +87,7 @@ void main() {
             ({slot, status}) async => [_ad(1, '첫 배너')],
           ),
           adSettingsGetProvider.overrideWithValue(() async => true),
+          adSlotConfigListProvider.overrideWithValue(() async => _configs()),
         ],
         child: MaterialApp(theme: DpTheme.light(), home: const AdminAdsPage()),
       ),
@@ -103,6 +113,7 @@ void main() {
             ({slot, status}) async => [_ad(1, '첫 배너')],
           ),
           adSettingsGetProvider.overrideWithValue(() async => false),
+          adSlotConfigListProvider.overrideWithValue(() async => _configs()),
         ],
         child: MaterialApp(theme: DpTheme.light(), home: const AdminAdsPage()),
       ),
@@ -127,6 +138,7 @@ void main() {
         overrides: [
           adsListProvider.overrideWithValue(({slot, status}) async => []),
           adSettingsGetProvider.overrideWithValue(() async => false),
+          adSlotConfigListProvider.overrideWithValue(() async => _configs()),
         ],
         child: MaterialApp(theme: DpTheme.light(), home: const AdminAdsPage()),
       ),
@@ -140,5 +152,63 @@ void main() {
     // 방향은 admin_title_source_test의 소스 검사가 막는다.
     expect(header.title, adminHeaderTitleFor('/ads'));
     expect(find.byKey(const ValueKey('page-header-filters')), findsOneWidget);
+  });
+
+  testWidgets('슬롯 설정 버튼이 다이얼로그를 열고 3행을 보여준다', (tester) async {
+    tester.view.physicalSize = const Size(1400, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          adsListProvider.overrideWithValue(
+            ({slot, status}) async => [_ad(1, '첫 배너')],
+          ),
+          adSettingsGetProvider.overrideWithValue(() async => true),
+          adSlotConfigListProvider.overrideWithValue(() async => _configs()),
+        ],
+        child: MaterialApp(theme: DpTheme.light(), home: const AdminAdsPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(OutlinedButton, '슬롯 설정'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('DASHBOARD_TOP'), findsWidgets);
+    expect(find.byType(DropdownButtonFormField<String>), findsNWidgets(3));
+  });
+
+  testWidgets('애드센스를 고르고 단위 ID를 비우면 경고가 뜬다', (tester) async {
+    tester.view.physicalSize = const Size(1400, 1200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          adsListProvider.overrideWithValue(
+            ({slot, status}) async => [_ad(1, '첫 배너')],
+          ),
+          adSettingsGetProvider.overrideWithValue(() async => true),
+          adSlotConfigListProvider.overrideWithValue(() async => _configs()),
+        ],
+        child: MaterialApp(theme: DpTheme.light(), home: const AdminAdsPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(OutlinedButton, '슬롯 설정'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('단위 ID가 없으면 이 슬롯은 노출되지 않습니다'), findsNothing);
+
+    await tester.tap(find.byType(DropdownButtonFormField<String>).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('애드센스').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('단위 ID가 없으면 이 슬롯은 노출되지 않습니다'), findsOneWidget);
   });
 }

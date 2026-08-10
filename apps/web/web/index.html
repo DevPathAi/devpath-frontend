@@ -31,6 +31,10 @@
 
   <title>devpath_web</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- 구글 애드센스. 퍼블리셔 ID는 공개 값이며 심사 크롤러가 <head>에서 찾아야 한다. -->
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2785578834914321"
+          crossorigin="anonymous"></script>
 </head>
 <body>
   <!--
@@ -63,6 +67,76 @@
       return {
         dispose: function () { if (editor) editor.dispose(); }, // F5-a
         layout:  function () { if (editor) editor.layout(); },  // F5-b
+      };
+    };
+
+    // 애드센스 광고 단위 1개를 컨테이너에 삽입한다.
+    // onResolved(status, height)는 정확히 1회만 호출된다('filled' | 'unfilled').
+    // 자체 노출·클릭 추적은 붙이지 않는다(구글 정책).
+    window.createDevpathAdUnit = function (container, slotId, onResolved) {
+      var settled = false;
+      var observer = null;
+      var timer = null;
+      var rafId = null;
+
+      function settle(status, height) {
+        if (settled) return;
+        settled = true;
+        if (observer) { observer.disconnect(); observer = null; }
+        if (timer) { clearTimeout(timer); timer = null; }
+        if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+        onResolved(status, height);
+      }
+
+      var ins = document.createElement('ins');
+      ins.className = 'adsbygoogle';
+      ins.style.display = 'block';
+      ins.style.width = '100%';
+      ins.setAttribute('data-ad-client', 'ca-pub-2785578834914321');
+      ins.setAttribute('data-ad-slot', slotId);
+      ins.setAttribute('data-ad-format', 'auto');
+      ins.setAttribute('data-full-width-responsive', 'true');
+      container.appendChild(ins);
+
+      // 채워짐 여부는 구글이 data-ad-status로 알려준다. 폴링이 아니라 관측한다.
+      observer = new MutationObserver(function () {
+        var status = ins.getAttribute('data-ad-status');
+        if (status === 'filled') {
+          settle('filled', ins.offsetHeight);
+        } else if (status === 'unfilled') {
+          settle('unfilled', 0);
+        }
+      });
+      observer.observe(ins, { attributes: true, attributeFilter: ['data-ad-status'] });
+
+      // 스크립트 미로드·애드블록·응답 없음을 모두 흡수하는 단일 마감선.
+      // adsbygoogle 배열이 없다고 즉시 접으면 안 된다 — 스크립트가 async라
+      // 로드 전에는 없는 것이 정상이고, `|| []` 큐가 바로 그 대기용이다.
+      timer = setTimeout(function () { settle('unfilled', 0); }, 8000);
+
+      // 폭 0인 채로 push하면 "No slot size for availableWidth=0"으로 거부된다.
+      // 컨테이너가 실제로 레이아웃돼 폭을 가질 때까지 프레임을 기다린 뒤 push한다.
+      function pushWhenMeasurable() {
+        if (settled) return;
+        if (container.offsetWidth > 0) {
+          try {
+            (window.adsbygoogle = window.adsbygoogle || []).push({});
+          } catch (e) {
+            settle('unfilled', 0);
+          }
+          return;
+        }
+        rafId = requestAnimationFrame(pushWhenMeasurable);
+      }
+      rafId = requestAnimationFrame(pushWhenMeasurable);
+
+      return {
+        dispose: function () {
+          if (observer) { observer.disconnect(); observer = null; }
+          if (timer) { clearTimeout(timer); timer = null; }
+          if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+          if (ins.parentNode) { ins.parentNode.removeChild(ins); }
+        },
       };
     };
   </script>
