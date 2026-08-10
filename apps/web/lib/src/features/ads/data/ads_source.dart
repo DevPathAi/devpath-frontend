@@ -1,12 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../providers/api_providers.dart';
-import 'ad_view.dart';
+import 'ad_slot_content.dart';
 
-typedef AdFetch = Future<AdView?> Function(String slot);
+typedef AdFetch = Future<AdSlotContent?> Function(String slot);
 typedef AdEvent = Future<void> Function(int id, String type);
 
-/// GET /ads?slot= — 200이면 AdView, 204/에러면 null(fail-silent).
+/// GET /ads?slot= — 200이면 봉투 파싱, 204/에러/미지의 type이면 null(fail-silent).
 final adFetchProvider = Provider<AdFetch>((ref) {
   final client = ref.watch(apiClientProvider);
   return (slot) async {
@@ -16,7 +16,7 @@ final adFetchProvider = Provider<AdFetch>((ref) {
         query: {'slot': slot},
       );
       if (json == null || json.isEmpty) return null; // 204 → 빈 본문
-      return AdView.fromJson(json);
+      return adSlotContentFromJson(json);
     } catch (_) {
       return null; // fail-silent
     }
