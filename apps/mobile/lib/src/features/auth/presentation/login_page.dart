@@ -17,7 +17,7 @@ class LoginPage extends ConsumerWidget {
     final notifier = ref.read(authControllerProvider.notifier);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('DevPath AI')),
+      appBar: AppBar(title: const Text('Leva')),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,

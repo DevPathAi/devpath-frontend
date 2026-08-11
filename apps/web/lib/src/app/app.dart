@@ -16,7 +16,7 @@ class DevPathWebApp extends ConsumerWidget {
     final mode = ref.watch(themeModeProvider);
     final router = ref.watch(routerProvider);
     return MaterialApp.router(
-      title: 'DevPath AI',
+      title: 'Leva',
       debugShowCheckedModeBanner: false,
       theme: DpTheme.light(),
       darkTheme: DpTheme.dark(),

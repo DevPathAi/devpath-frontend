@@ -20,7 +20,7 @@ class AdminLoginPage extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'DevPath 운영 콘솔',
+                'Leva 관리자',
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
               if (err != null) ...[

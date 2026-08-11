@@ -10,7 +10,7 @@ class DevPathAdminApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp.router(
-      title: 'DevPath 운영 콘솔',
+      title: 'Leva 관리자',
       debugShowCheckedModeBanner: false,
       theme: DpTheme.light(),
       darkTheme: DpTheme.dark(),

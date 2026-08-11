@@ -152,7 +152,7 @@ class _AppShellViewState extends State<AppShellView> {
             borderRadius: BorderRadius.circular(DpRadius.button),
           ),
         ),
-        wordmark: 'DevPath',
+        wordmark: 'Leva',
       ),
       account: _AccountMenu(onGo: widget.onSelect),
       breadcrumb: breadcrumbFor(widget.location),

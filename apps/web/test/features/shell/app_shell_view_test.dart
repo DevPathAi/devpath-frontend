@@ -186,7 +186,7 @@ void main() {
 
     final finder = find.descendant(
       of: find.byType(DpNavRail),
-      matching: find.text('DevPath'),
+      matching: find.text('Leva'),
     );
     expect(
       effectiveTextColor(tester, finder),
@@ -208,7 +208,7 @@ void main() {
 
     final finder = find.descendant(
       of: find.byType(DpNavRail),
-      matching: find.text('DevPath'),
+      matching: find.text('Leva'),
     );
     expect(effectiveTextColor(tester, finder), DpColors.dark.railText);
   });
