@@ -76,7 +76,7 @@ Flutter 기본 템플릿 값이 그대로 배포돼 있다. 브랜드명조차 �
 
 1. `melos run format` · `melos run analyze` · `melos run test` 전부 통과
 2. PR → CI green → `develop` 머지
-3. **라이브 확인** — 머지 후 CI가 GHCR 이미지를 빌드하고 k3s가 그것을 서비스한다. 홈페이지(직접 업로드)와 배포 경로가 다르므로 **반영 시점이 다를 수 있다.** `app.leva.ai.kr`의 `title`·`description`·`robots`를 직접 조회해 확인하고, 반영되지 않았으면 배포 파이프라인 상태를 확인한다
+3. **라이브 확인** — ★**`develop` 머지로는 라이브에 반영되지 않는다.**★ `.github/workflows/ci.yml`에서 이미지 빌드(`web-image`·`admin-image`)와 배포(`web-deploy`) 잡은 `if: github.ref == 'refs/heads/main'`이라 **`main` 푸시에서만** 실행된다(실측: PR·develop에서는 `skipping`). 라이브 반영은 `develop → main` **릴리스**를 거쳐야 하며, 그것은 이 스펙의 범위가 아니다. 릴리스 시점에 `app.leva.ai.kr`의 `title`·`description`·`robots`를 직접 조회해 확인한다
 4. 배포 직후 단발 측정으로 판단하지 않는다 — 값이 안정될 때까지 반복 측정한다
 
 ## 7. 위험
@@ -85,5 +85,5 @@ Flutter 기본 템플릿 값이 그대로 배포돼 있다. 브랜드명조차 �
 |---|---|
 | 메타 정리 중 애드센스 스크립트 훼손 | §5의 보호 가드 |
 | `flutter build web`이 `index.html`을 변형 | 빌드가 치환하는 것은 `$FLUTTER_BASE_HREF`뿐이다. 빌드 산출물(`build/web/index.html`)에서 변경이 살아 있는지 확인한다 |
-| 이미지가 재빌드되지 않아 라이브 미반영 | §6.3에서 라이브를 직접 조회해 확인한다. 머지만으로 완료로 보지 않는다 |
+| 이미지가 재빌드되지 않아 라이브 미반영 | **확인됨(위험이 아니라 사실이다)** — 이미지·배포 잡은 `main` 전용이다. `develop` 머지 시점에는 라이브가 바뀌지 않는 것이 정상이고, 릴리스 때 함께 반영된다 |
 | `noindex`가 광고를 막을 것이라는 오해 | §4.3에 공식 근거를 남겼다 |
