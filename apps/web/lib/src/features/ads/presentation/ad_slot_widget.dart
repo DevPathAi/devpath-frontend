@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
-import '../application/ad_link_opener.dart';
+import '../../common/application/external_link_opener.dart';
 import '../data/ad_slot_content.dart';
 import '../data/ad_view.dart';
 import '../data/ads_source.dart';
@@ -44,7 +44,7 @@ class _AdSlotWidgetState extends ConsumerState<AdSlotWidget> {
 
   void _onTap(AdView ad) {
     ref.read(adEventProvider)(ad.id, 'CLICK');
-    ref.read(adLinkOpenerProvider).open(ad.linkUrl);
+    ref.read(externalLinkOpenerProvider).open(ad.linkUrl);
   }
 
   @override

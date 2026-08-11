@@ -2,6 +2,7 @@ import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:devpath_web/src/features/common/application/external_link_opener.dart';
 import 'package:devpath_web/src/features/consent/application/consent_controller.dart';
 import 'package:devpath_web/src/features/consent/application/consent_source.dart';
 import 'package:devpath_web/src/features/consent/presentation/consent_page.dart';
@@ -14,6 +15,14 @@ MaterialApp _app() =>
 class _BlockedController extends ConsentController {
   @override
   ConsentState build() => const ConsentBlocked();
+}
+
+/// 어떤 주소를 열었는지 기록하는 fake.
+class _RecordingOpener implements ExternalLinkOpener {
+  final List<String> opened = [];
+
+  @override
+  void open(String url) => opened.add(url);
 }
 
 /// submit 호출을 기록하는 fake — 실제 네트워크 없이 검증 게이트 통과 여부만 본다.
@@ -148,6 +157,77 @@ void main() {
 
     expect(recorder.submits, 1, reason: '전각 숫자는 반각으로 정규화되어 파싱돼야 한다');
     expect(recorder.lastBirthYear, 1995);
+  });
+
+  // 동의를 받으면서 방침 전문을 보여주지 않고 있었다. 한 줄 요약만 두고
+  // 「개인정보 수집·이용 동의」를 받는 것은 동의로 성립하기 어렵다.
+  testWidgets('개인정보 동의 항목에서 처리방침 전문으로 갈 수 있다', (tester) async {
+    bigView(tester);
+    final opener = _RecordingOpener();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [externalLinkOpenerProvider.overrideWithValue(opener)],
+        child: _app(),
+      ),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('consent-privacy-doc')));
+    await tester.pump();
+
+    expect(opener.opened, ['https://leva.ai.kr/privacy']);
+  });
+
+  // 전문을 「보려고」 누른 것이 「동의」가 되면 안 된다. trailing 버튼의 탭이
+  // 타일까지 전달되면 정확히 그 일이 벌어진다.
+  testWidgets('전문 링크를 눌러도 동의 체크는 켜지지 않는다', (tester) async {
+    bigView(tester);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          externalLinkOpenerProvider.overrideWithValue(_RecordingOpener()),
+        ],
+        child: _app(),
+      ),
+    );
+    bool privacyChecked() => tester
+        .widget<CheckboxListTile>(
+          find.widgetWithText(CheckboxListTile, '개인정보 수집·이용 동의'),
+        )
+        .value!;
+
+    await tester.tap(find.byKey(const ValueKey('consent-privacy-doc')));
+    await tester.pump();
+
+    expect(privacyChecked(), isFalse);
+
+    // 같은 방법으로 읽은 값이 켜지기도 하는지 확인한다. 이게 없으면 위 단언은
+    // 「언제나 false를 읽는 코드」로도 통과한다.
+    await tester.tap(find.text('개인정보 수집·이용 동의'));
+    await tester.pump();
+
+    expect(privacyChecked(), isTrue);
+  });
+
+  // 「전문 보기」가 타일의 trailing 으로 들어가면서 좁은 폭에서 제목·설명과
+  // 자리를 다툰다. 오버플로 예외로는 잡히지 않는다 — ListTile 이 텍스트를
+  // 줄바꿈해 버려 200px 에서도 예외가 나지 않았다. 그래서 존재가 아니라
+  // 「누를 수 있는가」를 본다. 버튼이 잘려 화면 밖으로 나가면 tap 이 실패한다.
+  testWidgets('좁은 폭에서도 전문 링크를 누를 수 있다', (tester) async {
+    tester.view.physicalSize = const Size(360, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final opener = _RecordingOpener();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [externalLinkOpenerProvider.overrideWithValue(opener)],
+        child: _app(),
+      ),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('consent-privacy-doc')));
+    await tester.pump();
+
+    expect(opener.opened, ['https://leva.ai.kr/privacy']);
   });
 
   testWidgets('ConsentBlocked → 차단 안내 + 로그아웃 버튼', (tester) async {

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/application/auth_controller.dart';
+import '../../common/application/external_link_opener.dart';
 import '../../common/presentation/brand_row.dart';
 import '../application/consent_controller.dart';
 import '../application/consent_source.dart';
@@ -13,7 +14,13 @@ import '../state/consent_state.dart';
 /// 필수: TERMS·PRIVACY / 선택: MARKETING·LCS_ATTACH·ERROR_LOG.
 enum _ConsentKind {
   terms('TERMS', true, '서비스 이용약관 동의', '서비스 이용에 필요한 기본 약관입니다.'),
-  privacy('PRIVACY', true, '개인정보 수집·이용 동의', '학습 진단·경로 제공을 위한 최소한의 정보를 수집합니다.'),
+  privacy(
+    'PRIVACY',
+    true,
+    '개인정보 수집·이용 동의',
+    '학습 진단·경로 제공을 위한 최소한의 정보를 수집합니다.',
+    docUrl: 'https://leva.ai.kr/privacy',
+  ),
   marketing('MARKETING', false, '마케팅 정보 수신 동의', '학습 팁과 이벤트 소식을 이메일로 받아봅니다.'),
   lcsAttach(
     'LCS_ATTACH',
@@ -28,12 +35,22 @@ enum _ConsentKind {
     '오류가 나면 진단 로그를 수집해 품질 개선에 씁니다.',
   );
 
-  const _ConsentKind(this.wire, this.required, this.title, this.desc);
+  const _ConsentKind(
+    this.wire,
+    this.required,
+    this.title,
+    this.desc, {
+    this.docUrl,
+  });
 
   final String wire;
   final bool required;
   final String title;
   final String desc;
+
+  /// 전문을 읽을 수 있는 주소. 한 줄 요약만 보여주고 동의를 받는 것은 동의로
+  /// 성립하기 어렵다. 문서가 공개된 항목에만 있다.
+  final String? docUrl;
 }
 
 /// 회원가입 필수 동의 gate 화면. OAuth 직후·진단 전에 노출된다(라우터 게이트).
@@ -209,6 +226,16 @@ class _ConsentPageState extends ConsumerState<ConsentPage> {
     contentPadding: EdgeInsets.zero,
     title: Text(k.title),
     subtitle: Text(k.desc),
+    // 전문은 새 탭으로 연다. 동의 화면을 떠나면 여기까지 온 맥락(OAuth 직후)이
+    // 끊긴다.
+    secondary: k.docUrl == null
+        ? null
+        : TextButton(
+            key: ValueKey('consent-${k.name}-doc'),
+            onPressed: () =>
+                ref.read(externalLinkOpenerProvider).open(k.docUrl!),
+            child: Text('전문 보기', semanticsLabel: '${k.title} 전문 보기'),
+          ),
   );
 }
 
