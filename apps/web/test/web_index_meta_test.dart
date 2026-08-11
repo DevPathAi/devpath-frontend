@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 /// web/index.html은 정적 파일이라 위젯 트리로 검증할 수 없다.
-/// 크롤러와 링크 미리보기가 보는 것은 이 파일의 <head>이므로 직접 읽어 단언한다.
+/// 크롤러와 링크 미리보기가 보는 것은 이 파일의 `<head>`이므로 직접 읽어 단언한다.
 void main() {
   final html = File('web/index.html').readAsStringSync();
 
@@ -17,10 +17,7 @@ void main() {
     });
 
     test('앱이 무엇인지 설명한다', () {
-      expect(
-        html,
-        contains('적응형 진단 결과에서 시작하는 맞춤 학습 로드맵'),
-      );
+      expect(html, contains('적응형 진단 결과에서 시작하는 맞춤 학습 로드맵'));
     });
 
     // 본문이 캔버스에 그려져 HTML에는 텍스트가 없다. 빈 페이지가 색인되면
