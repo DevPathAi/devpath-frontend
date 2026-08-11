@@ -14,6 +14,10 @@ final appConfigProvider = Provider<AppConfig>(
 /// localStorage 영속화는 후속(리스크 참조).
 final tokenStoreProvider = Provider<TokenStore>((ref) => InMemoryTokenStore());
 
+/// 최근 API 실패 링버퍼. 제보 다이얼로그가 읽고, 인터셉터가 쓴다.
+/// 메모리 전용이라 새로고침하면 비어 있다.
+final apiFailureLogProvider = Provider<ApiFailureLog>((ref) => ApiFailureLog());
+
 /// refresh/재시도 전용 클라이언트 — **AuthInterceptor를 절대 장착하지 않는다.**
 ///
 /// AuthInterceptor는 QueuedInterceptor(에러 콜백 직렬화)라서, onError 안에서 같은
@@ -38,7 +42,10 @@ final authFlowClientProvider = Provider<ApiClient>((ref) {
     ),
   );
   if (config.useMock) {
-    client.dio.httpClientAdapter = MockHttpAdapter(webMockFixtures);
+    client.dio.httpClientAdapter = MockHttpAdapter(
+      webMockFixtures,
+      sequences: webMockSequences,
+    );
   }
   return client;
 });
@@ -86,8 +93,20 @@ final apiClientProvider = Provider<ApiClient>((ref) {
     ),
   );
 
+  // 제보용 실패 기록 — **Auth 뒤 · ErrorNormalizer 앞**.
+  // index 0 이면 Auth 가 refresh 로 복구하는 일시적 401까지 기록되어, 사용자가 겪지도
+  // 않은 실패가 제보에 섞인다. 정규화 뒤면 handler.reject() 로 체인이 끝나 아무것도 못 본다.
+  // dp_core 의 api_failure_recorder_test 가 "정규화가 마지막"이라는 이 불변식을 지킨다.
+  client.dio.interceptors.insert(
+    client.dio.interceptors.length - 1,
+    ApiFailureRecorder(ref.watch(apiFailureLogProvider)),
+  );
+
   if (config.useMock) {
-    client.dio.httpClientAdapter = MockHttpAdapter(webMockFixtures);
+    client.dio.httpClientAdapter = MockHttpAdapter(
+      webMockFixtures,
+      sequences: webMockSequences,
+    );
   }
   return client;
 });

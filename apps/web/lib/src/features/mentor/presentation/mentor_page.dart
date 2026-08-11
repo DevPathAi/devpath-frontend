@@ -8,6 +8,9 @@ import '../state/mentor_state.dart';
 
 const _kExamples = ['비동기란?', '테스트는 어떻게 작성하나요?', 'Riverpod이 뭔가요?'];
 
+/// 하단에서 이 픽셀 이내면 새 메시지·토큰을 자동 추종(더 멀면 사용자가 읽는 중으로 보고 억제).
+const double _kFollowThreshold = 120;
+
 class MentorPage extends ConsumerStatefulWidget {
   const MentorPage({super.key});
 
@@ -17,11 +20,25 @@ class MentorPage extends ConsumerStatefulWidget {
 
 class _MentorPageState extends ConsumerState<MentorPage> {
   final _input = TextEditingController();
+  final _scroll = ScrollController();
 
   @override
   void dispose() {
     _input.dispose();
+    _scroll.dispose();
     super.dispose();
+  }
+
+  /// 하단 근처일 때만 새 메시지·토큰을 하단으로 추종(위로 읽는 중이면 억제).
+  void _autoFollow() {
+    if (!_scroll.hasClients) return;
+    final pos = _scroll.position;
+    if (pos.maxScrollExtent - pos.pixels > _kFollowThreshold) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scroll.hasClients) {
+        _scroll.jumpTo(_scroll.position.maxScrollExtent);
+      }
+    });
   }
 
   void _send(String q) {
@@ -31,79 +48,104 @@ class _MentorPageState extends ConsumerState<MentorPage> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(mentorControllerProvider, (prev, next) {
+      final grew = (prev?.messages.length ?? 0) != next.messages.length;
+      final tailChanged =
+          prev != null &&
+          prev.messages.isNotEmpty &&
+          next.messages.isNotEmpty &&
+          prev.messages.last.text != next.messages.last.text;
+      if (grew || tailChanged) _autoFollow();
+    });
+
     final s = ref.watch(mentorControllerProvider);
     final c = context.dpColors;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('AI 멘토')),
       body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (s.status == MentorStatus.killSwitch)
-            const DpKillSwitch()
-          else
-            Expanded(
-              child: s.messages.isEmpty
-                  ? _Empty(onPick: _send)
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(DpSpacing.lg),
-                      itemCount: s.messages.length,
-                      // ENG-REVIEW F9: 각 버블에 ValueKey 부여 + 스트리밍 중(마지막) 버블만
-                      // 변하는 텍스트를 들고 갱신. 토큰당 visible 버블 전체 재빌드 방지 —
-                      // 완료된 앞쪽 버블은 동일 Key·동일 text라 element 재사용(rebuild 스킵).
-                      itemBuilder: (_, i) {
-                        final isStreamingTail =
-                            i == s.messages.length - 1 &&
-                            s.status == MentorStatus.streaming;
-                        return _Bubble(
-                          key: ValueKey('msg-$i-${s.messages[i].fromUser}'),
-                          message: s.messages[i],
-                          // 스트리밍 꼬리만 텍스트가 자주 바뀜을 명시(앞쪽은 안정).
-                          isStreamingTail: isStreamingTail,
-                        );
-                      },
-                    ),
-            ),
-          // ENG-REVIEW D2: 끊김(partial) → 부분답변 보존 안내 + "다시 시도"(재전송) 버튼.
-          if (s.status == MentorStatus.partial)
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: DpSpacing.lg,
-                vertical: DpSpacing.sm,
-              ),
-              child: Row(
-                children: [
+          const DpPageHeader(
+            title: 'AI 멘토',
+            description: '막히는 부분을 물어보면 학습 맥락을 반영해 답합니다',
+          ),
+          Expanded(
+            child: Column(
+              children: [
+                if (s.status == MentorStatus.killSwitch)
+                  const DpKillSwitch()
+                else
                   Expanded(
+                    child: s.messages.isEmpty
+                        ? _Empty(onPick: _send)
+                        : ListView.builder(
+                            controller: _scroll,
+                            padding: const EdgeInsets.all(DpSpacing.lg),
+                            itemCount: s.messages.length,
+                            // ENG-REVIEW F9: 각 버블에 ValueKey 부여 + 스트리밍 중(마지막) 버블만
+                            // 변하는 텍스트를 들고 갱신. 토큰당 visible 버블 전체 재빌드 방지 —
+                            // 완료된 앞쪽 버블은 동일 Key·동일 text라 element 재사용(rebuild 스킵).
+                            itemBuilder: (_, i) {
+                              final isStreamingTail =
+                                  i == s.messages.length - 1 &&
+                                  s.status == MentorStatus.streaming;
+                              return _Bubble(
+                                key: ValueKey(
+                                  'msg-$i-${s.messages[i].fromUser}',
+                                ),
+                                message: s.messages[i],
+                                // 스트리밍 꼬리만 텍스트가 자주 바뀜을 명시(앞쪽은 안정).
+                                isStreamingTail: isStreamingTail,
+                              );
+                            },
+                          ),
+                  ),
+                // ENG-REVIEW D2: 끊김(partial) → 부분답변 보존 안내 + "다시 시도"(재전송) 버튼.
+                if (s.status == MentorStatus.partial)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: DpSpacing.lg,
+                      vertical: DpSpacing.sm,
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            s.error ?? '연결이 끊겼어요. 부분답변을 받았어요.',
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: c.textSecondary),
+                          ),
+                        ),
+                        const SizedBox(width: DpSpacing.sm),
+                        TextButton(
+                          onPressed: () => ref
+                              .read(mentorControllerProvider.notifier)
+                              .retry(),
+                          child: const Text('다시 시도'),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (s.status == MentorStatus.failed && s.error != null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: DpSpacing.lg,
+                    ),
                     child: Text(
-                      s.error ?? '연결이 끊겼어요. 부분답변을 받았어요.',
+                      s.error!,
                       style: Theme.of(
                         context,
-                      ).textTheme.bodySmall?.copyWith(color: c.warning),
+                      ).textTheme.bodySmall?.copyWith(color: c.danger),
                     ),
                   ),
-                  const SizedBox(width: DpSpacing.sm),
-                  TextButton(
-                    onPressed: () =>
-                        ref.read(mentorControllerProvider.notifier).retry(),
-                    child: const Text('다시 시도'),
-                  ),
-                ],
-              ),
+                // 슬라이스 #7 M-2: 참고자료(event:references) — 있으면 칩으로 렌더, 없으면 미표시.
+                if (s.references.isNotEmpty)
+                  _ReferencePanel(references: s.references),
+                if (s.status != MentorStatus.killSwitch)
+                  _Composer(controller: _input, onSend: _send),
+              ],
             ),
-          if (s.status == MentorStatus.failed && s.error != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: DpSpacing.lg),
-              child: Text(
-                s.error!,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: c.danger),
-              ),
-            ),
-          // 슬라이스 #7 M-2: 참고자료(event:references) — 있으면 칩으로 렌더, 없으면 미표시.
-          if (s.references.isNotEmpty)
-            _ReferencePanel(references: s.references),
-          if (s.status != MentorStatus.killSwitch)
-            _Composer(controller: _input, onSend: _send),
+          ),
         ],
       ),
     );

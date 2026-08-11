@@ -11,10 +11,12 @@ _CommunityPostSummary _$CommunityPostSummaryFromJson(
 ) => _CommunityPostSummary(
   id: (json['id'] as num).toInt(),
   title: json['title'] as String,
+  boardType: json['boardType'] as String? ?? 'QNA',
   authorId: (json['authorId'] as num?)?.toInt(),
   solved: json['solved'] as bool? ?? false,
   upvoteCount: (json['upvoteCount'] as num?)?.toInt() ?? 0,
-  answerCount: (json['answerCount'] as num?)?.toInt() ?? 0,
+  replyCount: (json['replyCount'] as num?)?.toInt() ?? 0,
+  excerpt: json['excerpt'] as String? ?? '',
 );
 
 Map<String, dynamic> _$CommunityPostSummaryToJson(
@@ -22,10 +24,12 @@ Map<String, dynamic> _$CommunityPostSummaryToJson(
 ) => <String, dynamic>{
   'id': instance.id,
   'title': instance.title,
+  'boardType': instance.boardType,
   'authorId': instance.authorId,
   'solved': instance.solved,
   'upvoteCount': instance.upvoteCount,
-  'answerCount': instance.answerCount,
+  'replyCount': instance.replyCount,
+  'excerpt': instance.excerpt,
 };
 
 _CommunityAnswer _$CommunityAnswerFromJson(Map<String, dynamic> json) =>
@@ -106,4 +110,55 @@ Map<String, dynamic> _$CommunityTagToJson(_CommunityTag instance) =>
       'id': instance.id,
       'name': instance.name,
       'postCount': instance.postCount,
+    };
+
+_CommunityPostDetail _$CommunityPostDetailFromJson(Map<String, dynamic> json) =>
+    _CommunityPostDetail(
+      id: (json['id'] as num).toInt(),
+      boardType: json['boardType'] as String,
+      title: json['title'] as String,
+      bodyMd: json['bodyMd'] as String,
+      authorId: (json['authorId'] as num?)?.toInt(),
+      upvoteCount: (json['upvoteCount'] as num?)?.toInt() ?? 0,
+      downvoteCount: (json['downvoteCount'] as num?)?.toInt() ?? 0,
+      tags:
+          (json['tags'] as List<dynamic>?)?.map((e) => e as String).toList() ??
+          const <String>[],
+      comments:
+          (json['comments'] as List<dynamic>?)
+              ?.map((e) => CommunityComment.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          const <CommunityComment>[],
+    );
+
+Map<String, dynamic> _$CommunityPostDetailToJson(
+  _CommunityPostDetail instance,
+) => <String, dynamic>{
+  'id': instance.id,
+  'boardType': instance.boardType,
+  'title': instance.title,
+  'bodyMd': instance.bodyMd,
+  'authorId': instance.authorId,
+  'upvoteCount': instance.upvoteCount,
+  'downvoteCount': instance.downvoteCount,
+  'tags': instance.tags,
+  'comments': instance.comments.map((e) => e.toJson()).toList(),
+};
+
+_CommunityComment _$CommunityCommentFromJson(Map<String, dynamic> json) =>
+    _CommunityComment(
+      id: (json['id'] as num).toInt(),
+      authorId: (json['authorId'] as num?)?.toInt(),
+      bodyMd: json['bodyMd'] as String,
+      upvoteCount: (json['upvoteCount'] as num?)?.toInt() ?? 0,
+      createdAt: json['createdAt'] as String,
+    );
+
+Map<String, dynamic> _$CommunityCommentToJson(_CommunityComment instance) =>
+    <String, dynamic>{
+      'id': instance.id,
+      'authorId': instance.authorId,
+      'bodyMd': instance.bodyMd,
+      'upvoteCount': instance.upvoteCount,
+      'createdAt': instance.createdAt,
     };

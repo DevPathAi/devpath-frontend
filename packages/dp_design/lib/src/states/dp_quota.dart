@@ -20,7 +20,8 @@ class DpQuota extends StatelessWidget {
         : '약 $s초 후 다시 시도할 수 있어요.';
     return DpStateScaffold(
       icon: DpIcons.quota,
-      iconColor: context.dpColors.warning,
+      // 서비스 상태는 사용자 잘못도 위험도 아니다 → 중립. (경고색은 진짜 경고 전용)
+      iconColor: context.dpColors.textSecondary,
       title: '오늘 사용 한도에 도달했어요',
       message: message,
       actionLabel: onUpgrade == null ? null : '플랜 업그레이드',

@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../providers/api_providers.dart';
 import 'ad_row.dart';
+import 'ad_slot_config_row.dart';
 import 'ad_stats_row.dart';
 
 typedef AdsListFetch =
@@ -69,6 +70,14 @@ final adDeleteProvider = Provider<AdDelete>((ref) {
   return (id) => client.delete<void>('/admin/ads/$id');
 });
 
+typedef AdBulkDelete = Future<void> Function(List<int> ids);
+
+final adBulkDeleteProvider = Provider<AdBulkDelete>((ref) {
+  final client = ref.watch(apiClientProvider);
+  return (ids) =>
+      client.post<void>('/admin/ads/bulk-delete', body: {'ids': ids});
+});
+
 final adImageUploadProvider = Provider<AdImageUpload>((ref) {
   final client = ref.watch(apiClientProvider);
   return (id, bytes, filename, contentType) async {
@@ -98,6 +107,33 @@ final adSettingsSetProvider = Provider<AdSettingsSet>((ref) {
       body: {'enabled': enabled},
     );
     return json['enabled'] as bool;
+  };
+});
+
+typedef AdSlotConfigList = Future<List<AdSlotConfigRow>> Function();
+typedef AdSlotConfigSave =
+    Future<AdSlotConfigRow> Function(AdSlotConfigRow row);
+
+final adSlotConfigListProvider = Provider<AdSlotConfigList>((ref) {
+  final client = ref.watch(apiClientProvider);
+  return () async {
+    final json = await client.get<List<dynamic>>('/admin/ads/slot-config');
+    return json
+        .map(
+          (o) => AdSlotConfigRow.fromJson((o as Map).cast<String, dynamic>()),
+        )
+        .toList();
+  };
+});
+
+final adSlotConfigSaveProvider = Provider<AdSlotConfigSave>((ref) {
+  final client = ref.watch(apiClientProvider);
+  return (row) async {
+    final json = await client.put<Map<String, dynamic>>(
+      '/admin/ads/slot-config/${row.slot}',
+      body: row.toRequestJson(),
+    );
+    return AdSlotConfigRow.fromJson(json);
   };
 });
 

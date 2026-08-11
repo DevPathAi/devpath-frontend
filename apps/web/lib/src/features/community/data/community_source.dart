@@ -59,6 +59,19 @@ typedef SimilarQuestionsFetch =
 /// 태그 자동완성 `GET /community/tags?q=` → `List<TagView>`.
 typedef TagAutocomplete = Future<List<CommunityTag>> Function(String q);
 
+/// 검색 `GET /community/search?q=&board=&tag=&solved=&sort=&page=&size=` → `SearchResponse`.
+/// 목록과 달리 **envelope**(`items`·`total`·`page`·`size`)이며 페이지네이션이 있다.
+typedef CommunitySearchFetch =
+    Future<CommunitySearchResult> Function({
+      required String q,
+      String? board,
+      String? tag,
+      bool? solved,
+      String? sort,
+      int page,
+      int size,
+    });
+
 List<T> _list<T>(Object? data, T Function(Map<String, dynamic>) fromJson) =>
     (data as List? ?? const [])
         .map((e) => fromJson((e as Map).cast<String, dynamic>()))
@@ -148,6 +161,64 @@ final similarQuestionsProvider = Provider<SimilarQuestionsFetch>((ref) {
   };
 });
 
+/// 신고 접수 `POST /community/reports`.
+/// 409=이미 신고한 대상, 400=본인 콘텐츠·잘못된 값, 404=대상 없음.
+typedef CommunityReportSubmit =
+    Future<CommunityReportResult> Function({
+      required String targetType,
+      required int targetId,
+      required CommunityReportCategory category,
+      String? reason,
+    });
+
+final communityReportProvider = Provider<CommunityReportSubmit>((ref) {
+  final client = ref.watch(apiClientProvider);
+  return ({
+    required String targetType,
+    required int targetId,
+    required CommunityReportCategory category,
+    String? reason,
+  }) async {
+    final json = await client.post<Map<String, dynamic>>(
+      '/community/reports',
+      body: {
+        'targetType': targetType,
+        'targetId': targetId,
+        'category': category.wire,
+        'reason': ?reason,
+      },
+    );
+    return CommunityReportResult.fromJson(json);
+  };
+});
+
+final communitySearchProvider = Provider<CommunitySearchFetch>((ref) {
+  final client = ref.watch(apiClientProvider);
+  return ({
+    required String q,
+    String? board,
+    String? tag,
+    bool? solved,
+    String? sort,
+    int page = 0,
+    int size = 20,
+  }) async {
+    final json = await client.get<Map<String, dynamic>>(
+      '/community/search',
+      query: <String, dynamic>{
+        'q': q,
+        'board': ?board,
+        'tag': ?tag,
+        'solved': ?solved,
+        'sort': ?sort,
+        'page': page,
+        'size': size,
+      },
+    );
+    return CommunitySearchResult.fromJson(json);
+  };
+});
+
 final tagAutocompleteProvider = Provider<TagAutocomplete>((ref) {
   final client = ref.watch(apiClientProvider);
   return (q) async {
@@ -156,5 +227,61 @@ final tagAutocompleteProvider = Provider<TagAutocomplete>((ref) {
       query: {'q': q},
     );
     return _list(data, CommunityTag.fromJson);
+  };
+});
+
+/// 일반 게시글 작성 `POST /community/posts {boardType,title,bodyMd,tags}` → `PostDetailView`.
+typedef PostCreate =
+    Future<CommunityPostDetail> Function({
+      required String boardType,
+      required String title,
+      required String bodyMd,
+      required List<String> tags,
+    });
+
+/// 일반 게시글 상세 `GET /community/posts/{id}` → `PostDetailView`(FREE/FEEDBACK, 댓글 포함).
+typedef PostDetailFetch = Future<CommunityPostDetail> Function(int id);
+
+/// 댓글 작성 `POST /community/posts/{id}/comments {bodyMd}` → `CommentView`.
+typedef CommentCreate =
+    Future<CommunityComment> Function(int postId, String bodyMd);
+
+final postCreateProvider = Provider<PostCreate>((ref) {
+  final client = ref.watch(apiClientProvider);
+  return ({
+    required String boardType,
+    required String title,
+    required String bodyMd,
+    required List<String> tags,
+  }) async {
+    final json = await client.post<Map<String, dynamic>>(
+      '/community/posts',
+      body: {
+        'boardType': boardType,
+        'title': title,
+        'bodyMd': bodyMd,
+        'tags': tags,
+      },
+    );
+    return CommunityPostDetail.fromJson(json);
+  };
+});
+
+final postDetailFetchProvider = Provider<PostDetailFetch>((ref) {
+  final client = ref.watch(apiClientProvider);
+  return (id) async {
+    final json = await client.get<Map<String, dynamic>>('/community/posts/$id');
+    return CommunityPostDetail.fromJson(json);
+  };
+});
+
+final commentCreateProvider = Provider<CommentCreate>((ref) {
+  final client = ref.watch(apiClientProvider);
+  return (postId, bodyMd) async {
+    final json = await client.post<Map<String, dynamic>>(
+      '/community/posts/$postId/comments',
+      body: {'bodyMd': bodyMd},
+    );
+    return CommunityComment.fromJson(json);
   };
 });

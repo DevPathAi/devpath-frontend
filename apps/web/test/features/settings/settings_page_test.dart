@@ -47,6 +47,11 @@ void main() {
     );
     await tester.pump();
 
+    expect(find.byType(AppBar), findsNothing);
+    final header = tester.widget<DpPageHeader>(find.byType(DpPageHeader));
+    expect(header.title, '설정');
+    expect(header.description, '알림·동의·계정을 관리합니다');
+
     // 알림 섹션
     expect(find.text('학습 리마인더'), findsOneWidget);
     expect(find.text('주간 리포트 이메일'), findsOneWidget);

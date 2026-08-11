@@ -20,4 +20,8 @@ abstract final class DpRadius {
 abstract final class DpDurations {
   static const Duration stageReveal = Duration(milliseconds: 200);
   static const Duration skeletonCrossfade = Duration(milliseconds: 150);
+  // 로드맵 §4.3 — hover/select/panelExpand (과도한 지연 회피).
+  static const Duration hover = Duration(milliseconds: 120);
+  static const Duration select = Duration(milliseconds: 180);
+  static const Duration panelExpand = Duration(milliseconds: 220);
 }

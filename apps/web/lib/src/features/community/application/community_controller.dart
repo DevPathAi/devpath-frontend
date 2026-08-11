@@ -8,17 +8,23 @@ class CommunityController extends Notifier<CommunityState> {
   @override
   CommunityState build() => const CommunityState();
 
-  Future<void> load({String? board, String? tag, String? sort}) async {
-    state = const CommunityState(phase: CommunityPhase.loading);
+  /// 보드 필터 전환 → 현재 board로 재조회.
+  Future<void> selectBoard(CommunityBoard board) async {
+    state = state.copyWith(board: board);
+    await load();
+  }
+
+  Future<void> load({String? tag, String? sort}) async {
+    state = state.copyWith(phase: CommunityPhase.loading);
     try {
       final posts = await ref.read(communityListProvider)(
-        board: board,
+        board: state.board.value,
         tag: tag,
         sort: sort,
       );
-      state = CommunityState(posts: posts, phase: CommunityPhase.loaded);
+      state = state.copyWith(posts: posts, phase: CommunityPhase.loaded);
     } on ApiException catch (e) {
-      state = CommunityState(phase: CommunityPhase.failed, error: e.message);
+      state = state.copyWith(phase: CommunityPhase.failed, error: e.message);
     }
   }
 }

@@ -39,4 +39,31 @@ void main() {
     expect(s.rows.map((e) => e.id), ['u2']);
     expect(s.statusFilter, 'SUSPENDED');
   });
+
+  test('bulkApprove: 선택 id로 POST 후 재조회·선택 초기화', () async {
+    List<int>? sentIds;
+    final c = ProviderContainer(
+      overrides: [
+        adminUsersFetchProvider.overrideWithValue(
+          ({cursor, status}) async => Page(
+            data: [_r('1', 'BETA_PENDING'), _r('2', 'BETA_PENDING')],
+            limit: 20,
+          ),
+        ),
+        adminUsersBulkApproveProvider.overrideWithValue((ids) async {
+          sentIds = ids;
+        }),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    await c.read(adminUsersProvider.notifier).load();
+    c.read(adminUsersProvider.notifier).toggleSelect('1');
+    c.read(adminUsersProvider.notifier).toggleSelect('2');
+    expect(c.read(adminUsersProvider).selectedIds, {'1', '2'});
+
+    await c.read(adminUsersProvider.notifier).bulkApprove();
+    expect(sentIds, [1, 2]);
+    expect(c.read(adminUsersProvider).selectedIds, isEmpty);
+  });
 }

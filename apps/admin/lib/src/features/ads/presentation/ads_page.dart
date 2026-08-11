@@ -2,8 +2,11 @@ import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../shell/presentation/admin_shell.dart';
+import '../../../widgets/bulk_action_bar.dart';
 import '../application/ads_controller.dart';
 import '../data/ad_row.dart';
+import '../data/ad_slot_config_row.dart';
 import '../data/ad_stats_row.dart';
 import '../data/ads_source.dart';
 import '../state/ads_state.dart';
@@ -32,100 +35,98 @@ class _AdsPageState extends ConsumerState<AdminAdsPage> {
     final n = ref.read(adsProvider.notifier);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('광고 관리'),
-        actions: [
-          const Text('전역 노출'),
-          Switch(value: s.globalEnabled, onChanged: (v) => n.toggleGlobal(v)),
-          const SizedBox(width: DpSpacing.md),
-          FilledButton.icon(
-            icon: const Icon(DpIcons.edit),
-            label: const Text('광고 생성'),
-            onPressed: () => _openForm(context, n, null),
-          ),
-          const SizedBox(width: DpSpacing.lg),
-        ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(48),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: DpSpacing.lg),
-            child: Row(
-              children: [
-                const Text('슬롯:'),
-                const SizedBox(width: DpSpacing.sm),
-                for (final slot in _kSlots)
-                  Padding(
-                    padding: const EdgeInsets.only(right: DpSpacing.xs),
-                    child: ChoiceChip(
-                      label: Text(slot),
-                      selected: s.slotFilter == slot,
-                      onSelected: (sel) => n.setSlotFilter(sel ? slot : null),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ),
-      body: switch (s.phase) {
-        AdsPhase.loading => const DpLoading(),
-        AdsPhase.failed => DpError(message: s.error ?? '오류', onRetry: n.load),
-        AdsPhase.loaded when s.rows.isEmpty => DpEmpty(
-          icon: DpIcons.ads,
-          title: '광고가 없어요',
-          actionLabel: '광고 생성',
-          onAction: () => _openForm(context, n, null),
-        ),
-        AdsPhase.loaded => SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: DataTable(
-            columns: const [
-              DataColumn(label: Text('제목')),
-              DataColumn(label: Text('슬롯')),
-              DataColumn(label: Text('가중치')),
-              DataColumn(label: Text('상태')),
-              DataColumn(label: Text('액션')),
+      body: Column(
+        children: [
+          DpPageHeader(
+            // 제목은 kAdminDestinations가 유일한 출처다(admin_shell.dart).
+            title: adminHeaderTitleFor('/ads'),
+            description: '하우스·스폰서 광고를 운영합니다',
+            actions: [
+              const Text('전역 노출'),
+              Switch(
+                value: s.globalEnabled,
+                onChanged: (v) => n.toggleGlobal(v),
+              ),
+              OutlinedButton(
+                onPressed: () => _openSlotConfig(context, n, s.slotConfigs),
+                child: const Text('슬롯 설정'),
+              ),
+              FilledButton.icon(
+                icon: const Icon(DpIcons.edit),
+                label: const Text('광고 생성'),
+                onPressed: () => _openForm(context, n, null),
+              ),
             ],
-            rows: [
-              for (final r in s.rows)
-                DataRow(
-                  cells: [
-                    DataCell(Text(r.title)),
-                    DataCell(Text(r.slot)),
-                    DataCell(Text('${r.weight}')),
-                    DataCell(
-                      Switch(
-                        value: r.status == 'ACTIVE',
-                        onChanged: (_) => n.toggleStatus(r),
-                      ),
-                    ),
-                    DataCell(
-                      Row(
-                        children: [
-                          IconButton(
-                            icon: const Icon(DpIcons.edit),
-                            tooltip: '수정',
-                            onPressed: () => _openForm(context, n, r),
-                          ),
-                          IconButton(
-                            icon: const Icon(DpIcons.dashboard),
-                            tooltip: '통계',
-                            onPressed: () => _openStats(context, r),
-                          ),
-                          IconButton(
-                            icon: const Icon(DpIcons.error),
-                            tooltip: '삭제',
-                            onPressed: () => n.remove(r.id!),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+            filters: [
+              const Text('슬롯:'),
+              for (final slot in _kSlots)
+                ChoiceChip(
+                  label: Text(slot),
+                  selected: s.slotFilter == slot,
+                  onSelected: (sel) => n.setSlotFilter(sel ? slot : null),
                 ),
             ],
           ),
-        ),
-      },
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 180),
+            child: s.selectedIds.isEmpty
+                ? const SizedBox.shrink()
+                : BulkActionBar(
+                    key: const Key('ads-bulk-bar'),
+                    count: s.selectedIds.length,
+                    actionLabel: '삭제',
+                    onAction: n.bulkDelete,
+                    onClear: n.clearSelection,
+                  ),
+          ),
+          Expanded(
+            child: switch (s.phase) {
+              AdsPhase.loading => const DpLoading(),
+              AdsPhase.failed => DpError(
+                message: s.error ?? '오류',
+                onRetry: n.load,
+              ),
+              AdsPhase.loaded when s.rows.isEmpty => DpEmpty(
+                icon: DpIcons.ads,
+                title: '광고가 없어요',
+                actionLabel: '광고 생성',
+                onAction: () => _openForm(context, n, null),
+              ),
+              AdsPhase.loaded => DpDataTable(
+                minWidth: 760,
+                showCheckboxColumn: true,
+                onSelectAll: (v) => n.selectAll(v ?? false),
+                columns: [
+                  DataColumn2(label: const Text('제목')),
+                  DataColumn2(label: const Text('슬롯')),
+                  DataColumn2(label: const Text('가중치')),
+                  DataColumn2(label: const Text('상태')),
+                  DataColumn2(label: const Text('액션'), fixedWidth: 64),
+                ],
+                rows: [
+                  for (final r in s.rows)
+                    DataRow2(
+                      selected: s.selectedIds.contains(r.id),
+                      onSelectChanged: (_) => n.toggleSelect(r.id!),
+                      cells: [
+                        DataCell(Text(r.title)),
+                        DataCell(Text(r.slot)),
+                        DataCell(Text('${r.weight}')),
+                        DataCell(
+                          Switch(
+                            value: r.status == 'ACTIVE',
+                            onChanged: (_) => n.toggleStatus(r),
+                          ),
+                        ),
+                        DataCell(_rowMenu(context, n, r)),
+                      ],
+                    ),
+                ],
+              ),
+            },
+          ),
+        ],
+      ),
     );
   }
 
@@ -146,10 +147,50 @@ class _AdsPageState extends ConsumerState<AdminAdsPage> {
     }
   }
 
+  Future<void> _openSlotConfig(
+    BuildContext context,
+    AdsController n,
+    List<AdSlotConfigRow> configs,
+  ) async {
+    final result = await showDialog<List<AdSlotConfigRow>>(
+      context: context,
+      builder: (_) => _SlotConfigDialog(configs: configs),
+    );
+    if (result == null) return;
+    for (final row in result) {
+      await n.saveSlotConfig(row);
+    }
+  }
+
   Future<void> _openStats(BuildContext context, AdRow row) async {
     await showDialog<void>(
       context: context,
       builder: (_) => _AdStatsDialog(adId: row.id!, title: row.title),
+    );
+  }
+
+  Widget _rowMenu(BuildContext context, AdsController n, AdRow r) {
+    return MenuAnchor(
+      builder: (context, controller, child) => IconButton(
+        icon: const Icon(DpIcons.moreVert),
+        tooltip: '작업',
+        onPressed: () =>
+            controller.isOpen ? controller.close() : controller.open(),
+      ),
+      menuChildren: [
+        MenuItemButton(
+          onPressed: () => _openForm(context, n, r),
+          child: const Text('수정'),
+        ),
+        MenuItemButton(
+          onPressed: () => _openStats(context, r),
+          child: const Text('통계'),
+        ),
+        MenuItemButton(
+          onPressed: () => n.remove(r.id!),
+          child: const Text('삭제'),
+        ),
+      ],
     );
   }
 }
@@ -358,6 +399,123 @@ class _AdStatsDialog extends ConsumerWidget {
           child: const Text('닫기'),
         ),
       ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 슬롯 설정 다이얼로그 — 슬롯별 광고 소스와 애드센스 단위 ID
+// ---------------------------------------------------------------------------
+const _kSourceLabels = {'HOUSE': '하우스 광고', 'ADSENSE': '애드센스', 'OFF': '끄기'};
+
+class _SlotConfigDialog extends StatefulWidget {
+  const _SlotConfigDialog({required this.configs});
+  final List<AdSlotConfigRow> configs;
+  @override
+  State<_SlotConfigDialog> createState() => _SlotConfigDialogState();
+}
+
+class _SlotConfigDialogState extends State<_SlotConfigDialog> {
+  late List<AdSlotConfigRow> _rows;
+  late final Map<String, TextEditingController> _unitIds;
+
+  @override
+  void initState() {
+    super.initState();
+    _rows = [...widget.configs];
+    _unitIds = {
+      for (final r in _rows)
+        r.slot: TextEditingController(text: r.adsenseSlotId ?? ''),
+    };
+  }
+
+  @override
+  void dispose() {
+    for (final c in _unitIds.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('슬롯 설정'),
+      content: SizedBox(
+        width: 520,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [for (var i = 0; i < _rows.length; i++) _row(context, i)],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('취소'),
+        ),
+        FilledButton(
+          onPressed: () {
+            final saved = [
+              for (final r in _rows)
+                r.copyWith(
+                  adsenseSlotId: _unitIds[r.slot]!.text.trim().isEmpty
+                      ? null
+                      : _unitIds[r.slot]!.text.trim(),
+                ),
+            ];
+            Navigator.of(context).pop(saved);
+          },
+          child: const Text('저장'),
+        ),
+      ],
+    );
+  }
+
+  Widget _row(BuildContext context, int i) {
+    final row = _rows[i];
+    final isAdsense = row.source == 'ADSENSE';
+    final unitIdEmpty = _unitIds[row.slot]!.text.trim().isEmpty;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: DpSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(row.slot, style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: DpSpacing.xs),
+          DropdownButtonFormField<String>(
+            initialValue: row.source,
+            decoration: const InputDecoration(labelText: '소스'),
+            items: [
+              for (final e in _kSourceLabels.entries)
+                DropdownMenuItem(value: e.key, child: Text(e.value)),
+            ],
+            onChanged: (v) => setState(() {
+              _rows[i] = row.copyWith(source: v ?? row.source);
+            }),
+          ),
+          if (isAdsense) ...[
+            const SizedBox(height: DpSpacing.xs),
+            TextField(
+              controller: _unitIds[row.slot],
+              decoration: const InputDecoration(labelText: '애드센스 단위 ID'),
+              onChanged: (_) => setState(() {}),
+            ),
+            if (unitIdEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: DpSpacing.xs),
+                child: Text(
+                  '단위 ID가 없으면 이 슬롯은 노출되지 않습니다',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: context.dpColors.warning,
+                  ),
+                ),
+              ),
+          ],
+        ],
+      ),
     );
   }
 }

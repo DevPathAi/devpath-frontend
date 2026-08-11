@@ -43,7 +43,7 @@ void main() {
               const CommunityPostSummary(
                 id: 1,
                 title: '실API 골든패스 질문',
-                answerCount: 2,
+                replyCount: 2,
               ),
             ],
           ),
@@ -56,8 +56,9 @@ void main() {
     // DONE 유저 → 게이트 통과 → /dashboard(초기 위치)
     expect(find.byType(DashboardPage), findsOneWidget);
 
-    // 셸 네비게이션: 커뮤니티 탭 → /community
-    await tester.tap(find.text('커뮤니티'));
+    // 셸 네비게이션: 커뮤니티 탭 → /community. 레일 라벨이 「커뮤니티」→「게시판」으로
+    // 바뀌어(Task 6) 텍스트 탐색 대신 목적지 index(3)의 rail-item 키로 찾는다.
+    await tester.tap(find.byKey(const ValueKey('rail-item-3')));
     await tester.pumpAndSettle();
 
     expect(find.byType(CommunityHomePage), findsOneWidget);

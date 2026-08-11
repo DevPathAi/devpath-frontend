@@ -18,7 +18,7 @@ final Map<String, MockFixture> _postsFx = {
         'authorId': 42,
         'solved': true,
         'upvoteCount': 3,
-        'answerCount': 2,
+        'replyCount': 2,
       },
     ],
   ),

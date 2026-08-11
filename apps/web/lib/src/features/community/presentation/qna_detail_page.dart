@@ -3,10 +3,14 @@ import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../auth/application/auth_controller.dart';
+import '../../auth/state/auth_state.dart';
 import '../application/qna_detail_controller.dart';
 import '../data/community_source.dart';
 import '../state/qna_detail_state.dart';
 import 'lcs_context.dart';
+import 'widgets/report_menu_button.dart';
+import '../../support/presentation/supportable_error.dart';
 
 class QnaDetailPage extends ConsumerStatefulWidget {
   const QnaDetailPage({super.key, required this.postId});
@@ -49,17 +53,28 @@ class _QnaDetailPageState extends ConsumerState<QnaDetailPage> {
     });
 
     final s = ref.watch(qnaDetailControllerProvider);
+    // 문서형 화면 — 헤더를 첫 sliver로 실어 본문과 함께 스크롤시킨다(DESIGN.md §9).
     return Scaffold(
-      appBar: AppBar(title: const Text('Q&A')),
-      body: switch (s) {
-        QnaLoading() => const DpLoading(),
-        QnaFailed(:final message) => DpError(message: message),
-        QnaLoaded(:final detail, :final submitting) => _Loaded(
-          detail: detail,
-          submitting: submitting,
-          answerCtrl: _answerCtrl,
-        ),
-      },
+      body: CustomScrollView(
+        slivers: [
+          const SliverToBoxAdapter(child: DpPageHeader(title: 'Q&A')),
+          switch (s) {
+            QnaLoading() => const SliverFillRemaining(
+              hasScrollBody: false,
+              child: DpLoading(),
+            ),
+            QnaFailed(:final message) => SliverFillRemaining(
+              hasScrollBody: false,
+              child: SupportableError(message: message),
+            ),
+            QnaLoaded(:final detail, :final submitting) => _Loaded(
+              detail: detail,
+              submitting: submitting,
+              answerCtrl: _answerCtrl,
+            ),
+          },
+        ],
+      ),
     );
   }
 }
@@ -80,70 +95,93 @@ class _Loaded extends ConsumerWidget {
     final c = context.dpColors;
     final notifier = ref.read(qnaDetailControllerProvider.notifier);
 
-    return ListView(
+    // 페이지의 `CustomScrollView`에 직접 실리는 **sliver**를 반환한다 —
+    // 여기서 `ListView`를 쓰면 중첩 스크롤이 되어 헤더가 밀려나지 않는다.
+    return SliverPadding(
       padding: const EdgeInsets.all(DpSpacing.lg),
-      children: [
-        Row(
-          children: [
-            if (detail.solved)
-              Padding(
-                padding: const EdgeInsets.only(right: DpSpacing.xs),
-                child: Icon(DpIcons.stepDone, color: c.success),
+      sliver: SliverList.list(
+        children: [
+          Row(
+            children: [
+              if (detail.solved)
+                Padding(
+                  padding: const EdgeInsets.only(right: DpSpacing.xs),
+                  child: Icon(DpIcons.stepDone, color: c.success),
+                ),
+              Expanded(
+                child: Text(
+                  detail.title,
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
               ),
-            Expanded(
-              child: Text(
-                detail.title,
-                style: Theme.of(context).textTheme.headlineSmall,
+              // QuestionDetailView 에는 작성자 id 가 없다(기존 계약) — 자기 글이어도 메뉴가
+              // 보이며, 그 경우 서버 400 을 전용 문구로 안내한다.
+              ReportMenuButton(
+                targetType: 'POST',
+                targetId: detail.id,
+                authorId: null,
+                currentUserId: _currentUserId(ref),
               ),
+            ],
+          ),
+          const SizedBox(height: DpSpacing.sm),
+          _VoteBar(
+            upvotes: detail.upvoteCount,
+            downvotes: detail.downvoteCount,
+            enabled: !submitting,
+            onVote: (v) =>
+                notifier.vote(CommunityVoteTarget.post, detail.id, v),
+          ),
+          const SizedBox(height: DpSpacing.md),
+          DpMarkdown(data: detail.bodyMd),
+          const SizedBox(height: DpSpacing.sm),
+          LcsAnswererPanel(questionId: detail.id),
+          if (detail.tags.isNotEmpty) ...[
+            const SizedBox(height: DpSpacing.md),
+            Wrap(
+              spacing: DpSpacing.xs,
+              // 게시글 상세와 같은 요소이므로 같은 배선을 쓴다 — DpTag가 tag* 토큰의
+              // 유일한 배선 지점이다(3-A 스펙 §7.2). 조사 단계에서 이 한 곳이 누락돼
+              // 형제 화면끼리 태그 칩 색이 갈려 있었다.
+              children: [for (final t in detail.tags) DpTag(label: '#$t')],
             ),
           ],
-        ),
-        const SizedBox(height: DpSpacing.sm),
-        _VoteBar(
-          upvotes: detail.upvoteCount,
-          downvotes: detail.downvoteCount,
-          enabled: !submitting,
-          onVote: (v) => notifier.vote(CommunityVoteTarget.post, detail.id, v),
-        ),
-        const SizedBox(height: DpSpacing.md),
-        DpMarkdown(data: detail.bodyMd),
-        const SizedBox(height: DpSpacing.sm),
-        LcsAnswererPanel(questionId: detail.id),
-        if (detail.tags.isNotEmpty) ...[
-          const SizedBox(height: DpSpacing.md),
-          Wrap(
-            spacing: DpSpacing.xs,
-            children: [for (final t in detail.tags) Chip(label: Text('#$t'))],
+          const Divider(height: DpSpacing.xl),
+          Text(
+            '답변 ${detail.answers.length}',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: DpSpacing.sm),
+          for (final a in detail.answers)
+            _AnswerCard(
+              answer: a,
+              questionSolved: detail.solved,
+              submitting: submitting,
+              currentUserId: _currentUserId(ref),
+              onVote: (v) => notifier.vote(CommunityVoteTarget.answer, a.id, v),
+              onAccept: () => notifier.accept(a.id),
+            ),
+          const SizedBox(height: DpSpacing.lg),
+          _AnswerComposer(
+            controller: answerCtrl,
+            submitting: submitting,
+            onSubmit: () {
+              final body = answerCtrl.text.trim();
+              if (body.isEmpty) return;
+              notifier.submitAnswer(body);
+              answerCtrl.clear();
+            },
           ),
         ],
-        const Divider(height: DpSpacing.xl),
-        Text(
-          '답변 ${detail.answers.length}',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        const SizedBox(height: DpSpacing.sm),
-        for (final a in detail.answers)
-          _AnswerCard(
-            answer: a,
-            questionSolved: detail.solved,
-            submitting: submitting,
-            onVote: (v) => notifier.vote(CommunityVoteTarget.answer, a.id, v),
-            onAccept: () => notifier.accept(a.id),
-          ),
-        const SizedBox(height: DpSpacing.lg),
-        _AnswerComposer(
-          controller: answerCtrl,
-          submitting: submitting,
-          onSubmit: () {
-            final body = answerCtrl.text.trim();
-            if (body.isEmpty) return;
-            notifier.submitAnswer(body);
-            answerCtrl.clear();
-          },
-        ),
-      ],
+      ),
     );
   }
+}
+
+/// 현재 로그인 사용자 id(문자열). 미인증이면 null. 자기 콘텐츠 신고 메뉴를 감추는 데 쓴다.
+String? _currentUserId(WidgetRef ref) {
+  final auth = ref.watch(authControllerProvider);
+  return auth is AuthAuthenticated ? auth.user.id : null;
 }
 
 class _AnswerCard extends StatelessWidget {
@@ -151,6 +189,7 @@ class _AnswerCard extends StatelessWidget {
     required this.answer,
     required this.questionSolved,
     required this.submitting,
+    required this.currentUserId,
     required this.onVote,
     required this.onAccept,
   });
@@ -158,6 +197,7 @@ class _AnswerCard extends StatelessWidget {
   final CommunityAnswer answer;
   final bool questionSolved;
   final bool submitting;
+  final String? currentUserId;
   final ValueChanged<int> onVote;
   final VoidCallback onAccept;
 
@@ -211,6 +251,13 @@ class _AnswerCard extends StatelessWidget {
                     onPressed: submitting ? null : onAccept,
                     child: const Text('채택'),
                   ),
+                // AI 초안은 authorId 가 null 이라 항상 신고할 수 있다(서버도 허용한다).
+                ReportMenuButton(
+                  targetType: 'ANSWER',
+                  targetId: answer.id,
+                  authorId: answer.authorId,
+                  currentUserId: currentUserId,
+                ),
               ],
             ),
             const SizedBox(height: DpSpacing.xs),

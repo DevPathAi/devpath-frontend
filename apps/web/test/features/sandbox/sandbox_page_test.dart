@@ -37,6 +37,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(MonacoEditorView), findsOneWidget);
+
+    // 2단계 스펙 §5가 지정한 유일한 제목 변경(Sandbox → 실습 샌드박스)을 회귀 고정한다
+    // — 그 전까지 이 변경에는 테스트가 없었다.
+    final header = tester.widget<DpPageHeader>(find.byType(DpPageHeader));
+    expect(header.title, '실습 샌드박스');
+    expect(header.description, '코드를 작성하고 바로 실행해 봅니다');
+
     await tester.tap(find.text('실행'));
     await tester.pumpAndSettle();
     expect(find.textContaining('실행 결과: OK'), findsOneWidget);

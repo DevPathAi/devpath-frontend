@@ -13,7 +13,8 @@ class DpKillSwitch extends StatelessWidget {
   @override
   Widget build(BuildContext context) => DpStateScaffold(
     icon: DpIcons.killSwitch,
-    iconColor: context.dpColors.warning,
+    // 서비스 상태는 사용자 잘못도 위험도 아니다 → 중립. (경고색은 진짜 경고 전용)
+    iconColor: context.dpColors.textSecondary,
     title: 'AI 기능이 잠시 점검 중이에요',
     message: '곧 복구됩니다. 그동안 다른 학습을 이어가 보세요.',
     actionLabel: altActionLabel,

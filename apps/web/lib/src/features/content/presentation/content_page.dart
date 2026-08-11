@@ -13,6 +13,7 @@ import '../../ads/presentation/ad_slot_widget.dart';
 import '../../dashboard/application/dashboard_controller.dart';
 import '../../path/application/path_controller.dart';
 import '../../../providers/api_providers.dart';
+import '../../support/presentation/supportable_error.dart';
 
 class ContentPage extends ConsumerStatefulWidget {
   const ContentPage({super.key, required this.contentId});
@@ -25,6 +26,11 @@ class ContentPage extends ConsumerStatefulWidget {
 class _ContentPageState extends ConsumerState<ContentPage>
     with WidgetsBindingObserver {
   final _scrollController = ScrollController();
+  // _scrollPct의 헤더 높이 보정에 쓴다 — DpPageHeader가 CustomScrollView의
+  // 첫 sliver로 실려 있어 _scrollController가 헤더+본문 전체 스크롤 범위를
+  // 관측한다(Task 10). 이 키로 헤더가 실제로 차지하는 박스 높이를 재서 서버로
+  // 보내는 진행률에서 빼낸다.
+  final _headerKey = GlobalKey();
   late final ContentController _contentController;
   late final ApiClient _apiClient;
   Timer? _dwellTimer;
@@ -33,6 +39,10 @@ class _ContentPageState extends ConsumerState<ContentPage>
   ContentState? _latestState;
   int _dwellSec = 0;
   bool _posting = false;
+
+  /// 마지막으로 실측에 성공한 스크롤 진행률. dispose 시점에는 스크롤 위치를
+  /// 잴 수 없어(자식 먼저 unmount → `hasClients == false`) 이 값이 필요하다.
+  double? _lastObservedScrollPct;
 
   @override
   void initState() {
@@ -91,28 +101,53 @@ class _ContentPageState extends ConsumerState<ContentPage>
         _syncTracker(content);
       }
     });
+    final c = context.dpColors;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('학습 콘텐츠'),
-        actions: [
-          TextButton.icon(
-            onPressed: () => context.go('/sandbox'),
-            icon: const Icon(DpIcons.code),
-            label: const Text('실습'),
+      body: CustomScrollView(
+        // 진행률 추적(_scrollPct)이 이 컨트롤러 하나로 헤더+본문 전체 스크롤
+        // 범위를 관측한다 — 본문에 별도 스크롤 위젯을 두면 중첩 스크롤이 되어
+        // 헤더가 스크롤과 함께 사라지지 않는다.
+        controller: _scrollController,
+        slivers: [
+          SliverToBoxAdapter(
+            child: DpPageHeader(
+              key: _headerKey,
+              title: '학습 콘텐츠',
+              description: '읽고 나면 바로 실습으로 이어집니다',
+              actions: [
+                TextButton.icon(
+                  key: const ValueKey('content-practice-action'),
+                  onPressed: () => context.go('/sandbox'),
+                  style: TextButton.styleFrom(
+                    backgroundColor: c.accentSoft,
+                    foregroundColor: c.primaryText,
+                    side: BorderSide(color: c.accentLine),
+                  ),
+                  icon: const Icon(DpIcons.code),
+                  label: const Text('실습'),
+                ),
+              ],
+            ),
           ),
+          switch (s) {
+            ContentLoading() => const SliverFillRemaining(
+              hasScrollBody: false,
+              child: DpLoading(),
+            ),
+            ContentFailed(:final message) => SliverFillRemaining(
+              hasScrollBody: false,
+              child: SupportableError(
+                message: message,
+                onRetry: () => _contentController.load(widget.contentId),
+              ),
+            ),
+            ContentLoaded(:final content) => SliverPadding(
+              padding: const EdgeInsets.all(DpSpacing.lg),
+              sliver: SliverToBoxAdapter(child: _ContentBody(content: content)),
+            ),
+          },
         ],
       ),
-      body: switch (s) {
-        ContentLoading() => const DpLoading(),
-        ContentFailed(:final message) => DpError(
-          message: message,
-          onRetry: () => _contentController.load(widget.contentId),
-        ),
-        ContentLoaded(:final content) => _ContentBody(
-          controller: _scrollController,
-          content: content,
-        ),
-      },
     );
   }
 
@@ -136,6 +171,8 @@ class _ContentPageState extends ConsumerState<ContentPage>
     _trackedContentKey = null;
     _dwellSec = 0;
     _posting = false;
+    // 다른 콘텐츠로 넘어가면 이전 글의 진행률이 새어나가면 안 된다.
+    _lastObservedScrollPct = null;
   }
 
   void _maybeFlushProgress({bool force = false}) {
@@ -153,11 +190,53 @@ class _ContentPageState extends ConsumerState<ContentPage>
     if (flush != null) unawaited(_postProgress(flush));
   }
 
+  /// [_scrollController]가 붙는 [CustomScrollView]는 헤더+본문을 함께
+  /// 스크롤한다(Task 10) — `pixels`/`maxScrollExtent`를 보정 없이 쓰면 분자·
+  /// 분모 양쪽에 헤더 높이(headerH)가 똑같이 더해져, 서버로 보내는 진행률이
+  /// 실제(본문 기준)보다 **부풀려진다**(1에 더 가깝게 나온다) — 같은 상수를
+  /// 분자·분모에 더하면 원래 비율이 1보다 작을 때 그 비율은 항상 커진다.
+  ///
+  /// 예: 헤더 80px, 본문만 스크롤하던 옛 구조의 max가 1000px이라 하자.
+  /// 본문을 500px 스크롤한 지점은 옛 의미로 pctOld = 500/1000 = 0.5다.
+  /// 지금 구조에서 같은 본문 위치는 pixelsNew = 500+80 = 580,
+  /// maxNew = 1000+80 = 1080이라 보정 없이 580/1080 ≈ 0.537을 보낸다 —
+  /// 0.5가 아니라 그보다 큰 값이다. 끝까지 스크롤(pixelsNew==maxNew)할
+  /// 때만 우연히 1.0으로 맞아떨어지고(완료 판정은 안전), 그 전 모든
+  /// 중간값은 항상 실제보다 부풀려져 나간다(실측: 헤더 보정 없이 50%
+  /// 지점을 스크롤하면 약 0.514가 전송됨 — 아래 회귀 테스트 참조).
+  ///
+  /// headerH를 [_headerKey]로 실측해 양쪽에서 빼면 옛 의미가 그대로
+  /// 복원된다: pctOld = (pixelsNew - headerH) / (maxNew - headerH)
+  /// = (580-80)/(1080-80) = 500/1000 = 0.5. 헤더가 아직 레이아웃되지 않아
+  /// 높이를 잴 수 없으면(initState 직후 등) 서버가 마지막으로 보낸 값을
+  /// 그대로 폴백한다.
+  /// ★dispose 경로에서는 이 함수가 실제 위치를 잴 수 없다.★ Element 트리는
+  /// 자식부터 unmount되므로 [dispose]가 도는 시점에는 `Scrollable`이 이미
+  /// 정리돼 `hasClients == false`다. 그때 서버가 마지막으로 준 값을 폴백으로
+  /// 돌려주면, 그 값이 [ContentProgressTracker.record]를 거치며 tracker에
+  /// 쌓여 있던 **최신 진행률을 덮어쓴다**(정기 flush 임계가 0.1이라 최대 10%가
+  /// 매번 유실되고, 완료 임계 0.8 근처에서는 완료 처리가 지연된다).
+  /// 그래서 마지막으로 **실측에 성공한** 값을 [_lastObservedScrollPct]에 남겨
+  /// 폴백보다 먼저 쓴다.
   double _scrollPct(double fallback) {
-    if (!_scrollController.hasClients) return fallback;
+    if (!_scrollController.hasClients) {
+      return _lastObservedScrollPct ?? fallback;
+    }
     final position = _scrollController.position;
-    if (position.maxScrollExtent <= 0) return 1;
-    return (position.pixels / position.maxScrollExtent).clamp(0, 1).toDouble();
+    final headerHeight = _headerHeight;
+    if (headerHeight == null) return _lastObservedScrollPct ?? fallback;
+    final maxExtent = position.maxScrollExtent - headerHeight;
+    if (maxExtent <= 0) return 1;
+    final pixels = position.pixels - headerHeight;
+    final pct = (pixels / maxExtent).clamp(0, 1).toDouble();
+    _lastObservedScrollPct = pct;
+    return pct;
+  }
+
+  double? get _headerHeight {
+    final box = _headerKey.currentContext?.findRenderObject();
+    if (box is! RenderBox || !box.hasSize) return null;
+    return box.size.height;
   }
 
   Future<void> _postProgress(ContentProgressFlush flush) async {
@@ -203,9 +282,8 @@ class _ContentPageState extends ConsumerState<ContentPage>
 }
 
 class _ContentBody extends StatelessWidget {
-  const _ContentBody({required this.controller, required this.content});
+  const _ContentBody({required this.content});
 
-  final ScrollController controller;
   final LearningContent content;
 
   @override
@@ -220,54 +298,49 @@ class _ContentBody extends StatelessWidget {
       if (content.difficulty != null) '난이도 ${content.difficulty}',
     ];
 
-    return SingleChildScrollView(
-      controller: controller,
-      padding: const EdgeInsets.all(DpSpacing.lg),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 840),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(content.title, style: text.headlineSmall),
-              const SizedBox(height: DpSpacing.sm),
-              if (meta.isNotEmpty)
-                Text(
-                  meta.join(' · '),
-                  style: text.bodySmall?.copyWith(color: colors.textSecondary),
-                ),
-              const SizedBox(height: DpSpacing.md),
-              Row(
-                children: [
-                  Expanded(
-                    child: LinearProgressIndicator(
-                      value: progress.scrollPct.clamp(0, 1).toDouble(),
-                    ),
-                  ),
-                  const SizedBox(width: DpSpacing.sm),
-                  Text(
-                    progress.completed ? '완료' : '$percent% 진행',
-                    style: text.labelMedium,
-                  ),
-                ],
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 840),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(content.title, style: text.headlineSmall),
+            const SizedBox(height: DpSpacing.sm),
+            if (meta.isNotEmpty)
+              Text(
+                meta.join(' · '),
+                style: text.bodySmall?.copyWith(color: colors.textSecondary),
               ),
-              if (content.conceptTags.isNotEmpty) ...[
-                const SizedBox(height: DpSpacing.md),
-                Wrap(
-                  spacing: DpSpacing.xs,
-                  runSpacing: DpSpacing.xs,
-                  children: [
-                    for (final tag in content.conceptTags)
-                      Chip(label: Text(tag)),
-                  ],
+            const SizedBox(height: DpSpacing.md),
+            Row(
+              children: [
+                Expanded(
+                  child: LinearProgressIndicator(
+                    value: progress.scrollPct.clamp(0, 1).toDouble(),
+                  ),
+                ),
+                const SizedBox(width: DpSpacing.sm),
+                Text(
+                  progress.completed ? '완료' : '$percent% 진행',
+                  style: text.labelMedium,
                 ),
               ],
-              const SizedBox(height: DpSpacing.xl),
-              DpMarkdown(data: content.markdown),
-              const SizedBox(height: DpSpacing.lg),
-              const AdSlotWidget(slot: 'CONTENT_PAGE'),
+            ),
+            if (content.conceptTags.isNotEmpty) ...[
+              const SizedBox(height: DpSpacing.md),
+              Wrap(
+                spacing: DpSpacing.xs,
+                runSpacing: DpSpacing.xs,
+                children: [
+                  for (final tag in content.conceptTags) Chip(label: Text(tag)),
+                ],
+              ),
             ],
-          ),
+            const SizedBox(height: DpSpacing.xl),
+            DpMarkdown(data: content.markdown),
+            const SizedBox(height: DpSpacing.lg),
+            const AdSlotWidget(slot: 'CONTENT_PAGE'),
+          ],
         ),
       ),
     );

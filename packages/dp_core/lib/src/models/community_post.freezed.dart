@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$CommunityPostSummary {
 
- int get id; String get title; int? get authorId; bool get solved; int get upvoteCount; int get answerCount;
+ int get id; String get title; String get boardType; int? get authorId; bool get solved; int get upvoteCount; int get replyCount; String get excerpt;
 /// Create a copy of CommunityPostSummary
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -28,16 +28,16 @@ $CommunityPostSummaryCopyWith<CommunityPostSummary> get copyWith => _$CommunityP
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is CommunityPostSummary&&(identical(other.id, id) || other.id == id)&&(identical(other.title, title) || other.title == title)&&(identical(other.authorId, authorId) || other.authorId == authorId)&&(identical(other.solved, solved) || other.solved == solved)&&(identical(other.upvoteCount, upvoteCount) || other.upvoteCount == upvoteCount)&&(identical(other.answerCount, answerCount) || other.answerCount == answerCount));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is CommunityPostSummary&&(identical(other.id, id) || other.id == id)&&(identical(other.title, title) || other.title == title)&&(identical(other.boardType, boardType) || other.boardType == boardType)&&(identical(other.authorId, authorId) || other.authorId == authorId)&&(identical(other.solved, solved) || other.solved == solved)&&(identical(other.upvoteCount, upvoteCount) || other.upvoteCount == upvoteCount)&&(identical(other.replyCount, replyCount) || other.replyCount == replyCount)&&(identical(other.excerpt, excerpt) || other.excerpt == excerpt));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,title,authorId,solved,upvoteCount,answerCount);
+int get hashCode => Object.hash(runtimeType,id,title,boardType,authorId,solved,upvoteCount,replyCount,excerpt);
 
 @override
 String toString() {
-  return 'CommunityPostSummary(id: $id, title: $title, authorId: $authorId, solved: $solved, upvoteCount: $upvoteCount, answerCount: $answerCount)';
+  return 'CommunityPostSummary(id: $id, title: $title, boardType: $boardType, authorId: $authorId, solved: $solved, upvoteCount: $upvoteCount, replyCount: $replyCount, excerpt: $excerpt)';
 }
 
 
@@ -48,7 +48,7 @@ abstract mixin class $CommunityPostSummaryCopyWith<$Res>  {
   factory $CommunityPostSummaryCopyWith(CommunityPostSummary value, $Res Function(CommunityPostSummary) _then) = _$CommunityPostSummaryCopyWithImpl;
 @useResult
 $Res call({
- int id, String title, int? authorId, bool solved, int upvoteCount, int answerCount
+ int id, String title, String boardType, int? authorId, bool solved, int upvoteCount, int replyCount, String excerpt
 });
 
 
@@ -65,15 +65,17 @@ class _$CommunityPostSummaryCopyWithImpl<$Res>
 
 /// Create a copy of CommunityPostSummary
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? title = null,Object? authorId = freezed,Object? solved = null,Object? upvoteCount = null,Object? answerCount = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? title = null,Object? boardType = null,Object? authorId = freezed,Object? solved = null,Object? upvoteCount = null,Object? replyCount = null,Object? excerpt = null,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,title: null == title ? _self.title : title // ignore: cast_nullable_to_non_nullable
+as String,boardType: null == boardType ? _self.boardType : boardType // ignore: cast_nullable_to_non_nullable
 as String,authorId: freezed == authorId ? _self.authorId : authorId // ignore: cast_nullable_to_non_nullable
 as int?,solved: null == solved ? _self.solved : solved // ignore: cast_nullable_to_non_nullable
 as bool,upvoteCount: null == upvoteCount ? _self.upvoteCount : upvoteCount // ignore: cast_nullable_to_non_nullable
-as int,answerCount: null == answerCount ? _self.answerCount : answerCount // ignore: cast_nullable_to_non_nullable
-as int,
+as int,replyCount: null == replyCount ? _self.replyCount : replyCount // ignore: cast_nullable_to_non_nullable
+as int,excerpt: null == excerpt ? _self.excerpt : excerpt // ignore: cast_nullable_to_non_nullable
+as String,
   ));
 }
 
@@ -158,10 +160,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String title,  int? authorId,  bool solved,  int upvoteCount,  int answerCount)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String title,  String boardType,  int? authorId,  bool solved,  int upvoteCount,  int replyCount,  String excerpt)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _CommunityPostSummary() when $default != null:
-return $default(_that.id,_that.title,_that.authorId,_that.solved,_that.upvoteCount,_that.answerCount);case _:
+return $default(_that.id,_that.title,_that.boardType,_that.authorId,_that.solved,_that.upvoteCount,_that.replyCount,_that.excerpt);case _:
   return orElse();
 
 }
@@ -179,10 +181,10 @@ return $default(_that.id,_that.title,_that.authorId,_that.solved,_that.upvoteCou
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String title,  int? authorId,  bool solved,  int upvoteCount,  int answerCount)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String title,  String boardType,  int? authorId,  bool solved,  int upvoteCount,  int replyCount,  String excerpt)  $default,) {final _that = this;
 switch (_that) {
 case _CommunityPostSummary():
-return $default(_that.id,_that.title,_that.authorId,_that.solved,_that.upvoteCount,_that.answerCount);case _:
+return $default(_that.id,_that.title,_that.boardType,_that.authorId,_that.solved,_that.upvoteCount,_that.replyCount,_that.excerpt);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -199,10 +201,10 @@ return $default(_that.id,_that.title,_that.authorId,_that.solved,_that.upvoteCou
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String title,  int? authorId,  bool solved,  int upvoteCount,  int answerCount)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String title,  String boardType,  int? authorId,  bool solved,  int upvoteCount,  int replyCount,  String excerpt)?  $default,) {final _that = this;
 switch (_that) {
 case _CommunityPostSummary() when $default != null:
-return $default(_that.id,_that.title,_that.authorId,_that.solved,_that.upvoteCount,_that.answerCount);case _:
+return $default(_that.id,_that.title,_that.boardType,_that.authorId,_that.solved,_that.upvoteCount,_that.replyCount,_that.excerpt);case _:
   return null;
 
 }
@@ -214,15 +216,17 @@ return $default(_that.id,_that.title,_that.authorId,_that.solved,_that.upvoteCou
 @JsonSerializable()
 
 class _CommunityPostSummary implements CommunityPostSummary {
-  const _CommunityPostSummary({required this.id, required this.title, this.authorId, this.solved = false, this.upvoteCount = 0, this.answerCount = 0});
+  const _CommunityPostSummary({required this.id, required this.title, this.boardType = 'QNA', this.authorId, this.solved = false, this.upvoteCount = 0, this.replyCount = 0, this.excerpt = ''});
   factory _CommunityPostSummary.fromJson(Map<String, dynamic> json) => _$CommunityPostSummaryFromJson(json);
 
 @override final  int id;
 @override final  String title;
+@override@JsonKey() final  String boardType;
 @override final  int? authorId;
 @override@JsonKey() final  bool solved;
 @override@JsonKey() final  int upvoteCount;
-@override@JsonKey() final  int answerCount;
+@override@JsonKey() final  int replyCount;
+@override@JsonKey() final  String excerpt;
 
 /// Create a copy of CommunityPostSummary
 /// with the given fields replaced by the non-null parameter values.
@@ -237,16 +241,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _CommunityPostSummary&&(identical(other.id, id) || other.id == id)&&(identical(other.title, title) || other.title == title)&&(identical(other.authorId, authorId) || other.authorId == authorId)&&(identical(other.solved, solved) || other.solved == solved)&&(identical(other.upvoteCount, upvoteCount) || other.upvoteCount == upvoteCount)&&(identical(other.answerCount, answerCount) || other.answerCount == answerCount));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _CommunityPostSummary&&(identical(other.id, id) || other.id == id)&&(identical(other.title, title) || other.title == title)&&(identical(other.boardType, boardType) || other.boardType == boardType)&&(identical(other.authorId, authorId) || other.authorId == authorId)&&(identical(other.solved, solved) || other.solved == solved)&&(identical(other.upvoteCount, upvoteCount) || other.upvoteCount == upvoteCount)&&(identical(other.replyCount, replyCount) || other.replyCount == replyCount)&&(identical(other.excerpt, excerpt) || other.excerpt == excerpt));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,title,authorId,solved,upvoteCount,answerCount);
+int get hashCode => Object.hash(runtimeType,id,title,boardType,authorId,solved,upvoteCount,replyCount,excerpt);
 
 @override
 String toString() {
-  return 'CommunityPostSummary(id: $id, title: $title, authorId: $authorId, solved: $solved, upvoteCount: $upvoteCount, answerCount: $answerCount)';
+  return 'CommunityPostSummary(id: $id, title: $title, boardType: $boardType, authorId: $authorId, solved: $solved, upvoteCount: $upvoteCount, replyCount: $replyCount, excerpt: $excerpt)';
 }
 
 
@@ -257,7 +261,7 @@ abstract mixin class _$CommunityPostSummaryCopyWith<$Res> implements $CommunityP
   factory _$CommunityPostSummaryCopyWith(_CommunityPostSummary value, $Res Function(_CommunityPostSummary) _then) = __$CommunityPostSummaryCopyWithImpl;
 @override @useResult
 $Res call({
- int id, String title, int? authorId, bool solved, int upvoteCount, int answerCount
+ int id, String title, String boardType, int? authorId, bool solved, int upvoteCount, int replyCount, String excerpt
 });
 
 
@@ -274,15 +278,17 @@ class __$CommunityPostSummaryCopyWithImpl<$Res>
 
 /// Create a copy of CommunityPostSummary
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? title = null,Object? authorId = freezed,Object? solved = null,Object? upvoteCount = null,Object? answerCount = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? title = null,Object? boardType = null,Object? authorId = freezed,Object? solved = null,Object? upvoteCount = null,Object? replyCount = null,Object? excerpt = null,}) {
   return _then(_CommunityPostSummary(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,title: null == title ? _self.title : title // ignore: cast_nullable_to_non_nullable
+as String,boardType: null == boardType ? _self.boardType : boardType // ignore: cast_nullable_to_non_nullable
 as String,authorId: freezed == authorId ? _self.authorId : authorId // ignore: cast_nullable_to_non_nullable
 as int?,solved: null == solved ? _self.solved : solved // ignore: cast_nullable_to_non_nullable
 as bool,upvoteCount: null == upvoteCount ? _self.upvoteCount : upvoteCount // ignore: cast_nullable_to_non_nullable
-as int,answerCount: null == answerCount ? _self.answerCount : answerCount // ignore: cast_nullable_to_non_nullable
-as int,
+as int,replyCount: null == replyCount ? _self.replyCount : replyCount // ignore: cast_nullable_to_non_nullable
+as int,excerpt: null == excerpt ? _self.excerpt : excerpt // ignore: cast_nullable_to_non_nullable
+as String,
   ));
 }
 
@@ -1395,6 +1401,580 @@ id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
 as String,postCount: null == postCount ? _self.postCount : postCount // ignore: cast_nullable_to_non_nullable
 as int,
+  ));
+}
+
+
+}
+
+
+/// @nodoc
+mixin _$CommunityPostDetail {
+
+ int get id; String get boardType; String get title; String get bodyMd; int? get authorId; int get upvoteCount; int get downvoteCount; List<String> get tags; List<CommunityComment> get comments;
+/// Create a copy of CommunityPostDetail
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$CommunityPostDetailCopyWith<CommunityPostDetail> get copyWith => _$CommunityPostDetailCopyWithImpl<CommunityPostDetail>(this as CommunityPostDetail, _$identity);
+
+  /// Serializes this CommunityPostDetail to a JSON map.
+  Map<String, dynamic> toJson();
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is CommunityPostDetail&&(identical(other.id, id) || other.id == id)&&(identical(other.boardType, boardType) || other.boardType == boardType)&&(identical(other.title, title) || other.title == title)&&(identical(other.bodyMd, bodyMd) || other.bodyMd == bodyMd)&&(identical(other.authorId, authorId) || other.authorId == authorId)&&(identical(other.upvoteCount, upvoteCount) || other.upvoteCount == upvoteCount)&&(identical(other.downvoteCount, downvoteCount) || other.downvoteCount == downvoteCount)&&const DeepCollectionEquality().equals(other.tags, tags)&&const DeepCollectionEquality().equals(other.comments, comments));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,id,boardType,title,bodyMd,authorId,upvoteCount,downvoteCount,const DeepCollectionEquality().hash(tags),const DeepCollectionEquality().hash(comments));
+
+@override
+String toString() {
+  return 'CommunityPostDetail(id: $id, boardType: $boardType, title: $title, bodyMd: $bodyMd, authorId: $authorId, upvoteCount: $upvoteCount, downvoteCount: $downvoteCount, tags: $tags, comments: $comments)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $CommunityPostDetailCopyWith<$Res>  {
+  factory $CommunityPostDetailCopyWith(CommunityPostDetail value, $Res Function(CommunityPostDetail) _then) = _$CommunityPostDetailCopyWithImpl;
+@useResult
+$Res call({
+ int id, String boardType, String title, String bodyMd, int? authorId, int upvoteCount, int downvoteCount, List<String> tags, List<CommunityComment> comments
+});
+
+
+
+
+}
+/// @nodoc
+class _$CommunityPostDetailCopyWithImpl<$Res>
+    implements $CommunityPostDetailCopyWith<$Res> {
+  _$CommunityPostDetailCopyWithImpl(this._self, this._then);
+
+  final CommunityPostDetail _self;
+  final $Res Function(CommunityPostDetail) _then;
+
+/// Create a copy of CommunityPostDetail
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? boardType = null,Object? title = null,Object? bodyMd = null,Object? authorId = freezed,Object? upvoteCount = null,Object? downvoteCount = null,Object? tags = null,Object? comments = null,}) {
+  return _then(_self.copyWith(
+id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
+as int,boardType: null == boardType ? _self.boardType : boardType // ignore: cast_nullable_to_non_nullable
+as String,title: null == title ? _self.title : title // ignore: cast_nullable_to_non_nullable
+as String,bodyMd: null == bodyMd ? _self.bodyMd : bodyMd // ignore: cast_nullable_to_non_nullable
+as String,authorId: freezed == authorId ? _self.authorId : authorId // ignore: cast_nullable_to_non_nullable
+as int?,upvoteCount: null == upvoteCount ? _self.upvoteCount : upvoteCount // ignore: cast_nullable_to_non_nullable
+as int,downvoteCount: null == downvoteCount ? _self.downvoteCount : downvoteCount // ignore: cast_nullable_to_non_nullable
+as int,tags: null == tags ? _self.tags : tags // ignore: cast_nullable_to_non_nullable
+as List<String>,comments: null == comments ? _self.comments : comments // ignore: cast_nullable_to_non_nullable
+as List<CommunityComment>,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [CommunityPostDetail].
+extension CommunityPostDetailPatterns on CommunityPostDetail {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _CommunityPostDetail value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _CommunityPostDetail() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _CommunityPostDetail value)  $default,){
+final _that = this;
+switch (_that) {
+case _CommunityPostDetail():
+return $default(_that);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _CommunityPostDetail value)?  $default,){
+final _that = this;
+switch (_that) {
+case _CommunityPostDetail() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String boardType,  String title,  String bodyMd,  int? authorId,  int upvoteCount,  int downvoteCount,  List<String> tags,  List<CommunityComment> comments)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _CommunityPostDetail() when $default != null:
+return $default(_that.id,_that.boardType,_that.title,_that.bodyMd,_that.authorId,_that.upvoteCount,_that.downvoteCount,_that.tags,_that.comments);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String boardType,  String title,  String bodyMd,  int? authorId,  int upvoteCount,  int downvoteCount,  List<String> tags,  List<CommunityComment> comments)  $default,) {final _that = this;
+switch (_that) {
+case _CommunityPostDetail():
+return $default(_that.id,_that.boardType,_that.title,_that.bodyMd,_that.authorId,_that.upvoteCount,_that.downvoteCount,_that.tags,_that.comments);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String boardType,  String title,  String bodyMd,  int? authorId,  int upvoteCount,  int downvoteCount,  List<String> tags,  List<CommunityComment> comments)?  $default,) {final _that = this;
+switch (_that) {
+case _CommunityPostDetail() when $default != null:
+return $default(_that.id,_that.boardType,_that.title,_that.bodyMd,_that.authorId,_that.upvoteCount,_that.downvoteCount,_that.tags,_that.comments);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+@JsonSerializable()
+
+class _CommunityPostDetail implements CommunityPostDetail {
+  const _CommunityPostDetail({required this.id, required this.boardType, required this.title, required this.bodyMd, this.authorId, this.upvoteCount = 0, this.downvoteCount = 0, final  List<String> tags = const <String>[], final  List<CommunityComment> comments = const <CommunityComment>[]}): _tags = tags,_comments = comments;
+  factory _CommunityPostDetail.fromJson(Map<String, dynamic> json) => _$CommunityPostDetailFromJson(json);
+
+@override final  int id;
+@override final  String boardType;
+@override final  String title;
+@override final  String bodyMd;
+@override final  int? authorId;
+@override@JsonKey() final  int upvoteCount;
+@override@JsonKey() final  int downvoteCount;
+ final  List<String> _tags;
+@override@JsonKey() List<String> get tags {
+  if (_tags is EqualUnmodifiableListView) return _tags;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_tags);
+}
+
+ final  List<CommunityComment> _comments;
+@override@JsonKey() List<CommunityComment> get comments {
+  if (_comments is EqualUnmodifiableListView) return _comments;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_comments);
+}
+
+
+/// Create a copy of CommunityPostDetail
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$CommunityPostDetailCopyWith<_CommunityPostDetail> get copyWith => __$CommunityPostDetailCopyWithImpl<_CommunityPostDetail>(this, _$identity);
+
+@override
+Map<String, dynamic> toJson() {
+  return _$CommunityPostDetailToJson(this, );
+}
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _CommunityPostDetail&&(identical(other.id, id) || other.id == id)&&(identical(other.boardType, boardType) || other.boardType == boardType)&&(identical(other.title, title) || other.title == title)&&(identical(other.bodyMd, bodyMd) || other.bodyMd == bodyMd)&&(identical(other.authorId, authorId) || other.authorId == authorId)&&(identical(other.upvoteCount, upvoteCount) || other.upvoteCount == upvoteCount)&&(identical(other.downvoteCount, downvoteCount) || other.downvoteCount == downvoteCount)&&const DeepCollectionEquality().equals(other._tags, _tags)&&const DeepCollectionEquality().equals(other._comments, _comments));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,id,boardType,title,bodyMd,authorId,upvoteCount,downvoteCount,const DeepCollectionEquality().hash(_tags),const DeepCollectionEquality().hash(_comments));
+
+@override
+String toString() {
+  return 'CommunityPostDetail(id: $id, boardType: $boardType, title: $title, bodyMd: $bodyMd, authorId: $authorId, upvoteCount: $upvoteCount, downvoteCount: $downvoteCount, tags: $tags, comments: $comments)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$CommunityPostDetailCopyWith<$Res> implements $CommunityPostDetailCopyWith<$Res> {
+  factory _$CommunityPostDetailCopyWith(_CommunityPostDetail value, $Res Function(_CommunityPostDetail) _then) = __$CommunityPostDetailCopyWithImpl;
+@override @useResult
+$Res call({
+ int id, String boardType, String title, String bodyMd, int? authorId, int upvoteCount, int downvoteCount, List<String> tags, List<CommunityComment> comments
+});
+
+
+
+
+}
+/// @nodoc
+class __$CommunityPostDetailCopyWithImpl<$Res>
+    implements _$CommunityPostDetailCopyWith<$Res> {
+  __$CommunityPostDetailCopyWithImpl(this._self, this._then);
+
+  final _CommunityPostDetail _self;
+  final $Res Function(_CommunityPostDetail) _then;
+
+/// Create a copy of CommunityPostDetail
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? boardType = null,Object? title = null,Object? bodyMd = null,Object? authorId = freezed,Object? upvoteCount = null,Object? downvoteCount = null,Object? tags = null,Object? comments = null,}) {
+  return _then(_CommunityPostDetail(
+id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
+as int,boardType: null == boardType ? _self.boardType : boardType // ignore: cast_nullable_to_non_nullable
+as String,title: null == title ? _self.title : title // ignore: cast_nullable_to_non_nullable
+as String,bodyMd: null == bodyMd ? _self.bodyMd : bodyMd // ignore: cast_nullable_to_non_nullable
+as String,authorId: freezed == authorId ? _self.authorId : authorId // ignore: cast_nullable_to_non_nullable
+as int?,upvoteCount: null == upvoteCount ? _self.upvoteCount : upvoteCount // ignore: cast_nullable_to_non_nullable
+as int,downvoteCount: null == downvoteCount ? _self.downvoteCount : downvoteCount // ignore: cast_nullable_to_non_nullable
+as int,tags: null == tags ? _self._tags : tags // ignore: cast_nullable_to_non_nullable
+as List<String>,comments: null == comments ? _self._comments : comments // ignore: cast_nullable_to_non_nullable
+as List<CommunityComment>,
+  ));
+}
+
+
+}
+
+
+/// @nodoc
+mixin _$CommunityComment {
+
+ int get id; int? get authorId; String get bodyMd; int get upvoteCount; String get createdAt;
+/// Create a copy of CommunityComment
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$CommunityCommentCopyWith<CommunityComment> get copyWith => _$CommunityCommentCopyWithImpl<CommunityComment>(this as CommunityComment, _$identity);
+
+  /// Serializes this CommunityComment to a JSON map.
+  Map<String, dynamic> toJson();
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is CommunityComment&&(identical(other.id, id) || other.id == id)&&(identical(other.authorId, authorId) || other.authorId == authorId)&&(identical(other.bodyMd, bodyMd) || other.bodyMd == bodyMd)&&(identical(other.upvoteCount, upvoteCount) || other.upvoteCount == upvoteCount)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,id,authorId,bodyMd,upvoteCount,createdAt);
+
+@override
+String toString() {
+  return 'CommunityComment(id: $id, authorId: $authorId, bodyMd: $bodyMd, upvoteCount: $upvoteCount, createdAt: $createdAt)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $CommunityCommentCopyWith<$Res>  {
+  factory $CommunityCommentCopyWith(CommunityComment value, $Res Function(CommunityComment) _then) = _$CommunityCommentCopyWithImpl;
+@useResult
+$Res call({
+ int id, int? authorId, String bodyMd, int upvoteCount, String createdAt
+});
+
+
+
+
+}
+/// @nodoc
+class _$CommunityCommentCopyWithImpl<$Res>
+    implements $CommunityCommentCopyWith<$Res> {
+  _$CommunityCommentCopyWithImpl(this._self, this._then);
+
+  final CommunityComment _self;
+  final $Res Function(CommunityComment) _then;
+
+/// Create a copy of CommunityComment
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? authorId = freezed,Object? bodyMd = null,Object? upvoteCount = null,Object? createdAt = null,}) {
+  return _then(_self.copyWith(
+id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
+as int,authorId: freezed == authorId ? _self.authorId : authorId // ignore: cast_nullable_to_non_nullable
+as int?,bodyMd: null == bodyMd ? _self.bodyMd : bodyMd // ignore: cast_nullable_to_non_nullable
+as String,upvoteCount: null == upvoteCount ? _self.upvoteCount : upvoteCount // ignore: cast_nullable_to_non_nullable
+as int,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
+as String,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [CommunityComment].
+extension CommunityCommentPatterns on CommunityComment {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _CommunityComment value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _CommunityComment() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _CommunityComment value)  $default,){
+final _that = this;
+switch (_that) {
+case _CommunityComment():
+return $default(_that);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _CommunityComment value)?  $default,){
+final _that = this;
+switch (_that) {
+case _CommunityComment() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  int? authorId,  String bodyMd,  int upvoteCount,  String createdAt)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _CommunityComment() when $default != null:
+return $default(_that.id,_that.authorId,_that.bodyMd,_that.upvoteCount,_that.createdAt);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  int? authorId,  String bodyMd,  int upvoteCount,  String createdAt)  $default,) {final _that = this;
+switch (_that) {
+case _CommunityComment():
+return $default(_that.id,_that.authorId,_that.bodyMd,_that.upvoteCount,_that.createdAt);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  int? authorId,  String bodyMd,  int upvoteCount,  String createdAt)?  $default,) {final _that = this;
+switch (_that) {
+case _CommunityComment() when $default != null:
+return $default(_that.id,_that.authorId,_that.bodyMd,_that.upvoteCount,_that.createdAt);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+@JsonSerializable()
+
+class _CommunityComment implements CommunityComment {
+  const _CommunityComment({required this.id, this.authorId, required this.bodyMd, this.upvoteCount = 0, required this.createdAt});
+  factory _CommunityComment.fromJson(Map<String, dynamic> json) => _$CommunityCommentFromJson(json);
+
+@override final  int id;
+@override final  int? authorId;
+@override final  String bodyMd;
+@override@JsonKey() final  int upvoteCount;
+@override final  String createdAt;
+
+/// Create a copy of CommunityComment
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$CommunityCommentCopyWith<_CommunityComment> get copyWith => __$CommunityCommentCopyWithImpl<_CommunityComment>(this, _$identity);
+
+@override
+Map<String, dynamic> toJson() {
+  return _$CommunityCommentToJson(this, );
+}
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _CommunityComment&&(identical(other.id, id) || other.id == id)&&(identical(other.authorId, authorId) || other.authorId == authorId)&&(identical(other.bodyMd, bodyMd) || other.bodyMd == bodyMd)&&(identical(other.upvoteCount, upvoteCount) || other.upvoteCount == upvoteCount)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,id,authorId,bodyMd,upvoteCount,createdAt);
+
+@override
+String toString() {
+  return 'CommunityComment(id: $id, authorId: $authorId, bodyMd: $bodyMd, upvoteCount: $upvoteCount, createdAt: $createdAt)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$CommunityCommentCopyWith<$Res> implements $CommunityCommentCopyWith<$Res> {
+  factory _$CommunityCommentCopyWith(_CommunityComment value, $Res Function(_CommunityComment) _then) = __$CommunityCommentCopyWithImpl;
+@override @useResult
+$Res call({
+ int id, int? authorId, String bodyMd, int upvoteCount, String createdAt
+});
+
+
+
+
+}
+/// @nodoc
+class __$CommunityCommentCopyWithImpl<$Res>
+    implements _$CommunityCommentCopyWith<$Res> {
+  __$CommunityCommentCopyWithImpl(this._self, this._then);
+
+  final _CommunityComment _self;
+  final $Res Function(_CommunityComment) _then;
+
+/// Create a copy of CommunityComment
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? authorId = freezed,Object? bodyMd = null,Object? upvoteCount = null,Object? createdAt = null,}) {
+  return _then(_CommunityComment(
+id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
+as int,authorId: freezed == authorId ? _self.authorId : authorId // ignore: cast_nullable_to_non_nullable
+as int?,bodyMd: null == bodyMd ? _self.bodyMd : bodyMd // ignore: cast_nullable_to_non_nullable
+as String,upvoteCount: null == upvoteCount ? _self.upvoteCount : upvoteCount // ignore: cast_nullable_to_non_nullable
+as int,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
+as String,
   ));
 }
 

@@ -76,20 +76,29 @@ class _SandboxLayoutState extends State<SandboxLayout> {
     // 폐기되어 코드가 소실된다 → IndexedStack으로 전 페인을 트리에 유지하고 하나만 visible.
     return Column(
       children: [
+        // 좌측 정렬 — Column의 기본 crossAxisAlignment(center)로는 세그먼트가
+        // 중앙에 놓여 페이지 헤더의 좌측선과 어긋난다(실측 left=255.6 vs 헤더 16).
+        // 가로 여백은 헤더와 같은 lg(16)로 맞추고 세로만 sm(8)을 유지한다.
         Padding(
-          padding: const EdgeInsets.all(DpSpacing.sm),
-          child: SegmentedButton<int>(
-            segments: const [
-              ButtonSegment(value: 0, label: Text('에디터')),
-              ButtonSegment(value: 1, label: Text('실행')),
-              ButtonSegment(value: 2, label: Text('리뷰')),
-            ],
-            selected: {_tab},
-            onSelectionChanged: (s) => setState(() {
-              _tab = s.first;
-              // 에디터 가시화 시 Monaco 재레이아웃(숨김 동안 0px였던 레이아웃 보정).
-              if (_tab == 0) widget.onEditorVisible?.call();
-            }),
+          padding: const EdgeInsets.symmetric(
+            horizontal: DpSpacing.lg,
+            vertical: DpSpacing.sm,
+          ),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: SegmentedButton<int>(
+              segments: const [
+                ButtonSegment(value: 0, label: Text('에디터')),
+                ButtonSegment(value: 1, label: Text('실행')),
+                ButtonSegment(value: 2, label: Text('리뷰')),
+              ],
+              selected: {_tab},
+              onSelectionChanged: (s) => setState(() {
+                _tab = s.first;
+                // 에디터 가시화 시 Monaco 재레이아웃(숨김 동안 0px였던 레이아웃 보정).
+                if (_tab == 0) widget.onEditorVisible?.call();
+              }),
+            ),
           ),
         ),
         Expanded(

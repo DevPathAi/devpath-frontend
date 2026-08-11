@@ -7,6 +7,7 @@ import '../../auth/state/auth_state.dart';
 import '../application/path_controller.dart';
 import '../data/path_sse_source.dart';
 import 'path_plan_view.dart';
+import '../../support/presentation/supportable_error.dart';
 
 /// PATH-001. 진입 시 기존 경로를 먼저 조회하고, 없으면 생성한다.
 class PathPage extends ConsumerStatefulWidget {
@@ -40,25 +41,50 @@ class _PathPageState extends ConsumerState<PathPage> {
     final s = ref.watch(pathControllerProvider);
     final notifier = ref.read(pathControllerProvider.notifier);
 
-    final body = switch (s.phase) {
-      PathPhase.complete when s.result != null => PathPlanView(plan: s.result!),
-      // F4: killSwitch/failed는 이어하기 불가 → DpError로(전용 DpKillSwitch/DpQuota 렌더는 P4c).
-      PathPhase.failed || PathPhase.killSwitch => DpError(
-        message: s.error ?? '경로 생성에 실패했어요',
-        onRetry: notifier.start,
+    // 완료(PathPlanView)는 자체 콘텐츠를 SliverList로 헤더와 함께 스크롤한다.
+    // 그 외 상태(진행·중단·실패)는 화면 중앙에 고정하는 SliverFillRemaining.
+    final bodySliver = switch (s.phase) {
+      PathPhase.complete when s.result != null => SliverPadding(
+        padding: const EdgeInsets.all(DpSpacing.lg),
+        sliver: SliverList.list(
+          children: PathPlanView.children(context, s.result!),
+        ),
       ),
-      PathPhase.partial => _Progress(
-        completed: s.completed,
-        current: s.current,
-        note: s.error ?? '연결이 끊겼어요',
-        onRestart: notifier.start,
+      // F4: killSwitch/failed는 이어하기 불가 → SupportableError로(전용 DpKillSwitch/DpQuota 렌더는 P4c).
+      PathPhase.failed || PathPhase.killSwitch => SliverFillRemaining(
+        hasScrollBody: false,
+        child: SupportableError(
+          message: s.error ?? '경로 생성에 실패했어요',
+          onRetry: notifier.start,
+        ),
       ),
-      _ => _Progress(completed: s.completed, current: s.current),
+      PathPhase.partial => SliverFillRemaining(
+        hasScrollBody: false,
+        child: _Progress(
+          completed: s.completed,
+          current: s.current,
+          note: s.error ?? '연결이 끊겼어요',
+          onRestart: notifier.start,
+        ),
+      ),
+      _ => SliverFillRemaining(
+        hasScrollBody: false,
+        child: _Progress(completed: s.completed, current: s.current),
+      ),
     };
 
     return Scaffold(
-      appBar: AppBar(title: const Text('학습 경로 생성')),
-      body: body,
+      body: CustomScrollView(
+        slivers: [
+          const SliverToBoxAdapter(
+            child: DpPageHeader(
+              title: '학습 경로',
+              description: '진단 결과로 만든 12주 계획입니다',
+            ),
+          ),
+          bodySliver,
+        ],
+      ),
     );
   }
 }
@@ -98,7 +124,7 @@ class _Progress extends StatelessWidget {
                 note!,
                 style: Theme.of(
                   context,
-                ).textTheme.bodySmall?.copyWith(color: c.warning),
+                ).textTheme.bodySmall?.copyWith(color: c.textSecondary),
               ),
             ],
             if (onRestart != null) ...[

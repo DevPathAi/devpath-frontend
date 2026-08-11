@@ -11,6 +11,6 @@ void main() {
       ),
     );
     expect(find.text('비어 있음'), findsOneWidget);
-    expect(DpColors.light.primary, const Color(0xFF6366F1));
+    expect(DpColors.light.primary, const Color(0xFFB45309));
   });
 }

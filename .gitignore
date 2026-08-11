@@ -33,3 +33,4 @@ apps/mobile/build/
 # 브레인스토밍 비주얼 컴패니언 (로컬 전용)
 .superpowers/
 .omc/
+.gstack/

@@ -1,7 +1,9 @@
 import 'package:devpath_web/src/features/ads/application/ad_link_opener.dart';
+import 'package:devpath_web/src/features/ads/data/ad_slot_content.dart';
 import 'package:devpath_web/src/features/ads/data/ad_view.dart';
 import 'package:devpath_web/src/features/ads/data/ads_source.dart';
 import 'package:devpath_web/src/features/ads/presentation/ad_slot_widget.dart';
+import 'package:devpath_web/src/features/ads/presentation/adsense_unit_view.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,12 +16,14 @@ class _FakeOpener implements AdLinkOpener {
   void open(String url) => opened = url;
 }
 
-AdView _ad() => const AdView(
-  id: 5,
-  title: '테스트 광고',
-  imageUrl: null,
-  linkUrl: 'https://e.com/land',
-  slot: 'DASHBOARD_TOP',
+HouseAd _house() => const HouseAd(
+  AdView(
+    id: 5,
+    title: '테스트 광고',
+    imageUrl: null,
+    linkUrl: 'https://e.com/land',
+    slot: 'DASHBOARD_TOP',
+  ),
 );
 
 void main() {
@@ -42,10 +46,12 @@ void main() {
     expect(find.text('광고'), findsNothing);
   });
 
-  testWidgets('fetch→AdView renders title and 광고 label', (tester) async {
+  testWidgets('fetch→HouseAd renders title and 광고 label', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [adFetchProvider.overrideWithValue((slot) async => _ad())],
+        overrides: [
+          adFetchProvider.overrideWithValue((slot) async => _house()),
+        ],
         child: MaterialApp(
           theme: DpTheme.light(),
           home: const Scaffold(body: AdSlotWidget(slot: 'DASHBOARD_TOP')),
@@ -65,7 +71,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          adFetchProvider.overrideWithValue((slot) async => _ad()),
+          adFetchProvider.overrideWithValue((slot) async => _house()),
           adEventProvider.overrideWithValue((id, type) async {
             events.add('$id:$type');
           }),
@@ -82,5 +88,53 @@ void main() {
     await tester.pumpAndSettle();
     expect(opener.opened, 'https://e.com/land');
     expect(events, contains('5:CLICK'));
+  });
+
+  testWidgets('fetch→AdsenseUnit renders AdSenseUnitView', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          adFetchProvider.overrideWithValue(
+            (slot) async => const AdsenseUnit('1234567890'),
+          ),
+        ],
+        child: MaterialApp(
+          theme: DpTheme.light(),
+          home: const Scaffold(body: AdSlotWidget(slot: 'DASHBOARD_TOP')),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final view = tester.widget<AdSenseUnitView>(find.byType(AdSenseUnitView));
+    expect(view.slotId, '1234567890');
+    // 하우스 광고 카드는 그려지지 않는다.
+    expect(find.byType(InkWell), findsNothing);
+    expect(find.text('광고'), findsNothing);
+  });
+
+  testWidgets('애드센스 가지는 노출·클릭 이벤트를 전혀 보내지 않는다 (구글 정책)', (tester) async {
+    final events = <String>[];
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          adFetchProvider.overrideWithValue(
+            (slot) async => const AdsenseUnit('1234567890'),
+          ),
+          adEventProvider.overrideWithValue((id, type) async {
+            events.add('$id:$type');
+          }),
+        ],
+        child: MaterialApp(
+          theme: DpTheme.light(),
+          home: const Scaffold(body: AdSlotWidget(slot: 'DASHBOARD_TOP')),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 2));
+
+    expect(events, isEmpty);
+    expect(find.byType(VisibilityDetector), findsNothing);
   });
 }

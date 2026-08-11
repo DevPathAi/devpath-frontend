@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/application/auth_controller.dart';
+import '../../common/presentation/brand_row.dart';
 import '../application/consent_controller.dart';
 import '../application/consent_source.dart';
 import '../state/consent_state.dart';
@@ -106,77 +107,92 @@ class _ConsentPageState extends ConsumerState<ConsentPage> {
     final submitting = state is ConsentSubmitting;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('가입 전 동의')),
       body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 480),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(DpSpacing.xl),
+        child: SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  '서비스 이용을 위해 아래 항목에 동의해 주세요',
-                  style: Theme.of(context).textTheme.titleMedium,
+                brandRow(context),
+                const DpPageHeader(
+                  title: '가입 전 동의',
+                  description: '서비스 이용에 필요한 항목입니다',
                 ),
-                const SizedBox(height: DpSpacing.lg),
-                for (final k in _ConsentKind.values.where((k) => k.required))
-                  _consentTile(k),
-                const Divider(height: DpSpacing.xl),
-                TextField(
-                  controller: _birthYear,
-                  focusNode: _birthYearFocus,
-                  keyboardType: TextInputType.number,
-                  // digitsOnly 라이브 필터는 IME 조합(한글·전각) 입력을 조용히
-                  // 삼킬 수 있어 제거 — 검증은 제출 시 _year 파싱으로 수행한다.
-                  inputFormatters: [LengthLimitingTextInputFormatter(4)],
-                  decoration: InputDecoration(
-                    labelText: '출생 연도 (필수)',
-                    hintText: '예: 2000',
-                    helperText: '만 14세 미만은 가입할 수 없습니다.',
-                    errorText: _yearError,
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: DpSpacing.xl),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      for (final k in _ConsentKind.values.where(
+                        (k) => k.required,
+                      ))
+                        _consentTile(k),
+                      const Divider(height: DpSpacing.xl),
+                      TextField(
+                        controller: _birthYear,
+                        focusNode: _birthYearFocus,
+                        keyboardType: TextInputType.number,
+                        // digitsOnly 라이브 필터는 IME 조합(한글·전각) 입력을 조용히
+                        // 삼킬 수 있어 제거 — 검증은 제출 시 _year 파싱으로 수행한다.
+                        inputFormatters: [LengthLimitingTextInputFormatter(4)],
+                        decoration: InputDecoration(
+                          labelText: '출생 연도 (필수)',
+                          hintText: '예: 2000',
+                          helperText: '만 14세 미만은 가입할 수 없습니다.',
+                          errorText: _yearError,
+                        ),
+                        onChanged: (_) => setState(() {
+                          if (_year != null) _yearError = null;
+                        }),
+                      ),
+                      const SizedBox(height: DpSpacing.lg),
+                      Text(
+                        '선택 동의',
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          color: c.textSecondary,
+                        ),
+                      ),
+                      for (final k in _ConsentKind.values.where(
+                        (k) => !k.required,
+                      ))
+                        _consentTile(k),
+                      if (state is ConsentError) ...[
+                        const SizedBox(height: DpSpacing.md),
+                        Text(
+                          state.message,
+                          style: Theme.of(
+                            context,
+                          ).textTheme.bodySmall?.copyWith(color: c.danger),
+                        ),
+                      ],
+                      if (_requiredError != null) ...[
+                        const SizedBox(height: DpSpacing.md),
+                        Text(
+                          _requiredError!,
+                          style: Theme.of(
+                            context,
+                          ).textTheme.bodySmall?.copyWith(color: c.danger),
+                        ),
+                      ],
+                      const SizedBox(height: DpSpacing.xl),
+                      FilledButton(
+                        onPressed: submitting ? null : _submitPressed,
+                        child: submitting
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text('동의하고 계속하기'),
+                      ),
+                      const SizedBox(height: DpSpacing.xl),
+                    ],
                   ),
-                  onChanged: (_) => setState(() {
-                    if (_year != null) _yearError = null;
-                  }),
-                ),
-                const SizedBox(height: DpSpacing.lg),
-                Text(
-                  '선택 동의',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.labelLarge?.copyWith(color: c.textSecondary),
-                ),
-                for (final k in _ConsentKind.values.where((k) => !k.required))
-                  _consentTile(k),
-                if (state is ConsentError) ...[
-                  const SizedBox(height: DpSpacing.md),
-                  Text(
-                    state.message,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodySmall?.copyWith(color: c.danger),
-                  ),
-                ],
-                if (_requiredError != null) ...[
-                  const SizedBox(height: DpSpacing.md),
-                  Text(
-                    _requiredError!,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodySmall?.copyWith(color: c.danger),
-                  ),
-                ],
-                const SizedBox(height: DpSpacing.xl),
-                FilledButton(
-                  onPressed: submitting ? null : _submitPressed,
-                  child: submitting
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('동의하고 계속하기'),
                 ),
               ],
             ),
