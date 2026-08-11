@@ -3,6 +3,7 @@ import 'package:devpath_web/src/features/community/presentation/post_create_page
 import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -117,6 +118,52 @@ void main() {
       button.width,
       lessThan(300),
       reason: '늘어나면 콘텐츠 폭 전체(3-A 실측 약 1110px)를 차지한다',
+    );
+  });
+
+  // 에디터가 고정 높이 자체 스크롤이면 내부에 스크롤할 내용이 없어도 휠을
+  // 흡수해 페이지가 멈춘다. 커서가 본문 위에 있을 때 화면이 고장난 것처럼 보인다.
+  // 뷰포트를 낮게 잡아야(_wideView는 2000) 스크롤될 여지가 생긴다.
+  testWidgets('에디터 위에서 휠을 굴리면 페이지가 스크롤된다', (tester) async {
+    tester.view.physicalSize = const Size(1400, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final c = ProviderContainer(
+      overrides: [
+        postCreateProvider.overrideWithValue(
+          ({
+            required boardType,
+            required title,
+            required bodyMd,
+            required tags,
+          }) async => _created(30, boardType),
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+    final body = _bodyWith('짧은 본문');
+    addTearDown(body.dispose);
+
+    await tester.pumpWidget(_host(c, bodyController: body));
+    await tester.pumpAndSettle();
+
+    // 헤더 설명은 첫 sliver에 있어 페이지가 스크롤되면 위로 밀린다.
+    final finder = find.text('자유롭게 쓰거나 코드 피드백을 요청하세요');
+    final before = tester.getTopLeft(finder).dy;
+
+    final pointer = TestPointer(1, PointerDeviceKind.mouse);
+    pointer.hover(tester.getCenter(find.byType(QuillEditor)));
+    await tester.sendEventToBinding(pointer.scroll(const Offset(0, 300)));
+    await tester.pumpAndSettle();
+
+    final after = tester.getTopLeft(finder).dy;
+
+    expect(
+      after,
+      lessThan(before),
+      reason: '에디터가 휠을 흡수하면 헤더가 제자리에 남는다(before=$before after=$after)',
     );
   });
 
