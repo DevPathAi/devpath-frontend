@@ -224,6 +224,51 @@ void main() {
     expect(top, greaterThanOrEqualTo(0.0), reason: '툴바가 위로 밀려났다(top=$top)');
   });
 
+  // ★알려진 부작용을 문서화한다.★ pinned 헤더는 뒤따르는 sliver가 스크롤되는
+  // 동안 계속 상단에 붙어 있고, 다음 pinned 헤더가 밀어내야 사라진다. 이 화면엔
+  // 그런 게 없어 본문을 지나 태그·버튼 영역에서도 툴바가 남는다.
+  // 의도한 동작은 아니지만 수용한 상태다 — 바꾸려면 이 테스트가 먼저 red가 된다.
+  testWidgets('본문을 지나서도 툴바가 남는다(수용한 부작용)', (tester) async {
+    tester.view.physicalSize = const Size(1400, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final c = ProviderContainer(
+      overrides: [
+        postCreateProvider.overrideWithValue(
+          ({
+            required boardType,
+            required title,
+            required bodyMd,
+            required tags,
+          }) async => _created(30, boardType),
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+    final body = _bodyWith(List.filled(60, '긴 본문 줄입니다.').join('\n'));
+    addTearDown(body.dispose);
+
+    await tester.pumpWidget(_host(c, bodyController: body));
+    await tester.pumpAndSettle();
+
+    // 본문 끝을 지나 게시 버튼이 보일 때까지 충분히 내린다.
+    final pointer = TestPointer(1, PointerDeviceKind.mouse);
+    pointer.hover(tester.getCenter(find.byType(QuillEditor)));
+    for (var i = 0; i < 6; i++) {
+      await tester.sendEventToBinding(pointer.scroll(const Offset(0, 400)));
+      await tester.pumpAndSettle();
+    }
+
+    expect(find.widgetWithText(FilledButton, '게시'), findsOneWidget);
+    expect(
+      find.byType(DpRichEditorToolbar),
+      findsOneWidget,
+      reason: '본문을 벗어난 위치에서도 툴바가 남아 있다(수용한 부작용)',
+    );
+  });
+
   testWidgets('FEEDBACK 프리셋: 페이지 헤더 라벨이 "피드백 요청"', (tester) async {
     _wideView(tester);
     final c = ProviderContainer(
