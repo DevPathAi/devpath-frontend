@@ -22,6 +22,6 @@ void main() {
     // 자체를 직접 단언한다(find.text보다 brandRow 위젯 유무에 견고하다 —
     // F4, 4화면 전부 이 형태로 통일).
     expect(find.byKey(const ValueKey('brand-row')), findsOneWidget);
-    expect(find.text('DevPath'), findsOneWidget);
+    expect(find.text('Leva'), findsOneWidget);
   });
 }
