@@ -1,11 +1,11 @@
 {
-    "name": "devpath_admin",
-    "short_name": "devpath_admin",
+    "name": "Leva 관리자",
+    "short_name": "Leva 관리자",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#FAF9F7",
+    "theme_color": "#B45309",
+    "description": "Leva 서비스 운영을 위한 관리자 도구입니다.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
