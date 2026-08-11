@@ -224,11 +224,63 @@ void main() {
     expect(top, greaterThanOrEqualTo(0.0), reason: '툴바가 위로 밀려났다(top=$top)');
   });
 
-  // ★알려진 부작용을 문서화한다.★ pinned 헤더는 뒤따르는 sliver가 스크롤되는
-  // 동안 계속 상단에 붙어 있고, 다음 pinned 헤더가 밀어내야 사라진다. 이 화면엔
-  // 그런 게 없어 본문을 지나 태그·버튼 영역에서도 툴바가 남는다.
-  // 의도한 동작은 아니지만 수용한 상태다 — 바꾸려면 이 테스트가 먼저 red가 된다.
-  testWidgets('본문을 지나서도 툴바가 남는다(수용한 부작용)', (tester) async {
+  // 원래 결함의 정확한 조건: **내용이 짧아 에디터 안에 스크롤할 것이 없는데도**
+  // 휠을 흡수해 페이지가 멈췄다. 뷰포트를 낮게 잡아야 짧은 본문에서도 페이지가
+  // 스크롤될 여지가 생긴다(헤더+제목+에디터만으로 400을 넘는다).
+  testWidgets('내용이 짧아도 에디터 위 휠이 페이지를 스크롤한다', (tester) async {
+    tester.view.physicalSize = const Size(1400, 400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final c = ProviderContainer(
+      overrides: [
+        postCreateProvider.overrideWithValue(
+          ({
+            required boardType,
+            required title,
+            required bodyMd,
+            required tags,
+          }) async => _created(30, boardType),
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+    final body = _bodyWith('짧은 본문');
+    addTearDown(body.dispose);
+
+    await tester.pumpWidget(_host(c, bodyController: body));
+    await tester.pumpAndSettle();
+
+    final page = tester
+        .state<ScrollableState>(
+          find
+              .ancestor(
+                of: find.text('자유글 작성'),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        )
+        .position;
+    final before = page.pixels;
+
+    final pointer = TestPointer(1, PointerDeviceKind.mouse);
+    pointer.hover(tester.getCenter(find.byType(QuillEditor)));
+    await tester.sendEventToBinding(pointer.scroll(const Offset(0, 200)));
+    await tester.pumpAndSettle();
+
+    expect(
+      page.pixels,
+      greaterThan(before),
+      reason:
+          '에디터 안에 스크롤할 것이 없는데도 휠을 흡수했다(before=$before after=${page.pixels})',
+    );
+  });
+
+  // 툴바는 본문을 지나 태그·버튼 영역에서도 화면에 남는다. 구현상으로는
+  // pinned 헤더를 밀어낼 다음 헤더가 없어서 그렇지만, **사용자 확인 결과 이
+  // 동작이 맞다**(2026-08-11). 작성 중에는 서식 버튼이 늘 닿는 곳에 있어야 한다.
+  testWidgets('본문을 지나서도 툴바가 남는다', (tester) async {
     tester.view.physicalSize = const Size(1400, 800);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -265,7 +317,7 @@ void main() {
     expect(
       find.byType(DpRichEditorToolbar),
       findsOneWidget,
-      reason: '본문을 벗어난 위치에서도 툴바가 남아 있다(수용한 부작용)',
+      reason: '작성 중에는 어느 위치에서도 서식 버튼에 닿아야 한다',
     );
   });
 
