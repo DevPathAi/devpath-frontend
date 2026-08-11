@@ -120,8 +120,9 @@ class _PostCreatePageState extends ConsumerState<PostCreatePage> {
   @override
   Widget build(BuildContext context) {
     // 문서형 화면 — 헤더를 첫 sliver로 실어 폼과 함께 스크롤시킨다(DESIGN.md §9).
-    // 본문 에디터(DpRichEditor)는 고정 높이(260px)의 자체 스크롤 영역이라
-    // sliver 안에서도 높이가 유한하고, 페이지 스크롤과 경쟁하지 않는다.
+    // 본문 에디터는 자체 스크롤이 없어(scrollable: false) 페이지 스크롤과
+    // 경쟁하지 않는다. 대신 내용만큼 늘어나므로 툴바만 pinned sliver로 고정해
+    // 긴 글을 쓰는 동안에도 서식 버튼에 닿을 수 있게 한다.
     return Scaffold(
       body: CustomScrollView(
         slivers: [
@@ -132,7 +133,12 @@ class _PostCreatePageState extends ConsumerState<PostCreatePage> {
             ),
           ),
           SliverPadding(
-            padding: const EdgeInsets.all(DpSpacing.lg),
+            padding: const EdgeInsets.fromLTRB(
+              DpSpacing.lg,
+              DpSpacing.lg,
+              DpSpacing.lg,
+              0,
+            ),
             sliver: SliverList.list(
               children: [
                 TextField(
@@ -147,12 +153,35 @@ class _PostCreatePageState extends ConsumerState<PostCreatePage> {
                 // 본문 안내 문구는 헤더 설명과 같은 말이라 제거했다(3-A Task 14-3).
                 // 헤더가 더 눈에 띄는 자리이고, 2단계 스펙 §5가 그 문구를 지정했다.
                 const SizedBox(height: DpSpacing.md),
-                DpRichEditor(
-                  key: const ValueKey('post-body-editor'),
-                  controller: _bodyController,
-                  enabled: !_submitting,
-                ),
-                const SizedBox(height: DpSpacing.md),
+              ],
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: DpSpacing.lg),
+            sliver: SliverPersistentHeader(
+              pinned: true,
+              delegate: DpRichEditorToolbarHeader(controller: _bodyController),
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: DpSpacing.lg),
+            sliver: SliverToBoxAdapter(
+              child: DpRichEditorBody(
+                key: const ValueKey('post-body-editor'),
+                controller: _bodyController,
+                enabled: !_submitting,
+              ),
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(
+              DpSpacing.lg,
+              DpSpacing.md,
+              DpSpacing.lg,
+              DpSpacing.lg,
+            ),
+            sliver: SliverList.list(
+              children: [
                 TextField(
                   controller: _tagsCtrl,
                   enabled: !_submitting,
