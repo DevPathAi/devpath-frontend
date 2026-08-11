@@ -157,9 +157,9 @@ class _QuestionCreatePageState extends ConsumerState<QuestionCreatePage> {
   Widget build(BuildContext context) {
     final c = context.dpColors;
     // 문서형 화면 — 헤더를 첫 sliver로 실어 폼과 함께 스크롤시킨다(DESIGN.md §9).
-    // 본문 에디터는 자체 스크롤이 없어(scrollable: false) 페이지 스크롤과
-    // 경쟁하지 않는다. 대신 내용만큼 늘어나므로 툴바만 pinned sliver로 고정해
-    // 긴 글을 쓰는 동안에도 서식 버튼에 닿을 수 있게 한다.
+    // 본문 에디터는 상한까지 내용에 따라 늘어나므로, 늘어나는 동안에는 스크롤할
+    // 것이 없어 휠이 이 CustomScrollView로 전달된다. 대신 에디터가 길어지면
+    // 툴바가 위로 사라지므로 툴바만 pinned sliver로 고정한다.
     return Scaffold(
       body: CustomScrollView(
         slivers: [
