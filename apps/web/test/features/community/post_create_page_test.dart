@@ -121,9 +121,14 @@ void main() {
     );
   });
 
-  // 에디터가 고정 높이 자체 스크롤이면 내부에 스크롤할 내용이 없어도 휠을
-  // 흡수해 페이지가 멈춘다. 커서가 본문 위에 있을 때 화면이 고장난 것처럼 보인다.
-  // 뷰포트를 낮게 잡아야(_wideView는 2000) 스크롤될 여지가 생긴다.
+  // 에디터가 고정 높이 자체 스크롤이면 커서가 본문 위에 있을 때 휠을 흡수해
+  // 페이지가 멈춘다. 화면이 고장난 것처럼 보인다.
+  //
+  // ★본문을 길게 주는 것이 이 테스트의 핵심이다.★ 짧은 본문이면 콘텐츠 전체가
+  // 뷰포트(800)에 들어가 스크롤할 것이 없고, 그러면 고치기 전과 후가 똑같이
+  // "안 움직인다"로 나와 수정 여부를 구별하지 못한다. 길게 주면 고치기 전에는
+  // 에디터가 260에 고정돼 페이지가 짧고(=흡수해도 움직일 것이 없음이 아니라
+  // 흡수해서 안 움직임), 고친 뒤에는 에디터가 늘어나 페이지가 스크롤된다.
   testWidgets('에디터 위에서 휠을 굴리면 페이지가 스크롤된다', (tester) async {
     tester.view.physicalSize = const Size(1400, 800);
     tester.view.devicePixelRatio = 1.0;
@@ -143,27 +148,39 @@ void main() {
       ],
     );
     addTearDown(c.dispose);
-    final body = _bodyWith('짧은 본문');
+    final body = _bodyWith(List.filled(60, '긴 본문 줄입니다.').join('\n'));
     addTearDown(body.dispose);
 
     await tester.pumpWidget(_host(c, bodyController: body));
     await tester.pumpAndSettle();
 
-    // 헤더 설명은 첫 sliver에 있어 페이지가 스크롤되면 위로 밀린다.
-    final finder = find.text('자유롭게 쓰거나 코드 피드백을 요청하세요');
-    final before = tester.getTopLeft(finder).dy;
+    // 위젯 좌표로 재면 안 된다 — 페이지가 실제로 스크롤되면 헤더가 뷰포트 밖으로
+    // 나가고 sliver가 그 자식을 제거해, 성공했을 때 오히려 좌표를 못 잰다.
+    // 페이지 스크롤 위치를 직접 읽는다. Scrollable은 flutter_quill 툴바가
+    // 내부에 더 만들어 여러 개이므로 헤더를 품은 것을 지목한다.
+    final page = tester
+        .state<ScrollableState>(
+          find
+              .ancestor(
+                of: find.text('자유글 작성'),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        )
+        .position;
+    final before = page.pixels;
 
     final pointer = TestPointer(1, PointerDeviceKind.mouse);
     pointer.hover(tester.getCenter(find.byType(QuillEditor)));
     await tester.sendEventToBinding(pointer.scroll(const Offset(0, 300)));
     await tester.pumpAndSettle();
 
-    final after = tester.getTopLeft(finder).dy;
+    final after = page.pixels;
 
     expect(
       after,
-      lessThan(before),
-      reason: '에디터가 휠을 흡수하면 헤더가 제자리에 남는다(before=$before after=$after)',
+      greaterThan(before),
+      reason: '에디터가 휠을 흡수하면 페이지가 제자리다(before=$before after=$after)',
     );
   });
 
