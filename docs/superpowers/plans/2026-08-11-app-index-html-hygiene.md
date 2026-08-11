@@ -332,9 +332,13 @@ gh pr merge <번호> --merge --delete-branch
 
 red면 머지하지 않는다.
 
-- [ ] **Step 5: 라이브 확인**
+- [ ] **Step 5: 라이브 확인 — `develop` 머지로는 반영되지 않는다(실측으로 확인됨)**
 
-★홈페이지와 배포 경로가 다르다.★ 이 레포는 CI가 GHCR 이미지를 빌드하고 k3s가 그것을 서비스한다. **머지만으로 반영됐다고 보지 않는다.**
+★★`.github/workflows/ci.yml`에서 이미지 빌드(`web-image`·`admin-image`)와 배포(`web-deploy`) 잡은 `if: github.ref == 'refs/heads/main'`이다. PR과 `develop`에서는 `skipping`으로 건너뛴다.★★
+
+즉 **이 계획을 끝까지 수행해도 라이브는 바뀌지 않는다.** 라이브 반영은 `develop → main` 릴리스를 거쳐야 하고, 그것은 이 계획의 범위가 아니다(릴리스는 그 자체로 계획과 검증이 필요한 별도 작업이다).
+
+따라서 이 단계에서 할 일은 **라이브가 아직 옛 값인 것을 확인하고 그것이 정상임을 기록**하는 것이다. 릴리스 시점에 아래 명령으로 확인한다.
 
 ```bash
 curl -sS -4 https://app.leva.ai.kr/ | grep -E "<title>|name=\"description\"|name=\"robots\""
@@ -344,7 +348,8 @@ Expected: 새 title·description·`noindex`.
 
 `curl.exe -4`를 쓴다(이 환경의 `Invoke-WebRequest`는 DNS 오류를 낸다).
 
-- 옛 값이 나오면 → 이미지가 아직 배포되지 않은 것이다. 배포 파이프라인(GHCR 태그·ArgoCD sync) 상태를 확인한다
+- 릴리스 **전**이라면 옛 값이 나오는 것이 정상이다
+- 릴리스 **후**에도 옛 값이면 → 이미지 빌드·배포 잡의 결과와 k3s 롤아웃 상태를 확인한다
 - 반영됐으면 → **연속 두 라운드가 같은 값을 낼 때까지** 반복 측정한다
 
 - [ ] **Step 6: 광고가 여전히 나오는지 확인한다**
