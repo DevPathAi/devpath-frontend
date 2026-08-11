@@ -132,8 +132,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    final doc = Document()
-      ..insert(0, List.filled(80, '긴 본문 줄입니다.').join('\n'));
+    final doc = Document()..insert(0, List.filled(80, '긴 본문 줄입니다.').join('\n'));
     final c = QuillController(
       document: doc,
       selection: const TextSelection.collapsed(offset: 0),

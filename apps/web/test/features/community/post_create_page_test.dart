@@ -1,5 +1,6 @@
 import 'package:devpath_web/src/features/community/data/community_source.dart';
 import 'package:devpath_web/src/features/community/presentation/post_create_page.dart';
+import 'package:devpath_web/src/features/community/presentation/widgets/rich_editor.dart';
 import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/cupertino.dart';
@@ -182,6 +183,45 @@ void main() {
       greaterThan(before),
       reason: '에디터가 휠을 흡수하면 페이지가 제자리다(before=$before after=$after)',
     );
+  });
+
+  // 에디터가 늘어나면 툴바가 본문과 함께 위로 사라진다. 긴 글을 쓰는 동안
+  // 서식 버튼에 닿으려면 매번 올라가야 하므로 상단에 고정한다.
+  testWidgets('페이지를 스크롤해도 툴바가 화면에 남는다', (tester) async {
+    tester.view.physicalSize = const Size(1400, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final c = ProviderContainer(
+      overrides: [
+        postCreateProvider.overrideWithValue(
+          ({
+            required boardType,
+            required title,
+            required bodyMd,
+            required tags,
+          }) async => _created(30, boardType),
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+    final body = _bodyWith(List.filled(60, '긴 본문 줄입니다.').join('\n'));
+    addTearDown(body.dispose);
+
+    await tester.pumpWidget(_host(c, bodyController: body));
+    await tester.pumpAndSettle();
+
+    final pointer = TestPointer(1, PointerDeviceKind.mouse);
+    pointer.hover(tester.getCenter(find.byType(QuillEditor)));
+    await tester.sendEventToBinding(pointer.scroll(const Offset(0, 400)));
+    await tester.pumpAndSettle();
+
+    // 고정돼 있으면 화면 안에 남는다. 함께 스크롤되면 sliver가 제거하거나
+    // 음수 좌표로 밀려난다.
+    expect(find.byType(DpRichEditorToolbar), findsOneWidget);
+    final top = tester.getTopLeft(find.byType(DpRichEditorToolbar)).dy;
+    expect(top, greaterThanOrEqualTo(0.0), reason: '툴바가 위로 밀려났다(top=$top)');
   });
 
   testWidgets('FEEDBACK 프리셋: 페이지 헤더 라벨이 "피드백 요청"', (tester) async {
