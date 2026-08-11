@@ -557,6 +557,10 @@ Map<String, dynamic> mockLearningPath() => {
       'expectedOutcome': '비동기 API 호출과 Stream 구독을 안정적으로 다룰 수 있어요.',
       'locked': false,
       'tasks': [
+        // 앞의 둘을 완료로 둬 진행률이 0이 아니게 한다. 12주가 전부 0%면
+        // 주차별 진행률 막대가 하나도 그려지지 않아 화면으로 확인할 수 없다
+        // (3-B 보고서 §6). 마지막 퀴즈는 미완료로 남긴다 — 「이번 주 과제」에서
+        // 눌러 콘텐츠로 이동하는 시나리오가 거기 걸려 있다.
         {
           'orderNum': 1,
           'taskType': 'READ',
@@ -564,7 +568,7 @@ Map<String, dynamic> mockLearningPath() => {
           'required': true,
           'contentId': 1,
           'contentSlug': 'future-async-await',
-          'completed': false,
+          'completed': true,
         },
         {
           'orderNum': 2,
@@ -573,7 +577,7 @@ Map<String, dynamic> mockLearningPath() => {
           'required': true,
           'contentId': 2,
           'contentSlug': 'stream-subscription',
-          'completed': false,
+          'completed': true,
         },
         {
           'orderNum': 3,
