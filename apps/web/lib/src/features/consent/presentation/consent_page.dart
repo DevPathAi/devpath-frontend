@@ -13,7 +13,13 @@ import '../state/consent_state.dart';
 /// 동의 항목. 백엔드 `ConsentType`(wire) + 필수 여부 + 마이크로카피.
 /// 필수: TERMS·PRIVACY / 선택: MARKETING·LCS_ATTACH·ERROR_LOG.
 enum _ConsentKind {
-  terms('TERMS', true, '서비스 이용약관 동의', '서비스 이용에 필요한 기본 약관입니다.'),
+  terms(
+    'TERMS',
+    true,
+    '서비스 이용약관 동의',
+    '서비스 이용에 필요한 기본 약관입니다.',
+    docUrl: 'https://leva.ai.kr/terms',
+  ),
   privacy(
     'PRIVACY',
     true,
