@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../common/application/external_link_opener.dart';
 import '../../common/presentation/brand_row.dart';
+import '../../settings/data/settings_models.dart';
 import '../application/consent_controller.dart';
 import '../application/consent_source.dart';
 import '../state/consent_state.dart';
@@ -77,6 +78,10 @@ class _ConsentPageState extends ConsumerState<ConsentPage> {
   String? _yearError;
   String? _requiredError;
 
+  /// prefill(GET /consents/me) 응답을 한 번만 폼에 반영하기 위한 플래그.
+  /// 없으면 이후 build마다 리스너가 값을 다시 덮어써 사용자의 입력을 지울 수 있다.
+  bool _prefillApplied = false;
+
   @override
   void dispose() {
     _birthYear.dispose();
@@ -126,6 +131,38 @@ class _ConsentPageState extends ConsumerState<ConsentPage> {
     final state = ref.watch(consentControllerProvider);
     if (state is ConsentBlocked) return _BlockedView();
 
+    // I-2/I-3: 재동의로 재사용되는 화면이라 기존 이용자의 선택 동의·생년을
+    // 불러와 미리 반영해야 한다. 실패해도 화면은 떠야 하므로(신규 가입자와
+    // 동일 폴백) 로딩 중에만 스피너로 막고, 에러는 그냥 빈 폼으로 넘어간다.
+    final prefill = ref.watch(consentPrefillProvider);
+    ref.listen<AsyncValue<ConsentsView>>(consentPrefillProvider, (
+      previous,
+      next,
+    ) {
+      final view = next.value;
+      if (view == null || _prefillApplied) return;
+      _prefillApplied = true;
+      setState(() {
+        // 선택 항목만 prefill한다 — 필수 2종(TERMS·PRIVACY)은 재동의의 목적이
+        // "다시 받는 것"이므로 서버 값과 무관하게 항상 false로 시작한다.
+        for (final k in _ConsentKind.values.where((k) => !k.required)) {
+          final item = view.itemOf(k.wire);
+          if (item != null) _agreed[k] = item.agreed;
+        }
+        if (view.birthYear != null) {
+          _birthYear.text = view.birthYear.toString();
+        }
+      });
+    });
+
+    if (prefill.isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    // 기존 이용자 판별: 조회된 동의 이력(items)이 있으면 재동의로 본다.
+    // prefill이 에러였다면 valueOrNull이 null이라 신규 가입자와 같게 처리된다.
+    final isReturningUser = prefill.value?.items.isNotEmpty ?? false;
+
     final c = context.dpColors;
     final submitting = state is ConsentSubmitting;
 
@@ -139,9 +176,11 @@ class _ConsentPageState extends ConsumerState<ConsentPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 brandRow(context),
-                const DpPageHeader(
-                  title: '가입 전 동의',
-                  description: '서비스 이용에 필요한 항목입니다',
+                DpPageHeader(
+                  title: isReturningUser ? '서비스 이용약관 재동의' : '가입 전 동의',
+                  description: isReturningUser
+                      ? '약관이 새로 게시되어 다시 동의를 받습니다'
+                      : '서비스 이용에 필요한 항목입니다',
                 ),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: DpSpacing.xl),
@@ -272,6 +311,17 @@ class _BlockedView extends ConsumerWidget {
                   style: Theme.of(
                     context,
                   ).textTheme.bodyMedium?.copyWith(color: c.textSecondary),
+                ),
+                const SizedBox(height: DpSpacing.sm),
+                // I-3: 기존 이용자가 재동의 중 출생 연도를 잘못 입력해도 같은
+                // 화면을 본다. 로그아웃 버튼만 있으면 "계정이 잘렸다"는 신호로
+                // 읽힌다 — 재시도 경로가 있음을 알려준다.
+                Text(
+                  '출생 연도를 잘못 입력하셨다면 다시 로그인해 재시도할 수 있습니다.',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: c.textSecondary),
                 ),
                 const SizedBox(height: DpSpacing.xl),
                 OutlinedButton(
