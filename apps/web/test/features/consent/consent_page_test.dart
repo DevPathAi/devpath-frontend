@@ -230,6 +230,22 @@ void main() {
     expect(opener.opened, ['https://leva.ai.kr/privacy']);
   });
 
+  testWidgets('약관 전문 링크가 약관 페이지를 연다', (tester) async {
+    bigView(tester);
+    final opener = _RecordingOpener();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [externalLinkOpenerProvider.overrideWithValue(opener)],
+        child: _app(),
+      ),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('consent-terms-doc')));
+    await tester.pump();
+
+    expect(opener.opened, ['https://leva.ai.kr/terms']);
+  });
+
   testWidgets('ConsentBlocked → 차단 안내 + 로그아웃 버튼', (tester) async {
     bigView(tester);
     await tester.pumpWidget(
