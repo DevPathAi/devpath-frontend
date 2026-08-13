@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../auth/application/auth_controller.dart';
 import '../../auth/state/auth_state.dart';
+import '../../common/application/track_catalog.dart';
 import '../../common/presentation/brand_row.dart';
 import '../application/diagnostic_controller.dart';
 import '../state/diagnostic_state.dart';
@@ -115,27 +116,55 @@ class _DiagnosticPageState extends ConsumerState<DiagnosticPage> {
   }
 }
 
-class _StartView extends StatelessWidget {
+class _StartView extends StatefulWidget {
   const _StartView({required this.auth, required this.notifier});
   final AuthState auth;
   final DiagnosticController notifier;
 
   @override
+  State<_StartView> createState() => _StartViewState();
+}
+
+class _StartViewState extends State<_StartView> {
+  /// 기본값을 두지 않는다. 트랙은 문항뿐 아니라 학습 경로와 콘텐츠 매칭까지
+  /// 결정하므로, 조용한 기본값이 바로 이 화면이 냈던 결함의 형태다.
+  String? _track;
+
+  @override
   Widget build(BuildContext context) {
-    final isMember = auth is AuthAuthenticated;
+    final isMember = widget.auth is AuthAuthenticated;
     return Column(
       mainAxisSize: MainAxisSize.min,
       // 헤더(DpPageHeader)가 좌측 정렬이므로 본문도 같은 축에 세운다.
-      // Column의 기본값(center)을 그대로 두면 넓은 폭에서 헤더는 왼쪽,
-      // 본문은 가운데로 시각 축이 둘로 갈린다(3-A 육안 확인 §4-1).
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('실력 진단 15문항', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: DpSpacing.lg),
+        DropdownButtonFormField<String>(
+          key: const ValueKey('diagnostic-track'),
+          initialValue: _track,
+          decoration: const InputDecoration(labelText: '진단할 트랙'),
+          items: [
+            for (final e in trackLabels.entries)
+              DropdownMenuItem(value: e.key, child: Text(e.value)),
+          ],
+          onChanged: (v) => setState(() => _track = v),
+        ),
+        if (_track == null) ...[
+          const SizedBox(height: DpSpacing.sm),
+          Text(
+            '트랙을 먼저 골라주세요. 고른 트랙의 문항이 나오고 학습 경로도 그 트랙으로 만들어집니다.',
+            key: const ValueKey('diagnostic-track-hint'),
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+        const SizedBox(height: DpSpacing.lg),
         FilledButton(
-          onPressed: () => isMember
-              ? notifier.startAsMember('BACKEND_SPRING')
-              : notifier.startAsGuest('BACKEND_SPRING'),
+          onPressed: _track == null
+              ? null
+              : () => isMember
+                    ? widget.notifier.startAsMember(_track!)
+                    : widget.notifier.startAsGuest(_track!),
           child: const Text('진단 시작하기'),
         ),
       ],

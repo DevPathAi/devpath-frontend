@@ -9,6 +9,7 @@ import 'package:devpath_web/src/features/path/presentation/path_page.dart';
 import 'package:devpath_web/src/providers/api_providers.dart';
 import 'package:dio/dio.dart';
 import 'package:dp_core/dp_core.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -124,6 +125,11 @@ void main() {
     expect(find.byType(DiagnosticPage), findsOneWidget);
 
     // 진단 시작 → 즉시 완료(next=null) → DiagnosticResultState → PATH 생성 화면
+    // 트랙을 고르기 전에는 시작 버튼이 비활성이다.
+    await tester.tap(find.byKey(const ValueKey('diagnostic-track')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('백엔드 (Spring)').last);
+    await tester.pumpAndSettle();
     await tester.tap(find.text('진단 시작하기'));
     await tester.pumpAndSettle();
     expect(find.byType(PathPage), findsOneWidget);
@@ -164,6 +170,11 @@ void main() {
     // 로그인 → 진단 → 진단 시작 → 즉시 완료 → PATH 생성(중단)
     await tester.tap(find.text('GitHub로 계속하기 (목)'));
     await tester.pumpAndSettle();
+    // 트랙을 고르기 전에는 시작 버튼이 비활성이다.
+    await tester.tap(find.byKey(const ValueKey('diagnostic-track')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('백엔드 (Spring)').last);
+    await tester.pumpAndSettle();
     await tester.tap(find.text('진단 시작하기'));
     await tester.pumpAndSettle();
 
@@ -201,6 +212,11 @@ void main() {
 
     // 진단 시작 → 실제 픽스처(POST /onboarding/assessments → GET .../1/next)로
     // 문항이 렌더돼야 한다(회원 경로 픽스처 누락 시 이 지점에서 막힌다).
+    // 트랙을 고르기 전에는 시작 버튼이 비활성이다.
+    await tester.tap(find.byKey(const ValueKey('diagnostic-track')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('백엔드 (Spring)').last);
+    await tester.pumpAndSettle();
     await tester.tap(find.text('진단 시작하기'));
     await tester.pumpAndSettle();
     expect(find.text('비동기 함수의 반환 타입은 무엇인가요?'), findsOneWidget);
@@ -225,6 +241,11 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('GitHub로 계속하기 (목)'));
+    await tester.pumpAndSettle();
+    // 트랙을 고르기 전에는 시작 버튼이 비활성이다.
+    await tester.tap(find.byKey(const ValueKey('diagnostic-track')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('백엔드 (Spring)').last);
     await tester.pumpAndSettle();
     await tester.tap(find.text('진단 시작하기'));
     await tester.pumpAndSettle();

@@ -29,6 +29,36 @@ Widget _host() => ProviderScope(
   child: MaterialApp(theme: DpTheme.light(), home: const DiagnosticPage()),
 );
 
+/// 시작 호출을 기록하는 컨트롤러. 실제 API 를 부르지 않는다.
+class _RecordingController extends DiagnosticController {
+  final List<String> memberStarts = <String>[];
+  final List<String> guestStarts = <String>[];
+
+  @override
+  DiagnosticState build() => const DiagnosticIdle();
+
+  @override
+  Future<void> startAsMember(String track) async => memberStarts.add(track);
+
+  @override
+  Future<void> startAsGuest(String track) async => guestStarts.add(track);
+}
+
+/// 인증 상태로 고정.
+class _AuthedController extends AuthController {
+  @override
+  AuthState build() => AuthAuthenticated(
+    const User(
+      id: 'u',
+      email: 'e@x.com',
+      nickname: 'n',
+      role: UserRole.learner,
+      onboardingStatus: OnboardingStatus.pending,
+      consentStatus: ConsentStatus.done,
+    ),
+  );
+}
+
 void main() {
   testWidgets('DiagnosticIdle: 시작 안내 + 진단 시작하기 CTA 렌더', (tester) async {
     await tester.pumpWidget(
@@ -204,5 +234,105 @@ void main() {
     await tester.pumpWidget(_host());
     await tester.pump();
     expect(find.byType(DiagnosticPage), findsOneWidget);
+  });
+
+  testWidgets('트랙 미선택이면 시작할 수 없고 이유가 화면에 보인다', (tester) async {
+    final rec = _RecordingController();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authControllerProvider.overrideWith(_UnauthController.new),
+          diagnosticControllerProvider.overrideWith(() => rec),
+        ],
+        child: MaterialApp(
+          theme: DpTheme.light(),
+          home: const DiagnosticPage(),
+        ),
+      ),
+    );
+
+    // 조용한 비활성 버튼 금지 — 왜 못 누르는지 화면에 있어야 한다.
+    expect(find.byKey(const ValueKey('diagnostic-track-hint')), findsOneWidget);
+
+    final button = tester.widget<FilledButton>(find.byType(FilledButton));
+    expect(button.onPressed, isNull);
+  });
+
+  testWidgets('게스트: 고른 트랙으로 시작한다', (tester) async {
+    final rec = _RecordingController();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authControllerProvider.overrideWith(_UnauthController.new),
+          diagnosticControllerProvider.overrideWith(() => rec),
+        ],
+        child: MaterialApp(
+          theme: DpTheme.light(),
+          home: const DiagnosticPage(),
+        ),
+      ),
+    );
+
+    // 기본값(BACKEND_SPRING)이 아닌 트랙을 고른다 — 다시 하드코딩되면 red 가 된다.
+    await tester.tap(find.byKey(const ValueKey('diagnostic-track')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('DevOps').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(FilledButton));
+    await tester.pump();
+
+    expect(rec.guestStarts, ['DEVOPS']);
+    expect(rec.memberStarts, isEmpty);
+  });
+
+  testWidgets('회원: 고른 트랙으로 시작한다', (tester) async {
+    final rec = _RecordingController();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authControllerProvider.overrideWith(_AuthedController.new),
+          diagnosticControllerProvider.overrideWith(() => rec),
+        ],
+        child: MaterialApp(
+          theme: DpTheme.light(),
+          home: const DiagnosticPage(),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('diagnostic-track')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('DevOps').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(FilledButton));
+    await tester.pump();
+
+    expect(rec.memberStarts, ['DEVOPS']);
+    expect(rec.guestStarts, isEmpty);
+  });
+
+  testWidgets('선택 후에는 안내 문구가 사라진다', (tester) async {
+    final rec = _RecordingController();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authControllerProvider.overrideWith(_UnauthController.new),
+          diagnosticControllerProvider.overrideWith(() => rec),
+        ],
+        child: MaterialApp(
+          theme: DpTheme.light(),
+          home: const DiagnosticPage(),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('diagnostic-track')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('DevOps').last);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('diagnostic-track-hint')), findsNothing);
   });
 }
