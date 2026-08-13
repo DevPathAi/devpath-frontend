@@ -55,10 +55,17 @@ DB CHECK 5곳 변경이 따라붙어 성격도 크기도 다르다.
 선택기 하나로 둘 다 해결된다.
 
 **기본값을 두지 않는다.** 트랙은 문항뿐 아니라 학습 경로와 콘텐츠 매칭까지 결정한다. 조용한 기본값이
-바로 이번 결함의 형태다. 다만 프로필에 `targetTrack`이 있으면 **미리 선택된 상태**로 제시한다.
+바로 이번 결함의 형태다. 매번 이용자가 직접 고른다.
 
 고르기 전에는 시작 버튼을 비활성화하되 **왜 눌리지 않는지 화면에 적는다.** 조용한 비활성 버튼은
 이 레포에서 이미 사고를 낸 적이 있다(2026-07-27 동의 화면).
+
+**프로필 기반 프리필은 하지 않는다.** `UserSummary`(세션)는 `id`·`email`·`nickname`·`role`·
+`onboardingStatus`·`consentStatus`만 담아 `targetTrack`이 없다. 프리필하려면 진단 화면이
+`GET /users/me/profile`을 따로 부르고 로딩·실패 경로를 다뤄야 하는데, **온보딩으로 처음 들어온
+이용자는 프로필이 비어 있어 프리필할 값 자체가 없다.** 값이 있는 경우는 재진단뿐이고, 그때는
+트랙을 바꾸려는 의도적 행동이므로 직접 고르는 편이 자연스럽다. 온보딩 임계경로에 네트워크
+호출을 더할 이유가 없다.
 
 트랙 라벨은 마이페이지 `_trackLabels`와 **같은 출처**를 쓴다. 두 화면이 각자 리터럴을 들고 있으면
 트랙을 늘릴 때 한쪽만 고치는 사고가 난다. 지금 `_trackLabels`는 `mypage_page.dart`의
@@ -98,33 +105,30 @@ user_profiles.target_track = event.track
 
 마이페이지 드롭다운은 그대로 두되, 이제 **사실을 반영**하게 된다.
 
-### 재진단 = 갈아타기
+### 재진단 = 갈아타기 — **이미 동작한다**
 
-다른 트랙으로 진단을 마치면 기존 `ACTIVE` 학습 경로를 `ARCHIVED`로 내리고 새 경로를 만든다.
+다른 트랙으로 진단을 마치면 기존 `ACTIVE` 학습 경로가 `ARCHIVED`가 되고 새 경로가 생긴다.
+**이 동작은 이미 구현돼 있다.**
 
-- `learning_paths.status`는 이미 `CHECK (status IN ('ACTIVE','ARCHIVED'))`다 — 스키마 변경 없음
+```java
+// LearningPathPersistenceService.persist() — 새 경로를 만들기 전에
+paths.archiveActiveByUserId(userId);
+```
+
+`LearningPathRepository.archiveActiveByUserId()`가 `status='ACTIVE'`인 행을 `ARCHIVED`로 내린다.
+`ActivePathConflictException`은 정상 경로가 아니라 **동시 생성 경합용 안전망**이다.
+
+따라서 이 스펙은 갈아타기를 **새로 만들지 않는다.** 다만 트랙 선택을 열면 이 경로가 처음으로
+실제로 쓰이므로, 「다른 트랙으로 경로를 만들면 옛 경로가 ARCHIVED가 된다」를 **회귀 테스트로
+고정**한다. 지금은 이 동작을 지키는 테스트가 없어, 누가 `archiveActiveByUserId` 호출을 지우면
+아무도 모른 채 재진단이 깨진다.
+
+- `learning_paths.status`는 이미 `CHECK (status IN ('ACTIVE','ARCHIVED'))` — 스키마 변경 없음
 - `CREATE UNIQUE INDEX uq_learning_paths_active_user ON learning_paths(user_id) WHERE status = 'ACTIVE'`
   는 그대로 산다(이용자당 ACTIVE 1개)
 - 과거 경로는 기록으로 남는다
 
-## 인접 결함 — 이 배선을 놓으면 드러난다
-
-### 재진단은 오늘 이미 깨져 있다
-
-`LearningPathPersistenceService`는 두 번째 경로 저장 시 유니크 위반을 잡아 예외를 던진다.
-
-```java
-} catch (DataIntegrityViolationException e) {
-  if (isUniqueViolation(e)) {
-    throw new ActivePathConflictException(
-        "PATH_GENERATION_CONFLICT: an active learning path already exists for user " + userId, e);
-  }
-```
-
-지금은 트랙이 하나뿐이라 아무도 재진단할 이유가 없어 드러나지 않았을 뿐이다.
-**트랙 선택을 열면 바로 이 오류에 부딪힌다** — 위의 갈아타기는 선택이 아니라 필수다.
-
-### 고아 진단 세션
+## 인접 결함 — 고아 진단 세션
 
 `AssessmentService.start()`는 아무 확인 없이 새 행을 만든다.
 
@@ -151,7 +155,6 @@ public long start(long userId, String track) {
 | 진단 화면 | 트랙 미선택이면 시작 불가 **+ 이유가 화면에 보인다** |
 | 진단 화면 | **`DEVOPS`를 골라** 시작하면 `startAsMember('DEVOPS')`로 호출된다 |
 | 진단 화면 | 게스트도 같다 — `startAsGuest('DEVOPS')` |
-| 진단 화면 | `targetTrack`이 있으면 미리 선택된 상태로 뜬다 |
 | platform-svc | `AssessmentCompletedEvent{track}` 수신 시 `target_track`이 갱신된다(프로필 행 없으면 생성) |
 | learning-svc | 다른 트랙으로 경로 생성 시 기존 `ACTIVE`가 `ARCHIVED`, 새 경로가 `ACTIVE` |
 | learning-svc | 새 진단 시작 시 그 이용자의 기존 `IN_PROGRESS`가 `ABANDONED` |
