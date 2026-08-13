@@ -82,6 +82,11 @@ void main() {
     expect(find.byType(DiagnosticPage), findsOneWidget);
 
     // 3) 진단 시작 → 즉시 완료(next=null) → PATH 생성 화면
+    // 트랙을 고르기 전에는 시작 버튼이 비활성이다.
+    await tester.tap(find.byKey(const ValueKey('diagnostic-track')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('백엔드 (Spring)').last);
+    await tester.pumpAndSettle();
     await tester.tap(find.text('진단 시작하기'));
     await tester.pumpAndSettle();
     expect(find.byType(PathPage), findsOneWidget);

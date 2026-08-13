@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../application/mypage_controller.dart';
 import '../state/mypage_state.dart';
+import '../../common/application/track_catalog.dart';
 import '../../support/presentation/supportable_error.dart';
 
 /// 마이페이지: 프로필 표시/편집 + 활동 집계(부분실패 내성) + 설정 진입.
@@ -74,14 +75,6 @@ class _BodyState extends ConsumerState<_Body> {
     'SIDE_PROJECT': '사이드 프로젝트',
   };
 
-  static const _trackLabels = <String, String>{
-    'BACKEND_SPRING': '백엔드 (Spring)',
-    'FRONTEND_REACT': '프론트엔드 (React)',
-    'MOBILE_FLUTTER': '모바일 (Flutter)',
-    'DEVOPS': 'DevOps',
-    'FULLSTACK': '풀스택',
-  };
-
   late final TextEditingController _bio;
   late final TextEditingController _years;
   String? _learningGoal;
@@ -96,7 +89,7 @@ class _BodyState extends ConsumerState<_Body> {
     _learningGoal = _goalLabels.containsKey(p.learningGoal)
         ? p.learningGoal
         : null;
-    _targetTrack = _trackLabels.containsKey(p.targetTrack)
+    _targetTrack = trackLabels.containsKey(p.targetTrack)
         ? p.targetTrack
         : null;
   }
@@ -204,7 +197,7 @@ class _BodyState extends ConsumerState<_Body> {
                   initialValue: _targetTrack,
                   decoration: const InputDecoration(labelText: '목표 트랙'),
                   items: [
-                    for (final e in _trackLabels.entries)
+                    for (final e in trackLabels.entries)
                       DropdownMenuItem(value: e.key, child: Text(e.value)),
                   ],
                   onChanged: (v) => setState(() => _targetTrack = v),
