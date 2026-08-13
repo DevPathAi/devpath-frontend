@@ -4,7 +4,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/application/auth_controller.dart';
+import '../../common/application/external_link_opener.dart';
 import '../../common/presentation/brand_row.dart';
+import '../../settings/data/settings_models.dart';
 import '../application/consent_controller.dart';
 import '../application/consent_source.dart';
 import '../state/consent_state.dart';
@@ -12,8 +14,20 @@ import '../state/consent_state.dart';
 /// 동의 항목. 백엔드 `ConsentType`(wire) + 필수 여부 + 마이크로카피.
 /// 필수: TERMS·PRIVACY / 선택: MARKETING·LCS_ATTACH·ERROR_LOG.
 enum _ConsentKind {
-  terms('TERMS', true, '서비스 이용약관 동의', '서비스 이용에 필요한 기본 약관입니다.'),
-  privacy('PRIVACY', true, '개인정보 수집·이용 동의', '학습 진단·경로 제공을 위한 최소한의 정보를 수집합니다.'),
+  terms(
+    'TERMS',
+    true,
+    '서비스 이용약관 동의',
+    '서비스 이용에 필요한 기본 약관입니다.',
+    docUrl: 'https://leva.ai.kr/terms',
+  ),
+  privacy(
+    'PRIVACY',
+    true,
+    '개인정보 수집·이용 동의',
+    '학습 진단·경로 제공을 위한 최소한의 정보를 수집합니다.',
+    docUrl: 'https://leva.ai.kr/privacy',
+  ),
   marketing('MARKETING', false, '마케팅 정보 수신 동의', '학습 팁과 이벤트 소식을 이메일로 받아봅니다.'),
   lcsAttach(
     'LCS_ATTACH',
@@ -28,12 +42,22 @@ enum _ConsentKind {
     '오류가 나면 진단 로그를 수집해 품질 개선에 씁니다.',
   );
 
-  const _ConsentKind(this.wire, this.required, this.title, this.desc);
+  const _ConsentKind(
+    this.wire,
+    this.required,
+    this.title,
+    this.desc, {
+    this.docUrl,
+  });
 
   final String wire;
   final bool required;
   final String title;
   final String desc;
+
+  /// 전문을 읽을 수 있는 주소. 한 줄 요약만 보여주고 동의를 받는 것은 동의로
+  /// 성립하기 어렵다. 문서가 공개된 항목에만 있다.
+  final String? docUrl;
 }
 
 /// 회원가입 필수 동의 gate 화면. OAuth 직후·진단 전에 노출된다(라우터 게이트).
@@ -53,6 +77,10 @@ class _ConsentPageState extends ConsumerState<ConsentPage> {
   final FocusNode _birthYearFocus = FocusNode();
   String? _yearError;
   String? _requiredError;
+
+  /// prefill(GET /consents/me) 응답을 한 번만 폼에 반영하기 위한 플래그.
+  /// 없으면 이후 build마다 리스너가 값을 다시 덮어써 사용자의 입력을 지울 수 있다.
+  bool _prefillApplied = false;
 
   @override
   void dispose() {
@@ -103,6 +131,38 @@ class _ConsentPageState extends ConsumerState<ConsentPage> {
     final state = ref.watch(consentControllerProvider);
     if (state is ConsentBlocked) return _BlockedView();
 
+    // I-2/I-3: 재동의로 재사용되는 화면이라 기존 이용자의 선택 동의·생년을
+    // 불러와 미리 반영해야 한다. 실패해도 화면은 떠야 하므로(신규 가입자와
+    // 동일 폴백) 로딩 중에만 스피너로 막고, 에러는 그냥 빈 폼으로 넘어간다.
+    final prefill = ref.watch(consentPrefillProvider);
+    ref.listen<AsyncValue<ConsentsView>>(consentPrefillProvider, (
+      previous,
+      next,
+    ) {
+      final view = next.value;
+      if (view == null || _prefillApplied) return;
+      _prefillApplied = true;
+      setState(() {
+        // 선택 항목만 prefill한다 — 필수 2종(TERMS·PRIVACY)은 재동의의 목적이
+        // "다시 받는 것"이므로 서버 값과 무관하게 항상 false로 시작한다.
+        for (final k in _ConsentKind.values.where((k) => !k.required)) {
+          final item = view.itemOf(k.wire);
+          if (item != null) _agreed[k] = item.agreed;
+        }
+        if (view.birthYear != null) {
+          _birthYear.text = view.birthYear.toString();
+        }
+      });
+    });
+
+    if (prefill.isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    // 기존 이용자 판별: 조회된 동의 이력(items)이 있으면 재동의로 본다.
+    // prefill이 에러였다면 valueOrNull이 null이라 신규 가입자와 같게 처리된다.
+    final isReturningUser = prefill.value?.items.isNotEmpty ?? false;
+
     final c = context.dpColors;
     final submitting = state is ConsentSubmitting;
 
@@ -116,9 +176,11 @@ class _ConsentPageState extends ConsumerState<ConsentPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 brandRow(context),
-                const DpPageHeader(
-                  title: '가입 전 동의',
-                  description: '서비스 이용에 필요한 항목입니다',
+                DpPageHeader(
+                  title: isReturningUser ? '서비스 이용약관 재동의' : '가입 전 동의',
+                  description: isReturningUser
+                      ? '약관이 새로 게시되어 다시 동의를 받습니다'
+                      : '서비스 이용에 필요한 항목입니다',
                 ),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: DpSpacing.xl),
@@ -209,6 +271,16 @@ class _ConsentPageState extends ConsumerState<ConsentPage> {
     contentPadding: EdgeInsets.zero,
     title: Text(k.title),
     subtitle: Text(k.desc),
+    // 전문은 새 탭으로 연다. 동의 화면을 떠나면 여기까지 온 맥락(OAuth 직후)이
+    // 끊긴다.
+    secondary: k.docUrl == null
+        ? null
+        : TextButton(
+            key: ValueKey('consent-${k.name}-doc'),
+            onPressed: () =>
+                ref.read(externalLinkOpenerProvider).open(k.docUrl!),
+            child: Text('전문 보기', semanticsLabel: '${k.title} 전문 보기'),
+          ),
   );
 }
 
@@ -239,6 +311,17 @@ class _BlockedView extends ConsumerWidget {
                   style: Theme.of(
                     context,
                   ).textTheme.bodyMedium?.copyWith(color: c.textSecondary),
+                ),
+                const SizedBox(height: DpSpacing.sm),
+                // I-3: 기존 이용자가 재동의 중 출생 연도를 잘못 입력해도 같은
+                // 화면을 본다. 로그아웃 버튼만 있으면 "계정이 잘렸다"는 신호로
+                // 읽힌다 — 재시도 경로가 있음을 알려준다.
+                Text(
+                  '출생 연도를 잘못 입력하셨다면 다시 로그인해 재시도할 수 있습니다.',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: c.textSecondary),
                 ),
                 const SizedBox(height: DpSpacing.xl),
                 OutlinedButton(

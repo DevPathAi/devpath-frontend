@@ -11,6 +11,11 @@ const double kDpRichEditorToolbarHeight = 42.0;
 /// 툴바 아래 구분선 두께.
 const double kDpRichEditorDividerHeight = 1.0;
 
+/// 본문이 늘어날 수 있는 상한. 여기까지는 내용에 따라 커지고, 넘으면 에디터가
+/// 자체 스크롤한다. 자체 스크롤을 아예 없애면 캐럿 추적이 깨지므로(문서 참조)
+/// 없애는 대신 상한을 크게 둔다.
+const double kDpRichEditorMaxHeight = 2000.0;
+
 /// 커뮤니티 작성 본문용 WYSIWYG 에디터(웹 전용)의 툴바.
 ///
 /// 저장 계약은 마크다운(`bodyMd`)이므로 **마크다운으로 무손실 표현 가능한
@@ -75,7 +80,13 @@ class DpRichEditorToolbar extends StatelessWidget {
               multiRowsDisplay: false,
             ),
           ),
-          const Divider(height: kDpRichEditorDividerHeight),
+          // Divider를 쓰면 안 된다. dp_design이 dividerColor를 정의하지 않아
+          // Material 기본색이 적용되고, 좌우 테두리(c.border)와 색이 달라
+          // 툴바-본문 이음매가 선으로 드러난다(사용자 실측).
+          SizedBox(
+            height: kDpRichEditorDividerHeight,
+            child: ColoredBox(color: c.border),
+          ),
         ],
       ),
     );
@@ -84,16 +95,23 @@ class DpRichEditorToolbar extends StatelessWidget {
 
 /// 본문 입력 영역.
 ///
-/// `scrollable: false` 라 문서 전체 높이로 늘어난다. 자체 스크롤이 없으므로
-/// **휠 이벤트가 바깥 스크롤로 전달된다** — 고정 높이였을 때는 내부에 스크롤할
-/// 내용이 없어도 에디터가 휠을 흡수해 페이지가 멈췄다.
-/// 반드시 스크롤 가능한 부모(작성 화면의 `CustomScrollView`) 안에 둔다.
+/// `minHeight`~`maxHeight` 사이에서 **내용에 따라 늘어난다.** 늘어나는 동안에는
+/// 스크롤할 것이 없어 휠이 바깥 스크롤로 전달된다 — 고정 높이였을 때는 내부에
+/// 스크롤할 내용이 없어도 에디터가 휠을 흡수해 페이지가 멈췄다.
+///
+/// ★자체 스크롤을 없애지(`scrollable: false`) 않는 이유★ — 그러면
+/// `ScrollController` 에 클라이언트가 붙지 않아 flutter_quill 의 `bringIntoView`
+/// 가 캐럿을 좇지 못한다. 타이핑 중 커서가 화면 밖으로 나가도 아무도 따라가지
+/// 않았다(사용자 실측). 대신 `maxHeight` 를 크게 둬 같은 효과를 얻는다.
+///
+/// 스크롤 가능한 부모(작성 화면의 `CustomScrollView`) 안에 둔다.
 class DpRichEditorBody extends StatefulWidget {
   const DpRichEditorBody({
     super.key,
     required this.controller,
     this.enabled = true,
     this.minHeight = 260,
+    this.maxHeight = kDpRichEditorMaxHeight,
   });
 
   final QuillController controller;
@@ -103,6 +121,12 @@ class DpRichEditorBody extends StatefulWidget {
 
   /// 빈 문서에서도 확보할 최소 높이.
   final double minHeight;
+
+  /// 이 높이까지는 내용에 따라 늘어나고, 넘으면 에디터가 자체 스크롤한다.
+  ///
+  /// 자체 스크롤을 없애면(`scrollable: false`) 캐럿 추적이 깨지므로 유지하되,
+  /// 값을 크게 둬 실질적으로 「내용만큼 늘어나는」 동작을 얻는다.
+  final double maxHeight;
 
   @override
   State<DpRichEditorBody> createState() => _DpRichEditorBodyState();
@@ -151,15 +175,15 @@ class _DpRichEditorBodyState extends State<DpRichEditorBody> {
             bottom: Radius.circular(DpRadius.input),
           ),
         ),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(minHeight: widget.minHeight),
-          child: Padding(
-            padding: const EdgeInsets.all(DpSpacing.sm),
-            child: QuillEditor.basic(
-              controller: widget.controller,
-              focusNode: _focusNode,
-              scrollController: _scrollController,
-              config: const QuillEditorConfig(scrollable: false),
+        child: Padding(
+          padding: const EdgeInsets.all(DpSpacing.sm),
+          child: QuillEditor.basic(
+            controller: widget.controller,
+            focusNode: _focusNode,
+            scrollController: _scrollController,
+            config: QuillEditorConfig(
+              minHeight: widget.minHeight,
+              maxHeight: widget.maxHeight,
             ),
           ),
         ),
@@ -178,11 +202,13 @@ class DpRichEditor extends StatelessWidget {
     required this.controller,
     this.enabled = true,
     this.minHeight = 260,
+    this.maxHeight = kDpRichEditorMaxHeight,
   });
 
   final QuillController controller;
   final bool enabled;
   final double minHeight;
+  final double maxHeight;
 
   @override
   Widget build(BuildContext context) {
@@ -194,6 +220,7 @@ class DpRichEditor extends StatelessWidget {
           controller: controller,
           enabled: enabled,
           minHeight: minHeight,
+          maxHeight: maxHeight,
         ),
       ],
     );

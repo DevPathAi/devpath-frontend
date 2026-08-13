@@ -1,4 +1,4 @@
-import 'package:devpath_web/src/features/ads/application/ad_link_opener.dart';
+import 'package:devpath_web/src/features/common/application/external_link_opener.dart';
 import 'package:devpath_web/src/features/ads/data/ad_slot_content.dart';
 import 'package:devpath_web/src/features/ads/data/ad_view.dart';
 import 'package:devpath_web/src/features/ads/data/ads_source.dart';
@@ -10,7 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
-class _FakeOpener implements AdLinkOpener {
+class _FakeOpener implements ExternalLinkOpener {
   String? opened;
   @override
   void open(String url) => opened = url;
@@ -75,7 +75,7 @@ void main() {
           adEventProvider.overrideWithValue((id, type) async {
             events.add('$id:$type');
           }),
-          adLinkOpenerProvider.overrideWithValue(opener),
+          externalLinkOpenerProvider.overrideWithValue(opener),
         ],
         child: MaterialApp(
           theme: DpTheme.light(),
