@@ -123,6 +123,13 @@ paths.archiveActiveByUserId(userId);
 고정**한다. 지금은 이 동작을 지키는 테스트가 없어, 누가 `archiveActiveByUserId` 호출을 지우면
 아무도 모른 채 재진단이 깨진다.
 
+회귀 가드는 **둘로 나뉜다** — 하나만으로는 「그 한 줄」이 지켜지지 않는다.
+
+| 테스트 | 지키는 것 | 지키지 <b>못</b>하는 것 |
+|---|---|---|
+| `LearningPathArchiveOnSwitchTest` (통합) | 쿼리 — 내 ACTIVE만 ARCHIVED, 그 뒤 새 ACTIVE 삽입 | `persist()`를 호출하지 않으므로 호출 여부 |
+| `LearningPathPersistenceServiceTest.persistArchivesActivePathBeforeInsertingNewOne` (mock) | `persist()`가 저장 **전에** 아카이브를 부른다 | 쿼리가 실제로 맞는 행만 내리는지 |
+
 - `learning_paths.status`는 이미 `CHECK (status IN ('ACTIVE','ARCHIVED'))` — 스키마 변경 없음
 - `CREATE UNIQUE INDEX uq_learning_paths_active_user ON learning_paths(user_id) WHERE status = 'ACTIVE'`
   는 그대로 산다(이용자당 ACTIVE 1개)
@@ -157,6 +164,7 @@ public long start(long userId, String track) {
 | 진단 화면 | 게스트도 같다 — `startAsGuest('DEVOPS')` |
 | platform-svc | `AssessmentCompletedEvent{track}` 수신 시 `target_track`이 갱신된다(프로필 행 없으면 생성) |
 | learning-svc | 다른 트랙으로 경로 생성 시 기존 `ACTIVE`가 `ARCHIVED`, 새 경로가 `ACTIVE` |
+| learning-svc | `persist()`가 새 경로를 저장하기 **전에** `archiveActiveByUserId`를 부른다 |
 | learning-svc | 새 진단 시작 시 그 이용자의 기존 `IN_PROGRESS`가 `ABANDONED` |
 
 두 번째·세 번째가 핵심이다. `BACKEND_SPRING`으로 단언하면 누군가 다시 하드코딩해도 green이므로
@@ -164,14 +172,25 @@ public long start(long userId, String track) {
 
 ## 완료 조건
 
+완료 조건은 **신규 온보딩·게스트 이용자** 기준이다. 온보딩을 마친 이용자는
+`router.dart`가 `/diagnostic`을 `/path`로 되돌리고 앱에 그 링크도 없어, 아래 조건을
+**UI로 실행할 수 없다**(아래 「이 스펙 밖」 참조).
+
 - 진단 시작 화면에서 5트랙을 고를 수 있고, 고른 트랙의 문항이 나온다.
 - 진단을 마치면 마이페이지 트랙이 그 값으로 바뀐다.
 - 다른 트랙으로 다시 진단하면 옛 학습 경로가 `ARCHIVED`가 되고 새 경로가 생긴다(오류 없이).
+  — 서버 계약으로서 성립하고 회귀 테스트로 고정된다. UI 진입점은 아직 없다.
 - 진단을 다시 시작해도 `IN_PROGRESS` 세션이 쌓이지 않는다.
 - 위 테스트가 모두 통과한다.
 
 ## 이 스펙 밖
 
+- **기존 이용자의 재진단 진입점.** 이 스펙은 트랙 선택을 **신규 온보딩·게스트 경로에만**
+  연다. `apps/web/lib/src/app/router.dart`의 온보딩 게이트가 `onboardingStatus == DONE`인
+  이용자를 `/diagnostic` → `/path`로 되돌리고, 앱 어디에도 `/diagnostic` 링크가 없다.
+  따라서 「트랙을 바꿔 다시 진단」은 서버·데이터 계약으로만 성립하고 **화면으로는 도달
+  불가**다. 진입점 신설(게이트 예외 + 마이페이지·경로 화면의 「트랙 바꾸기」 버튼)은
+  별도 스펙이다. 그때까지 마이페이지 「목표 트랙」 편집은 여전히 아무것도 바꾸지 않는다.
 - **트랙 3종 확장**(Python 계열 · Node/TypeScript 백엔드 · 데이터/AI) — 별도 스펙. 트랙당
   지침 md 1개 + 문항 100개 + 학습 콘텐츠 + 임베딩 + DB CHECK 5곳(`question_bank`·`assessments`·
   `learning_paths`·`contents`·`user_profiles`) 변경. 오프라인 생성 파이프라인

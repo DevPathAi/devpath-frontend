@@ -1005,7 +1005,16 @@ cd /d/workspace/dpa/devpath-learning-svc && gh pr create --base develop --title 
 - 갈아타기 아카이브 회귀 가드가 있고 **판별력이 실증됐다**.
 - 세 레포 전체 테스트가 통과하고 PR 3건이 `develop` 대상으로 열려 있다.
 
+> **최종 리뷰 후 정정(2026-08-14).** 위 조건은 **신규 온보딩·게스트 이용자** 기준이다.
+> Task 5 의 회귀 가드도 처음에는 리포지토리 쿼리만 검증해 「`persist()` 가 그 한 줄을 부른다」를
+> 지키지 못했다 — 수정 웨이브에서 `LearningPathPersistenceServiceTest.
+> persistArchivesActivePathBeforeInsertingNewOne` 을 더해 호출까지 고정했다(호출 제거 시 red 실증).
+
 ## 이 계획의 범위 밖
 
+- **기존 이용자의 재진단 진입점.** `router.dart` 의 온보딩 게이트가 `onboardingStatus == DONE` 인
+  이용자를 `/diagnostic` → `/path` 로 되돌리고 앱에 `/diagnostic` 링크가 없어, 「트랙을 바꿔 다시
+  진단」은 이 계획 이후에도 **화면으로 도달할 수 없다**(서버·데이터 계약으로만 성립). 진입점
+  신설은 별도 스펙 — 설계 문서 「이 스펙 밖」 참조.
 - **트랙 3종 확장**(Python 계열 · Node/TypeScript 백엔드 · 데이터/AI) — 별도 스펙. 트랙당 지침 md + 문항 100개 + 학습 콘텐츠 + 임베딩 + DB CHECK 5곳 변경.
 - 배포(각 레포 `develop`→`main` 릴리스)는 컨트롤러가 별도로 판단한다.
