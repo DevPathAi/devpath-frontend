@@ -828,6 +828,8 @@ status CHECK 에 ABANDONED 가 이미 있어 스키마 변경은 없다."
 
 트랙을 바꿔 재진단하면 옛 학습 경로가 `ARCHIVED` 가 되고 새 경로가 생긴다. **이 동작은 이미 구현돼 있다** — `LearningPathPersistenceService.persist()` 가 `paths.archiveActiveByUserId(userId)` 를 먼저 부른다. 다만 이를 지키는 테스트가 없어, 누가 그 한 줄을 지우면 아무도 모른 채 재진단이 깨진다. 트랙 선택이 열리면 이 경로가 처음으로 실제로 쓰인다.
 
+> **2026-08-14 정정 — 아래 Step 1 이 만드는 테스트는 「그 한 줄」을 지키지 않는다.** 리포지토리 쿼리만 검증하고 `persist()` 를 호출하지 않아, 호출을 지워도 green 이다(최종 리뷰 I-1). 호출은 수정 웨이브에서 더한 `LearningPathPersistenceServiceTest` 의 `persistArchivesActivePathBeforeInsertingNewOne` 이 지킨다. 아래 코드블록의 javadoc 사본도 그 시점의 옛 문구이며, 실제 파일은 정정됐다. 완료 조건 아래 정정 노트를 함께 볼 것.
+
 **Files:**
 - Test: `src/test/java/ai/devpath/learning/path/LearningPathArchiveOnSwitchTest.java` (신설)
 
@@ -1007,8 +1009,8 @@ cd /d/workspace/dpa/devpath-learning-svc && gh pr create --base develop --title 
 
 > **최종 리뷰 후 정정(2026-08-14).** 위 조건은 **신규 온보딩·게스트 이용자** 기준이다.
 > Task 5 의 회귀 가드도 처음에는 리포지토리 쿼리만 검증해 「`persist()` 가 그 한 줄을 부른다」를
-> 지키지 못했다 — 수정 웨이브에서 `LearningPathPersistenceServiceTest.
-> persistArchivesActivePathBeforeInsertingNewOne` 을 더해 호출까지 고정했다(호출 제거 시 red 실증).
+> 지키지 못했다 — 수정 웨이브에서 `LearningPathPersistenceServiceTest` 의
+> `persistArchivesActivePathBeforeInsertingNewOne` 을 더해 호출까지 고정했다(호출 제거 시 red 실증).
 
 ## 이 계획의 범위 밖
 

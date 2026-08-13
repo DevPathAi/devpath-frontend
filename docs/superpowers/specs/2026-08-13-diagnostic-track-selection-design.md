@@ -120,8 +120,8 @@ paths.archiveActiveByUserId(userId);
 
 따라서 이 스펙은 갈아타기를 **새로 만들지 않는다.** 다만 트랙 선택을 열면 이 경로가 처음으로
 실제로 쓰이므로, 「다른 트랙으로 경로를 만들면 옛 경로가 ARCHIVED가 된다」를 **회귀 테스트로
-고정**한다. 지금은 이 동작을 지키는 테스트가 없어, 누가 `archiveActiveByUserId` 호출을 지우면
-아무도 모른 채 재진단이 깨진다.
+고정**한다. 이 작업 전까지는 이 동작을 지키는 테스트가 없어, 누가 `archiveActiveByUserId` 호출을
+지우면 아무도 모른 채 재진단이 깨졌다.
 
 회귀 가드는 **둘로 나뉜다** — 하나만으로는 「그 한 줄」이 지켜지지 않는다.
 
@@ -190,7 +190,10 @@ public long start(long userId, String track) {
   이용자를 `/diagnostic` → `/path`로 되돌리고, 앱 어디에도 `/diagnostic` 링크가 없다.
   따라서 「트랙을 바꿔 다시 진단」은 서버·데이터 계약으로만 성립하고 **화면으로는 도달
   불가**다. 진입점 신설(게이트 예외 + 마이페이지·경로 화면의 「트랙 바꾸기」 버튼)은
-  별도 스펙이다. 그때까지 마이페이지 「목표 트랙」 편집은 여전히 아무것도 바꾸지 않는다.
+  별도 스펙이다. 그때까지 마이페이지 「목표 트랙」 편집은 값을 저장하기는 하지만
+  (`UserProfileService.update()`가 `setTargetTrack`으로 쓴다) **문항도 학습 경로도 바꾸지
+  않고**, 다음 진단 완료 시 `AssessmentCompletedEvent`가 그 값을 말없이 덮어쓴다 —
+  작성자가 둘이 된다.
 - **트랙 3종 확장**(Python 계열 · Node/TypeScript 백엔드 · 데이터/AI) — 별도 스펙. 트랙당
   지침 md 1개 + 문항 100개 + 학습 콘텐츠 + 임베딩 + DB CHECK 5곳(`question_bank`·`assessments`·
   `learning_paths`·`contents`·`user_profiles`) 변경. 오프라인 생성 파이프라인
