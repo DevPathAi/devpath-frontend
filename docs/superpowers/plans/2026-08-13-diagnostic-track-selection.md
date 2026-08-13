@@ -33,6 +33,7 @@
 | frontend | `apps/web/lib/src/features/mypage/presentation/mypage_page.dart` | private `_trackLabels` 제거 → 공용 카탈로그 사용 |
 | frontend | `apps/web/lib/src/features/diagnostic/presentation/diagnostic_page.dart` | `_StartView` 에 트랙 선택 |
 | frontend | `apps/web/test/features/diagnostic/diagnostic_page_test.dart` | 선택·비활성·호출 인자 검증 |
+| frontend | `apps/web/test/golden_path_onboarding_test.dart` · `apps/web/test/golden_path_test.dart` | 통합 흐름에 트랙 선택 삽입(5곳) |
 | platform-svc | `src/main/java/ai/devpath/platform/onboarding/AssessmentCompletedConsumer.java` | 진단 완료 시 `target_track` 갱신 |
 | platform-svc | `src/test/java/ai/devpath/platform/onboarding/AssessmentTargetTrackSyncTest.java` (신설) | 갱신·생성 검증 |
 | learning-svc | `src/main/java/ai/devpath/learning/assessment/AssessmentRepository.java` | `ABANDONED` 일괄 전이 쿼리 |
@@ -389,6 +390,32 @@ cd /d/workspace/dpa/devpath-frontend/apps/web && flutter test test/features/diag
 
 Expected: PASS (파일 전체).
 
+- [ ] **Step 4b: 골든패스 통합 테스트를 복구한다**
+
+트랙을 고르기 전에는 시작 버튼이 비활성이므로, **「진단 시작하기」를 바로 탭하던 통합 테스트가 깨진다.** 실측 결과 5곳이다.
+
+| 파일 | 탭 지점(행) |
+|---|---|
+| `apps/web/test/golden_path_onboarding_test.dart` | 127 · 167 · 204 · 229 |
+| `apps/web/test/golden_path_test.dart` | 85 |
+
+**다섯 곳 모두** `await tester.tap(find.text('진단 시작하기'));` **바로 앞에** 아래 네 줄을 넣는다.
+
+```dart
+    // 트랙을 고르기 전에는 시작 버튼이 비활성이다.
+    await tester.tap(find.byKey(const ValueKey('diagnostic-track')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('백엔드 (Spring)').last);
+    await tester.pumpAndSettle();
+```
+
+> **여기서 `백엔드 (Spring)`(=`BACKEND_SPRING`)을 쓰는 것은 전역 제약과 충돌하지 않는다.** 그 제약은 「화면이 어떤 트랙으로 시작했는가」를 **단언**할 때 기본값을 쓰지 말라는 것이다. 이 다섯 곳은 단언이 아니라 **입력**이며, 하드코딩 시절 이 흐름이 실제로 보내던 값이다. 같은 값을 넣어야 목 픽스처와 이후 단언이 원래 의미 그대로 유지된다.
+
+들여쓰기는 각 지점의 주변 코드에 맞춘다. **그 밖의 줄을 바꾸지 않는다.**
+
+Run: `cd /d/workspace/dpa/devpath-frontend/apps/web && flutter test test/golden_path_onboarding_test.dart test/golden_path_test.dart`
+Expected: PASS (5개 전부)
+
 - [ ] **Step 5: 하드코딩이 사라졌는지 확인한다**
 
 ```bash
@@ -410,7 +437,7 @@ Expected: 전부 통과, `melos run format` 이 `0 changed`.
 - [ ] **Step 7: 커밋하고 PR 을 올린다**
 
 ```bash
-git -C /d/workspace/dpa/devpath-frontend add apps/web/lib/src/features/diagnostic/presentation/diagnostic_page.dart apps/web/test/features/diagnostic/diagnostic_page_test.dart
+git -C /d/workspace/dpa/devpath-frontend add apps/web/lib/src/features/diagnostic/presentation/diagnostic_page.dart apps/web/test/features/diagnostic/diagnostic_page_test.dart apps/web/test/golden_path_onboarding_test.dart apps/web/test/golden_path_test.dart
 git -C /d/workspace/dpa/devpath-frontend commit -m "feat(diagnostic): 진단 시작 화면에서 트랙을 고른다
 
 트랙이 'BACKEND_SPRING' 으로 하드코딩돼, 어떤 스택을 쓰든 백엔드 문항만
