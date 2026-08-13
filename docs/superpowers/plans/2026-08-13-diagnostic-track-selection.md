@@ -841,11 +841,22 @@ status CHECK 에 ABANDONED 가 이미 있어 스키마 변경은 없다."
 
 리포지토리 수준에서 검증한다 — `persist()` 는 AI 생성 결과(`GeneratedLearningPath`)를 요구해 단위 테스트에서 조립 비용이 크다. 지켜야 할 계약은 「같은 이용자의 ACTIVE 는 아카이브된다」이므로 그것을 직접 단언한다.
 
+> **⚠️ 벌크 JPQL 과 1차 캐시.** `archiveActiveByUserId` 는 `@Modifying` 벌크 UPDATE 라 **영속성
+> 컨텍스트를 건너뛰고 DB 를 직접** 고친다. 같은 트랜잭션에서 `findById()` 로 다시 읽으면 Hibernate
+> 1차 캐시의 **옛 값**이 돌아온다. 그래서 각 단언 전에 `em.clear()` 로 캐시를 비운다.
+>
+> 이것은 미관 문제가 아니다. `doesNotTouchOtherUsers` 는 캐시를 비우지 않으면 **쿼리가 잘못돼
+> 남의 행까지 아카이브해도 통과**한다 — 판별력이 0인 테스트가 된다.
+>
+> 운영 코드는 이 문제를 겪지 않는다. `persist()` 도 `start()` 도 벌크 업데이트 뒤에 그 행들을
+> **다시 읽지 않고** 새 행만 넣기 때문이다. 따라서 `clearAutomatically = true` 를 붙일 이유가 없다.
+
 ```java
 package ai.devpath.learning.path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -866,6 +877,7 @@ import org.springframework.transaction.annotation.Transactional;
 class LearningPathArchiveOnSwitchTest {
 
   @Autowired LearningPathRepository paths;
+  @Autowired EntityManager em;
 
   private LearningPath activePath(long userId, String track) {
     LearningPath p = new LearningPath();
@@ -886,7 +898,8 @@ class LearningPathArchiveOnSwitchTest {
     int archived = paths.archiveActiveByUserId(userId);
 
     assertThat(archived).isEqualTo(1);
-    paths.flush();
+    // 벌크 UPDATE 는 영속성 컨텍스트를 건너뛴다 — 비우지 않으면 캐시의 옛 값을 읽는다.
+    em.clear();
     assertThat(paths.findById(pathId).orElseThrow().getStatus()).isEqualTo("ARCHIVED");
   }
 
@@ -900,7 +913,9 @@ class LearningPathArchiveOnSwitchTest {
 
     paths.archiveActiveByUserId(mine);
 
-    paths.flush();
+    // ★비우지 않으면 이 테스트는 판별력이 0이다 — 쿼리가 남의 행을 아카이브해도
+    //  캐시가 ACTIVE 를 돌려줘 통과해 버린다.
+    em.clear();
     assertThat(paths.findById(othersPath).orElseThrow().getStatus()).isEqualTo("ACTIVE");
   }
 
@@ -911,7 +926,7 @@ class LearningPathArchiveOnSwitchTest {
     paths.saveAndFlush(activePath(userId, "BACKEND_SPRING"));
 
     paths.archiveActiveByUserId(userId);
-    paths.flush();
+    em.clear();
 
     // uq_learning_paths_active_user 는 ACTIVE 만 본다 — 아카이브 후에는 새 ACTIVE 가 들어간다.
     long newId = paths.saveAndFlush(activePath(userId, "DEVOPS")).getId();
