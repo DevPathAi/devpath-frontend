@@ -10,4 +10,5 @@ const trackLabels = <String, String>{
   'MOBILE_FLUTTER': '모바일 (Flutter)',
   'DEVOPS': 'DevOps',
   'FULLSTACK': '풀스택',
+  'PYTHON_BACKEND': 'Python 백엔드 (Django/FastAPI)',
 };
