@@ -9,13 +9,14 @@ import 'package:flutter_test/flutter_test.dart';
 /// 키는 서버 CHECK 제약(`assessments.track` 등 5곳)과 같은 값이라 조용히 줄면
 /// 이용자가 고를 수 있는 트랙만 사라진다 — 여기서 계약으로 잠근다.
 void main() {
-  test('카탈로그는 5트랙을 정확히 이 순서로 낸다', () {
+  test('카탈로그는 6트랙을 정확히 이 순서로 낸다', () {
     expect(trackLabels.keys, [
       'BACKEND_SPRING',
       'FRONTEND_REACT',
       'MOBILE_FLUTTER',
       'DEVOPS',
       'FULLSTACK',
+      'PYTHON_BACKEND',
     ]);
   });
 }
