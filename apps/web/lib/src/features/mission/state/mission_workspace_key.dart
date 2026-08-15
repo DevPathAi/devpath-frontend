@@ -29,7 +29,7 @@ final class MissionWorkspaceKey {
     required String? taskId,
     required String? contentId,
   }) {
-    final parsedTaskId = _parseCanonicalId(taskId);
+    final parsedTaskId = tryParseTaskId(taskId);
     final parsedContentId = _parseCanonicalId(contentId);
     if (parsedTaskId == null || parsedContentId == null) return null;
     return MissionWorkspaceKey(
@@ -41,6 +41,9 @@ final class MissionWorkspaceKey {
   String get contentLocation => '/mission/$taskId/content/$contentId';
 
   String get sandboxLocation => '/mission/$taskId/sandbox';
+
+  /// Parses the task-only segment used by the canonical Sandbox route.
+  static int? tryParseTaskId(String? value) => _parseCanonicalId(value);
 
   static int? _parseCanonicalId(String? value) {
     if (value == null || !RegExp(r'^[1-9][0-9]*$').hasMatch(value)) {

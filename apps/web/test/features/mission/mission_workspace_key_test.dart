@@ -19,6 +19,7 @@ void main() {
     });
 
     test('route 문자열은 양의 canonical 십진 정수만 허용한다', () {
+      expect(MissionWorkspaceKey.tryParseTaskId('7'), 7);
       expect(
         MissionWorkspaceKey.tryParse(taskId: '7', contentId: '101'),
         const MissionWorkspaceKey(taskId: 7, contentId: 101),
@@ -36,6 +37,11 @@ void main() {
         '1 ',
         '9007199254740992',
       ]) {
+        expect(
+          MissionWorkspaceKey.tryParseTaskId(value),
+          isNull,
+          reason: 'invalid standalone taskId: $value',
+        );
         expect(
           MissionWorkspaceKey.tryParse(taskId: value, contentId: '1'),
           isNull,

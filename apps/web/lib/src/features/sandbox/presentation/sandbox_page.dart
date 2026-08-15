@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../review/application/review_controller.dart';
 import '../../review/presentation/review_panel.dart';
+import '../../mission/state/mission_workspace_key.dart';
 import '../application/run_controller.dart';
 import '../state/run_state.dart';
 import 'monaco_editor_view.dart';
@@ -15,7 +16,10 @@ const _kInitialCode = 'void main() {\n  print(\'hello devpath\');\n}\n';
 const _kLanguages = ['JAVA', 'NODE', 'PYTHON'];
 
 class SandboxPage extends ConsumerStatefulWidget {
-  const SandboxPage({super.key});
+  const SandboxPage({super.key, this.workspaceKey});
+
+  /// Verified canonical workspace. Legacy `/sandbox` keeps this null.
+  final MissionWorkspaceKey? workspaceKey;
 
   @override
   ConsumerState<SandboxPage> createState() => _SandboxPageState();
@@ -39,7 +43,9 @@ class _SandboxPageState extends ConsumerState<SandboxPage> {
         children: [
           DpPageHeader(
             title: '실습 샌드박스',
-            description: '코드를 작성하고 바로 실행해 봅니다',
+            description: widget.workspaceKey == null
+                ? '코드를 작성하고 바로 실행해 봅니다'
+                : '현재 미션에서 이어진 코드 실습입니다',
             actions: [
               DropdownButton<String>(
                 key: const Key('sandbox_language_dropdown'),

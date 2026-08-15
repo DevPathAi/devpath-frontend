@@ -108,22 +108,32 @@ class AppShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final loc = GoRouterState.of(context).matchedLocation;
-    return DpCommandPalette(
-      commands: [
-        for (final d in kShellDestinations)
-          (
-            id: d.path,
-            label: d.label,
-            icon: d.icon,
-            onInvoke: () => context.go(d.path),
+    final router = GoRouter.of(context);
+    return ListenableBuilder(
+      // Imperative `push` routes are wrapped in an internal match and are not
+      // reflected by RouteMatchList.uri on every go_router version. The route
+      // information provider is the browser-visible source of truth for both
+      // declarative `go` and imperative `push` navigation.
+      listenable: router.routeInformationProvider,
+      builder: (context, _) {
+        final location = router.routeInformationProvider.value.uri.path;
+        return DpCommandPalette(
+          commands: [
+            for (final d in kShellDestinations)
+              (
+                id: d.path,
+                label: d.label,
+                icon: d.icon,
+                onInvoke: () => context.go(d.path),
+              ),
+          ],
+          child: AppShellView(
+            location: location,
+            onSelect: (path) => context.go(path),
+            child: child,
           ),
-      ],
-      child: AppShellView(
-        location: loc,
-        onSelect: (path) => context.go(path),
-        child: child,
-      ),
+        );
+      },
     );
   }
 }

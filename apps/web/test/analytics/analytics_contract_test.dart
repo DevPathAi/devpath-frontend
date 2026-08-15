@@ -209,8 +209,14 @@ void main() {
       final canonicalFile = File(
         'lib/src/analytics/mission-spine.analytics.v1.json',
       );
-      final canonical =
-          jsonDecode(canonicalFile.readAsStringSync()) as Map<String, dynamic>;
+      // Git stores this contract as LF. Some existing Windows worktrees were
+      // created before the eol=lf attribute and still expose CRLF bytes, so
+      // hash the canonical repository representation rather than checkout EOL.
+      final canonicalText = canonicalFile.readAsStringSync().replaceAll(
+        '\r\n',
+        '\n',
+      );
+      final canonical = jsonDecode(canonicalText) as Map<String, dynamic>;
       final actualEvents = <String, Object?>{
         for (final entry in analyticsEventSpecs.entries)
           entry.key: {
@@ -224,7 +230,7 @@ void main() {
       };
 
       expect(
-        sha256.convert(canonicalFile.readAsBytesSync()).toString(),
+        sha256.convert(utf8.encode(canonicalText)).toString(),
         canonicalContractSha256,
       );
       expect(canonical['version'], analyticsContractVersion);

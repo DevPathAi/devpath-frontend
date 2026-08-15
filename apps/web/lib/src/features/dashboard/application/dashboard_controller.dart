@@ -29,8 +29,7 @@ class DashboardController extends Notifier<DashboardState> {
   ///
   /// Dashboard가 닫힌 동안 계정이 바뀐 경우 post-frame 동기화 전에 이전
   /// [DashLoaded]가 한 frame 렌더되는 것을 막기 위한 read-only projection이다.
-  bool isBoundTo(String? ownerKey) =>
-      _ownerBound && _ownerKey == ownerKey;
+  bool isBoundTo(String? ownerKey) => _ownerBound && _ownerKey == ownerKey;
 
   /// Dashboard 화면이 인증 상태에서 얻은 owner를 전달한다. 컨트롤러 자체가
   /// AuthController를 강제로 초기화하지 않으므로 콘텐츠 완료 후 지표 refresh가

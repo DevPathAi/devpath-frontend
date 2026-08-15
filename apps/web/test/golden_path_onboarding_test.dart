@@ -62,6 +62,7 @@ class _NewUserFirstApiClient implements ApiClient {
   _NewUserFirstApiClient(this._inner);
   final ApiClient _inner;
   int _meCalls = 0;
+  int _thisWeekCalls = 0;
 
   @override
   Future<T> get<T>(String path, {Map<String, dynamic>? query}) {
@@ -70,6 +71,19 @@ class _NewUserFirstApiClient implements ApiClient {
         code: ApiErrorCode.resourceNotFound,
         message: '아직 생성된 학습 경로가 없습니다',
         status: 404,
+      );
+    }
+    if (path == '/learning-paths/me/this-week' && _thisWeekCalls++ == 0) {
+      return Future.value(
+        <String, dynamic>{
+              'outcome': 'NO_ACTIVE_PATH',
+              'pathId': null,
+              'weekNum': null,
+              'tasks': <Object?>[],
+              'nextTask': null,
+              'pathCompleted': false,
+            }
+            as T,
       );
     }
     return _inner.get<T>(path, query: query);

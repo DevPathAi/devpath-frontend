@@ -15,19 +15,20 @@ typedef MissionContentBuilder =
     Widget Function(BuildContext context, MissionWorkspaceKey key);
 
 /// Seam for the route-keyed Content page that follows this router slice.
-Widget legacyMissionContentBuilder(
+Widget canonicalMissionContentBuilder(
   BuildContext context,
   MissionWorkspaceKey key,
-) => ContentPage(key: ValueKey(key), contentId: key.contentId.toString());
+) => ContentPage.mission(key: ValueKey(key), workspaceKey: key);
 
 /// Resolves a canonical task/content deep link against the server-owned Today
-/// projection before allowing the legacy Content controller to issue its GET.
+/// projection before allowing the route-keyed Content controller to issue its
+/// GET or progress writes.
 class MissionContentRouteResolver extends ConsumerStatefulWidget {
   const MissionContentRouteResolver({
     super.key,
     required this.taskId,
     required this.contentId,
-    this.contentBuilder = legacyMissionContentBuilder,
+    this.contentBuilder = canonicalMissionContentBuilder,
   });
 
   final String? taskId;
@@ -115,8 +116,10 @@ class _MissionContentRouteResolverState
     MissionWorkspaceKey key,
     CurrentMission mission,
   ) {
-    final task = mission.nextTask;
-    if (task?.taskId != key.taskId || task?.contentId != key.contentId) {
+    final matching = mission.tasks.where(
+      (task) => task.taskId == key.taskId && task.contentId == key.contentId,
+    );
+    if (matching.length != 1) {
       return const _MissionRouteRecovery.mismatch();
     }
     return widget.contentBuilder(context, key);

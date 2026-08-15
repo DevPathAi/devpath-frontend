@@ -5,6 +5,7 @@ import 'package:devpath_web/src/features/auth/application/auth_controller.dart';
 import 'package:devpath_web/src/features/auth/state/auth_state.dart';
 import 'package:devpath_web/src/features/content/presentation/content_page.dart';
 import 'package:devpath_web/src/features/path/presentation/path_page.dart';
+import 'package:devpath_web/src/features/sandbox/presentation/sandbox_page.dart';
 import 'package:devpath_web/src/features/dashboard/presentation/dashboard_page.dart';
 import 'package:devpath_web/src/features/shell/presentation/app_shell.dart';
 import 'package:devpath_web/src/providers/api_providers.dart';
@@ -87,6 +88,17 @@ void main() {
     expect(find.byType(ContentPage), findsOneWidget);
     expect(find.text('에러 처리 패턴 적용'), findsWidgets);
     expect(find.textContaining('불러오지 못했'), findsNothing);
+
+    await tester.ensureVisible(find.text('실습 시작'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('실습 시작'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SandboxPage), findsOneWidget);
+    expect(
+      tester.widget<AppShellView>(find.byType(AppShellView)).location,
+      '/mission/1003/sandbox',
+    );
   });
 
   testWidgets('실제 router가 canonical Today와 검증된 mission/content deep link를 연다', (

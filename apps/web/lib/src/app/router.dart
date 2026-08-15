@@ -20,6 +20,7 @@ import '../features/community/presentation/question_create_page.dart';
 import '../features/dashboard/presentation/dashboard_page.dart';
 import '../features/mentor/presentation/mentor_page.dart';
 import '../features/mission/presentation/mission_content_route_resolver.dart';
+import '../features/mission/presentation/mission_sandbox_route_resolver.dart';
 import '../features/diagnostic/presentation/diagnostic_page.dart';
 import '../features/diagnostic/application/diagnostic_controller.dart';
 import '../features/diagnostic/state/diagnostic_state.dart';
@@ -210,6 +211,12 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/content/:id',
             builder: (_, state) =>
                 ContentPage(contentId: state.pathParameters['id']!),
+          ),
+          GoRoute(
+            path: '/mission/:taskId/sandbox',
+            builder: (_, state) => MissionSandboxRouteResolver(
+              taskId: state.pathParameters['taskId'],
+            ),
           ),
           GoRoute(path: '/sandbox', builder: (_, _) => const SandboxPage()),
           GoRoute(path: '/mentor', builder: (_, _) => const MentorPage()),
