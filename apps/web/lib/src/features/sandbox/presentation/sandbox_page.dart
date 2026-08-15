@@ -448,14 +448,8 @@ class _SandboxPageState extends ConsumerState<SandboxPage> {
   }) => SandboxLayout(
     key: _layoutKey,
     onEditorVisible: () => _editorKey.currentState?.layout(),
-    editor: MonacoEditorView(
-      key: _editorKey,
-      initialCode: draft.code,
-      language: draft.language ?? SandboxLanguage.java,
-      onChanged: (value) => ref
-          .read(sandboxWorkspaceControllerProvider(key).notifier)
-          .updateCode(value),
-    ),
+    onReviewVisibilityChanged: key == null ? null : _onReviewVisibilityChanged,
+    editor: _editorPane(key: key, draft: draft),
     log: _LogPane(
       run: run,
       onRecover: run.sandboxSessionId == null
@@ -476,6 +470,40 @@ class _SandboxPageState extends ConsumerState<SandboxPage> {
       },
     ),
   );
+
+  Widget _editorPane({
+    required MissionWorkspaceKey? key,
+    required SandboxWorkspaceState draft,
+  }) {
+    final language = draft.language;
+    if (language == null) {
+      final context = draft.context;
+      return DpEmpty(
+        key: const ValueKey('sandbox-runtime-neutral'),
+        icon: DpIcons.sandboxOff,
+        title: context?.starterKind == SandboxStarterKind.unsupported
+            ? '지원하지 않는 실행 환경이에요'
+            : '실행 언어를 선택해 주세요',
+        message: context?.starterKind == SandboxStarterKind.unsupported
+            ? '편집기와 실행기는 지원 runtime이 확인될 때까지 열지 않습니다.'
+            : '위에서 JAVA, NODE 또는 PYTHON을 선택하면 편집기를 준비합니다.',
+      );
+    }
+    return MonacoEditorView(
+      key: _editorKey,
+      initialCode: draft.code,
+      language: language,
+      onChanged: (value) => ref
+          .read(sandboxWorkspaceControllerProvider(key).notifier)
+          .updateCode(value),
+    );
+  }
+
+  void _onReviewVisibilityChanged(bool visible) {
+    if (!visible) return;
+    final key = widget.workspaceKey;
+    if (key != null) _scheduleFunnelCaptures(key);
+  }
 
   bool _hasCurrentReview(RunState run, ReviewState review) =>
       review is ReviewLoaded &&
@@ -519,6 +547,7 @@ class _SandboxPageState extends ConsumerState<SandboxPage> {
   }
 
   void _captureContextualReview(MissionWorkspaceKey key) {
+    if (_layoutKey.currentState?.isReviewVisible != true) return;
     final run = ref.read(runControllerFamilyProvider(key));
     final review = ref.read(reviewControllerFamilyProvider(key));
     final reviewId = contextualReviewId(run: run, review: review);

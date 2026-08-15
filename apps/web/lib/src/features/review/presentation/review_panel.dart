@@ -67,8 +67,8 @@ class _ReviewPanelState extends ConsumerState<ReviewPanel> {
         icon: DpIcons.content,
         title: 'AI 코드리뷰',
         message: '코드를 작성하고 리뷰를 받아보세요.',
-        actionLabel: 'AI 리뷰 요청',
-        onAction: _requestCurrentSession,
+        actionLabel: widget.workspaceKey == null ? 'AI 리뷰 요청' : null,
+        onAction: widget.workspaceKey == null ? _requestCurrentSession : null,
       ),
       ReviewLoading() => const DpLoading(label: '리뷰 생성 중…'),
       // F6-a: P3 DpKillSwitch의 대체행동(altActionLabel/onAltAction)을 배선 —

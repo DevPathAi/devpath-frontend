@@ -210,6 +210,11 @@ final class SandboxSession {
         'Sandbox session status and finishedAt are inconsistent',
       );
     }
+    if (finishedAt != null && finishedAt.isBefore(startedAt)) {
+      throw const FormatException(
+        'Sandbox session finishedAt precedes startedAt',
+      );
+    }
     return SandboxSession(
       sessionId: sessionId,
       language: SandboxLanguage.fromWire(rawLanguage),

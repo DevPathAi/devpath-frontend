@@ -286,6 +286,15 @@ void main() {
       () => SandboxSession.fromJson(session(startedAt: '2026-13-40T25:61:61Z')),
       throwsFormatException,
     );
+    expect(
+      () => SandboxSession.fromJson(
+        session(
+          startedAt: '2026-08-16T00:00:02Z',
+          finishedAt: '2026-08-16T00:00:01Z',
+        ),
+      ),
+      throwsFormatException,
+    );
 
     expect(SandboxSession.fromJson(session()).status.isTerminal, isTrue);
   });

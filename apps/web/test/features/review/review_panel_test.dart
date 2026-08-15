@@ -100,6 +100,27 @@ void main() {
     expect(find.text('AI 리뷰 요청'), findsOneWidget);
   });
 
+  testWidgets('canonical idle: route primary와 경쟁하는 Filled action이 없다', (
+    tester,
+  ) async {
+    const workspaceKey = MissionWorkspaceKey(taskId: 7, contentId: 11);
+    final c = ProviderContainer(
+      overrides: [
+        currentMissionOwnerKeyProvider.overrideWithValue('owner-1'),
+        reviewControllerFamilyProvider(
+          workspaceKey,
+        ).overrideWith(() => _FakeReview(const ReviewIdle())),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    await tester.pumpWidget(_host(c, workspaceKey: workspaceKey));
+
+    expect(find.text('AI 코드리뷰'), findsOneWidget);
+    expect(find.text('AI 리뷰 요청'), findsNothing);
+    expect(find.byType(FilledButton), findsNothing);
+  });
+
   testWidgets('loaded: 신뢰도와 개선 라인 표시', (tester) async {
     final c = ProviderContainer(
       overrides: [

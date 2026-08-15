@@ -70,29 +70,51 @@
       var editor = null;
       var pendingCode = code;
       var pendingRuntime = runtime;
+      var monacoReady = false;
+      var disposed = false;
       function monacoLanguage(value) {
+        if (value === 'JAVA') return 'java';
         if (value === 'NODE') return 'javascript';
         if (value === 'PYTHON') return 'python';
-        return 'java';
+        return null;
+      }
+      function renderPending() {
+        if (!monacoReady || disposed) return;
+        var language = monacoLanguage(pendingRuntime);
+        if (language === null) {
+          if (editor) { editor.dispose(); editor = null; }
+          container.textContent = '';
+          container.setAttribute('data-runtime-state', 'unsupported');
+          return;
+        }
+        container.removeAttribute('data-runtime-state');
+        if (!editor) {
+          editor = monaco.editor.create(container, {
+            value: pendingCode, language: language, theme: 'vs-dark',
+            automaticLayout: true, minimap: { enabled: false }, fontSize: 14,
+          });
+          editor.onDidChangeModelContent(function () { onChange(editor.getValue()); });
+          // F5-c DD7: Esc 시 Monaco 밖(dart sentinel)으로 포커스를 넘긴다.
+          editor.addCommand(monaco.KeyCode.Escape, function () { onEscape(); });
+          return;
+        }
+        if (editor.getValue() !== pendingCode) editor.setValue(pendingCode);
+        monaco.editor.setModelLanguage(editor.getModel(), language);
       }
       require(['vs/editor/editor.main'], function () {
-        editor = monaco.editor.create(container, {
-          value: pendingCode, language: monacoLanguage(pendingRuntime), theme: 'vs-dark',
-          automaticLayout: true, minimap: { enabled: false }, fontSize: 14,
-        });
-        editor.onDidChangeModelContent(function () { onChange(editor.getValue()); });
-        // F5-c DD7: Esc 시 Monaco 밖(dart sentinel)으로 포커스를 넘긴다.
-        editor.addCommand(monaco.KeyCode.Escape, function () { onEscape(); });
+        monacoReady = true;
+        renderPending();
       });
       return {
-        dispose: function () { if (editor) editor.dispose(); }, // F5-a
+        dispose: function () {
+          disposed = true;
+          if (editor) { editor.dispose(); editor = null; }
+        }, // F5-a
         layout:  function () { if (editor) editor.layout(); },  // F5-b
         update:  function (nextCode, nextRuntime) {
           pendingCode = nextCode;
           pendingRuntime = nextRuntime;
-          if (!editor) return;
-          if (editor.getValue() !== nextCode) editor.setValue(nextCode);
-          monaco.editor.setModelLanguage(editor.getModel(), monacoLanguage(nextRuntime));
+          renderPending();
         },
       };
     };

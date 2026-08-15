@@ -14,6 +14,7 @@ import 'package:devpath_web/src/features/sandbox/application/sandbox_funnel_anal
 import 'package:devpath_web/src/features/sandbox/data/sandbox_funnel_store.dart';
 import 'package:devpath_web/src/features/sandbox/data/sandbox_run_source.dart';
 import 'package:devpath_web/src/features/sandbox/data/sandbox_session_store.dart';
+import 'package:devpath_web/src/features/sandbox/presentation/monaco_editor_view.dart';
 import 'package:devpath_web/src/features/sandbox/presentation/sandbox_page.dart';
 import 'package:devpath_web/src/features/sandbox/state/run_state.dart';
 import 'package:devpath_web/src/providers/api_providers.dart';
@@ -404,11 +405,35 @@ void main() {
       findsOneWidget,
     );
     expect(find.textContaining('public class Main'), findsNothing);
+    expect(find.byType(MonacoEditorView), findsNothing);
+    expect(
+      find.byKey(const ValueKey('sandbox-runtime-neutral')),
+      findsOneWidget,
+    );
     expect(find.text('코드 실행'), findsOneWidget);
     final band = tester.widget<DpNextActionBand>(find.byType(DpNextActionBand));
     expect(band.state, DpNextActionState.disabled);
     expect(calls, 0);
   });
+
+  for (final width in <double>[1024, 1240]) {
+    testWidgets('${width.toInt()}px canonical idle은 primary surface가 하나다', (
+      tester,
+    ) async {
+      tester.view.physicalSize = Size(width, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      await _pump(tester, track: 'BACKEND_SPRING');
+
+      expect(
+        find.byKey(const ValueKey('dp-next-action-primary')),
+        findsOneWidget,
+      );
+      expect(find.text('AI 리뷰 요청'), findsNothing);
+      expect(find.byType(FilledButton), findsNothing);
+    });
+  }
 
   testWidgets('FULLSTACK은 runtime 선택 전 비활성이고 명시 선택 뒤 generic을 실행한다', (
     tester,
@@ -667,6 +692,16 @@ void main() {
         'run_id': 91,
         'first_successful_run': true,
       });
+      expect(
+        analytics.events.where(
+          (entry) => entry.$1 == 'contextual_review_viewed',
+        ),
+        isEmpty,
+        reason: 'offstage Review pane은 viewed가 아니다',
+      );
+      await tester.tap(find.text('리뷰').first);
+      await tester.pumpAndSettle();
+
       final review = analytics.events.singleWhere(
         (entry) => entry.$1 == 'contextual_review_viewed',
       );
@@ -678,6 +713,16 @@ void main() {
         'next_action_outcome': 'next_mission',
         'first_view': true,
       });
+      await tester.tap(find.text('에디터').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('리뷰').first);
+      await tester.pumpAndSettle();
+      expect(
+        analytics.events.where(
+          (event) => event.$1 == 'contextual_review_viewed',
+        ),
+        hasLength(1),
+      );
       for (final event in analytics.events) {
         expect(event.$2.keys, isNot(containsAll(['code', 'output', 'status'])));
       }
@@ -691,8 +736,6 @@ void main() {
       expect(tester.takeException(), isNull);
 
       final router = GoRouter.of(tester.element(find.byType(SandboxPage)));
-      await tester.tap(find.text('리뷰').first);
-      await tester.pumpAndSettle();
       await tester.drag(find.byType(ListView).last, const Offset(0, -320));
       await tester.pumpAndSettle();
       expect(
@@ -727,6 +770,49 @@ void main() {
       semantics.dispose();
     },
   );
+
+  testWidgets('1024px visible Review는 contextual funnel을 즉시 한 번 보낸다', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1024, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final analytics = _SpyAnalytics();
+    await _pump(
+      tester,
+      track: 'BACKEND_SPRING',
+      authenticated: true,
+      fixedOwner: '73',
+      analytics: analytics,
+      funnelStore: MemorySandboxFunnelStore(),
+      review: const {
+        'id': '501',
+        'status': 'DONE',
+        'confidence': 92,
+        'strengths': ['정확한 예외 처리'],
+        'improvements': <Map<String, Object?>>[],
+        'security': <Map<String, Object?>>[],
+      },
+      connect: (_) async* {
+        yield const SseEvent(event: 'session', data: '91');
+        yield const SseEvent(
+          event: 'result',
+          data:
+              '{"sessionId":91,"status":"COMPLETED",'
+              '"exitCode":0,"truncated":false}',
+        );
+      },
+    );
+
+    await tester.ensureVisible(find.text('코드 실행'));
+    await tester.tap(find.text('코드 실행'));
+    await tester.pumpAndSettle();
+
+    expect(
+      analytics.events.where((event) => event.$1 == 'contextual_review_viewed'),
+      hasLength(1),
+    );
+  });
 
   testWidgets('invalid review id는 review funnel을 보내지 않는다', (tester) async {
     final analytics = _SpyAnalytics();

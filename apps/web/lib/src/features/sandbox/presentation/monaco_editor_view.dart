@@ -22,7 +22,7 @@ class MonacoEditorView extends StatefulWidget {
   const MonacoEditorView({
     super.key,
     required this.initialCode,
-    this.language = SandboxLanguage.java,
+    required this.language,
     this.onChanged,
   });
   final String initialCode;

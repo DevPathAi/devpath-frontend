@@ -10,7 +10,10 @@ void main() {
       MaterialApp(
         theme: DpTheme.light(),
         home: const Scaffold(
-          body: MonacoEditorView(initialCode: 'void main() {}'),
+          body: MonacoEditorView(
+            initialCode: 'void main() {}',
+            language: SandboxLanguage.java,
+          ),
         ),
       ),
     );
@@ -25,7 +28,10 @@ void main() {
       MaterialApp(
         theme: DpTheme.light(),
         home: const Scaffold(
-          body: MonacoEditorView(initialCode: 'void main() {}'),
+          body: MonacoEditorView(
+            initialCode: 'void main() {}',
+            language: SandboxLanguage.java,
+          ),
         ),
       ),
     );
