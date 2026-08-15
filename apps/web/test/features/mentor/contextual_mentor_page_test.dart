@@ -143,7 +143,7 @@ Future<ProviderContainer> _pump(
       mentorContextualSseConnectProvider.overrideWithValue(
         (
           question, {
-          String? contentId,
+          int? contentId,
           int? contextSnapshotId,
           int fromStep = 0,
         }) =>
@@ -188,7 +188,18 @@ void main() {
     expect(find.textContaining('LCS'), findsNothing);
     expect(find.text('현재 편집기 코드'), findsOneWidget);
     expect(find.text('최근 오류'), findsOneWidget);
-    expect(find.text('제외됨'), findsNWidgets(2));
+    expect(find.text('제외됨'), findsNWidgets(3));
+    final initialCapsule = tester.widget<DpContextCapsule>(
+      find.byType(DpContextCapsule),
+    );
+    final sensitivityById = {
+      for (final field in initialCapsule.fields) field.id: field.sensitivity,
+    };
+    expect(sensitivityById['review_summary'], DpContextSensitivity.medium);
+    expect(
+      sensitivityById['current_code'],
+      DpContextSensitivity.potentiallySensitive,
+    );
 
     await tester.enterText(find.byType(TextField), '왜 실패하나요?');
     expect(

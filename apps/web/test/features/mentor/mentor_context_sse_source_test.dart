@@ -96,7 +96,7 @@ void main() {
     await container
         .read(mentorContextualSseConnectProvider)(
           '왜 실패하나요?',
-          contentId: '3',
+          contentId: 3,
           contextSnapshotId: 71,
         )
         .toList();
@@ -106,7 +106,7 @@ void main() {
     expect(adapter.request?.queryParameters, isEmpty);
     expect(adapter.request?.data, {
       'message': '왜 실패하나요?',
-      'contentId': '3',
+      'contentId': 3,
       'contextSnapshotId': 71,
     });
   });
@@ -131,7 +131,7 @@ void main() {
     await container
         .read(mentorContextualSseConnectProvider)(
           '질문',
-          contentId: '3',
+          contentId: 3,
           contextSnapshotId: null,
         )
         .toList();

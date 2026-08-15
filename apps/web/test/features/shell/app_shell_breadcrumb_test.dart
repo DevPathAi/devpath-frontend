@@ -24,6 +24,11 @@ void main() {
       (label: '오늘', path: '/dashboard'),
       (label: '실습 샌드박스', path: null),
     ]);
+    expect(breadcrumbFor('/mission/302/mentor'), const [
+      (label: '학습', path: null),
+      (label: '오늘', path: '/dashboard'),
+      (label: 'AI 멘토', path: null),
+    ]);
   });
 
   test('커뮤니티 하위 화면은 게시판 세그먼트가 클릭 가능', () {

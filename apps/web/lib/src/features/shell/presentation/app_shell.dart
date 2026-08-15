@@ -32,7 +32,11 @@ List<DpCrumb> breadcrumbFor(String location) {
   const account = (label: '계정', path: null);
 
   if (location.startsWith('/mission/')) {
-    final label = location.contains('/sandbox') ? '실습 샌드박스' : '학습 콘텐츠';
+    final label = location.contains('/mentor')
+        ? 'AI 멘토'
+        : location.contains('/sandbox')
+        ? '실습 샌드박스'
+        : '학습 콘텐츠';
     return [
       learning,
       const (label: '오늘', path: '/dashboard'),

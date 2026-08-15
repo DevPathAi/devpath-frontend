@@ -335,7 +335,10 @@ Future<ProviderContainer> _pump(
         builder: (_, state) {
           final intent = state.extra! as MentorEntryIntent;
           return Text(
-            'MENTOR:${intent.scopeKey.ownerId}:${intent.includeCurrentCode}',
+            'MENTOR:${intent.scopeKey.ownerId}:'
+            '${intent.entryReason.name}:'
+            '${intent.includeCurrentCode}:'
+            '${intent.includeReviewSummary}',
             textDirection: TextDirection.ltr,
           );
         },
@@ -375,8 +378,10 @@ void main() {
       await tester.tap(find.text('AI 멘토에게 질문'));
       await tester.pumpAndSettle();
 
-      expect(find.text('MENTOR:73:true'), findsOneWidget);
-      GoRouter.of(tester.element(find.text('MENTOR:73:true'))).pop();
+      expect(find.text('MENTOR:73:sandboxEditor:true:false'), findsOneWidget);
+      GoRouter.of(
+        tester.element(find.text('MENTOR:73:sandboxEditor:true:false')),
+      ).pop();
       await tester.pumpAndSettle();
       expect(find.byType(SandboxPage), findsOneWidget);
       expect(find.text('AI 멘토에게 질문'), findsOneWidget);
@@ -698,7 +703,7 @@ void main() {
     'persisted success와 valid ReviewLoaded는 exact funnel을 한 번 보내고 다음 Today로 간다',
     (tester) async {
       final semantics = tester.ensureSemantics();
-      tester.view.physicalSize = const Size(320, 800);
+      tester.view.physicalSize = const Size(320, 900);
       tester.view.devicePixelRatio = 1;
       tester.platformDispatcher.textScaleFactorTestValue = 2;
       addTearDown(tester.view.reset);
@@ -768,6 +773,14 @@ void main() {
         'next_action_outcome': 'next_mission',
         'first_view': true,
       });
+      await tester.ensureVisible(find.text('AI 멘토에게 질문'));
+      await tester.tap(find.text('AI 멘토에게 질문'));
+      await tester.pumpAndSettle();
+      expect(find.text('MENTOR:73:review:false:true'), findsOneWidget);
+      GoRouter.of(
+        tester.element(find.text('MENTOR:73:review:false:true')),
+      ).pop();
+      await tester.pumpAndSettle();
       await tester.tap(find.text('에디터').first);
       await tester.pumpAndSettle();
       await tester.tap(find.text('리뷰').first);

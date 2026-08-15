@@ -18,16 +18,21 @@ const _kExamples = ['비동기란?', '테스트는 어떻게 작성하나요?', 
 const double _kFollowThreshold = 120;
 
 class MentorPage extends ConsumerStatefulWidget {
-  const MentorPage({super.key}) : scopeKey = null, includeCurrentCode = false;
+  const MentorPage({super.key})
+    : scopeKey = null,
+      includeCurrentCode = false,
+      includeReviewSummary = false;
 
   const MentorPage.contextual({
     super.key,
     required this.scopeKey,
     this.includeCurrentCode = false,
+    this.includeReviewSummary = false,
   });
 
   final MentorScopeKey? scopeKey;
   final bool includeCurrentCode;
+  final bool includeReviewSummary;
 
   @override
   ConsumerState<MentorPage> createState() => _MentorPageState();
@@ -53,7 +58,8 @@ class _MentorPageState extends ConsumerState<MentorPage> {
   void didUpdateWidget(covariant MentorPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.scopeKey != widget.scopeKey ||
-        oldWidget.includeCurrentCode != widget.includeCurrentCode) {
+        oldWidget.includeCurrentCode != widget.includeCurrentCode ||
+        oldWidget.includeReviewSummary != widget.includeReviewSummary) {
       final oldScope = oldWidget.scopeKey;
       if (oldScope != null) _retention?.deactivate(oldScope);
       _capsuleExpandedOverride = null;
@@ -70,7 +76,10 @@ class _MentorPageState extends ConsumerState<MentorPage> {
       _retention!.activate(scope);
       ref
           .read(contextualMentorControllerProvider(scope).notifier)
-          .initializeContext(includeCurrentCode: widget.includeCurrentCode);
+          .initializeContext(
+            includeCurrentCode: widget.includeCurrentCode,
+            includeReviewSummary: widget.includeReviewSummary,
+          );
     });
   }
 
@@ -134,6 +143,15 @@ class _MentorPageState extends ConsumerState<MentorPage> {
     }
   }
 
+  void _listenForOwnerChanges() {
+    if (_isContextual) return;
+    ref.listen(currentMissionOwnerKeyProvider, (previous, owner) {
+      if (previous == owner) return;
+      _input.clear();
+      _capsuleExpandedOverride = null;
+    });
+  }
+
   Future<void> _sendLegacy(String question) async {
     final normalized = question.trim();
     if (normalized.isEmpty) return;
@@ -172,6 +190,7 @@ class _MentorPageState extends ConsumerState<MentorPage> {
 
   @override
   Widget build(BuildContext context) {
+    _listenForOwnerChanges();
     _listenForMessages();
     final state = _watchState();
     return _isContextual
@@ -446,8 +465,9 @@ class _MentorPageState extends ConsumerState<MentorPage> {
       valueSummary: summary,
       source: _fieldSource(id),
       sensitivity: switch (id) {
-        'current_content' || 'review_summary' => DpContextSensitivity.low,
-        'current_code' => DpContextSensitivity.medium,
+        'current_content' => DpContextSensitivity.low,
+        'review_summary' => DpContextSensitivity.medium,
+        'current_code' => DpContextSensitivity.potentiallySensitive,
         _ => DpContextSensitivity.potentiallySensitive,
       },
       inclusion: included

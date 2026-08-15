@@ -22,14 +22,24 @@ final class MentorScopeKey {
   String toString() => 'MentorScopeKey(workspace: $workspaceKey)';
 }
 
-/// Navigation-only intent. It contains identifiers and a one-request opt-in,
-/// never editor text, output, errors, prompts, or snapshot content.
+/// Navigation-only intent. It contains identifiers, the explicit CTA reason,
+/// and selection defaults; never editor text, output, errors, prompts, or
+/// snapshot content.
+enum MentorEntryReason { sandboxEditor, review }
+
 final class MentorEntryIntent {
   const MentorEntryIntent({
     required this.scopeKey,
-    this.includeCurrentCode = false,
-  });
+    required this.entryReason,
+    required this.includeCurrentCode,
+    required this.includeReviewSummary,
+  }) : assert(
+         !includeCurrentCode || entryReason == MentorEntryReason.sandboxEditor,
+       ),
+       assert(!includeReviewSummary || entryReason == MentorEntryReason.review);
 
   final MentorScopeKey scopeKey;
+  final MentorEntryReason entryReason;
   final bool includeCurrentCode;
+  final bool includeReviewSummary;
 }

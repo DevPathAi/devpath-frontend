@@ -25,7 +25,7 @@ typedef MentorSseConnect =
 typedef MentorContextualSseConnect =
     Stream<SseEvent> Function(
       String question, {
-      String? contentId,
+      int? contentId,
       int? contextSnapshotId,
       int fromStep,
     });
@@ -118,7 +118,7 @@ final mentorContextualSseConnectProvider = Provider<MentorContextualSseConnect>(
     if (config.useMock) {
       return (
         question, {
-        String? contentId,
+        int? contentId,
         int? contextSnapshotId,
         int fromStep = 0,
       }) async* {
@@ -135,7 +135,7 @@ final mentorContextualSseConnectProvider = Provider<MentorContextualSseConnect>(
     final apiClient = ref.watch(apiClientProvider);
     return (
       question, {
-      String? contentId,
+      int? contentId,
       int? contextSnapshotId,
       int fromStep = 0,
     }) {

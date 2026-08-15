@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:devpath_web/src/features/community/data/lcs_source.dart';
+import 'package:devpath_web/src/features/dashboard/application/current_mission_controller.dart';
 import 'package:devpath_web/src/features/mentor/application/mentor_controller.dart';
 import 'package:devpath_web/src/features/mentor/data/mentor_sse_source.dart';
 import 'package:devpath_web/src/features/mentor/state/mentor_state.dart';
@@ -14,6 +15,17 @@ Stream<SseEvent> _tokens(List<String> t) async* {
     yield SseEvent(event: 'token', data: x);
   }
   yield const SseEvent(event: 'terminal', data: '{"status":"DONE"}');
+}
+
+final _ownerProvider = NotifierProvider<_OwnerController, String?>(
+  _OwnerController.new,
+);
+
+final class _OwnerController extends Notifier<String?> {
+  @override
+  String? build() => 'owner-a';
+
+  void switchTo(String owner) => state = owner;
 }
 
 void main() {
@@ -110,12 +122,12 @@ void main() {
     expect(s.messages.last.text, '부분'); // 보존
   });
 
-  test('명시 terminal 전 EOF는 빈 멘토 버블을 제거하고 partial이다', () async {
+  test('legacy contextless는 token+EOF를 기존 idle success로 유지한다', () async {
     final c = ProviderContainer(
       overrides: [
         mentorSseConnectProvider.overrideWithValue(
           (q, {String? contentId, int fromStep = 0}) =>
-              const Stream<SseEvent>.empty(),
+              Stream.value(const SseEvent(event: 'token', data: '기존 답변')),
         ),
       ],
     );
@@ -123,10 +135,54 @@ void main() {
 
     await c.read(mentorControllerProvider.notifier).send('질문');
     final s = c.read(mentorControllerProvider);
-    expect(s.status, MentorStatus.partial);
-    // 사용자 버블만 — 빈 멘토 버블 잔류 없음.
-    expect(s.messages, hasLength(1));
-    expect(s.messages.single.fromUser, isTrue);
+    expect(s.status, MentorStatus.idle);
+    expect(s.messages.last.text, '기존 답변');
+  });
+
+  test('global /mentor는 A pending→B에서 즉시 reset하고 A late event를 무시한다', () async {
+    final stream = StreamController<SseEvent>();
+    final c = ProviderContainer(
+      overrides: [
+        currentMissionOwnerKeyProvider.overrideWith(
+          (ref) => ref.watch(_ownerProvider),
+        ),
+        mentorSseConnectProvider.overrideWithValue(
+          (question, {String? contentId, int fromStep = 0}) => stream.stream,
+        ),
+      ],
+    );
+    addTearDown(() async {
+      await stream.close();
+      c.dispose();
+    });
+
+    final pending = c.read(mentorControllerProvider.notifier).send('A 질문');
+    stream.add(const SseEvent(event: 'token', data: 'A 답변'));
+    stream.add(
+      SseEvent(
+        event: 'references',
+        data: jsonEncode(const [
+          {'contentId': 7, 'slug': 'a', 'title': 'A 참고'},
+        ]),
+      ),
+    );
+    await Future<void>.delayed(Duration.zero);
+    expect(c.read(mentorControllerProvider).messages, isNotEmpty);
+    expect(c.read(mentorControllerProvider).references, isNotEmpty);
+
+    c.read(_ownerProvider.notifier).switchTo('owner-b');
+    await Future<void>.delayed(Duration.zero);
+
+    var state = c.read(mentorControllerProvider);
+    expect(state.status, MentorStatus.idle);
+    expect(state.messages, isEmpty);
+    expect(state.references, isEmpty);
+    stream.add(const SseEvent(event: 'token', data: 'A 늦은 토큰'));
+    await Future<void>.delayed(Duration.zero);
+    state = c.read(mentorControllerProvider);
+    expect(state.messages, isEmpty);
+    expect(state.references, isEmpty);
+    await pending;
   });
 
   // ENG-REVIEW(취소 경쟁조건): 연속 send 시 잔여 콜백이 새 버블에 오append되지 않는다.

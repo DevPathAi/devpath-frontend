@@ -89,7 +89,8 @@ class MentorController extends Notifier<MentorState> {
   StreamSubscription<SseEvent>? _sub;
   Completer<void>? _inFlight;
   String? _lastQuestion;
-  String? _lastContentId;
+  String? _lastLegacyContentId;
+  int? _lastContextualContentId;
   int? _lastContextSnapshotId;
   List<String> _lastUsedContextFields = const [];
   var _generation = 0;
@@ -100,12 +101,12 @@ class MentorController extends Notifier<MentorState> {
   MentorState build() {
     _disposed = false;
     final scope = scopeKey;
-    if (scope != null) {
-      ref.listen(currentMissionOwnerKeyProvider, (_, owner) {
-        if (_disposed || owner == scope.ownerId) return;
+    ref.listen(currentMissionOwnerKeyProvider, (previous, owner) {
+      if (_disposed || previous == owner) return;
+      if (scope == null || owner != scope.ownerId) {
         _resetForOwnershipChange();
-      });
-    }
+      }
+    });
     ref.onDispose(() {
       _disposed = true;
       _generation += 1;
@@ -115,7 +116,10 @@ class MentorController extends Notifier<MentorState> {
     return const MentorState();
   }
 
-  void initializeContext({required bool includeCurrentCode}) {
+  void initializeContext({
+    required bool includeCurrentCode,
+    bool includeReviewSummary = false,
+  }) {
     final scope = scopeKey;
     if (scope == null) return;
     final preservesSameQuestionRetry =
@@ -140,6 +144,7 @@ class MentorController extends Notifier<MentorState> {
       contextOptions: _contextOptions(
         evidence,
         includeCurrentCode: includeCurrentCode,
+        includeReviewSummary: includeReviewSummary,
       ),
       contextPhase: MentorContextPhase.selecting,
       contextPreview: null,
@@ -154,7 +159,7 @@ class MentorController extends Notifier<MentorState> {
     final scope = scopeKey;
     if (scope == null) return;
     if (!_contextInitialized) {
-      initializeContext(includeCurrentCode: false);
+      initializeContext(includeCurrentCode: false, includeReviewSummary: false);
       return;
     }
     final previous = {
@@ -164,16 +169,11 @@ class MentorController extends Notifier<MentorState> {
         _contextOptions(
               ref.read(mentorContextEvidenceProvider(scope)),
               includeCurrentCode: false,
+              includeReviewSummary: false,
             )
             .map((option) {
               final prior = previous[option.id];
-              final becameAvailableReview =
-                  option.id == 'review_summary' &&
-                  prior?.available == false &&
-                  option.available;
-              final selected =
-                  option.available &&
-                  (prior?.selected == true || becameAvailableReview);
+              final selected = option.available && prior?.selected == true;
               return option.copyWith(selected: selected);
             })
             .toList(growable: false);
@@ -217,7 +217,7 @@ class MentorController extends Notifier<MentorState> {
       _clearRetryMetadata();
     }
     if (!_contextInitialized) {
-      initializeContext(includeCurrentCode: false);
+      initializeContext(includeCurrentCode: false, includeReviewSummary: false);
     } else {
       refreshContextSources();
     }
@@ -304,7 +304,7 @@ class MentorController extends Notifier<MentorState> {
       _resetOneRequestSelections();
       await _sendStream(
         question,
-        contentId: scope.workspaceKey.contentId.toString(),
+        contextualContentId: scope.workspaceKey.contentId,
         contextSnapshotId: snapshotId,
         usedContextFields: List.unmodifiable(draft.fieldsAvailable),
       );
@@ -318,14 +318,15 @@ class MentorController extends Notifier<MentorState> {
   /// LCS draft/commit calls.
   Future<void> send(String question, {String? contentId}) => _sendStream(
     question,
-    contentId: contentId,
+    legacyContentId: contentId,
     contextSnapshotId: null,
     usedContextFields: const [],
   );
 
   Future<void> _sendStream(
     String question, {
-    required String? contentId,
+    String? legacyContentId,
+    int? contextualContentId,
     required int? contextSnapshotId,
     required List<String> usedContextFields,
   }) {
@@ -340,7 +341,8 @@ class MentorController extends Notifier<MentorState> {
     _completeInFlight();
     final generation = ++_generation;
     _lastQuestion = normalized;
-    _lastContentId = contentId;
+    _lastLegacyContentId = legacyContentId;
+    _lastContextualContentId = contextualContentId;
     _lastContextSnapshotId = contextSnapshotId;
     _lastUsedContextFields = List.unmodifiable(usedContextFields);
     final done = Completer<void>();
@@ -364,10 +366,13 @@ class MentorController extends Notifier<MentorState> {
     Stream<SseEvent> stream;
     try {
       stream = scope == null
-          ? ref.read(mentorSseConnectProvider)(normalized, contentId: contentId)
+          ? ref.read(mentorSseConnectProvider)(
+              normalized,
+              contentId: legacyContentId,
+            )
           : ref.read(mentorContextualSseConnectProvider)(
               normalized,
-              contentId: contentId,
+              contentId: contextualContentId,
               contextSnapshotId: contextSnapshotId,
             );
     } on Object catch (error) {
@@ -427,11 +432,21 @@ class MentorController extends Notifier<MentorState> {
           return;
         }
         terminalReceived = true;
-        state = state.copyWith(
-          messages: _pruneEmptyMentorBubble(state.messages, targetIndex),
-          status: MentorStatus.partial,
-          error: '답변이 완료되기 전에 연결이 종료됐어요. 받은 내용은 그대로 두었어요.',
-        );
+        final pruned = _pruneEmptyMentorBubble(state.messages, targetIndex);
+        if (scope == null) {
+          state = state.copyWith(
+            messages: pruned,
+            status: MentorStatus.idle,
+            error: null,
+          );
+          _clearRetryMetadata();
+        } else {
+          state = state.copyWith(
+            messages: pruned,
+            status: MentorStatus.partial,
+            error: '답변이 완료되기 전에 연결이 종료됐어요. 받은 내용은 그대로 두었어요.',
+          );
+        }
         if (!done.isCompleted) done.complete();
       },
       cancelOnError: true,
@@ -447,7 +462,8 @@ class MentorController extends Notifier<MentorState> {
     if (question == null) return Future.value();
     return _sendStream(
       question,
-      contentId: _lastContentId,
+      legacyContentId: _lastLegacyContentId,
+      contextualContentId: _lastContextualContentId,
       contextSnapshotId: _lastContextSnapshotId,
       usedContextFields: _lastUsedContextFields,
     );
@@ -456,6 +472,7 @@ class MentorController extends Notifier<MentorState> {
   List<MentorContextOption> _contextOptions(
     MentorContextEvidence evidence, {
     required bool includeCurrentCode,
+    required bool includeReviewSummary,
   }) => [
     const MentorContextOption(
       id: 'current_content',
@@ -489,7 +506,7 @@ class MentorController extends Notifier<MentorState> {
     MentorContextOption(
       id: 'review_summary',
       available: evidence.review != null,
-      selected: evidence.review != null,
+      selected: includeReviewSummary && evidence.review != null,
       unavailableReason: evidence.review == null ? '현재 실행과 연결된 리뷰가 없어요.' : null,
     ),
   ];
@@ -646,7 +663,8 @@ class MentorController extends Notifier<MentorState> {
 
   void _clearRetryMetadata() {
     _lastQuestion = null;
-    _lastContentId = null;
+    _lastLegacyContentId = null;
+    _lastContextualContentId = null;
     _lastContextSnapshotId = null;
     _lastUsedContextFields = const [];
   }

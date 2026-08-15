@@ -121,7 +121,7 @@ final class _Harness {
         }),
         mentorContextualSseConnectProvider.overrideWithValue((
           question, {
-          String? contentId,
+          int? contentId,
           int? contextSnapshotId,
           int fromStep = 0,
         }) {
@@ -178,7 +178,7 @@ final class _Harness {
 }
 
 void main() {
-  test('Sandbox 진입 기본값은 code/review ON, error/output OFF다', () {
+  test('editor CTA 기본값은 content/code만 ON, review/error/output은 OFF다', () {
     final h = _Harness();
     addTearDown(h.dispose);
     final controller = h.container.read(
@@ -187,11 +187,8 @@ void main() {
 
     controller.initializeContext(includeCurrentCode: true);
     var state = h.container.read(contextualMentorControllerProvider(_scope));
-    expect(state.selectedContextFields, {
-      'current_content',
-      'current_code',
-      'review_summary',
-    });
+    expect(state.selectedContextFields, {'current_content', 'current_code'});
+    expect(state.selectedContextFields, isNot(contains('review_summary')));
     expect(state.selectedContextFields, isNot(contains('recent_errors')));
     expect(state.selectedContextFields, isNot(contains('recent_output')));
 
@@ -199,6 +196,26 @@ void main() {
     state = h.container.read(contextualMentorControllerProvider(_scope));
     expect(state.selectedContextFields, isNot(contains('current_code')));
     expect(state.contextPreview, isNull);
+  });
+
+  test('Review CTA 기본값은 content/review만 ON이다', () {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    final controller = h.container.read(
+      contextualMentorControllerProvider(_scope).notifier,
+    );
+
+    controller.initializeContext(
+      includeCurrentCode: false,
+      includeReviewSummary: true,
+    );
+
+    expect(
+      h.container
+          .read(contextualMentorControllerProvider(_scope))
+          .selectedContextFields,
+      {'current_content', 'review_summary'},
+    );
   });
 
   test('exact stderr가 비어 있으면 recent_errors는 unavailable이다', () {
@@ -224,7 +241,7 @@ void main() {
     expect(option.unavailableReason, contains('오류'));
   });
 
-  test('preview 직전 새로 완료된 exact review를 기본 포함한다', () async {
+  test('preview 직전 새로 완료된 exact review를 자동 선택하지 않는다', () async {
     final h = _Harness(
       evidence: const MentorContextEvidence(currentCode: 'code'),
     );
@@ -247,7 +264,7 @@ void main() {
     h.container.invalidate(mentorContextEvidenceProvider(_scope));
     await controller.preparePreview('리뷰 질문');
 
-    expect(h.draftRequests.single.fields, contains('review_summary'));
+    expect(h.draftRequests.single.fields, isNot(contains('review_summary')));
   });
 
   test('draft는 현재 선택과 exact requestContext를 만들고 실제 preview를 보존한다', () async {
@@ -269,7 +286,6 @@ void main() {
       'current_code',
       'recent_errors',
       'recent_output',
-      'review_summary',
     ]);
     expect(request.context, {
       'current_code': 'throw StateError();',
@@ -278,16 +294,6 @@ void main() {
         'stdout': 'before\nok\n',
         'stderr': 'StateError\n',
         'truncated': false,
-      },
-      'review_summary': {
-        'confidence': 84,
-        'strengths': ['예외 경로가 명확해요'],
-        'improvements': [
-          {'message': '복구 경로를 분리하세요', 'line': 7, 'severity': 'warning'},
-        ],
-        'security': [
-          {'message': '원문 로그를 노출하지 마세요', 'severity': 'error'},
-        ],
       },
     });
     final state = h.container.read(contextualMentorControllerProvider(_scope));
@@ -317,11 +323,10 @@ void main() {
       'current_content',
       'current_code',
       'recent_output',
-      'review_summary',
     ]);
     expect(state.selectedContextFields, isNot(contains('current_code')));
     expect(state.selectedContextFields, isNot(contains('recent_output')));
-    expect(state.selectedContextFields, contains('review_summary'));
+    expect(state.selectedContextFields, isNot(contains('review_summary')));
 
     await controller.retry();
     expect(

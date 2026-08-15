@@ -66,7 +66,8 @@ Future<void> _pump(
   required _MissionApi api,
   MentorEntryIntent? intent,
   String owner = 'route-user',
-  void Function(MentorScopeKey scope, bool includeCode)? onBuild,
+  void Function(MentorScopeKey scope, bool includeCode, bool includeReview)?
+  onBuild,
   void Function()? onDraft,
 }) async {
   await tester.pumpWidget(
@@ -95,11 +96,12 @@ Future<void> _pump(
         home: MissionMentorRouteResolver(
           taskId: taskId,
           entryIntent: intent,
-          mentorBuilder: (context, scope, includeCode) {
-            onBuild?.call(scope, includeCode);
+          mentorBuilder: (context, scope, includeCode, includeReview) {
+            onBuild?.call(scope, includeCode, includeReview);
             return MentorPage.contextual(
               scopeKey: scope,
               includeCurrentCode: includeCode,
+              includeReviewSummary: includeReview,
             );
           },
         ),
@@ -119,6 +121,7 @@ void main() {
     final api = _MissionApi(_available());
     MentorScopeKey? captured;
     bool? includeCode;
+    bool? includeReview;
     var drafts = 0;
     await _pump(
       tester,
@@ -127,11 +130,14 @@ void main() {
       api: api,
       intent: const MentorEntryIntent(
         scopeKey: _scope,
+        entryReason: MentorEntryReason.sandboxEditor,
         includeCurrentCode: true,
+        includeReviewSummary: false,
       ),
-      onBuild: (scope, include) {
+      onBuild: (scope, code, review) {
         captured = scope;
-        includeCode = include;
+        includeCode = code;
+        includeReview = review;
       },
       onDraft: () => drafts += 1,
     );
@@ -139,7 +145,52 @@ void main() {
     expect(api.calls, 1);
     expect(captured, _scope);
     expect(includeCode, isTrue);
+    expect(includeReview, isFalse);
     expect(drafts, 0, reason: 'route resolution must not draft context');
+  });
+
+  testWidgets('Review CTA intent만 review summary를 기본 선택한다', (tester) async {
+    final api = _MissionApi(_available());
+    bool? includeCode;
+    bool? includeReview;
+    await _pump(
+      tester,
+      taskId: '302',
+      enabled: true,
+      api: api,
+      intent: const MentorEntryIntent(
+        scopeKey: _scope,
+        entryReason: MentorEntryReason.review,
+        includeCurrentCode: false,
+        includeReviewSummary: true,
+      ),
+      onBuild: (_, code, review) {
+        includeCode = code;
+        includeReview = review;
+      },
+    );
+
+    expect(includeCode, isFalse);
+    expect(includeReview, isTrue);
+  });
+
+  testWidgets('direct/back route는 content only로 시작한다', (tester) async {
+    final api = _MissionApi(_available());
+    bool? includeCode;
+    bool? includeReview;
+    await _pump(
+      tester,
+      taskId: '302',
+      enabled: true,
+      api: api,
+      onBuild: (_, code, review) {
+        includeCode = code;
+        includeReview = review;
+      },
+    );
+
+    expect(includeCode, isFalse);
+    expect(includeReview, isFalse);
   });
 
   testWidgets('다른 owner의 stale intent는 code opt-in을 승계하지 않는다', (tester) async {
@@ -155,9 +206,11 @@ void main() {
           ownerId: 'old-owner',
           workspaceKey: _workspace,
         ),
+        entryReason: MentorEntryReason.sandboxEditor,
         includeCurrentCode: true,
+        includeReviewSummary: false,
       ),
-      onBuild: (_, include) => includeCode = include,
+      onBuild: (_, code, _) => includeCode = code,
     );
 
     expect(includeCode, isFalse);
@@ -173,7 +226,7 @@ void main() {
         taskId: taskId,
         enabled: true,
         api: api,
-        onBuild: (_, _) => built += 1,
+        onBuild: (_, _, _) => built += 1,
         onDraft: () => drafts += 1,
       );
       expect(built, 0);
@@ -193,7 +246,7 @@ void main() {
       taskId: '302',
       enabled: false,
       api: api,
-      onBuild: (_, _) => built += 1,
+      onBuild: (_, _, _) => built += 1,
       onDraft: () => drafts += 1,
     );
 

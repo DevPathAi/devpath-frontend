@@ -17,16 +17,19 @@ typedef MissionMentorBuilder =
       BuildContext context,
       MentorScopeKey scopeKey,
       bool includeCurrentCode,
+      bool includeReviewSummary,
     );
 
 Widget canonicalMissionMentorBuilder(
   BuildContext context,
   MentorScopeKey scopeKey,
   bool includeCurrentCode,
+  bool includeReviewSummary,
 ) => MentorPage.contextual(
   key: ValueKey(scopeKey),
   scopeKey: scopeKey,
   includeCurrentCode: includeCurrentCode,
+  includeReviewSummary: includeReviewSummary,
 );
 
 /// Resolves identifiers against the authenticated owner's authoritative Today
@@ -111,9 +114,16 @@ class _MissionMentorRouteResolverState
     );
     final scope = MentorScopeKey(ownerId: owner, workspaceKey: workspaceKey);
     final intent = widget.entryIntent;
+    final validIntent = intent != null && intent.scopeKey == scope;
     final includeCode =
-        intent != null && intent.includeCurrentCode && intent.scopeKey == scope;
-    return widget.mentorBuilder(context, scope, includeCode);
+        validIntent &&
+        intent.entryReason == MentorEntryReason.sandboxEditor &&
+        intent.includeCurrentCode;
+    final includeReview =
+        validIntent &&
+        intent.entryReason == MentorEntryReason.review &&
+        intent.includeReviewSummary;
+    return widget.mentorBuilder(context, scope, includeCode, includeReview);
   }
 }
 

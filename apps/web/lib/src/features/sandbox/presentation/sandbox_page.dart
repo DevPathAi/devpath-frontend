@@ -408,8 +408,10 @@ class _SandboxPageState extends ConsumerState<SandboxPage> {
                           style: OutlinedButton.styleFrom(
                             minimumSize: const Size(0, 44),
                           ),
-                          onPressed: () =>
-                              _openMentor(key, includeCurrentCode: true),
+                          onPressed: () => _openMentor(
+                            key,
+                            entryReason: MentorEntryReason.sandboxEditor,
+                          ),
                           icon: const Icon(DpIcons.mentor),
                           label: const Text('AI 멘토에게 질문'),
                         ),
@@ -477,7 +479,7 @@ class _SandboxPageState extends ConsumerState<SandboxPage> {
       nextAction: reviewNextAction,
       onAskMentor: key == null
           ? null
-          : () => _openMentor(key, includeCurrentCode: false),
+          : () => _openMentor(key, entryReason: MentorEntryReason.review),
       onRequest: () {
         final sessionId = ref.read(runProvider).sandboxSessionId;
         final message = sessionId == null
@@ -492,7 +494,7 @@ class _SandboxPageState extends ConsumerState<SandboxPage> {
 
   void _openMentor(
     MissionWorkspaceKey key, {
-    required bool includeCurrentCode,
+    required MentorEntryReason entryReason,
   }) {
     final owner = ref.read(currentMissionOwnerKeyProvider);
     if (owner == null || !_isScheduledWorkspaceCurrent(key, owner)) {
@@ -506,7 +508,9 @@ class _SandboxPageState extends ConsumerState<SandboxPage> {
         key.mentorLocation,
         extra: MentorEntryIntent(
           scopeKey: MentorScopeKey(ownerId: owner, workspaceKey: key),
-          includeCurrentCode: includeCurrentCode,
+          entryReason: entryReason,
+          includeCurrentCode: entryReason == MentorEntryReason.sandboxEditor,
+          includeReviewSummary: entryReason == MentorEntryReason.review,
         ),
       ),
     );
