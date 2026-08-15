@@ -81,7 +81,7 @@ void main() {
     //  DiagnosticController 는 그때만 complete() 로 넘어간다).
     for (final key in [
       'GET /onboarding/assessments/1/next',
-      'GET /onboarding/assessments/guest/g-mock/next',
+      'GET /onboarding/assessments/guest/123e4567-e89b-42d3-a456-426614174000/next',
     ]) {
       test('$key 는 문항 2개 뒤 null 로 끝난다', () {
         final seq = webMockSequences[key];

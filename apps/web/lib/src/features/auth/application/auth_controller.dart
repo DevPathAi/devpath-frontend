@@ -8,6 +8,9 @@ import 'oauth_launcher.dart';
 /// OAuth 로그인/로그아웃. login()은 OAuth 리다이렉트, bootstrapFromCallback()은
 /// OAuth 콜백 후 세션 복원, bootstrapSession()은 앱 시작 시 자동 세션 복원.
 class AuthController extends Notifier<AuthState> {
+  Future<void>? _sessionBootstrap;
+  bool _callbackFailureDetailsRequested = false;
+
   @override
   AuthState build() {
     // 앱 시작 1회 세션 복원 시도. AuthLoading 반환 후 microtask로 비동기 실행하여
@@ -37,9 +40,26 @@ class AuthController extends Notifier<AuthState> {
   /// + User 파싱 → AuthAuthenticated. 쿠키 없음/만료(401) → AuthUnauthenticated.
   /// build()에서 Future.microtask로 자동 호출된다(앱 시작 1회).
   /// 인증된 유저(AuthAuthenticated)가 이미 있으면 재실행하지 않는다.
-  Future<void> bootstrapSession() async {
+  Future<void> bootstrapSession() {
     // 이미 인증 완료된 상태면 재실행 방지(예: bootstrapFromCallback 이후 재진입).
-    if (state is AuthAuthenticated) return;
+    if (state is AuthAuthenticated) return Future.value();
+    return _bootstrap(includeApiError: false);
+  }
+
+  /// startup refresh와 OAuth callback replay가 겹쳐도 같은 refresh 한 건을 공유한다.
+  Future<void> _bootstrap({required bool includeApiError}) {
+    final inFlight = _sessionBootstrap;
+    if (inFlight != null) return inFlight;
+    late final Future<void> operation;
+    operation = _performBootstrap(includeApiError: includeApiError)
+        .whenComplete(() {
+          if (identical(_sessionBootstrap, operation)) _sessionBootstrap = null;
+        });
+    _sessionBootstrap = operation;
+    return operation;
+  }
+
+  Future<void> _performBootstrap({required bool includeApiError}) async {
     try {
       final data = await _client.post<Map<String, dynamic>>('/auth/refresh');
       if (!ref.mounted) return; // dispose 후 async gap에서 진입 방지
@@ -49,32 +69,33 @@ class AuthController extends Notifier<AuthState> {
         User.fromJson((data['user'] as Map).cast<String, dynamic>()),
       );
       _identifyAuthenticatedUser();
-    } on ApiException {
+    } on ApiException catch (error) {
       if (!ref.mounted) return;
-      state = const AuthUnauthenticated(); // 쿠키 없음/만료 → 미인증
+      state = AuthUnauthenticated(
+        error: includeApiError || _callbackFailureDetailsRequested
+            ? error.message
+            : null,
+      ); // 쿠키 없음/만료 → 미인증
     } catch (_) {
       if (!ref.mounted) return;
-      state =
-          const AuthUnauthenticated(); // 네트워크/타임아웃/파싱 등 비-ApiException → 미인증
+      state = AuthUnauthenticated(
+        error: includeApiError || _callbackFailureDetailsRequested
+            ? '로그인 상태를 확인하지 못했어요. 다시 시도해 주세요.'
+            : null,
+      ); // 네트워크/타임아웃/파싱 등 비-ApiException → 미인증
     }
   }
 
   /// OAuth 콜백 후 세션 복원: POST /auth/refresh(쿠키, 본문 없음) → access 저장
   /// + User 파싱 → AuthAuthenticated. 실패 시 AuthUnauthenticated(error).
-  Future<void> bootstrapFromCallback() async {
-    try {
-      final data = await _client.post<Map<String, dynamic>>('/auth/refresh');
-      await _store.save(access: data['access_token'] as String, refresh: '');
-      state = AuthAuthenticated(
-        User.fromJson((data['user'] as Map).cast<String, dynamic>()),
-      );
-      _identifyAuthenticatedUser();
-    } on ApiException catch (e) {
-      state = AuthUnauthenticated(error: e.message);
-    } catch (_) {
-      state =
-          const AuthUnauthenticated(); // 네트워크/타임아웃/파싱 등 비-ApiException → 미인증
-    }
+  Future<void> bootstrapFromCallback() {
+    if (state is AuthAuthenticated) return Future.value();
+    // startup refresh가 먼저 시작됐더라도 callback이 합류한 순간부터 이 요청의
+    // 실패는 복구 UI가 설명할 수 있어야 한다.
+    _callbackFailureDetailsRequested = true;
+    return _bootstrap(includeApiError: true).whenComplete(() {
+      _callbackFailureDetailsRequested = false;
+    });
   }
 
   Future<void> logout() async {

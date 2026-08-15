@@ -484,15 +484,14 @@ final Map<String, MockFixture> webMockFixtures = {
   // 진단 API(비회원 guest 흐름)
   // ⚠️ next 는 고정 픽스처가 아니라 webMockSequences 에 있다 — 같은 문항이 반복되면
   //    완료로 넘어가지 못하기 때문이다(파일 하단 주석 참고).
-  'POST /onboarding/assessments/guest': (200, {'guestAssessmentId': 'g-mock'}),
-  'POST /onboarding/assessments/guest/g-mock/answer': (
+  'POST /onboarding/assessments/guest': (
     200,
-    <String, dynamic>{},
+    {'guestAssessmentId': '123e4567-e89b-42d3-a456-426614174000'},
   ),
-  'POST /onboarding/assessments/guest/g-mock/complete': (
-    200,
-    {'diagnosedLevel': 'MID', 'confidenceWeight': 0.8},
-  ),
+  'POST /onboarding/assessments/guest/123e4567-e89b-42d3-a456-426614174000/answer':
+      (200, <String, dynamic>{}),
+  'POST /onboarding/assessments/guest/123e4567-e89b-42d3-a456-426614174000/complete':
+      (200, {'diagnosedLevel': 'MID', 'confidenceWeight': 0.8}),
   // 진단 API(회원 흐름) — next 는 webMockSequences 참고.
   'POST /onboarding/assessments': (200, {'assessmentId': 1}),
   'POST /onboarding/assessments/1/answer': (200, <String, dynamic>{}),
@@ -684,11 +683,12 @@ Map<String, dynamic> mockCurrentMission() {
 /// 완료 상태가 유지된다.
 final Map<String, MockSequence> webMockSequences = {
   // 게스트: 문항 2개 → 종료
-  'GET /onboarding/assessments/guest/g-mock/next': [
-    (200, _question(1, '비동기 함수의 반환 타입은 무엇인가요?', 1, 2)),
-    (200, _question(2, 'Stream 구독을 해제하지 않으면 어떤 문제가 생기나요?', 2, 2)),
-    (200, null),
-  ],
+  'GET /onboarding/assessments/guest/123e4567-e89b-42d3-a456-426614174000/next':
+      [
+        (200, _question(1, '비동기 함수의 반환 타입은 무엇인가요?', 1, 2)),
+        (200, _question(2, 'Stream 구독을 해제하지 않으면 어떤 문제가 생기나요?', 2, 2)),
+        (200, null),
+      ],
   // 회원: 문항 2개 → 종료
   'GET /onboarding/assessments/1/next': [
     (200, _question(1, '비동기 함수의 반환 타입은 무엇인가요?', 1, 2)),

@@ -5,7 +5,7 @@ class _StubGuestClaimStorage implements GuestClaimStorage {
   @override
   String? read() => _v;
   @override
-  void write(String guestId) => _v = guestId;
+  void write(String rawContinuation) => _v = rawContinuation;
   @override
   void clear() => _v = null;
 }

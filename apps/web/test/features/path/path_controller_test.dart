@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:devpath_web/src/app/app_config.dart';
+import 'package:devpath_web/src/data/web_mock_fixtures.dart';
 import 'package:devpath_web/src/features/path/application/path_controller.dart';
 import 'package:devpath_web/src/features/path/data/path_sse_source.dart';
 import 'package:devpath_web/src/providers/api_providers.dart';
@@ -35,7 +36,118 @@ Stream<SseEvent> _emitThenError(List<String> stages) async* {
   throw Exception('연결 끊김');
 }
 
+class _MalformedPathClient implements ApiClient {
+  @override
+  Future<T> get<T>(String path, {Map<String, dynamic>? query}) async =>
+      <String, dynamic>{'pathId': 'not-an-int'} as T;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
+}
+
+class _DelayedPathClient implements ApiClient {
+  final requests = <Completer<Map<String, dynamic>>>[];
+
+  @override
+  Future<T> get<T>(String path, {Map<String, dynamic>? query}) {
+    final request = Completer<Map<String, dynamic>>();
+    requests.add(request);
+    return request.future.then((value) => value as T);
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
+}
+
+Future<void> _flushUntil(bool Function() condition) async {
+  for (var i = 0; i < 20 && !condition(); i++) {
+    await Future<void>.delayed(Duration.zero);
+  }
+  expect(condition(), isTrue);
+}
+
 void main() {
+  test('reset 중인 GET의 늦은 응답은 idle state를 덮지 않는다', () async {
+    final api = _DelayedPathClient();
+    final container = ProviderContainer(
+      overrides: [apiClientProvider.overrideWithValue(api)],
+    );
+    addTearDown(container.dispose);
+    final controller = container.read(pathControllerProvider.notifier);
+
+    final load = controller.loadOrStart();
+    await _flushUntil(() => api.requests.length == 1);
+    controller.reset();
+    api.requests.single.complete(mockLearningPath());
+
+    await load.timeout(const Duration(seconds: 1));
+    expect(container.read(pathControllerProvider).phase, PathPhase.idle);
+  });
+
+  test('A reset 뒤 B load보다 늦게 끝난 A GET은 B 경로를 덮지 않는다', () async {
+    final api = _DelayedPathClient();
+    final container = ProviderContainer(
+      overrides: [apiClientProvider.overrideWithValue(api)],
+    );
+    addTearDown(container.dispose);
+    final controller = container.read(pathControllerProvider.notifier);
+
+    final loadA = controller.loadOrStart();
+    await _flushUntil(() => api.requests.length == 1);
+    controller.reset();
+    final loadB = controller.loadOrStart();
+    await _flushUntil(() => api.requests.length == 2);
+
+    api.requests[1].complete({...mockLearningPath(), 'pathId': 202});
+    await loadB.timeout(const Duration(seconds: 1));
+    expect(container.read(pathControllerProvider).result?.pathId, 202);
+
+    api.requests[0].complete({...mockLearningPath(), 'pathId': 101});
+    await loadA.timeout(const Duration(seconds: 1));
+    expect(container.read(pathControllerProvider).result?.pathId, 202);
+  });
+
+  test('reset은 이벤트 없는 SSE start Future도 즉시 완료한다', () async {
+    final events = StreamController<SseEvent>();
+    final container = ProviderContainer(
+      overrides: [
+        pathSseConnectProvider.overrideWithValue(() => events.stream),
+      ],
+    );
+    addTearDown(() async {
+      await events.close();
+      container.dispose();
+    });
+    final controller = container.read(pathControllerProvider.notifier);
+
+    final start = controller.start();
+    await Future<void>.delayed(Duration.zero);
+    controller.reset();
+
+    await start.timeout(const Duration(seconds: 1));
+    expect(container.read(pathControllerProvider).phase, PathPhase.idle);
+  });
+
+  test('reset 뒤 SSE done의 늦은 GET은 idle state를 덮지 않는다', () async {
+    final api = _DelayedPathClient();
+    final container = ProviderContainer(
+      overrides: [
+        apiClientProvider.overrideWithValue(api),
+        pathSseConnectProvider.overrideWithValue(() => _emit(const ['done'])),
+      ],
+    );
+    addTearDown(container.dispose);
+    final controller = container.read(pathControllerProvider.notifier);
+
+    final start = controller.start();
+    await _flushUntil(() => api.requests.length == 1);
+    controller.reset();
+    api.requests.single.complete(mockLearningPath());
+
+    await start.timeout(const Duration(seconds: 1));
+    expect(container.read(pathControllerProvider).phase, PathPhase.idle);
+  });
+
   test('정상: 4단계 후 완료(타임라인 결과 로드)', () async {
     final container = ProviderContainer(
       overrides: [
@@ -70,6 +182,42 @@ void main() {
     expect(s.phase, PathPhase.complete);
     expect(s.completed, kPathStageLabels);
     expect(s.result, isNotNull);
+  });
+
+  test('초기 경로 응답이 잘못되면 정제된 failed 상태로 종료한다', () async {
+    final container = ProviderContainer(
+      overrides: [
+        apiClientProvider.overrideWithValue(_MalformedPathClient()),
+        pathSseConnectProvider.overrideWithValue(
+          () => throw StateError('malformed path must not start SSE'),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(pathControllerProvider.notifier).loadOrStart();
+
+    final s = container.read(pathControllerProvider);
+    expect(s.phase, PathPhase.failed);
+    expect(s.result, isNull);
+    expect(s.error, '학습 경로를 불러오지 못했어요. 다시 시도해 주세요.');
+  });
+
+  test('SSE done 뒤 경로 응답이 잘못되면 정제된 failed로 종료한다', () async {
+    final container = ProviderContainer(
+      overrides: [
+        apiClientProvider.overrideWithValue(_MalformedPathClient()),
+        pathSseConnectProvider.overrideWithValue(() => _emit(const ['done'])),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(pathControllerProvider.notifier).start();
+
+    final s = container.read(pathControllerProvider);
+    expect(s.phase, PathPhase.failed);
+    expect(s.result, isNull);
+    expect(s.error, '학습 경로를 불러오지 못했어요. 다시 시도해 주세요.');
   });
 
   test('중단 시 완료 단계 보존 후 다시 생성으로 처음부터 완성', () async {

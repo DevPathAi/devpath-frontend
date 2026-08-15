@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -73,8 +74,11 @@ class _ThrowingAdapter implements HttpClientAdapter {
 // ---------------------------------------------------------------------------
 class _MockRefreshAdapter implements HttpClientAdapter {
   final int statusCode;
+  final Completer<void>? gate;
+  final entered = Completer<void>();
+  int calls = 0;
 
-  _MockRefreshAdapter({this.statusCode = 200});
+  _MockRefreshAdapter({this.statusCode = 200, this.gate});
 
   @override
   Future<ResponseBody> fetch(
@@ -82,6 +86,9 @@ class _MockRefreshAdapter implements HttpClientAdapter {
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
   ) async {
+    calls++;
+    if (!entered.isCompleted) entered.complete();
+    await gate?.future;
     if (statusCode == 200) {
       return ResponseBody.fromString(
         jsonEncode({
@@ -206,6 +213,50 @@ void main() {
   // bootstrapFromCallback() — /auth/refresh 세션 복원 테스트
   // -------------------------------------------------------------------------
   group('bootstrapFromCallback()', () {
+    test('callback 두 번과 startup refresh가 겹쳐도 한 요청을 공유한다', () async {
+      final gate = Completer<void>();
+      final adapter = _MockRefreshAdapter(gate: gate);
+      final container = _containerWithAdapter(adapter);
+      addTearDown(container.dispose);
+      final controller = container.read(authControllerProvider.notifier);
+
+      final first = controller.bootstrapFromCallback();
+      final replay = controller.bootstrapFromCallback();
+      await adapter.entered.future;
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      expect(adapter.calls, 1);
+
+      gate.complete();
+      await Future.wait([first, replay]);
+      expect(container.read(authControllerProvider), isA<AuthAuthenticated>());
+    });
+
+    test('startup refresh에 callback이 합류한 실패도 callback 오류를 보존한다', () async {
+      final gate = Completer<void>();
+      final adapter = _MockRefreshAdapter(statusCode: 401, gate: gate);
+      final container = _containerWithAdapter(adapter);
+      addTearDown(container.dispose);
+
+      // provider build의 startup bootstrap이 includeApiError:false로 먼저 진입한다.
+      container.read(authControllerProvider);
+      await adapter.entered.future;
+      final callback = container
+          .read(authControllerProvider.notifier)
+          .bootstrapFromCallback();
+      expect(adapter.calls, 1);
+
+      gate.complete();
+      await callback;
+
+      final state = container.read(authControllerProvider);
+      expect(state, isA<AuthUnauthenticated>());
+      expect(
+        (state as AuthUnauthenticated).error,
+        isNotNull,
+        reason: 'callback이 합류하면 startup 요청 실패도 복구 UI가 설명해야 한다',
+      );
+    });
+
     test('POST /auth/refresh 성공 시 AuthAuthenticated로 전이하고 user를 담는다', () async {
       final container = _containerWithAdapter(
         _MockRefreshAdapter(statusCode: 200),
