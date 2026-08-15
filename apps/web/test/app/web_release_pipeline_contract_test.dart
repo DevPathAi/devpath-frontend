@@ -56,7 +56,11 @@ void main() {
         .join('\n');
   }
 
-  Future<ProcessResult> runImmutableBind(String candidateConfigDigest) async {
+  Future<ProcessResult> runImmutableBind(
+    String candidateConfigDigest, {
+    String indexFixture = 'valid',
+  }) async {
+    final resolverInstall = stepRun('Install immutable image resolver');
     final bindScript = stepRun(
       'Bind immutable tag once',
     ).replaceAll(r'${{ matrix.identity }}', 'off');
@@ -66,9 +70,13 @@ set -u
 source_sha=0123456789abcdef0123456789abcdef01234567
 registry_digest=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 registry_config_digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+registry_child_digest=sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
+registry_second_child_digest=sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+attestation_digest=sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 github_output="$(mktemp)"
 mutation_log="$(mktemp)"
-trap 'rm -f "${github_output}" "${mutation_log}"' EXIT
+runner_temp="$(mktemp -d)"
+trap 'rm -f "${github_output}" "${mutation_log}" "${runner_temp}/resolve-web-image-config.sh" "${runner_temp}/immutable-tag-bind-off.err"; rmdir "${runner_temp}"' EXIT
 export TAG_REFERENCE="ghcr.io/devpathai/devpath-web:${source_sha}-mission-off"
 export IMAGE_REPOSITORY=ghcr.io/devpathai/devpath-web
 export CANDIDATE_REFERENCE="leva-web-candidate:${source_sha}-mission-off"
@@ -80,8 +88,115 @@ export SOURCE_SHA="${source_sha}"
 export MISSION_SPINE_ENABLED=false
 export ANALYTICS_CONTRACT_VERSION=mission-spine.analytics.v1
 export ANALYTICS_ENVIRONMENT=production
-export RUNNER_TEMP=/tmp
+export INDEX_FIXTURE=__INDEX_FIXTURE__
+export RUNNER_TEMP="${runner_temp}"
 export GITHUB_OUTPUT="${github_output}"
+
+emit_root_manifest() {
+  case "${INDEX_FIXTURE}" in
+    single)
+      jq -nc --arg digest "${registry_config_digest}" \
+        '{
+          schemaVersion: 2,
+          mediaType: "application/vnd.oci.image.manifest.v1+json",
+          config: {digest: $digest},
+          layers: []
+        }'
+      ;;
+    valid)
+      jq -nc \
+        --arg child "${registry_child_digest}" \
+        --arg attestation "${attestation_digest}" \
+        '{
+          schemaVersion: 2,
+          mediaType: "application/vnd.oci.image.index.v1+json",
+          manifests: [
+            {
+              mediaType: "application/vnd.oci.image.manifest.v1+json",
+              digest: $child,
+              size: 123,
+              platform: {os: "linux", architecture: "amd64"}
+            },
+            {
+              mediaType: "application/vnd.oci.image.manifest.v1+json",
+              digest: $attestation,
+              size: 123,
+              platform: {os: "unknown", architecture: "unknown"},
+              annotations: {
+                "vnd.docker.reference.type": "attestation-manifest",
+                "vnd.docker.reference.digest": $child
+              }
+            }
+          ]
+        }'
+      ;;
+    missing)
+      jq -nc \
+        --arg attestation "${attestation_digest}" \
+        '{
+          schemaVersion: 2,
+          mediaType: "application/vnd.oci.image.index.v1+json",
+          manifests: [{
+            mediaType: "application/vnd.oci.image.manifest.v1+json",
+            digest: $attestation,
+            size: 123,
+            platform: {os: "unknown", architecture: "unknown"},
+            annotations: {"vnd.docker.reference.type": "attestation-manifest"}
+          }]
+        }'
+      ;;
+    duplicate)
+      jq -nc \
+        --arg child "${registry_child_digest}" \
+        --arg second "${registry_second_child_digest}" \
+        '{
+          schemaVersion: 2,
+          mediaType: "application/vnd.oci.image.index.v1+json",
+          manifests: [
+            {
+              mediaType: "application/vnd.oci.image.manifest.v1+json",
+              digest: $child,
+              size: 123,
+              platform: {os: "linux", architecture: "amd64"}
+            },
+            {
+              mediaType: "application/vnd.oci.image.manifest.v1+json",
+              digest: $second,
+              size: 123,
+              platform: {os: "linux", architecture: "amd64"}
+            }
+          ]
+        }'
+      ;;
+    extra-runnable)
+      jq -nc \
+        --arg child "${registry_child_digest}" \
+        --arg second "${registry_second_child_digest}" \
+        '{
+          schemaVersion: 2,
+          mediaType: "application/vnd.oci.image.index.v1+json",
+          manifests: [
+            {
+              mediaType: "application/vnd.oci.image.manifest.v1+json",
+              digest: $child,
+              size: 123,
+              platform: {os: "linux", architecture: "amd64"}
+            },
+            {
+              mediaType: "application/vnd.oci.image.manifest.v1+json",
+              digest: $second,
+              size: 123,
+              platform: {os: "linux", architecture: "arm64"}
+            }
+          ]
+        }'
+      ;;
+    *)
+      echo "Unknown index fixture: ${INDEX_FIXTURE}" >&2
+      return 96
+      ;;
+  esac
+}
 
 docker() {
   if test "$1" = "tag" || test "$1" = "push"; then
@@ -94,8 +209,24 @@ docker() {
   fi
   case "$*" in
     *"--raw"*)
-      jq -nc --arg digest "${registry_config_digest}" \
-        '{schemaVersion: 2, config: {digest: $digest}}'
+      case "$4" in
+        "${IMAGE_REPOSITORY}@${registry_digest}")
+          emit_root_manifest
+          ;;
+        "${IMAGE_REPOSITORY}@${registry_child_digest}")
+          jq -nc --arg digest "${registry_config_digest}" \
+            '{
+              schemaVersion: 2,
+              mediaType: "application/vnd.oci.image.manifest.v1+json",
+              config: {digest: $digest},
+              layers: []
+            }'
+          ;;
+        *)
+          echo "Unexpected raw manifest reference: $4" >&2
+          return 95
+          ;;
+      esac
       ;;
     *"{{json .Image}}"*)
       jq -nc \
@@ -122,6 +253,10 @@ docker() {
   esac
 }
 
+''' +
+        resolverInstall +
+        r'''
+
 set +e
 (
 ''' +
@@ -139,7 +274,9 @@ exit "${status}"
 
     final process = await Process.start('bash', ['-s']);
     process.stdin.write(
-      harness.replaceAll('__CANDIDATE_CONFIG_DIGEST__', candidateConfigDigest),
+      harness
+          .replaceAll('__CANDIDATE_CONFIG_DIGEST__', candidateConfigDigest)
+          .replaceAll('__INDEX_FIXTURE__', indexFixture),
     );
     await process.stdin.close();
     final stdout = await process.stdout.transform(utf8.decoder).join();
@@ -227,24 +364,21 @@ exit "${status}"
     expect(tagMutation, greaterThan(bind));
     expect(publishJob, contains('id: immutable-tag'));
     expect(publishJob, contains('id: candidate-metadata'));
+    expect(publishJob, contains('name: Install immutable image resolver'));
+    expect(
+      RegExp(
+        r'resolve_linux_amd64_config "\$\{IMAGE_REPOSITORY\}"',
+      ).allMatches(publishJob).length,
+      3,
+      reason: 'preflight, bind and post-push must share one resolver',
+    );
     expect(
       publishJob,
       contains(
         'test "\${observed_config_digest}" = "\${candidate_config_digest}"',
       ),
     );
-    expect(
-      publishJob,
-      contains(
-        'raw_manifest_json="\$(docker buildx imagetools inspect "\${exact_reference}" --raw)"',
-      ),
-    );
-    expect(
-      publishJob,
-      contains(
-        'observed_config_digest="\$(jq -er \'.config.digest\' <<<"\${raw_manifest_json}")"',
-      ),
-    );
+    expect(publishJob, contains('resolve_linux_amd64_config'));
     expect(publishJob, contains('Refusing to overwrite immutable tag'));
     expect(
       publishJob.indexOf('Refusing to overwrite immutable tag'),
@@ -266,6 +400,19 @@ exit "${status}"
     expect(mutationLog(result), isEmpty);
   });
 
+  test('a single image manifest resolves its config without mutation', () async {
+    const matchingConfig =
+        'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    final result = await runImmutableBind(
+      matchingConfig,
+      indexFixture: 'single',
+    );
+
+    expect(result.exitCode, 0, reason: result.stderr as String);
+    expect(result.stdout as String, contains('mode=reused'));
+    expect(mutationLog(result), isEmpty);
+  });
+
   test('a different candidate is rejected before a tag mutation', () async {
     const driftedConfig =
         'sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc';
@@ -273,6 +420,45 @@ exit "${status}"
 
     expect(result.exitCode, isNot(0));
     expect(result.stderr as String, contains('candidate digest drift'));
+    expect(mutationLog(result), isEmpty);
+  });
+
+  test('an index missing linux amd64 is rejected without mutation', () async {
+    const matchingConfig =
+        'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    final result = await runImmutableBind(
+      matchingConfig,
+      indexFixture: 'missing',
+    );
+
+    expect(result.exitCode, isNot(0));
+    expect(result.stderr as String, contains('exactly one linux/amd64'));
+    expect(mutationLog(result), isEmpty);
+  });
+
+  test('duplicate linux amd64 children are rejected without mutation', () async {
+    const matchingConfig =
+        'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    final result = await runImmutableBind(
+      matchingConfig,
+      indexFixture: 'duplicate',
+    );
+
+    expect(result.exitCode, isNot(0));
+    expect(result.stderr as String, contains('exactly one linux/amd64'));
+    expect(mutationLog(result), isEmpty);
+  });
+
+  test('an unexpected runnable platform is rejected without mutation', () async {
+    const matchingConfig =
+        'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    final result = await runImmutableBind(
+      matchingConfig,
+      indexFixture: 'extra-runnable',
+    );
+
+    expect(result.exitCode, isNot(0));
+    expect(result.stderr as String, contains('unexpected runnable platform'));
     expect(mutationLog(result), isEmpty);
   });
 

@@ -112,6 +112,129 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install immutable image resolver
+        shell: bash
+        run: |
+          set -euo pipefail
+          resolver_path="${RUNNER_TEMP}/resolve-web-image-config.sh"
+          cat >"${resolver_path}" <<'RESOLVER'
+          resolve_linux_amd64_config() {
+            local image_repository="$1"
+            local root_digest="$2"
+            local root_manifest_json
+            local child_digest
+            local child_manifest_json
+            local config_digest
+            local unexpected_runnable_count
+            local linux_amd64_count
+
+            if ! [[ "${root_digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+              echo "Invalid root image digest: ${root_digest}" >&2
+              return 1
+            fi
+            if ! root_manifest_json="$(docker buildx imagetools inspect "${image_repository}@${root_digest}" --raw)"; then
+              echo "Unable to inspect exact root image ${image_repository}@${root_digest}" >&2
+              return 1
+            fi
+
+            if jq -e '
+              (.manifests? == null) and
+              ((.config.digest? | type) == "string")
+            ' <<<"${root_manifest_json}" >/dev/null; then
+              child_digest="${root_digest}"
+              child_manifest_json="${root_manifest_json}"
+            elif jq -e '(.manifests | type) == "array"' \
+              <<<"${root_manifest_json}" >/dev/null; then
+              if ! jq -e '
+                (.manifests | length) > 0 and
+                all(.manifests[];
+                  ((.digest | type) == "string") and
+                  (.digest | test("^sha256:[0-9a-f]{64}$")) and
+                  ((.platform | type) == "object") and
+                  ((.platform.os | type) == "string") and
+                  ((.platform.architecture | type) == "string")
+                )
+              ' <<<"${root_manifest_json}" >/dev/null; then
+                echo "Malformed OCI index descriptors" >&2
+                return 1
+              fi
+              if ! jq -e '
+                all(.manifests[];
+                  if (.platform.os == "unknown" and
+                      .platform.architecture == "unknown") then
+                    .annotations["vnd.docker.reference.type"] ==
+                      "attestation-manifest"
+                  else
+                    true
+                  end
+                )
+              ' <<<"${root_manifest_json}" >/dev/null; then
+                echo "Unknown platform descriptor is not an attestation" >&2
+                return 1
+              fi
+
+              unexpected_runnable_count="$(jq -er '[
+                .manifests[]
+                | select(
+                    .platform.os != "unknown" or
+                    .platform.architecture != "unknown"
+                  )
+                | select(
+                    .platform.os != "linux" or
+                    .platform.architecture != "amd64"
+                  )
+              ] | length' <<<"${root_manifest_json}")"
+              if ! test "${unexpected_runnable_count}" = "0"; then
+                echo "OCI index has an unexpected runnable platform" >&2
+                return 1
+              fi
+
+              linux_amd64_count="$(jq -er '[
+                .manifests[]
+                | select(
+                    .platform.os == "linux" and
+                    .platform.architecture == "amd64"
+                  )
+              ] | length' <<<"${root_manifest_json}")"
+              if ! test "${linux_amd64_count}" = "1"; then
+                echo "OCI index must contain exactly one linux/amd64 child" >&2
+                return 1
+              fi
+              child_digest="$(jq -er '
+                .manifests[]
+                | select(
+                    .platform.os == "linux" and
+                    .platform.architecture == "amd64"
+                  )
+                | .digest
+              ' <<<"${root_manifest_json}")"
+              if ! child_manifest_json="$(docker buildx imagetools inspect "${image_repository}@${child_digest}" --raw)"; then
+                echo "Unable to inspect exact linux/amd64 child ${image_repository}@${child_digest}" >&2
+                return 1
+              fi
+            else
+              echo "Exact image is neither a runnable manifest nor an OCI index" >&2
+              return 1
+            fi
+
+            if ! config_digest="$(jq -er '
+              if .manifests? != null then
+                error("nested OCI index is not runnable")
+              elif ((.config.digest? | type) != "string") then
+                error("image config digest missing")
+              elif (.config.digest | test("^sha256:[0-9a-f]{64}$") | not) then
+                error("invalid image config digest")
+              else
+                .config.digest
+              end
+            ' <<<"${child_manifest_json}")"; then
+              echo "Unable to resolve a runnable image config digest" >&2
+              return 1
+            fi
+            printf '%s\n' "${config_digest}"
+          }
+          RESOLVER
+          chmod 0555 "${resolver_path}"
       - name: Inspect immutable tag before build
         id: immutable-tag
         shell: bash
@@ -124,12 +247,13 @@ jobs:
           ANALYTICS_ENVIRONMENT: production
         run: |
           set -euo pipefail
+          source "${RUNNER_TEMP}/resolve-web-image-config.sh"
           inspect_error="${RUNNER_TEMP}/immutable-tag-preflight-${{ matrix.identity }}.err"
           if tag_digest="$(docker buildx imagetools inspect "${TAG_REFERENCE}" --format '{{.Manifest.Digest}}' 2>"${inspect_error}")"; then
             test "${tag_digest}" != ""
             test "${tag_digest}" != "sha256:"
             exact_reference="${IMAGE_REPOSITORY}@${tag_digest}"
-            raw_manifest_json="$(docker buildx imagetools inspect "${exact_reference}" --raw)"
+            config_digest="$(resolve_linux_amd64_config "${IMAGE_REPOSITORY}" "${tag_digest}")"
             image_json="$(docker buildx imagetools inspect "${exact_reference}" --format '{{json .Image}}')"
             normalized_image="$(jq -ec '
               if (.architecture == "amd64" and .os == "linux") then .
@@ -154,7 +278,6 @@ jobs:
                 echo "Refusing incompatible immutable tag ${TAG_REFERENCE}" >&2
                 exit 1
               }
-            config_digest="$(jq -er '.config.digest' <<<"${raw_manifest_json}")"
             {
               echo "state=present"
               echo "digest=${tag_digest}"
@@ -241,12 +364,13 @@ jobs:
           ANALYTICS_ENVIRONMENT: production
         run: |
           set -euo pipefail
+          source "${RUNNER_TEMP}/resolve-web-image-config.sh"
           candidate_config_digest="${CANDIDATE_CONFIG_DIGEST}"
           test "${candidate_config_digest}" != ""
           inspect_error="${RUNNER_TEMP}/immutable-tag-bind-${{ matrix.identity }}.err"
           if observed_digest="$(docker buildx imagetools inspect "${TAG_REFERENCE}" --format '{{.Manifest.Digest}}' 2>"${inspect_error}")"; then
             exact_reference="${IMAGE_REPOSITORY}@${observed_digest}"
-            raw_manifest_json="$(docker buildx imagetools inspect "${exact_reference}" --raw)"
+            observed_config_digest="$(resolve_linux_amd64_config "${IMAGE_REPOSITORY}" "${observed_digest}")"
             image_json="$(docker buildx imagetools inspect "${exact_reference}" --format '{{json .Image}}')"
             normalized_image="$(jq -ec '
               if (.architecture == "amd64" and .os == "linux") then .
@@ -269,7 +393,6 @@ jobs:
                 echo "Refusing to overwrite immutable tag ${TAG_REFERENCE}: config drift" >&2
                 exit 1
               }
-            observed_config_digest="$(jq -er '.config.digest' <<<"${raw_manifest_json}")"
             if test "${PREFLIGHT_STATE}" = "present"; then
               test "${observed_digest}" = "${PREFLIGHT_DIGEST}" || {
                 echo "Refusing to overwrite immutable tag ${TAG_REFERENCE}: digest changed during build" >&2
@@ -295,9 +418,7 @@ jobs:
             docker tag "${CANDIDATE_REFERENCE}" "${tag_reference}"
             docker push "${tag_reference}"
             registry_digest="$(docker buildx imagetools inspect "${tag_reference}" --format '{{.Manifest.Digest}}')"
-            exact_reference="${IMAGE_REPOSITORY}@${registry_digest}"
-            raw_manifest_json="$(docker buildx imagetools inspect "${exact_reference}" --raw)"
-            observed_config_digest="$(jq -er '.config.digest' <<<"${raw_manifest_json}")"
+            observed_config_digest="$(resolve_linux_amd64_config "${IMAGE_REPOSITORY}" "${registry_digest}")"
             test "${observed_config_digest}" = "${candidate_config_digest}"
             publish_mode="created"
           else
