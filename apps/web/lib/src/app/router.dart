@@ -19,6 +19,7 @@ import '../features/community/presentation/qna_detail_page.dart';
 import '../features/community/presentation/question_create_page.dart';
 import '../features/dashboard/presentation/dashboard_page.dart';
 import '../features/mentor/presentation/mentor_page.dart';
+import '../features/mission/presentation/mission_content_route_resolver.dart';
 import '../features/diagnostic/presentation/diagnostic_page.dart';
 import '../features/diagnostic/application/diagnostic_controller.dart';
 import '../features/diagnostic/state/diagnostic_state.dart';
@@ -193,7 +194,18 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, _, child) => AppShell(child: child),
         routes: [
           GoRoute(path: '/dashboard', builder: (_, _) => const DashboardPage()),
+          GoRoute(
+            path: '/path/:pathId/today',
+            builder: (_, _) => const DashboardPage(),
+          ),
           GoRoute(path: '/path', builder: (_, _) => const PathPage()),
+          GoRoute(
+            path: '/mission/:taskId/content/:contentId',
+            builder: (_, state) => MissionContentRouteResolver(
+              taskId: state.pathParameters['taskId'],
+              contentId: state.pathParameters['contentId'],
+            ),
+          ),
           GoRoute(
             path: '/content/:id',
             builder: (_, state) =>

@@ -14,7 +14,7 @@ typedef ShellDestination = ({
 
 /// 설정은 레일이 아니라 계정 블록으로 내려갔다(디자인 2단계).
 const List<ShellDestination> kShellDestinations = [
-  (path: '/dashboard', icon: DpIcons.dashboard, label: '대시보드', section: '학습'),
+  (path: '/dashboard', icon: DpIcons.dashboard, label: '오늘', section: '학습'),
   (path: '/path', icon: DpIcons.path, label: '학습 경로', section: '학습'),
   (path: '/mentor', icon: DpIcons.mentor, label: 'AI 멘토', section: '학습'),
   (path: '/community', icon: DpIcons.community, label: '게시판', section: '커뮤니티'),
@@ -31,6 +31,17 @@ List<DpCrumb> breadcrumbFor(String location) {
   const learning = (label: '학습', path: null);
   const account = (label: '계정', path: null);
 
+  if (location.startsWith('/mission/')) {
+    final label = location.contains('/sandbox') ? '실습 샌드박스' : '학습 콘텐츠';
+    return [
+      learning,
+      const (label: '오늘', path: '/dashboard'),
+      (label: label, path: null),
+    ];
+  }
+  if (location.startsWith('/path/') && location.endsWith('/today')) {
+    return const [learning, (label: '오늘', path: null)];
+  }
   if (location.startsWith('/community/new/post')) {
     return const [_crumbCommunity, _crumbBoard, (label: '새 글', path: null)];
   }
@@ -47,7 +58,7 @@ List<DpCrumb> breadcrumbFor(String location) {
     return const [_crumbCommunity, _crumbBoard, (label: 'Q&A', path: null)];
   }
   if (location.startsWith('/dashboard')) {
-    return const [learning, (label: '대시보드', path: null)];
+    return const [learning, (label: '오늘', path: null)];
   }
   if (location.startsWith('/path')) {
     return const [learning, (label: '학습 경로', path: null)];
@@ -68,6 +79,26 @@ List<DpCrumb> breadcrumbFor(String location) {
     return const [account, (label: '마이페이지', path: null)];
   }
   return const [];
+}
+
+/// Mission workspace child routes belong to Today. Legacy secondary routes stay
+/// neutral so a content deep link never pretends that the first tab is active.
+int? shellDestinationIndexFor(String location) {
+  if (location == '/dashboard' ||
+      location.startsWith('/dashboard/') ||
+      (location.startsWith('/path/') && location.endsWith('/today')) ||
+      location.startsWith('/mission/')) {
+    return 0;
+  }
+  if (location == '/path') return 1;
+
+  final index = kShellDestinations.indexWhere(
+    (destination) =>
+        destination.path != '/dashboard' &&
+        destination.path != '/path' &&
+        location.startsWith(destination.path),
+  );
+  return index < 0 ? null : index;
 }
 
 /// 라우터 결합 셸: 위치를 읽고, 명령 팔레트로 감싸 표현부에 위임.
@@ -126,10 +157,7 @@ class _AppShellViewState extends State<AppShellView> {
   // 5→4로 줄면서 /settings·/mypage·/content/:id·/sandbox가 여기 없다 —
   // 예전처럼 0(대시보드)으로 폴백하면 레일이 잘못된 항목을 활성 표시한다.
   int? get _index {
-    final i = kShellDestinations.indexWhere(
-      (d) => widget.location.startsWith(d.path),
-    );
-    return i < 0 ? null : i;
+    return shellDestinationIndexFor(widget.location);
   }
 
   @override

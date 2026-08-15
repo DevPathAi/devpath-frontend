@@ -5,11 +5,14 @@ import 'package:devpath_web/src/features/auth/application/auth_controller.dart';
 import 'package:devpath_web/src/features/auth/state/auth_state.dart';
 import 'package:devpath_web/src/features/content/presentation/content_page.dart';
 import 'package:devpath_web/src/features/path/presentation/path_page.dart';
+import 'package:devpath_web/src/features/dashboard/presentation/dashboard_page.dart';
+import 'package:devpath_web/src/features/shell/presentation/app_shell.dart';
 import 'package:devpath_web/src/providers/api_providers.dart';
 import 'package:dio/dio.dart';
 import 'package:dp_core/dp_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 
 const _missionSpineConfig = AppConfig(
   baseUrl: 'https://mock.devpath.ai',
@@ -84,5 +87,32 @@ void main() {
     expect(find.byType(ContentPage), findsOneWidget);
     expect(find.text('에러 처리 패턴 적용'), findsWidgets);
     expect(find.textContaining('불러오지 못했'), findsNothing);
+  });
+
+  testWidgets('실제 router가 canonical Today와 검증된 mission/content deep link를 연다', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_app());
+    await tester.pumpAndSettle();
+
+    var context = tester.element(find.byType(DashboardPage));
+    GoRouter.of(context).go('/path/101/today');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(DashboardPage), findsOneWidget);
+    expect(
+      tester.widget<AppShellView>(find.byType(AppShellView)).location,
+      '/path/101/today',
+    );
+
+    context = tester.element(find.byType(DashboardPage));
+    GoRouter.of(context).go('/mission/1003/content/3');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ContentPage), findsOneWidget);
+    expect(
+      tester.widget<AppShellView>(find.byType(AppShellView)).location,
+      '/mission/1003/content/3',
+    );
   });
 }
