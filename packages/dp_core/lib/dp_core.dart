@@ -30,8 +30,10 @@ export 'src/models/community_search.dart';
 export 'src/models/community_report.dart';
 export 'src/models/lcs_snapshot.dart';
 export 'src/models/assessment.dart';
+export 'src/models/sandbox.dart';
 export 'src/api/assessment_api.dart';
 export 'src/api/learning_path_api.dart';
+export 'src/api/sandbox_api.dart';
 export 'src/mock/mock_http_adapter.dart';
 export 'src/mock/mock_sse_source.dart';
 

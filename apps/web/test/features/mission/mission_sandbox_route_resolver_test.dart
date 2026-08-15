@@ -1,7 +1,11 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:devpath_web/src/app/app_config.dart';
 import 'package:devpath_web/src/features/dashboard/application/current_mission_controller.dart';
 import 'package:devpath_web/src/features/mission/presentation/mission_sandbox_route_resolver.dart';
 import 'package:devpath_web/src/features/mission/state/mission_workspace_key.dart';
+import 'package:devpath_web/src/features/sandbox/data/sandbox_run_source.dart';
 import 'package:devpath_web/src/features/sandbox/presentation/sandbox_page.dart';
 import 'package:devpath_web/src/providers/api_providers.dart';
 import 'package:dio/dio.dart';
@@ -22,6 +26,37 @@ final class _MissionApi extends LearningPathApi {
     calls += 1;
     return mission;
   }
+}
+
+final class _ContentAdapter implements HttpClientAdapter {
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future? cancelFuture,
+  ) async => ResponseBody.fromString(
+    jsonEncode({
+      'id': 77,
+      'slug': 'async-error-handling',
+      'title': '에러 처리 실습',
+      'track': 'BACKEND_SPRING',
+      'markdown': '# 에러 처리',
+      'conceptTags': <String>[],
+      'progress': {
+        'scrollPct': 0.0,
+        'dwellSec': 0,
+        'completed': false,
+        'completedAt': null,
+      },
+    }),
+    200,
+    headers: {
+      Headers.contentTypeHeader: [Headers.jsonContentType],
+    },
+  );
+
+  @override
+  void close({bool force = false}) {}
 }
 
 CurrentMission _available() {
@@ -51,7 +86,11 @@ Future<void> _pump(
   required String? taskId,
   required bool enabled,
   required _MissionApi api,
+  SandboxRunV2Connect? v2Connect,
 }) async {
+  final client = ApiClient.create(
+    const ApiConfig(baseUrl: 'https://mock.devpath.ai/api/v1'),
+  )..dio.httpClientAdapter = _ContentAdapter();
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
@@ -63,7 +102,10 @@ Future<void> _pump(
           ),
         ),
         learningPathApiProvider.overrideWithValue(api),
+        apiClientProvider.overrideWithValue(client),
         currentMissionOwnerKeyProvider.overrideWithValue('route-user'),
+        if (v2Connect != null)
+          sandboxRunV2ConnectProvider.overrideWithValue(v2Connect),
       ],
       child: MaterialApp(
         theme: DpTheme.light(),
@@ -72,6 +114,8 @@ Future<void> _pump(
     ),
   );
   await tester.pump();
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 1));
   await tester.pump();
 }
 
@@ -106,9 +150,20 @@ void main() {
     tester,
   ) async {
     final api = _MissionApi(_available());
-    await _pump(tester, taskId: '302', enabled: false, api: api);
+    var v2Calls = 0;
+    await _pump(
+      tester,
+      taskId: '302',
+      enabled: false,
+      api: api,
+      v2Connect: (_) {
+        v2Calls += 1;
+        return const Stream<SseEvent>.empty();
+      },
+    );
 
     expect(api.calls, 0);
+    expect(v2Calls, 0);
     expect(find.byType(SandboxPage), findsNothing);
     expect(find.text('오늘로 돌아가기'), findsOneWidget);
   });

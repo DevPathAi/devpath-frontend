@@ -259,7 +259,11 @@ bool _isPositiveDatabaseId(Object? value) {
   if (value is int) {
     return value > 0 && value <= _maxCrossRuntimeSafeInteger;
   }
-  return value is String && RegExp(r'^[1-9][0-9]{0,18}$').hasMatch(value);
+  if (value is! String || !RegExp(r'^[1-9][0-9]*$').hasMatch(value)) {
+    return false;
+  }
+  final parsed = int.tryParse(value);
+  return parsed != null && parsed <= _maxCrossRuntimeSafeInteger;
 }
 
 bool _isScalar(Object? value) =>

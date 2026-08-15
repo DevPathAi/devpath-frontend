@@ -64,13 +64,20 @@
           crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script>
     require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs' }});
-    // F5-a/F5-c 반영: { dispose, layout } 핸들 반환 + Esc 포커스 탈출.
+    // F5-a/F5-c 반영: { dispose, layout, update } 핸들 반환 + Esc 포커스 탈출.
     // require가 비동기라 editor가 즉시 없을 수 있으므로 핸들은 클로저로 editor를 지연 참조.
-    window.createDevpathEditor = function (container, code, onChange, onEscape) {
+    window.createDevpathEditor = function (container, code, runtime, onChange, onEscape) {
       var editor = null;
+      var pendingCode = code;
+      var pendingRuntime = runtime;
+      function monacoLanguage(value) {
+        if (value === 'NODE') return 'javascript';
+        if (value === 'PYTHON') return 'python';
+        return 'java';
+      }
       require(['vs/editor/editor.main'], function () {
         editor = monaco.editor.create(container, {
-          value: code, language: 'dart', theme: 'vs-dark',
+          value: pendingCode, language: monacoLanguage(pendingRuntime), theme: 'vs-dark',
           automaticLayout: true, minimap: { enabled: false }, fontSize: 14,
         });
         editor.onDidChangeModelContent(function () { onChange(editor.getValue()); });
@@ -80,6 +87,13 @@
       return {
         dispose: function () { if (editor) editor.dispose(); }, // F5-a
         layout:  function () { if (editor) editor.layout(); },  // F5-b
+        update:  function (nextCode, nextRuntime) {
+          pendingCode = nextCode;
+          pendingRuntime = nextRuntime;
+          if (!editor) return;
+          if (editor.getValue() !== nextCode) editor.setValue(nextCode);
+          monaco.editor.setModelLanguage(editor.getModel(), monacoLanguage(nextRuntime));
+        },
       };
     };
 

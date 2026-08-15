@@ -1,8 +1,11 @@
 import 'package:devpath_web/src/features/review/application/review_controller.dart';
 import 'package:devpath_web/src/features/review/presentation/review_panel.dart';
 import 'package:devpath_web/src/features/review/state/review_state.dart';
+import 'package:devpath_web/src/features/dashboard/application/current_mission_controller.dart';
+import 'package:devpath_web/src/features/mission/state/mission_workspace_key.dart';
 import 'package:devpath_web/src/features/sandbox/application/run_controller.dart';
 import 'package:devpath_web/src/features/sandbox/data/sandbox_run_source.dart';
+import 'package:devpath_web/src/features/sandbox/state/run_state.dart';
 import 'package:devpath_web/src/providers/api_providers.dart';
 import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
@@ -18,13 +21,50 @@ class _FakeReview extends ReviewController {
   ReviewState build() => _initial;
 }
 
-Widget _host(ProviderContainer c) => UncontrolledProviderScope(
-  container: c,
-  child: MaterialApp(
-    theme: DpTheme.light(),
-    home: Scaffold(body: ReviewPanel(onRequest: () {})),
-  ),
-);
+final class _RecordingReview extends ReviewController {
+  _RecordingReview(super.workspaceKey, this.calls);
+
+  final List<int> calls;
+
+  @override
+  ReviewState build() => const ReviewIdle();
+
+  @override
+  Future<void> pollForSession(
+    int sandboxSessionId, {
+    Duration interval = const Duration(seconds: 2),
+    int maxAttempts = 30,
+  }) async {
+    calls.add(sandboxSessionId);
+  }
+}
+
+final class _TerminalRun extends RunController {
+  _TerminalRun(super.workspaceKey);
+
+  @override
+  RunState build() => const RunCompleted(
+    result: SandboxTerminalResult(
+      sessionId: 42,
+      status: SandboxSessionStatus.completed,
+      exitCode: 0,
+      truncated: false,
+    ),
+    persisted: true,
+    explicitRun: true,
+  );
+}
+
+Widget _host(ProviderContainer c, {MissionWorkspaceKey? workspaceKey}) =>
+    UncontrolledProviderScope(
+      container: c,
+      child: MaterialApp(
+        theme: DpTheme.light(),
+        home: Scaffold(
+          body: ReviewPanel(workspaceKey: workspaceKey, onRequest: () {}),
+        ),
+      ),
+    );
 
 // F6-a: context.go('/community')가 동작하도록 GoRouter를 끼운 호스트.
 Widget _hostRouter(ProviderContainer c) {
@@ -173,6 +213,25 @@ void main() {
     expect(find.textContaining('서버 오류'), findsOneWidget);
   });
 
+  testWidgets('refresh/failure 중에도 마지막 valid review를 계속 보여준다', (tester) async {
+    const previous = CodeReview(confidence: 86, strengths: ['보존된 장점']);
+    final c = ProviderContainer(
+      overrides: [
+        reviewControllerProvider.overrideWith(
+          () => _FakeReview(
+            const ReviewLoading(previous: previous, sessionId: 41),
+          ),
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+    await tester.pumpWidget(_host(c));
+
+    expect(find.textContaining('86'), findsWidgets);
+    expect(find.text('보존된 장점'), findsOneWidget);
+    expect(find.textContaining('새 리뷰를 확인'), findsOneWidget);
+  });
+
   // F6-e: RunDone.sandboxSessionId 감지 시 자동 pollForSession 트리거 검증.
   testWidgets('RunDone with sandboxSessionId → auto-poll triggers ReviewLoaded', (
     tester,
@@ -217,5 +276,101 @@ void main() {
 
     expect(find.textContaining('75'), findsWidgets);
     expect(find.textContaining('자동 폴링 테스트'), findsOneWidget);
+  });
+
+  testWidgets('canonical RunTerminal은 같은 workspace review만 자동 poll한다', (
+    tester,
+  ) async {
+    const workspaceKey = MissionWorkspaceKey(taskId: 7, contentId: 11);
+    final client = ApiClient.create(
+      const ApiConfig(baseUrl: 'https://t/api/v1'),
+    );
+    client.dio.httpClientAdapter = MockHttpAdapter({
+      'GET /reviews?sandboxSessionId=42': (
+        200,
+        {
+          'status': 'DONE',
+          'confidence': 91,
+          'strengths': ['canonical review'],
+          'improvements': <Map<String, dynamic>>[],
+          'security': <Map<String, dynamic>>[],
+        },
+      ),
+    });
+    final c = ProviderContainer(
+      overrides: [
+        apiClientProvider.overrideWithValue(client),
+        sandboxRunV2ConnectProvider.overrideWithValue((_) async* {
+          yield const SseEvent(event: 'session', data: '42');
+          yield const SseEvent(
+            event: 'result',
+            data:
+                '{"sessionId":42,"status":"COMPLETED",'
+                '"exitCode":0,"truncated":false}',
+          );
+        }),
+        sandboxSessionReadProvider.overrideWithValue(
+          (_) async => SandboxSession(
+            sessionId: 42,
+            language: SandboxLanguage.python,
+            contentId: workspaceKey.contentId,
+            codeBlockId: null,
+            stdout: 'ok\n',
+            stderr: '',
+            exitCode: 0,
+            status: SandboxSessionStatus.completed,
+            truncated: false,
+            startedAt: DateTime.utc(2026, 8, 16),
+            finishedAt: DateTime.utc(2026, 8, 16, 0, 0, 1),
+          ),
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+    await tester.pumpWidget(_host(c, workspaceKey: workspaceKey));
+
+    await c
+        .read(runControllerFamilyProvider(workspaceKey).notifier)
+        .run('print("ok")', 'PYTHON');
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('91'), findsWidgets);
+    expect(find.text('canonical review'), findsOneWidget);
+    expect(c.read(reviewControllerProvider), isA<ReviewIdle>());
+  });
+
+  testWidgets('같은 session ID라도 workspace가 바뀌면 새 review를 poll한다', (
+    tester,
+  ) async {
+    const first = MissionWorkspaceKey(taskId: 7, contentId: 11);
+    const second = MissionWorkspaceKey(taskId: 8, contentId: 12);
+    final firstCalls = <int>[];
+    final secondCalls = <int>[];
+    final c = ProviderContainer(
+      overrides: [
+        currentMissionOwnerKeyProvider.overrideWithValue('owner-1'),
+        runControllerFamilyProvider(
+          first,
+        ).overrideWith(() => _TerminalRun(first)),
+        runControllerFamilyProvider(
+          second,
+        ).overrideWith(() => _TerminalRun(second)),
+        reviewControllerFamilyProvider(
+          first,
+        ).overrideWith(() => _RecordingReview(first, firstCalls)),
+        reviewControllerFamilyProvider(
+          second,
+        ).overrideWith(() => _RecordingReview(second, secondCalls)),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    await tester.pumpWidget(_host(c, workspaceKey: first));
+    await tester.pump();
+    expect(firstCalls, [42]);
+
+    await tester.pumpWidget(_host(c, workspaceKey: second));
+    await tester.pump();
+    expect(secondCalls, [42]);
   });
 }

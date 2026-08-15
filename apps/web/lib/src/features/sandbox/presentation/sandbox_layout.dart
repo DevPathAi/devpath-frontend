@@ -19,12 +19,22 @@ class SandboxLayout extends StatefulWidget {
   final VoidCallback? onEditorVisible;
 
   @override
-  State<SandboxLayout> createState() => _SandboxLayoutState();
+  State<SandboxLayout> createState() => SandboxLayoutState();
 }
 
-class _SandboxLayoutState extends State<SandboxLayout> {
+class SandboxLayoutState extends State<SandboxLayout> {
   int _tab = 0; // <1024 세그먼트: 0=editor 1=log 2=review
   bool _logOpen = true; // 1024–1239 로그 접이
+
+  void showEditor() => _showPane(0);
+  void showLog() => _showPane(1);
+  void showReview() => _showPane(2);
+
+  void _showPane(int pane) {
+    if (!mounted || _tab == pane) return;
+    setState(() => _tab = pane);
+    if (pane == 0) widget.onEditorVisible?.call();
+  }
 
   @override
   Widget build(BuildContext context) {

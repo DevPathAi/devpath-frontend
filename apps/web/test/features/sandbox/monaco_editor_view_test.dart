@@ -1,5 +1,6 @@
 import 'package:devpath_web/src/features/sandbox/presentation/monaco_editor_view.dart';
 import 'package:dp_design/dp_design.dart';
+import 'package:dp_core/dp_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -29,5 +30,40 @@ void main() {
       ),
     );
     expect(find.byType(Focus), findsWidgets); // 공개 위젯이 Focus를 노출
+  });
+
+  testWidgets('runtime/template 갱신은 editor draft와 syntax language를 함께 갱신한다', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: DpTheme.light(),
+        home: const Scaffold(
+          body: MonacoEditorView(
+            key: ValueKey('editor'),
+            initialCode: "console.log('ok');",
+            language: SandboxLanguage.node,
+          ),
+        ),
+      ),
+    );
+    expect(find.textContaining('console.log'), findsOneWidget);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: DpTheme.light(),
+        home: const Scaffold(
+          body: MonacoEditorView(
+            key: ValueKey('editor'),
+            initialCode: 'print("ok")',
+            language: SandboxLanguage.python,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.textContaining('print("ok")'), findsOneWidget);
+    expect(find.textContaining('console.log'), findsNothing);
   });
 }

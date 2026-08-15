@@ -11,23 +11,43 @@ class SseClient {
   SseClient(this.dio);
   final Dio dio;
 
-  Stream<SseEvent> connect(String path, {Object? body}) async* {
+  Stream<SseEvent> connect(
+    String path, {
+    Object? body,
+    Map<String, Object?> requestHeaders = const {},
+    Map<String, String> responseHeaderEvents = const {},
+  }) async* {
     final ResponseBody res;
+    final Headers responseHeaders;
     try {
       final r = await dio.post<ResponseBody>(
         path,
         data: body,
         options: Options(
           responseType: ResponseType.stream,
-          headers: {Headers.acceptHeader: 'text/event-stream'},
+          headers: {
+            Headers.acceptHeader: 'text/event-stream',
+            ...requestHeaders,
+          },
         ),
       );
       res = r.data!;
+      responseHeaders = r.headers;
     } on DioException catch (e) {
       // get/post 헬퍼와 동일하게 실패를 ApiException으로 정규화.
       throw (e.error is ApiException)
           ? e.error as ApiException
           : ApiException.fromDio(e);
+    }
+
+    // Some accepted streaming operations expose their durable identity in the
+    // HTTP headers before the first SSE frame. Project only explicitly mapped
+    // headers into synthetic SSE events so existing consumers remain unchanged.
+    for (final mapping in responseHeaderEvents.entries) {
+      final value = responseHeaders.value(mapping.key);
+      if (value != null && value.isNotEmpty) {
+        yield SseEvent(event: mapping.value, data: value);
+      }
     }
 
     final lines = res.stream

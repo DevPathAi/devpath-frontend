@@ -2,6 +2,7 @@ import 'dart:js_interop';
 import 'dart:ui_web' as ui_web;
 
 import 'package:flutter/widgets.dart';
+import 'package:dp_core/dp_core.dart';
 import 'package:web/web.dart' as web;
 
 import 'monaco_editor_view.dart' show MonacoHandle;
@@ -10,6 +11,7 @@ import 'monaco_editor_view.dart' show MonacoHandle;
 extension type _JsEditorHandle._(JSObject _) implements JSObject {
   external void dispose();
   external void layout();
+  external void update(String code, String language);
 }
 
 /// index.html이 정의하는 셈: createDevpathEditor(container, code, onChange, onEscape)
@@ -18,6 +20,7 @@ extension type _JsEditorHandle._(JSObject _) implements JSObject {
 external _JsEditorHandle _createDevpathEditor(
   web.HTMLElement container,
   String initialCode,
+  String language,
   JSFunction onChange,
   JSFunction onEscape,
 );
@@ -28,6 +31,7 @@ int _seq = 0;
 /// 함수형 build에서 매 rebuild마다 만들면 viewFactory 무한 증식.
 MonacoHandle createMonacoHandle({
   required String initialCode,
+  required SandboxLanguage language,
   ValueChanged<String>? onChanged,
   VoidCallback? onEscape,
 }) {
@@ -40,7 +44,13 @@ MonacoHandle createMonacoHandle({
       ..style.height = '100%';
     final cb = ((JSString v) => onChanged?.call(v.toDart)).toJS;
     final esc = (() => onEscape?.call()).toJS; // F5-c: Esc→dart sentinel
-    jsHandle = _createDevpathEditor(container, initialCode, cb, esc);
+    jsHandle = _createDevpathEditor(
+      container,
+      initialCode,
+      language.wireName,
+      cb,
+      esc,
+    );
     return container;
   });
 
@@ -57,6 +67,10 @@ class _WebHandle implements MonacoHandle {
 
   @override
   void layout() => _jsHandle()?.layout(); // F5-b
+
+  @override
+  void update({required String code, required SandboxLanguage language}) =>
+      _jsHandle()?.update(code, language.wireName);
 
   @override
   void dispose() => _jsHandle()?.dispose(); // F5-a: JS editor.dispose()

@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import 'package:dp_core/dp_core.dart';
 
 import 'monaco_editor_view_stub.dart'
     if (dart.library.js_interop) 'monaco_editor_view_web.dart'
@@ -8,6 +9,7 @@ import 'monaco_editor_view_stub.dart'
 /// stub도 동일 인터페이스를 만족(아래 stub 참조).
 abstract class MonacoHandle {
   Widget get view;
+  void update({required String code, required SandboxLanguage language});
   void layout(); // F5-b: 가시화 시 재레이아웃
   void dispose(); // F5-a: JS editor.dispose()
 }
@@ -20,9 +22,11 @@ class MonacoEditorView extends StatefulWidget {
   const MonacoEditorView({
     super.key,
     required this.initialCode,
+    this.language = SandboxLanguage.java,
     this.onChanged,
   });
   final String initialCode;
+  final SandboxLanguage language;
   final ValueChanged<String>? onChanged;
 
   @override
@@ -40,9 +44,19 @@ class MonacoEditorViewState extends State<MonacoEditorView> {
     super.initState();
     _handle = impl.createMonacoHandle(
       initialCode: widget.initialCode,
+      language: widget.language,
       onChanged: widget.onChanged,
       onEscape: () => _focusNode.requestFocus(), // Esc→컨테이너 밖 sentinel로 탈출
     );
+  }
+
+  @override
+  void didUpdateWidget(covariant MonacoEditorView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialCode != widget.initialCode ||
+        oldWidget.language != widget.language) {
+      _handle.update(code: widget.initialCode, language: widget.language);
+    }
   }
 
   /// F5-b: SandboxLayout이 에디터 가시화 시 호출(IndexedStack 토글 보정).

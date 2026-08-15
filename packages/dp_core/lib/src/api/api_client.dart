@@ -133,3 +133,22 @@ class ApiClient {
     }
   }
 }
+
+/// Additive SSE variant for protocols that opt into HTTP metadata.
+///
+/// An extension keeps [ApiClient]'s interface source-compatible with existing
+/// fakes while preventing ordinary [ApiClient.sse] consumers from inheriting
+/// Sandbox-specific header behavior.
+extension ApiClientSseMetadata on ApiClient {
+  Stream<SseEvent> sseWithMetadata(
+    String path, {
+    Object? body,
+    Map<String, Object?> requestHeaders = const {},
+    Map<String, String> responseHeaderEvents = const {},
+  }) => SseClient(dio).connect(
+    path,
+    body: body,
+    requestHeaders: requestHeaders,
+    responseHeaderEvents: responseHeaderEvents,
+  );
+}

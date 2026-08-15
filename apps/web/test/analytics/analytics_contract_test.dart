@@ -447,6 +447,25 @@ void main() {
       );
     });
 
+    test('run/review string IDs도 positive JS-safe DB ID만 허용한다', () {
+      expect(
+        validateAnalyticsEvent('first_practice_succeeded', {
+          ...common,
+          ...validEventProperties['first_practice_succeeded']!,
+          'run_id': '9007199254740992',
+        }).code,
+        AnalyticsValidationCode.invalidIdentifier,
+      );
+      expect(
+        validateAnalyticsEvent('contextual_review_viewed', {
+          ...common,
+          ...validEventProperties['contextual_review_viewed']!,
+          'review_id': '000501',
+        }).code,
+        AnalyticsValidationCode.invalidIdentifier,
+      );
+    });
+
     for (final vector in const [
       ('path_generated', 'path_id'),
       ('diagnostic_completed', 'duration_ms'),

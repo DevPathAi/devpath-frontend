@@ -8,6 +8,7 @@ enum ApiErrorCode {
   conflict,
   quotaExceeded,
   aiKillSwitchActive,
+  sandboxBusy,
   sandboxUnavailable,
   network,
   unknown;
@@ -21,6 +22,7 @@ enum ApiErrorCode {
     'CONFLICT' => conflict,
     'QUOTA_EXCEEDED' => quotaExceeded,
     'AI_KILL_SWITCH_ACTIVE' => aiKillSwitchActive,
+    'SANDBOX_BUSY' => sandboxBusy,
     'SANDBOX_UNAVAILABLE' => sandboxUnavailable,
     _ => unknown,
   };
