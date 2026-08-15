@@ -5,6 +5,9 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   test('본문 폰트는 Pretendard, 한글 행간 1.6', () {
     final t = DpTypography.textTheme(Brightness.light);
+    expect(t.bodyLarge!.fontFamily, 'Pretendard');
+    expect(t.bodyLarge!.fontSize, 16);
+    expect(t.bodyLarge!.height, closeTo(1.6, 0.001));
     expect(t.bodyMedium!.fontFamily, 'Pretendard');
     expect(t.bodyMedium!.height, closeTo(1.6, 0.001));
     expect(t.titleMedium!.fontWeight, FontWeight.w600);
@@ -41,6 +44,7 @@ void main() {
         t.titleLarge,
         t.titleMedium,
         t.titleSmall,
+        t.bodyLarge,
         t.bodyMedium,
         t.bodySmall,
         t.labelLarge,
