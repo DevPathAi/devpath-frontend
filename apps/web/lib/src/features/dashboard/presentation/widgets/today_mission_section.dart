@@ -3,6 +3,7 @@ import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 
 import '../../application/current_mission_controller.dart';
+import '../../../mission/state/mission_workspace_key.dart';
 
 class TodayMissionSection extends StatelessWidget {
   const TodayMissionSection({
@@ -17,7 +18,7 @@ class TodayMissionSection extends StatelessWidget {
   final CurrentMissionState state;
   final VoidCallback onRetry;
   final VoidCallback onOpenPath;
-  final ValueChanged<int> onOpenContent;
+  final ValueChanged<MissionWorkspaceKey> onOpenContent;
   final ValueChanged<int> onCompleteContentless;
 
   @override
@@ -85,7 +86,7 @@ class _AvailableMission extends StatelessWidget {
   final CurrentMissionState state;
   final CurrentMission mission;
   final VoidCallback onRetry;
-  final ValueChanged<int> onOpenContent;
+  final ValueChanged<MissionWorkspaceKey> onOpenContent;
   final ValueChanged<int> onCompleteContentless;
 
   @override
@@ -167,7 +168,12 @@ class _AvailableMission extends StatelessWidget {
               } else if (refreshFailed) {
                 onRetry();
               } else {
-                onOpenContent(contentId!);
+                onOpenContent(
+                  MissionWorkspaceKey(
+                    taskId: task.taskId!,
+                    contentId: contentId!,
+                  ),
+                );
               }
             },
           ),

@@ -69,8 +69,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     if (!ref.watch(appConfigProvider).missionSpineEnabled) {
       return _LegacyDashboard(
         state: safeDashboardState,
-        onRetry: () =>
-            unawaited(dashboardNotifier.load()),
+        onRetry: () => unawaited(dashboardNotifier.load()),
       );
     }
 
@@ -100,7 +99,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                     .invalidateAndRefetch(),
               ),
               onOpenPath: () => context.go('/path'),
-              onOpenContent: (contentId) => context.go('/content/$contentId'),
+              onOpenContent: (workspaceKey) =>
+                  context.push(workspaceKey.contentLocation),
               onCompleteContentless: (taskId) => unawaited(
                 ref
                     .read(currentMissionControllerProvider.notifier)

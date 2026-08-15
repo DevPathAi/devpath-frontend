@@ -3,6 +3,7 @@ import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 
 import '../../dashboard/application/current_mission_controller.dart';
+import '../../mission/state/mission_workspace_key.dart';
 
 /// Authoritative current-mission projection을 전경에 두고 전체 12주 문서를
 /// 보조 detail로 낮춘 Path 화면입니다. 현재 주차나 task는 [LearningPath]의
@@ -26,7 +27,7 @@ class MissionPathPlanView extends StatelessWidget {
   final String? planFailureMessage;
   final VoidCallback onRetryMission;
   final VoidCallback? onRetryPlan;
-  final ValueChanged<int> onOpenContent;
+  final ValueChanged<MissionWorkspaceKey> onOpenContent;
   final ValueChanged<int> onCompleteContentless;
 
   @override
@@ -113,7 +114,7 @@ class _AvailablePath extends StatelessWidget {
   final String? planFailureMessage;
   final VoidCallback? onRetryPlan;
   final VoidCallback onRetryMission;
-  final ValueChanged<int> onOpenContent;
+  final ValueChanged<MissionWorkspaceKey> onOpenContent;
   final ValueChanged<int> onCompleteContentless;
 
   @override
@@ -237,7 +238,12 @@ class _AvailablePath extends StatelessWidget {
               } else if (refreshFailed) {
                 onRetryMission();
               } else {
-                onOpenContent(contentId!);
+                onOpenContent(
+                  MissionWorkspaceKey(
+                    taskId: task.taskId!,
+                    contentId: contentId!,
+                  ),
+                );
               }
             },
           ),

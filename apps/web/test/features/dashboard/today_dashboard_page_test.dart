@@ -202,7 +202,7 @@ final _dashboardOwnerKeyProvider =
       _DashboardOwnerKeyController.new,
     );
 
-Future<void> _pumpDashboard(
+Future<GoRouter> _pumpDashboard(
   WidgetTester tester, {
   required bool enabled,
   required _DashboardMissionApi missionApi,
@@ -220,6 +220,13 @@ Future<void> _pumpDashboard(
       GoRoute(
         path: '/content/:id',
         builder: (_, state) => Text('content ${state.pathParameters['id']}'),
+      ),
+      GoRoute(
+        path: '/mission/:taskId/content/:contentId',
+        builder: (_, state) => Text(
+          'mission ${state.pathParameters['taskId']} '
+          'content ${state.pathParameters['contentId']}',
+        ),
       ),
     ],
   );
@@ -245,6 +252,7 @@ Future<void> _pumpDashboard(
   );
   await tester.pump();
   await tester.pump();
+  return router;
 }
 
 void main() {
@@ -560,10 +568,7 @@ void main() {
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
-        child: MaterialApp.router(
-          theme: DpTheme.light(),
-          routerConfig: router,
-        ),
+        child: MaterialApp.router(theme: DpTheme.light(), routerConfig: router),
       ),
     );
 
@@ -576,7 +581,7 @@ void main() {
     final missionApi = _DashboardMissionApi([
       Future.value(_mission('AVAILABLE')),
     ]);
-    await _pumpDashboard(
+    final router = await _pumpDashboard(
       tester,
       enabled: true,
       missionApi: missionApi,
@@ -592,7 +597,16 @@ void main() {
 
     await tester.tap(find.text('미션 열기'));
     await tester.pumpAndSettle();
-    expect(find.text('content 77'), findsOneWidget);
+    expect(
+      router.routerDelegate.state.uri.toString(),
+      '/mission/302/content/77',
+    );
+    expect(find.text('mission 302 content 77'), findsOneWidget);
+    expect(router.canPop(), isTrue);
+
+    router.pop();
+    await tester.pumpAndSettle();
+    expect(find.byType(DashboardPage), findsOneWidget);
   });
 
   testWidgets('320px와 200% 텍스트에서도 Today CTA 의미와 한 개의 행동을 유지한다', (tester) async {

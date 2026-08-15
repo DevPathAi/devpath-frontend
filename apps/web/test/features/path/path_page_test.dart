@@ -14,6 +14,7 @@ import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 
 Stream<SseEvent> _emit(List<String> stages) async* {
   for (final s in stages) {
@@ -38,6 +39,32 @@ Widget _host(ProviderContainer c) => UncontrolledProviderScope(
   container: c,
   child: MaterialApp(theme: DpTheme.light(), home: const PathPage()),
 );
+
+({Widget host, GoRouter router}) _routerHost(ProviderContainer c) {
+  final router = GoRouter(
+    routes: [
+      GoRoute(path: '/', builder: (_, _) => const PathPage()),
+      GoRoute(
+        path: '/content/:id',
+        builder: (_, state) => Text('legacy ${state.pathParameters['id']}'),
+      ),
+      GoRoute(
+        path: '/mission/:taskId/content/:contentId',
+        builder: (_, state) => Text(
+          'mission ${state.pathParameters['taskId']} '
+          'content ${state.pathParameters['contentId']}',
+        ),
+      ),
+    ],
+  );
+  return (
+    host: UncontrolledProviderScope(
+      container: c,
+      child: MaterialApp.router(theme: DpTheme.light(), routerConfig: router),
+    ),
+    router: router,
+  );
+}
 
 class _AuthedAuthController extends AuthController {
   @override
@@ -179,6 +206,49 @@ void main() {
     expect(mission.loadCalls, 1);
     expect(find.text('현재 3주차 과제'), findsWidgets);
     expect(find.byType(DpMissionHeader), findsOneWidget);
+  });
+
+  testWidgets('flag ON Path CTA는 taskId를 버리지 않고 canonical workspace를 push한다', (
+    tester,
+  ) async {
+    final path = _PendingPathController();
+    final mission = _ReadyMissionController(_availableMission());
+    final c = ProviderContainer(
+      overrides: [
+        appConfigProvider.overrideWithValue(
+          const AppConfig(
+            baseUrl: 'https://mock.devpath.ai',
+            useMock: true,
+            missionSpineEnabled: true,
+          ),
+        ),
+        authControllerProvider.overrideWith(_AuthedAuthController.new),
+        pathControllerProvider.overrideWith(() => path),
+        currentMissionControllerProvider.overrideWith(() => mission),
+      ],
+    );
+    final routed = _routerHost(c);
+    addTearDown(() {
+      if (!path.pending.isCompleted) path.pending.complete();
+      routed.router.dispose();
+      c.dispose();
+    });
+
+    await tester.pumpWidget(routed.host);
+    await tester.pump();
+    await tester.tap(find.text('미션 열기'));
+    await tester.pumpAndSettle();
+
+    expect(
+      routed.router.routerDelegate.state.uri.toString(),
+      '/mission/302/content/303',
+    );
+    expect(find.text('mission 302 content 303'), findsOneWidget);
+    expect(routed.router.canPop(), isTrue);
+
+    routed.router.pop();
+    await tester.pumpAndSettle();
+    expect(find.byType(PathPage), findsOneWidget);
   });
 
   testWidgets('flag OFF는 legacy Path만 시작하고 current mission을 요청하지 않는다', (

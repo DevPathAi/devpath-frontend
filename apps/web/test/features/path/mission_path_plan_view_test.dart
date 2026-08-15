@@ -1,5 +1,6 @@
 import 'package:devpath_web/src/features/dashboard/application/current_mission_controller.dart';
 import 'package:devpath_web/src/features/path/presentation/mission_path_plan_view.dart';
+import 'package:devpath_web/src/features/mission/state/mission_workspace_key.dart';
 import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
@@ -12,7 +13,7 @@ Widget _host({
   String? planFailureMessage,
   VoidCallback? onRetryMission,
   VoidCallback? onRetryPlan,
-  ValueChanged<int>? onOpenContent,
+  ValueChanged<MissionWorkspaceKey>? onOpenContent,
   ValueChanged<int>? onCompleteContentless,
 }) => MaterialApp(
   theme: DpTheme.light(),
@@ -129,17 +130,20 @@ void main() {
   });
 
   testWidgets('현재 content task와 contentless task의 행동 경계를 지킨다', (tester) async {
-    int? openedContent;
+    MissionWorkspaceKey? openedWorkspace;
     await tester.pumpWidget(
       _host(
         missionState: CurrentMissionState(mission: _availableMission()),
         plan: _path(),
-        onOpenContent: (id) => openedContent = id,
+        onOpenContent: (key) => openedWorkspace = key,
       ),
     );
 
     await tester.tap(find.text('미션 열기'));
-    expect(openedContent, 303);
+    expect(
+      openedWorkspace,
+      const MissionWorkspaceKey(taskId: 302, contentId: 303),
+    );
 
     int? completedTask;
     await tester.pumpWidget(

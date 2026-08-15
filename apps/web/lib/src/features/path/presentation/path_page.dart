@@ -166,7 +166,8 @@ class _PathPageState extends ConsumerState<PathPage> {
                   .read(currentMissionControllerProvider.notifier)
                   .invalidateAndRefetch(),
             ),
-            onOpenContent: (contentId) => context.go('/content/$contentId'),
+            onOpenContent: (workspaceKey) =>
+                context.push(workspaceKey.contentLocation),
             onCompleteContentless: (taskId) => unawaited(
               ref
                   .read(currentMissionControllerProvider.notifier)
@@ -196,7 +197,8 @@ class _PathPageState extends ConsumerState<PathPage> {
               .read(currentMissionControllerProvider.notifier)
               .invalidateAndRefetch(),
         ),
-        onOpenContent: (contentId) => context.go('/content/$contentId'),
+        onOpenContent: (workspaceKey) =>
+            context.push(workspaceKey.contentLocation),
         onCompleteContentless: (taskId) => unawaited(
           ref
               .read(currentMissionControllerProvider.notifier)
