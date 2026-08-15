@@ -93,6 +93,14 @@ jobs:
     permissions:
       contents: read
       packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - identity: off
+            enabled: 'false'
+          - identity: on
+            enabled: 'true'
     steps:
       - uses: actions/checkout@v6
       - uses: docker/setup-buildx-action@v3
@@ -102,6 +110,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/build-push-action@v7
+        id: publish
         with:
           context: .
           file: apps/web/Dockerfile
@@ -110,48 +119,137 @@ jobs:
             API_BASE_URL=${{ vars.WEB_API_BASE_URL }}
             USE_MOCK=false
             APP_VERSION=${{ github.sha }}
-            MISSION_SPINE_ENABLED=false
+            MISSION_SPINE_ENABLED=${{ matrix.enabled }}
             ANALYTICS_CONTRACT_VERSION=mission-spine.analytics.v1
             ANALYTICS_ENVIRONMENT=production
-          tags: |
-            ghcr.io/devpathai/devpath-web:${{ github.sha }}
-            ghcr.io/devpathai/devpath-web:main
+          tags: ghcr.io/devpathai/devpath-web:${{ github.sha }}-mission-${{ matrix.identity }}
+          labels: |
+            ai.leva.app_version=${{ github.sha }}
+            ai.leva.mission_spine_enabled=${{ matrix.enabled }}
+            ai.leva.analytics_contract_version=mission-spine.analytics.v1
+            ai.leva.analytics_environment=production
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: Record safe registry digest evidence
+        shell: bash
+        env:
+          EVIDENCE_PATH: ${{ runner.temp }}/leva-web-${{ matrix.identity }}.registry.json
+          SOURCE_SHA: ${{ github.sha }}
+          IDENTITY: ${{ matrix.identity }}
+          MISSION_SPINE_ENABLED: ${{ matrix.enabled }}
+          REGISTRY_DIGEST: ${{ steps.publish.outputs.digest }}
+          ANALYTICS_CONTRACT_VERSION: mission-spine.analytics.v1
+          ANALYTICS_ENVIRONMENT: production
+        run: |
+          set -euo pipefail
+          test "${REGISTRY_DIGEST}" != ""
+          test "${REGISTRY_DIGEST}" != "sha256:"
+          test "${IDENTITY}" = "off" || test "${IDENTITY}" = "on"
+          image_repository="ghcr.io/devpathai/devpath-web"
+          image_tag="${SOURCE_SHA}-mission-${IDENTITY}"
+          jq -n \
+            --arg source_sha "${SOURCE_SHA}" \
+            --arg image_repository "${image_repository}" \
+            --arg image_tag "${image_tag}" \
+            --arg image_digest "${REGISTRY_DIGEST}" \
+            --arg app_version "${SOURCE_SHA}" \
+            --argjson mission_spine_enabled "${MISSION_SPINE_ENABLED}" \
+            --arg analytics_contract_version "${ANALYTICS_CONTRACT_VERSION}" \
+            --arg analytics_environment "${ANALYTICS_ENVIRONMENT}" \
+            '{
+              "schema_version": "mission-spine.web-artifact.v1",
+              "source_sha": $source_sha,
+              "image_repository": $image_repository,
+              "image_tag": $image_tag,
+              "image_digest": $image_digest,
+              "compiled_config": {
+                "app_version": $app_version,
+                "mission_spine_enabled": $mission_spine_enabled,
+                "analytics_contract_version": $analytics_contract_version,
+                "analytics_environment": $analytics_environment
+              },
+              "image_labels": {
+                "ai.leva.app_version": $app_version,
+                "ai.leva.mission_spine_enabled": ($mission_spine_enabled | tostring),
+                "ai.leva.analytics_contract_version": $analytics_contract_version,
+                "ai.leva.analytics_environment": $analytics_environment
+              }
+            }' > "${EVIDENCE_PATH}"
+          jq -e '
+            (keys | sort) == [
+              "compiled_config", "image_digest", "image_labels",
+              "image_repository", "image_tag", "schema_version", "source_sha"
+            ] and
+            (.compiled_config | keys | sort) == [
+              "analytics_contract_version", "analytics_environment",
+              "app_version", "mission_spine_enabled"
+            ] and
+            (.image_labels | keys | sort) == [
+              "ai.leva.analytics_contract_version", "ai.leva.analytics_environment",
+              "ai.leva.app_version", "ai.leva.mission_spine_enabled"
+            ] and
+            (.image_digest | test("^sha256:[0-9a-f]{64}$"))
+          ' "${EVIDENCE_PATH}" >/dev/null
+      - name: Preserve immutable registry evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: leva-web-${{ github.sha }}-mission-${{ matrix.identity }}-registry-evidence
+          path: ${{ runner.temp }}/leva-web-${{ matrix.identity }}.registry.json
+          if-no-files-found: error
+          retention-days: 30
 
-  web-deploy:
+  web-image-release-contract:
     needs: web-image
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/create-github-app-token@v3
-        id: app-token
+      - name: Download OFF/ON registry evidence
+        uses: actions/download-artifact@v5
         with:
-          app-id: ${{ secrets.GITOPS_APP_ID }}
-          private-key: ${{ secrets.GITOPS_APP_PRIVATE_KEY }}
-          owner: DevPathAi
-          repositories: devpath-gitops
-      - uses: actions/checkout@v6
-        with:
-          repository: DevPathAi/devpath-gitops
-          token: ${{ steps.app-token.outputs.token }}
-          path: gitops
-      - name: Install kustomize
+          pattern: leva-web-${{ github.sha }}-mission-*-registry-evidence
+          path: evidence
+          merge-multiple: true
+      - name: Verify distinct immutable compiled identities
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ github.sha }}
         run: |
-          curl -sLo kustomize.tar.gz https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.4.3/kustomize_v5.4.3_linux_amd64.tar.gz
-          tar -xzf kustomize.tar.gz && sudo mv kustomize /usr/local/bin/
-      - name: set image to commit SHA
-        working-directory: gitops/apps/devpath-web/base
-        run: kustomize edit set image ghcr.io/devpathai/devpath-web=ghcr.io/devpathai/devpath-web:${{ github.sha }}
-      - name: commit & push
-        working-directory: gitops
-        run: |
-          git config user.name "devpath-gitops-bot[bot]"
-          git config user.email "devpath-gitops-bot[bot]@users.noreply.github.com"
-          git add -A
-          git diff --cached --quiet && echo "no change" && exit 0
-          git commit -m "deploy(web): ${{ github.sha }}"
-          for i in 1 2 3; do git push && break || (git pull --rebase && sleep 2); done
+          set -euo pipefail
+          off_evidence="evidence/leva-web-off.registry.json"
+          on_evidence="evidence/leva-web-on.registry.json"
+          test -s "${off_evidence}"
+          test -s "${on_evidence}"
+          jq -e --arg sha "${SOURCE_SHA}" '
+            .schema_version == "mission-spine.web-artifact.v1" and
+            .source_sha == $sha and
+            .image_repository == "ghcr.io/devpathai/devpath-web" and
+            .image_tag == ($sha + "-mission-off") and
+            .compiled_config.app_version == $sha and
+            .compiled_config.mission_spine_enabled == false and
+            .compiled_config.analytics_contract_version == "mission-spine.analytics.v1" and
+            .compiled_config.analytics_environment == "production" and
+            .image_labels["ai.leva.app_version"] == $sha and
+            .image_labels["ai.leva.mission_spine_enabled"] == "false" and
+            .image_labels["ai.leva.analytics_contract_version"] == "mission-spine.analytics.v1"
+          ' "${off_evidence}" >/dev/null
+          jq -e --arg sha "${SOURCE_SHA}" '
+            .schema_version == "mission-spine.web-artifact.v1" and
+            .source_sha == $sha and
+            .image_repository == "ghcr.io/devpathai/devpath-web" and
+            .image_tag == ($sha + "-mission-on") and
+            .compiled_config.app_version == $sha and
+            .compiled_config.mission_spine_enabled == true and
+            .compiled_config.analytics_contract_version == "mission-spine.analytics.v1" and
+            .compiled_config.analytics_environment == "production" and
+            .image_labels["ai.leva.app_version"] == $sha and
+            .image_labels["ai.leva.mission_spine_enabled"] == "true" and
+            .image_labels["ai.leva.analytics_contract_version"] == "mission-spine.analytics.v1"
+          ' "${on_evidence}" >/dev/null
+          off_digest="$(jq -r '.image_digest' "${off_evidence}")"
+          on_digest="$(jq -r '.image_digest' "${on_evidence}")"
+          test "${off_digest}" != "${on_digest}"
 
   admin-image:
     needs: analyze-test
