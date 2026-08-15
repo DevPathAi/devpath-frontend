@@ -1,13 +1,20 @@
+import 'dart:async';
+
+import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../providers/api_providers.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../auth/state/auth_state.dart';
+import '../../dashboard/application/current_mission_controller.dart';
+import '../../support/presentation/supportable_error.dart';
 import '../application/path_controller.dart';
 import '../data/path_sse_source.dart';
+import 'mission_path_plan_view.dart';
 import 'path_plan_view.dart';
-import '../../support/presentation/supportable_error.dart';
 
 /// PATH-001. 진입 시 기존 경로를 먼저 조회하고, 없으면 생성한다.
 class PathPage extends ConsumerStatefulWidget {
@@ -28,8 +35,12 @@ class _PathPageState extends ConsumerState<PathPage> {
 
   void _loadWhenAuthenticated(AuthState auth) {
     if (auth is! AuthAuthenticated) return;
-    if (ref.read(pathControllerProvider).phase != PathPhase.idle) return;
-    ref.read(pathControllerProvider.notifier).loadOrStart();
+    if (ref.read(appConfigProvider).missionSpineEnabled) {
+      unawaited(ref.read(currentMissionControllerProvider.notifier).load());
+    }
+    if (ref.read(pathControllerProvider).phase == PathPhase.idle) {
+      unawaited(ref.read(pathControllerProvider.notifier).loadOrStart());
+    }
   }
 
   @override
@@ -38,12 +49,33 @@ class _PathPageState extends ConsumerState<PathPage> {
       authControllerProvider,
       (_, next) => _loadWhenAuthenticated(next),
     );
+    final missionSpineEnabled = ref.watch(
+      appConfigProvider.select((config) => config.missionSpineEnabled),
+    );
     final s = ref.watch(pathControllerProvider);
     final notifier = ref.read(pathControllerProvider.notifier);
+    final missionState = missionSpineEnabled
+        ? ref.watch(currentMissionControllerProvider)
+        : null;
+
+    if (missionSpineEnabled) {
+      ref.listen<PathState>(pathControllerProvider, (previous, next) {
+        final generated =
+            previous?.phase == PathPhase.streaming &&
+            next.phase == PathPhase.complete;
+        if (generated) {
+          unawaited(
+            ref
+                .read(currentMissionControllerProvider.notifier)
+                .invalidateAndRefetch(),
+          );
+        }
+      });
+    }
 
     // 완료(PathPlanView)는 자체 콘텐츠를 SliverList로 헤더와 함께 스크롤한다.
     // 그 외 상태(진행·중단·실패)는 화면 중앙에 고정하는 SliverFillRemaining.
-    final bodySliver = switch (s.phase) {
+    final legacyBodySliver = switch (s.phase) {
       PathPhase.complete when s.result != null => SliverPadding(
         padding: const EdgeInsets.all(DpSpacing.lg),
         sliver: SliverList.list(
@@ -72,18 +104,103 @@ class _PathPageState extends ConsumerState<PathPage> {
         child: _Progress(completed: s.completed, current: s.current),
       ),
     };
+    final bodySliver = missionSpineEnabled
+        ? _missionBodySliver(
+            context,
+            pathState: s,
+            pathNotifier: notifier,
+            missionState: missionState!,
+          )
+        : legacyBodySliver;
 
     return Scaffold(
       body: CustomScrollView(
         slivers: [
-          const SliverToBoxAdapter(
+          SliverToBoxAdapter(
             child: DpPageHeader(
               title: '학습 경로',
-              description: '진단 결과로 만든 12주 계획입니다',
+              description: missionSpineEnabled
+                  ? '현재 미션을 먼저 보고, 필요할 때 12주 계획을 펼쳐보세요'
+                  : '진단 결과로 만든 12주 계획입니다',
             ),
           ),
           bodySliver,
         ],
+      ),
+    );
+  }
+
+  Widget _missionBodySliver(
+    BuildContext context, {
+    required PathState pathState,
+    required PathController pathNotifier,
+    required CurrentMissionState missionState,
+  }) {
+    final outcome = missionState.mission?.outcome;
+    final pathGenerationOwnsSurface =
+        (outcome == null || outcome == CurrentMissionOutcome.noActivePath) &&
+        pathState.phase != PathPhase.complete;
+
+    if (pathGenerationOwnsSurface) {
+      return switch (pathState.phase) {
+        PathPhase.failed || PathPhase.killSwitch => SliverFillRemaining(
+          hasScrollBody: false,
+          child: SupportableError(
+            message: pathState.error ?? '경로 생성에 실패했어요',
+            onRetry: pathNotifier.start,
+          ),
+        ),
+        PathPhase.partial => SliverFillRemaining(
+          hasScrollBody: false,
+          child: _Progress(
+            completed: pathState.completed,
+            current: pathState.current,
+            note: pathState.error ?? '연결이 끊겼어요',
+            onRestart: pathNotifier.start,
+          ),
+        ),
+        PathPhase.streaming => SliverFillRemaining(
+          hasScrollBody: false,
+          child: _Progress(
+            completed: pathState.completed,
+            current: pathState.current,
+          ),
+        ),
+        _ => SliverToBoxAdapter(
+          child: MissionPathPlanView(
+            missionState: missionState,
+            plan: null,
+            onRetryMission: () => unawaited(
+              ref
+                  .read(currentMissionControllerProvider.notifier)
+                  .invalidateAndRefetch(),
+            ),
+            onOpenContent: (contentId) => context.go('/content/$contentId'),
+            onCompleteContentless: (taskId) => unawaited(
+              ref
+                  .read(currentMissionControllerProvider.notifier)
+                  .completeContentlessTask(taskId),
+            ),
+          ),
+        ),
+      };
+    }
+
+    return SliverToBoxAdapter(
+      child: MissionPathPlanView(
+        missionState: missionState,
+        plan: pathState.phase == PathPhase.complete ? pathState.result : null,
+        onRetryMission: () => unawaited(
+          ref
+              .read(currentMissionControllerProvider.notifier)
+              .invalidateAndRefetch(),
+        ),
+        onOpenContent: (contentId) => context.go('/content/$contentId'),
+        onCompleteContentless: (taskId) => unawaited(
+          ref
+              .read(currentMissionControllerProvider.notifier)
+              .completeContentlessTask(taskId),
+        ),
       ),
     );
   }

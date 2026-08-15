@@ -1,10 +1,14 @@
+import 'dart:async';
 import 'dart:convert';
 
+import 'package:devpath_web/src/app/app_config.dart';
+import 'package:devpath_web/src/features/dashboard/application/current_mission_controller.dart';
 import 'package:devpath_web/src/features/auth/application/auth_controller.dart';
 import 'package:devpath_web/src/features/auth/state/auth_state.dart';
 import 'package:devpath_web/src/features/path/application/path_controller.dart';
 import 'package:devpath_web/src/features/path/data/path_sse_source.dart';
 import 'package:devpath_web/src/features/path/presentation/path_page.dart';
+import 'package:devpath_web/src/providers/api_providers.dart';
 import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
@@ -49,7 +53,150 @@ class _AuthedAuthController extends AuthController {
   );
 }
 
+class _PendingPathController extends PathController {
+  var loadCalls = 0;
+  final pending = Completer<void>();
+
+  @override
+  PathState build() => const PathState();
+
+  @override
+  Future<void> loadOrStart() {
+    loadCalls += 1;
+    return pending.future;
+  }
+}
+
+class _ReadyMissionController extends CurrentMissionController {
+  _ReadyMissionController(this.mission);
+
+  final CurrentMission mission;
+  var loadCalls = 0;
+  var refreshCalls = 0;
+
+  @override
+  CurrentMissionState build() => CurrentMissionState(mission: mission);
+
+  @override
+  Future<CurrentMission?> load({bool force = false}) async {
+    loadCalls += 1;
+    return mission;
+  }
+
+  @override
+  Future<CurrentMission?> invalidateAndRefetch() async {
+    refreshCalls += 1;
+    return mission;
+  }
+}
+
+class _GeneratingPathController extends PathController {
+  @override
+  PathState build() =>
+      const PathState(phase: PathPhase.streaming, current: '경로 생성 중');
+
+  void finish() {
+    state = PathState(phase: PathPhase.complete, result: _pathPlan());
+  }
+}
+
 void main() {
+  testWidgets('flag ON은 current mission과 전체 path를 병렬 시작하고 mission을 먼저 그린다', (
+    tester,
+  ) async {
+    final path = _PendingPathController();
+    final mission = _ReadyMissionController(_availableMission());
+    final c = ProviderContainer(
+      overrides: [
+        appConfigProvider.overrideWithValue(
+          const AppConfig(
+            baseUrl: 'https://mock.devpath.ai',
+            useMock: true,
+            missionSpineEnabled: true,
+          ),
+        ),
+        authControllerProvider.overrideWith(_AuthedAuthController.new),
+        pathControllerProvider.overrideWith(() => path),
+        currentMissionControllerProvider.overrideWith(() => mission),
+      ],
+    );
+    addTearDown(() {
+      if (!path.pending.isCompleted) path.pending.complete();
+      c.dispose();
+    });
+
+    await tester.pumpWidget(_host(c));
+    await tester.pump();
+
+    expect(path.loadCalls, 1);
+    expect(mission.loadCalls, 1);
+    expect(find.text('현재 3주차 과제'), findsWidgets);
+    expect(find.byType(DpMissionHeader), findsOneWidget);
+  });
+
+  testWidgets('flag OFF는 legacy Path만 시작하고 current mission을 요청하지 않는다', (
+    tester,
+  ) async {
+    final path = _PendingPathController();
+    final mission = _ReadyMissionController(_availableMission());
+    final c = ProviderContainer(
+      overrides: [
+        appConfigProvider.overrideWithValue(
+          const AppConfig(
+            baseUrl: 'https://mock.devpath.ai',
+            useMock: true,
+            missionSpineEnabled: false,
+          ),
+        ),
+        authControllerProvider.overrideWith(_AuthedAuthController.new),
+        pathControllerProvider.overrideWith(() => path),
+        currentMissionControllerProvider.overrideWith(() => mission),
+      ],
+    );
+    addTearDown(() {
+      if (!path.pending.isCompleted) path.pending.complete();
+      c.dispose();
+    });
+
+    await tester.pumpWidget(_host(c));
+    await tester.pump();
+
+    expect(path.loadCalls, 1);
+    expect(mission.loadCalls, 0);
+    expect(find.byType(DpMissionHeader), findsNothing);
+  });
+
+  testWidgets('새 경로 생성 완료 뒤 authoritative current mission만 다시 읽는다', (
+    tester,
+  ) async {
+    final path = _GeneratingPathController();
+    final mission = _ReadyMissionController(_noActiveMission());
+    final c = ProviderContainer(
+      overrides: [
+        appConfigProvider.overrideWithValue(
+          const AppConfig(
+            baseUrl: 'https://mock.devpath.ai',
+            useMock: true,
+            missionSpineEnabled: true,
+          ),
+        ),
+        authControllerProvider.overrideWith(_AuthedAuthController.new),
+        pathControllerProvider.overrideWith(() => path),
+        currentMissionControllerProvider.overrideWith(() => mission),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    await tester.pumpWidget(_host(c));
+    await tester.pump();
+    expect(mission.loadCalls, 1);
+
+    path.finish();
+    await tester.pump();
+
+    expect(mission.refreshCalls, 1);
+  });
+
   testWidgets('완료 시 12주 타임라인과 이번 주 과제를 렌더', (tester) async {
     final c = ProviderContainer(
       overrides: [
@@ -102,3 +249,63 @@ void main() {
     expect(stageView.currentIndex, 2); // collecting·generating 완료
   });
 }
+
+CurrentMission _availableMission() => CurrentMission.fromJson({
+  'outcome': 'AVAILABLE',
+  'pathId': 101,
+  'weekNum': 3,
+  'tasks': [
+    {
+      'taskId': 302,
+      'orderNum': 1,
+      'taskType': 'PRACTICE',
+      'title': '현재 3주차 과제',
+      'required': true,
+      'contentId': 303,
+      'contentSlug': 'current-week-three',
+      'completed': false,
+      'completedAt': null,
+    },
+  ],
+  'nextTask': {
+    'taskId': 302,
+    'orderNum': 1,
+    'taskType': 'PRACTICE',
+    'title': '현재 3주차 과제',
+    'required': true,
+    'contentId': 303,
+    'contentSlug': 'current-week-three',
+    'completed': false,
+    'completedAt': null,
+  },
+  'pathCompleted': false,
+});
+
+CurrentMission _noActiveMission() => CurrentMission.fromJson({
+  'outcome': 'NO_ACTIVE_PATH',
+  'pathId': null,
+  'weekNum': null,
+  'tasks': <Map<String, Object?>>[],
+  'nextTask': null,
+  'pathCompleted': false,
+});
+
+LearningPath _pathPlan() => LearningPath.fromJson({
+  'pathId': 101,
+  'track': 'BACKEND',
+  'totalWeeks': 12,
+  'rationale': '경로 근거',
+  'milestones': [
+    {
+      'weekNum': 1,
+      'title': '첫 주차',
+      'goalDescription': '목표',
+      'targetSkills': <String>[],
+      'estimatedHours': 3,
+      'whyThisOrder': '순서',
+      'expectedOutcome': '결과',
+      'locked': false,
+      'tasks': <Map<String, Object?>>[],
+    },
+  ],
+});
