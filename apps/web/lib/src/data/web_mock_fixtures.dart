@@ -139,6 +139,8 @@ final Map<String, MockFixture> webMockFixtures = {
   ),
   // PATH 생성 완료 후 결과 조회(스펙 §3 비동기 결과 조회 패턴)
   'GET /learning-paths/me': (200, mockLearningPath()),
+  // 서버가 producer order로 판정한 authoritative Today projection.
+  'GET /learning-paths/me/this-week': (200, mockCurrentMission()),
   // 학습 콘텐츠 조회(CNT-001)
   'GET /contents/c1': (200, mockContent('future-async-await')),
   'GET /contents/future-async-await': (200, mockContent('future-async-await')),
@@ -153,6 +155,9 @@ final Map<String, MockFixture> webMockFixtures = {
     200,
     mockContent('async-error-handling'),
   ),
+  // Today authoritative projection은 wire contentId를 사용해 `/content/3`으로
+  // 이동한다. slug 경로와 같은 콘텐츠를 돌려주는 숫자 ID alias다.
+  'GET /contents/3': (200, mockContent('async-error-handling')),
   'GET /contents/missing': (
     404,
     {
@@ -169,6 +174,15 @@ final Map<String, MockFixture> webMockFixtures = {
     },
   ),
   'POST /contents/async-error-handling/progress': (
+    200,
+    {
+      'scrollPct': 0.86,
+      'dwellSec': 46,
+      'completed': true,
+      'completedAt': '2026-06-21T10:00:00Z',
+    },
+  ),
+  'POST /contents/3/progress': (
     200,
     {
       'scrollPct': 0.86,
@@ -512,19 +526,26 @@ final Map<String, MockFixture> webMockFixtures = {
 
 Map<String, dynamic> mockContent(String slug) {
   final isStream = slug == 'stream-subscription';
+  final isAsyncError = slug == 'async-error-handling';
   return {
-    'id': isStream ? 2 : 1,
+    'id': isStream ? 2 : (isAsyncError ? 3 : 1),
     'slug': slug,
-    'title': isStream ? 'Stream 구독 실습' : 'Future/async-await 정리',
+    'title': isStream
+        ? 'Stream 구독 실습'
+        : (isAsyncError ? '에러 처리 패턴 적용' : 'Future/async-await 정리'),
     'track': 'BACKEND',
     'markdown': isStream
         ? '# Stream 구독 실습\n\n`StreamSubscription`을 저장하고 필요할 때 `cancel()` 합니다.\n'
+        : isAsyncError
+        ? '# 에러 처리 패턴 적용\n\n비동기 실패를 `try`/`catch`로 처리하고 호출자에게 의미 있는 오류를 전달합니다.\n'
         : '# 비동기 기초\n\nDart의 `Future`와 `async`/`await`로 비동기 흐름을 다룹니다.\n\n```dart\nFuture<int> answer() async => 42;\n```\n',
-    'estimatedMinutes': isStream ? 10 : 8,
-    'difficulty': isStream ? 0.6 : 0.5,
-    'bloomLevel': isStream ? 'APPLY' : 'UNDERSTAND',
+    'estimatedMinutes': isStream ? 10 : (isAsyncError ? 12 : 8),
+    'difficulty': isStream ? 0.6 : (isAsyncError ? 0.7 : 0.5),
+    'bloomLevel': isStream || isAsyncError ? 'APPLY' : 'UNDERSTAND',
     'conceptTags': isStream
         ? ['stream', 'subscription']
+        : isAsyncError
+        ? ['async-await', 'error-handling']
         : ['future', 'async-await'],
     'progress': {
       'scrollPct': 0.2,
@@ -604,6 +625,52 @@ Map<String, dynamic> mockLearningPath() => {
       },
   ],
 };
+
+Map<String, dynamic> mockCurrentMission() {
+  final tasks = <Map<String, dynamic>>[
+    {
+      'taskId': 1001,
+      'orderNum': 1,
+      'taskType': 'READ',
+      'title': 'Future/async-await 정리',
+      'required': true,
+      'contentId': 1,
+      'contentSlug': 'future-async-await',
+      'completed': true,
+      'completedAt': '2026-07-30T01:00:00.000Z',
+    },
+    {
+      'taskId': 1002,
+      'orderNum': 2,
+      'taskType': 'PRACTICE',
+      'title': 'Stream 구독 실습',
+      'required': true,
+      'contentId': 2,
+      'contentSlug': 'stream-subscription',
+      'completed': true,
+      'completedAt': '2026-07-31T01:00:00.000Z',
+    },
+    {
+      'taskId': 1003,
+      'orderNum': 3,
+      'taskType': 'QUIZ',
+      'title': '에러 처리 패턴 적용',
+      'required': false,
+      'contentId': 3,
+      'contentSlug': 'async-error-handling',
+      'completed': false,
+      'completedAt': null,
+    },
+  ];
+  return {
+    'outcome': 'AVAILABLE',
+    'pathId': 101,
+    'weekNum': 1,
+    'tasks': tasks,
+    'nextTask': Map<String, dynamic>.from(tasks.last),
+    'pathCompleted': false,
+  };
+}
 
 /// 호출 순서에 따라 응답이 달라져야 하는 목 엔드포인트.
 ///

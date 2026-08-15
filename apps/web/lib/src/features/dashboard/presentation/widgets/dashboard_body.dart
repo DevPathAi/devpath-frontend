@@ -25,6 +25,33 @@ class DashboardBody extends StatelessWidget {
     BuildContext context,
     DashboardSummary summary, {
     Key? key,
+  }) => _content(
+    context,
+    summary,
+    key: key,
+    includeLegacyHero: true,
+    includeAd: true,
+  );
+
+  /// Today 아래에 표시하는 보조 지표. legacy CTA와 광고는 제외한다.
+  static Widget supportingContent(
+    BuildContext context,
+    DashboardSummary summary, {
+    Key? key,
+  }) => _content(
+    context,
+    summary,
+    key: key,
+    includeLegacyHero: false,
+    includeAd: false,
+  );
+
+  static Widget _content(
+    BuildContext context,
+    DashboardSummary summary, {
+    required bool includeLegacyHero,
+    required bool includeAd,
+    Key? key,
   }) {
     final cross = switch (context.windowClass) {
       DpWindowClass.compact => 1,
@@ -39,43 +66,29 @@ class DashboardBody extends StatelessWidget {
     final badgeSpan = cross;
 
     final tiles = <StaggeredGridTile>[
-      StaggeredGridTile.fit(
-        crossAxisCellCount: cross,
-        child: const AdSlotWidget(slot: 'DASHBOARD_TOP'),
-      ),
-      StaggeredGridTile.fit(
-        crossAxisCellCount: ctaSpan,
-        child: _HeroCta(title: summary.nextTaskTitle),
-      ),
-      StaggeredGridTile.fit(
-        crossAxisCellCount: 1,
-        child: DpKpiCard(
-          label: '연속 학습',
-          value: summary.streakDays,
-          suffix: '일',
-          icon: DpIcons.stepDone,
+      if (includeLegacyHero) ...[
+        if (includeAd)
+          StaggeredGridTile.fit(
+            crossAxisCellCount: cross,
+            child: const AdSlotWidget(slot: 'DASHBOARD_TOP'),
+          ),
+        StaggeredGridTile.fit(
+          crossAxisCellCount: ctaSpan,
+          child: _HeroCta(title: summary.nextTaskTitle),
         ),
-      ),
-      StaggeredGridTile.fit(
-        crossAxisCellCount: 1,
-        child: DpKpiCard(
-          label: '완료 콘텐츠',
-          value: summary.completedContentCount,
-          icon: DpIcons.content,
-        ),
-      ),
-      StaggeredGridTile.fit(
-        crossAxisCellCount: donutSpan,
-        child: _DonutCard(percent: summary.progressPercent),
-      ),
-      StaggeredGridTile.fit(
-        crossAxisCellCount: donutSpan,
-        child: WeeklyActivityCard(activity: summary.weeklyActivity),
-      ),
-      StaggeredGridTile.fit(
-        crossAxisCellCount: donutSpan,
-        child: ProgressTrendCard(history: summary.progressHistory),
-      ),
+        _streakTile(summary),
+        _completedContentTile(summary),
+        _progressDonutTile(summary, donutSpan),
+        _weeklyActivityTile(summary, donutSpan),
+        _progressTrendTile(summary, donutSpan),
+      ] else ...[
+        // Today 전용 위계: 이번 주 진행 근거를 먼저, 스트릭·보조 지표를 뒤에 둔다.
+        _weeklyActivityTile(summary, donutSpan),
+        _progressDonutTile(summary, donutSpan),
+        _streakTile(summary),
+        _completedContentTile(summary),
+        _progressTrendTile(summary, donutSpan),
+      ],
       if (summary.badges.isNotEmpty)
         StaggeredGridTile.fit(
           crossAxisCellCount: badgeSpan,
@@ -101,6 +114,45 @@ class DashboardBody extends StatelessWidget {
     );
   }
 }
+
+StaggeredGridTile _streakTile(DashboardSummary summary) =>
+    StaggeredGridTile.fit(
+      crossAxisCellCount: 1,
+      child: DpKpiCard(
+        label: '연속 학습',
+        value: summary.streakDays,
+        suffix: '일',
+        icon: DpIcons.stepDone,
+      ),
+    );
+
+StaggeredGridTile _completedContentTile(DashboardSummary summary) =>
+    StaggeredGridTile.fit(
+      crossAxisCellCount: 1,
+      child: DpKpiCard(
+        label: '완료 콘텐츠',
+        value: summary.completedContentCount,
+        icon: DpIcons.content,
+      ),
+    );
+
+StaggeredGridTile _progressDonutTile(DashboardSummary summary, int span) =>
+    StaggeredGridTile.fit(
+      crossAxisCellCount: span,
+      child: _DonutCard(percent: summary.progressPercent),
+    );
+
+StaggeredGridTile _weeklyActivityTile(DashboardSummary summary, int span) =>
+    StaggeredGridTile.fit(
+      crossAxisCellCount: span,
+      child: WeeklyActivityCard(activity: summary.weeklyActivity),
+    );
+
+StaggeredGridTile _progressTrendTile(DashboardSummary summary, int span) =>
+    StaggeredGridTile.fit(
+      crossAxisCellCount: span,
+      child: ProgressTrendCard(history: summary.progressHistory),
+    );
 
 Widget _panel(BuildContext context, Widget child) {
   final c = context.dpColors;

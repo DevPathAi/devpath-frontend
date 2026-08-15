@@ -183,3 +183,11 @@ final apiClientProvider = Provider<ApiClient>((ref) {
   }
   return client;
 });
+
+/// Web의 Riverpod·캐시 정책과 분리된 공용 학습 경로 wire client.
+///
+/// Dashboard/Today와 이후 Path/mobile consumer가 endpoint 문자열이나 JSON을
+/// 다시 해석하지 않고 dp_core의 동일한 typed contract를 사용한다.
+final learningPathApiProvider = Provider<LearningPathApi>(
+  (ref) => LearningPathApi(ref.watch(apiClientProvider)),
+);
