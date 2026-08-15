@@ -1,16 +1,21 @@
 import 'package:dp_core/dp_core.dart';
+import 'package:devpath_web/src/analytics/journey_analytics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:devpath_web/src/features/diagnostic/application/diagnostic_controller.dart';
 import 'package:devpath_web/src/features/diagnostic/application/guest_claim_storage.dart';
 import 'package:devpath_web/src/features/diagnostic/state/diagnostic_state.dart';
+import 'package:devpath_web/src/providers/api_providers.dart';
 
 class _FakeApi implements AssessmentApi {
   int _served = 0;
   @override
   dynamic noSuchMethod(Invocation i) => super.noSuchMethod(i);
   @override
-  Future<String> startGuest(String track) async => 'g-1';
+  Future<String> startGuest(String track) async =>
+      '123e4567-e89b-42d3-a456-426614174000';
+  @override
+  Future<int> startMember(String track) async => 11;
   @override
   Future<NextQuestion?> next({int? assessmentId, String? guestId}) async {
     if (_served >= 15) return null;
@@ -56,18 +61,48 @@ class _FakeStorage implements GuestClaimStorage {
   void clear() => _v = null;
 }
 
+class _SpyJourneyAnalytics implements JourneyAnalytics {
+  final captures = <(String, Map<String, Object?>)>[];
+
+  @override
+  AnalyticsCaptureStatus capture(
+    String event,
+    Map<String, Object?> properties,
+  ) {
+    captures.add((event, properties));
+    return AnalyticsCaptureStatus.accepted;
+  }
+
+  @override
+  bool identify(String userId) => true;
+
+  @override
+  void reset() {}
+
+  @override
+  void setOptedOut(bool optedOut) {}
+}
+
 void main() {
   test('guest 진단: 시작→15문항→완료→가입게이트', () async {
+    final analytics = _SpyJourneyAnalytics();
     final container = ProviderContainer(
       overrides: [
         assessmentApiProvider.overrideWithValue(_FakeApi()),
         guestClaimStorageProvider.overrideWithValue(_FakeStorage()),
+        journeyAnalyticsProvider.overrideWithValue(analytics),
       ],
     );
     addTearDown(container.dispose);
     final notifier = container.read(diagnosticControllerProvider.notifier);
 
     await notifier.startAsGuest('BACKEND_SPRING');
+    expect(analytics.captures, hasLength(1));
+    expect(analytics.captures.single.$1, 'diagnostic_started');
+    expect(analytics.captures.single.$2, {
+      'track': 'BACKEND_SPRING',
+      'guest_id': '123e4567-e89b-42d3-a456-426614174000',
+    });
     var state = container.read(diagnosticControllerProvider);
     expect(state, isA<DiagnosticQuestion>());
 
@@ -76,5 +111,28 @@ void main() {
     }
     state = container.read(diagnosticControllerProvider);
     expect(state, isA<DiagnosticGateSignup>()); // 미인증 guest 완료 → 가입게이트
+  });
+
+  test('member start API 성공은 assessment_id로 diagnostic_started를 기록', () async {
+    final analytics = _SpyJourneyAnalytics();
+    final container = ProviderContainer(
+      overrides: [
+        assessmentApiProvider.overrideWithValue(_FakeApi()),
+        guestClaimStorageProvider.overrideWithValue(_FakeStorage()),
+        journeyAnalyticsProvider.overrideWithValue(analytics),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container
+        .read(diagnosticControllerProvider.notifier)
+        .startAsMember('BACKEND_SPRING');
+
+    expect(analytics.captures, hasLength(1));
+    expect(analytics.captures.single.$1, 'diagnostic_started');
+    expect(analytics.captures.single.$2, {
+      'track': 'BACKEND_SPRING',
+      'assessment_id': 11,
+    });
   });
 }

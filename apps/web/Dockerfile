@@ -1,8 +1,17 @@
+ARG APP_VERSION=dev
+ARG MISSION_SPINE_ENABLED=false
+ARG ANALYTICS_CONTRACT_VERSION=mission-spine.analytics.v1
+ARG ANALYTICS_ENVIRONMENT=test
+
 # ---- build stage: Flutter Web ----
 FROM ghcr.io/cirruslabs/flutter:stable AS build
 
 ARG API_BASE_URL=https://api.leva.ai.kr
 ARG USE_MOCK=false
+ARG APP_VERSION
+ARG MISSION_SPINE_ENABLED
+ARG ANALYTICS_CONTRACT_VERSION
+ARG ANALYTICS_ENVIRONMENT
 
 WORKDIR /src
 # 워크스페이스 전체 복사(Dart pub workspaces 단일 해석에 전 멤버 필요)
@@ -22,12 +31,25 @@ RUN dart pub global activate melos 7.0.0 \
 
 # 실 API 설정을 빌드시 각인(Flutter Web은 런타임 주입 불가)
 RUN cd apps/web \
+ && test "${ANALYTICS_CONTRACT_VERSION}" = "mission-spine.analytics.v1" \
  && flutter build web --release \
       --dart-define=API_BASE_URL=${API_BASE_URL} \
-      --dart-define=USE_MOCK=${USE_MOCK}
+      --dart-define=USE_MOCK=${USE_MOCK} \
+      --dart-define=APP_VERSION=${APP_VERSION} \
+      --dart-define=MISSION_SPINE_ENABLED=${MISSION_SPINE_ENABLED} \
+      --dart-define=ANALYTICS_CONTRACT_VERSION=${ANALYTICS_CONTRACT_VERSION} \
+      --dart-define=ANALYTICS_ENVIRONMENT=${ANALYTICS_ENVIRONMENT}
 
 # ---- runtime stage: nginx ----
 FROM nginx:alpine AS runtime
+ARG APP_VERSION
+ARG MISSION_SPINE_ENABLED
+ARG ANALYTICS_CONTRACT_VERSION
+ARG ANALYTICS_ENVIRONMENT
+LABEL ai.leva.app_version="${APP_VERSION}" \
+      ai.leva.mission_spine_enabled="${MISSION_SPINE_ENABLED}" \
+      ai.leva.analytics_contract_version="${ANALYTICS_CONTRACT_VERSION}" \
+      ai.leva.analytics_environment="${ANALYTICS_ENVIRONMENT}"
 COPY --from=build /src/apps/web/build/web /usr/share/nginx/html
 COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 8080

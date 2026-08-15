@@ -48,6 +48,7 @@ class AuthController extends Notifier<AuthState> {
       state = AuthAuthenticated(
         User.fromJson((data['user'] as Map).cast<String, dynamic>()),
       );
+      _identifyAuthenticatedUser();
     } on ApiException {
       if (!ref.mounted) return;
       state = const AuthUnauthenticated(); // 쿠키 없음/만료 → 미인증
@@ -67,6 +68,7 @@ class AuthController extends Notifier<AuthState> {
       state = AuthAuthenticated(
         User.fromJson((data['user'] as Map).cast<String, dynamic>()),
       );
+      _identifyAuthenticatedUser();
     } on ApiException catch (e) {
       state = AuthUnauthenticated(error: e.message);
     } catch (_) {
@@ -77,7 +79,15 @@ class AuthController extends Notifier<AuthState> {
 
   Future<void> logout() async {
     await _store.clear();
+    ref.read(journeyAnalyticsProvider).reset();
     state = const AuthUnauthenticated();
+  }
+
+  void _identifyAuthenticatedUser() {
+    final current = state;
+    if (current is AuthAuthenticated) {
+      ref.read(journeyAnalyticsProvider).identify(current.user.id);
+    }
   }
 
   /// 온보딩 완료로 갱신된 유저 반영(게이트 재평가 트리거).

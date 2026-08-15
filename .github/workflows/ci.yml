@@ -25,6 +25,67 @@ jobs:
       - name: Test
         run: melos run test
 
+  # ET1 contract proof only: build both compiled identities locally in CI.
+  # Publishing, exact-digest promotion, deployment and rollback belong to ET10.
+  web-image-config-contract:
+    needs: analyze-test
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - identity: off
+            enabled: 'false'
+          - identity: on
+            enabled: 'true'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v7
+        id: build
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          push: false
+          outputs: type=oci,dest=${{ runner.temp }}/leva-web-${{ matrix.identity }}.tar
+          build-args: |
+            API_BASE_URL=https://api.contract.invalid
+            USE_MOCK=false
+            APP_VERSION=${{ github.sha }}
+            MISSION_SPINE_ENABLED=${{ matrix.enabled }}
+            ANALYTICS_CONTRACT_VERSION=mission-spine.analytics.v1
+            ANALYTICS_ENVIRONMENT=production
+          tags: ghcr.io/devpathai/devpath-web:${{ github.sha }}-mission-${{ matrix.identity }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Record immutable build identity
+        shell: bash
+        env:
+          ARTIFACT_PATH: ${{ runner.temp }}/leva-web-${{ matrix.identity }}.tar
+          MANIFEST_PATH: ${{ runner.temp }}/leva-web-${{ matrix.identity }}.manifest.json
+          APP_VERSION: ${{ github.sha }}
+          MISSION_SPINE_ENABLED: ${{ matrix.enabled }}
+          ANALYTICS_CONTRACT_VERSION: mission-spine.analytics.v1
+          ANALYTICS_ENVIRONMENT: production
+          IDENTITY: ${{ matrix.identity }}
+        run: |
+          set -euo pipefail
+          artifact_sha256="$(sha256sum "${ARTIFACT_PATH}" | awk '{print $1}')"
+          printf '{"artifact":"leva-web-%s.tar","sha256":"%s","app_version":"%s","mission_spine_enabled":%s,"analytics_contract_version":"%s","analytics_environment":"%s"}\n' \
+            "${IDENTITY}" "${artifact_sha256}" "${APP_VERSION}" \
+            "${MISSION_SPINE_ENABLED}" "${ANALYTICS_CONTRACT_VERSION}" \
+            "${ANALYTICS_ENVIRONMENT}" > "${MANIFEST_PATH}"
+      - name: Preserve OFF/ON OCI artifact and manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: leva-web-${{ github.sha }}-mission-${{ matrix.identity }}
+          path: |
+            ${{ runner.temp }}/leva-web-${{ matrix.identity }}.tar
+            ${{ runner.temp }}/leva-web-${{ matrix.identity }}.manifest.json
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
   web-image:
     needs: analyze-test
     if: github.ref == 'refs/heads/main'
@@ -48,6 +109,10 @@ jobs:
           build-args: |
             API_BASE_URL=${{ vars.WEB_API_BASE_URL }}
             USE_MOCK=false
+            APP_VERSION=${{ github.sha }}
+            MISSION_SPINE_ENABLED=false
+            ANALYTICS_CONTRACT_VERSION=mission-spine.analytics.v1
+            ANALYTICS_ENVIRONMENT=production
           tags: |
             ghcr.io/devpathai/devpath-web:${{ github.sha }}
             ghcr.io/devpathai/devpath-web:main

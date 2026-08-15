@@ -32,6 +32,10 @@ class DiagnosticController extends Notifier<DiagnosticState> {
     try {
       _assessmentId = await _api.startMember(track);
       _guestId = null;
+      ref.read(journeyAnalyticsProvider).capture('diagnostic_started', {
+        'track': track,
+        'assessment_id': _assessmentId!,
+      });
       await _advance();
     } on ApiException catch (e) {
       state = DiagnosticError(e.message);
@@ -44,6 +48,10 @@ class DiagnosticController extends Notifier<DiagnosticState> {
       _guestId = await _api.startGuest(track);
       _storage.write(_guestId!); // OAuth 리로드 생존
       _assessmentId = null;
+      ref.read(journeyAnalyticsProvider).capture('diagnostic_started', {
+        'track': track,
+        'guest_id': _guestId!,
+      });
       await _advance();
     } on ApiException catch (e) {
       state = DiagnosticError(e.message);

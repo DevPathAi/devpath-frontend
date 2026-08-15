@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:devpath_web/src/analytics/journey_analytics.dart';
 import 'package:devpath_web/src/features/auth/application/auth_controller.dart';
 import 'package:devpath_web/src/features/auth/application/oauth_launcher.dart';
 import 'package:devpath_web/src/features/auth/state/auth_state.dart';
@@ -21,6 +22,29 @@ class _FakeOAuthLauncher implements OAuthLauncher {
   void launch(String url) {
     launchedUrl = url;
   }
+}
+
+class _SpyJourneyAnalytics implements JourneyAnalytics {
+  final identified = <String>[];
+  var resetCount = 0;
+
+  @override
+  AnalyticsCaptureStatus capture(
+    String event,
+    Map<String, Object?> properties,
+  ) => AnalyticsCaptureStatus.accepted;
+
+  @override
+  bool identify(String userId) {
+    identified.add(userId);
+    return true;
+  }
+
+  @override
+  void reset() => resetCount++;
+
+  @override
+  void setOptedOut(bool optedOut) {}
 }
 
 // ---------------------------------------------------------------------------
@@ -63,7 +87,7 @@ class _MockRefreshAdapter implements HttpClientAdapter {
         jsonEncode({
           'access_token': 'test-access-token',
           'user': {
-            'id': 'u-1',
+            'id': '101',
             'email': 'test@devpath.ai',
             'nickname': '테스터',
             'role': 'LEARNER',
@@ -106,7 +130,7 @@ class _DoneUserRefreshAdapter implements HttpClientAdapter {
       jsonEncode({
         'access_token': 'test-access-token',
         'user': {
-          'id': 'u-2',
+          'id': '102',
           'email': 'done@devpath.ai',
           'nickname': '완료자',
           'role': 'LEARNER',
@@ -195,7 +219,7 @@ void main() {
       final state = container.read(authControllerProvider);
       expect(state, isA<AuthAuthenticated>());
       final auth = state as AuthAuthenticated;
-      expect(auth.user.id, 'u-1');
+      expect(auth.user.id, '101');
       expect(auth.user.nickname, '테스터');
       expect(auth.user.onboardingStatus, OnboardingStatus.pending);
     });
@@ -246,7 +270,7 @@ void main() {
       final state = container.read(authControllerProvider);
       expect(state, isA<AuthAuthenticated>());
       final auth = state as AuthAuthenticated;
-      expect(auth.user.id, 'u-1');
+      expect(auth.user.id, '101');
       expect(auth.user.nickname, '테스터');
     });
 
@@ -399,5 +423,29 @@ void main() {
 
     expect(container.read(authControllerProvider), isA<AuthUnauthenticated>());
     expect(await container.read(tokenStoreProvider).readAccess(), isNull);
+  });
+
+  test('인증 성공은 내부 user id를 identify하고 logout은 reset한다', () async {
+    final analytics = _SpyJourneyAnalytics();
+    final container = ProviderContainer(
+      overrides: [
+        apiClientProvider.overrideWith((ref) {
+          final client = ApiClient.create(
+            const ApiConfig(baseUrl: 'http://test.local'),
+          );
+          client.dio.httpClientAdapter = _MockRefreshAdapter(statusCode: 200);
+          return client;
+        }),
+        journeyAnalyticsProvider.overrideWithValue(analytics),
+      ],
+    );
+    addTearDown(container.dispose);
+    final controller = container.read(authControllerProvider.notifier);
+
+    await controller.bootstrapFromCallback();
+    await controller.logout();
+
+    expect(analytics.identified, ['101']);
+    expect(analytics.resetCount, 1);
   });
 }
