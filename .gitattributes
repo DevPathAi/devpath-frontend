@@ -4,3 +4,6 @@
 # 일반 .dart는 기존 autocrlf 동작을 유지하도록 좁게 생성 파일만 지정한다.
 *.freezed.dart text eol=lf
 *.g.dart text eol=lf
+
+# 이 JSON은 JS/Dart가 raw SHA-256으로 동일성을 검증하므로 checkout에서도 LF를 유지한다.
+apps/web/lib/src/analytics/mission-spine.analytics.v1.json text eol=lf

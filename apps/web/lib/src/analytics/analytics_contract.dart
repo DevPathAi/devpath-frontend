@@ -204,7 +204,13 @@ const _tracks = <String>{
   'FULLSTACK',
   'PYTHON_BACKEND',
 };
-const _ctaLocations = <String>{'header', 'hero', 'mini_diagnostic', 'pricing'};
+const _ctaLocations = <String>{
+  'header',
+  'hero',
+  'mini_diagnostic',
+  'pricing',
+  'final',
+};
 const _diagnosedLevels = <String>{'JUNIOR', 'MID', 'SENIOR'};
 final _isoUtcMillis = RegExp(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$');
 final _uuidV4 = RegExp(

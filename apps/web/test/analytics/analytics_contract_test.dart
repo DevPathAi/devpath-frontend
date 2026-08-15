@@ -280,6 +280,17 @@ void main() {
       }
     });
 
+    test('accepts the final diagnostic CTA landing location', () {
+      expect(
+        validateAnalyticsEvent('landing_diagnostic_cta_clicked', {
+          ...common,
+          'page_view_id': 'ISEhISEhISEhISEhISEhIQ',
+          'cta_location': 'final',
+        }).valid,
+        isTrue,
+      );
+    });
+
     test('accepts a flat allowlisted event and rejects unknown names', () {
       expect(
         validateAnalyticsEvent('landing_viewed', {
