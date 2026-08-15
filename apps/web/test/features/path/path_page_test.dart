@@ -100,6 +100,53 @@ class _GeneratingPathController extends PathController {
   }
 }
 
+class _CompletedPathController extends PathController {
+  _CompletedPathController({this.initialPhase = PathPhase.complete});
+
+  final PathPhase initialPhase;
+  var loadCalls = 0;
+
+  @override
+  PathState build() => PathState(
+    phase: initialPhase,
+    result: initialPhase == PathPhase.complete ? _pathPlan() : null,
+  );
+
+  @override
+  Future<void> loadOrStart() async {
+    loadCalls += 1;
+  }
+
+  void finish() {
+    state = PathState(phase: PathPhase.complete, result: _pathPlan());
+  }
+}
+
+class _PartialPathController extends PathController {
+  var retryCalls = 0;
+
+  @override
+  PathState build() => const PathState(
+    phase: PathPhase.partial,
+    completed: ['진단 분석'],
+    error: '상세 생성 중 연결이 끊겼어요',
+  );
+
+  @override
+  Future<void> loadOrStart() async {
+    retryCalls += 1;
+  }
+}
+
+class _FailedPathController extends PathController {
+  @override
+  PathState build() =>
+      const PathState(phase: PathPhase.failed, error: '상세 조회에 실패했어요');
+
+  @override
+  Future<void> loadOrStart() async {}
+}
+
 void main() {
   testWidgets('flag ON은 current mission과 전체 path를 병렬 시작하고 mission을 먼저 그린다', (
     tester,
@@ -193,8 +240,133 @@ void main() {
 
     path.finish();
     await tester.pump();
+    await tester.pump();
 
     expect(mission.refreshCalls, 1);
+  });
+
+  testWidgets('완료 경로를 들고 진입하고 cached NO_ACTIVE_PATH면 한 번만 재조회한다', (
+    tester,
+  ) async {
+    final path = _CompletedPathController();
+    final mission = _ReadyMissionController(_noActiveMission());
+    final c = ProviderContainer(
+      overrides: [
+        appConfigProvider.overrideWithValue(
+          const AppConfig(
+            baseUrl: 'https://mock.devpath.ai',
+            useMock: true,
+            missionSpineEnabled: true,
+          ),
+        ),
+        authControllerProvider.overrideWith(_AuthedAuthController.new),
+        pathControllerProvider.overrideWith(() => path),
+        currentMissionControllerProvider.overrideWith(() => mission),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    await tester.pumpWidget(_host(c));
+    await tester.pump();
+    await tester.pump();
+
+    expect(path.loadCalls, 0);
+    expect(mission.loadCalls, 1);
+    expect(mission.refreshCalls, 1);
+  });
+
+  testWidgets('기존 경로 idle→complete도 cached NO_ACTIVE_PATH를 한 번만 재조회한다', (
+    tester,
+  ) async {
+    final path = _CompletedPathController(initialPhase: PathPhase.idle);
+    final mission = _ReadyMissionController(_noActiveMission());
+    final c = ProviderContainer(
+      overrides: [
+        appConfigProvider.overrideWithValue(
+          const AppConfig(
+            baseUrl: 'https://mock.devpath.ai',
+            useMock: true,
+            missionSpineEnabled: true,
+          ),
+        ),
+        authControllerProvider.overrideWith(_AuthedAuthController.new),
+        pathControllerProvider.overrideWith(() => path),
+        currentMissionControllerProvider.overrideWith(() => mission),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    await tester.pumpWidget(_host(c));
+    await tester.pump();
+    path.finish();
+    await tester.pump();
+    await tester.pump();
+
+    expect(path.loadCalls, 1);
+    expect(mission.refreshCalls, 1);
+  });
+
+  testWidgets('사용 가능한 미션은 상세 경로 중단에도 유지되고 보조 재시도를 제공한다', (tester) async {
+    final path = _PartialPathController();
+    final mission = _ReadyMissionController(_availableMission());
+    final c = ProviderContainer(
+      overrides: [
+        appConfigProvider.overrideWithValue(
+          const AppConfig(
+            baseUrl: 'https://mock.devpath.ai',
+            useMock: true,
+            missionSpineEnabled: true,
+          ),
+        ),
+        authControllerProvider.overrideWith(_AuthedAuthController.new),
+        pathControllerProvider.overrideWith(() => path),
+        currentMissionControllerProvider.overrideWith(() => mission),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    await tester.pumpWidget(_host(c));
+    await tester.pump();
+
+    expect(find.byType(DpMissionHeader), findsOneWidget);
+    expect(find.byType(DpNextActionBand), findsOneWidget);
+    expect(find.text('경로 상세를 불러오지 못했어요'), findsOneWidget);
+    expect(find.text('경로 상세 다시 확인'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('경로 상세 다시 확인'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('경로 상세 다시 확인'));
+    await tester.pump();
+    expect(path.retryCalls, 1);
+  });
+
+  testWidgets('사용 가능한 미션은 상세 경로 조회 실패에도 유일 primary를 유지한다', (tester) async {
+    final path = _FailedPathController();
+    final mission = _ReadyMissionController(_availableMission());
+    final c = ProviderContainer(
+      overrides: [
+        appConfigProvider.overrideWithValue(
+          const AppConfig(
+            baseUrl: 'https://mock.devpath.ai',
+            useMock: true,
+            missionSpineEnabled: true,
+          ),
+        ),
+        authControllerProvider.overrideWith(_AuthedAuthController.new),
+        pathControllerProvider.overrideWith(() => path),
+        currentMissionControllerProvider.overrideWith(() => mission),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    await tester.pumpWidget(_host(c));
+    await tester.pump();
+
+    expect(find.byType(DpMissionHeader), findsOneWidget);
+    expect(find.byType(DpNextActionBand), findsOneWidget);
+    expect(find.text('경로 상세를 불러오지 못했어요'), findsOneWidget);
+    expect(find.text('상세 조회에 실패했어요'), findsOneWidget);
+    expect(find.text('경로 상세 다시 확인'), findsOneWidget);
   });
 
   testWidgets('완료 시 12주 타임라인과 이번 주 과제를 렌더', (tester) async {

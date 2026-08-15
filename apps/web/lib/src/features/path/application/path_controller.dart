@@ -176,11 +176,7 @@ class PathController extends Notifier<PathState> {
   }
 
   Future<void> _loadResult(int generation) async {
-    final json = await ref
-        .read(apiClientProvider)
-        .get<Map<String, dynamic>>('/learning-paths/me');
-    if (!_isCurrent(generation)) return;
-    final result = LearningPath.fromJson(json);
+    final result = await ref.read(learningPathApiProvider).currentPath();
     if (!_isCurrent(generation)) return;
     state = state.copyWith(
       phase: PathPhase.complete,

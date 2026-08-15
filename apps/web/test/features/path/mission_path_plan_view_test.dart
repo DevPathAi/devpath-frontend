@@ -8,6 +8,10 @@ import 'package:flutter_test/flutter_test.dart';
 Widget _host({
   required CurrentMissionState missionState,
   LearningPath? plan,
+  bool isPlanLoading = false,
+  String? planFailureMessage,
+  VoidCallback? onRetryMission,
+  VoidCallback? onRetryPlan,
   ValueChanged<int>? onOpenContent,
   ValueChanged<int>? onCompleteContentless,
 }) => MaterialApp(
@@ -17,7 +21,10 @@ Widget _host({
       child: MissionPathPlanView(
         missionState: missionState,
         plan: plan,
-        onRetryMission: () {},
+        isPlanLoading: isPlanLoading,
+        planFailureMessage: planFailureMessage,
+        onRetryMission: onRetryMission ?? () {},
+        onRetryPlan: onRetryPlan,
         onOpenContent: onOpenContent ?? (_) {},
         onCompleteContentless: onCompleteContentless ?? (_) {},
       ),
@@ -58,6 +65,23 @@ void main() {
     expect(find.text('3주차를 지금 배우는 서버 경로 근거'), findsNothing);
   });
 
+  testWidgets('pathId가 같아도 weekNum이 없으면 상세를 추론하지 않는다', (tester) async {
+    final mismatchedPlan = _path();
+    final mission = _availableMission(weekNum: 4);
+
+    await tester.pumpWidget(
+      _host(
+        missionState: CurrentMissionState(mission: mission),
+        plan: mismatchedPlan,
+      ),
+    );
+
+    final header = tester.widget<DpMissionHeader>(find.byType(DpMissionHeader));
+    expect(header.why, '서버가 정한 이번 주의 첫 미완료 과제예요.');
+    expect(find.text('현재 미션과 경로 상세가 아직 맞지 않아요.'), findsOneWidget);
+    expect(find.text('3주차를 지금 배우는 서버 경로 근거'), findsNothing);
+  });
+
   testWidgets('미래 주차 상세는 기본 접힘이며 사용자가 열 때만 보인다', (tester) async {
     await tester.pumpWidget(
       _host(
@@ -75,6 +99,32 @@ void main() {
     await tester.tap(find.text('5주차 다음 단계'));
     await tester.pumpAndSettle();
 
+    expect(find.text('미래 상세 목표'), findsOneWidget);
+  });
+
+  testWidgets('주차 목록 갱신 시 펼침 상태가 다른 weekNum으로 이동하지 않는다', (tester) async {
+    await tester.pumpWidget(
+      _host(
+        missionState: CurrentMissionState(mission: _availableMission()),
+        plan: _path(),
+      ),
+    );
+
+    await tester.ensureVisible(find.text('5주차 다음 단계'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('5주차 다음 단계'));
+    await tester.pumpAndSettle();
+    expect(find.text('미래 상세 목표'), findsOneWidget);
+
+    await tester.pumpWidget(
+      _host(
+        missionState: CurrentMissionState(mission: _availableMission()),
+        plan: _pathWithInsertedFutureWeek(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('새로 추가된 상세 목표'), findsNothing);
     expect(find.text('미래 상세 목표'), findsOneWidget);
   });
 
@@ -129,7 +179,48 @@ void main() {
 
     expect(find.byType(DpProgressSpine), findsNothing);
     expect(find.text('12주 경로를 모두 완료했어요'), findsOneWidget);
-    expect(find.text('완료한 미션 2개'), findsOneWidget);
+    expect(find.text('마지막 주차 2개 미션 완료'), findsOneWidget);
+  });
+
+  testWidgets('NO_ACTIVE_PATH stale 실패는 마지막 결과와 재조회 행동을 명시한다', (tester) async {
+    var retryCalls = 0;
+    await tester.pumpWidget(
+      _host(
+        missionState: CurrentMissionState(
+          mission: _noActiveMission(),
+          isStale: true,
+          failureKind: CurrentMissionFailureKind.refresh,
+          failureMessage: '네트워크 오류',
+        ),
+        onRetryMission: () => retryCalls += 1,
+      ),
+    );
+
+    expect(find.text('경로 상태를 새로 확인하지 못했어요'), findsOneWidget);
+    expect(find.textContaining('마지막으로 확인한 결과'), findsOneWidget);
+    await tester.tap(find.text('현재 경로 다시 확인'));
+    expect(retryCalls, 1);
+  });
+
+  testWidgets('PATH_COMPLETED stale 실패는 완료 근거를 유지하고 재조회를 제공한다', (tester) async {
+    var retryCalls = 0;
+    await tester.pumpWidget(
+      _host(
+        missionState: CurrentMissionState(
+          mission: _completedMission(),
+          isStale: true,
+          failureKind: CurrentMissionFailureKind.refresh,
+          failureMessage: '네트워크 오류',
+        ),
+        plan: _path(),
+        onRetryMission: () => retryCalls += 1,
+      ),
+    );
+
+    expect(find.text('12주 경로를 모두 완료했어요'), findsOneWidget);
+    expect(find.text('마지막으로 확인한 완료 결과예요.'), findsOneWidget);
+    await tester.tap(find.text('완료 상태 다시 확인'));
+    expect(retryCalls, 1);
   });
 
   testWidgets('320px와 200% 글자에서도 primary action 하나로 overflow 없이 읽힌다', (
@@ -157,11 +248,11 @@ void main() {
   });
 }
 
-CurrentMission _availableMission({bool contentless = false}) =>
+CurrentMission _availableMission({bool contentless = false, int weekNum = 3}) =>
     CurrentMission.fromJson({
       'outcome': 'AVAILABLE',
       'pathId': 101,
-      'weekNum': 3,
+      'weekNum': weekNum,
       'tasks': [
         {
           'taskId': 301,
@@ -330,4 +421,31 @@ LearningPath _path({int pathId = 101}) => LearningPath.fromJson({
       'tasks': <Map<String, Object?>>[],
     },
   ],
+});
+
+LearningPath _pathWithInsertedFutureWeek() {
+  final json = _path().toJson();
+  final milestones = (json['milestones'] as List<Object?>)
+      .cast<Map<String, dynamic>>();
+  milestones.insert(2, {
+    'weekNum': 4,
+    'title': '새로 추가된 단계',
+    'goalDescription': '새로 추가된 상세 목표',
+    'targetSkills': <String>[],
+    'estimatedHours': 2,
+    'whyThisOrder': '새 순서',
+    'expectedOutcome': '새 결과',
+    'locked': true,
+    'tasks': <Map<String, Object?>>[],
+  });
+  return LearningPath.fromJson(json);
+}
+
+CurrentMission _noActiveMission() => CurrentMission.fromJson({
+  'outcome': 'NO_ACTIVE_PATH',
+  'pathId': null,
+  'weekNum': null,
+  'tasks': <Map<String, Object?>>[],
+  'nextTask': null,
+  'pathCompleted': false,
 });

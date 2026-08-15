@@ -12,14 +12,20 @@ class MissionPathPlanView extends StatelessWidget {
     super.key,
     required this.missionState,
     required this.plan,
+    this.isPlanLoading = false,
+    this.planFailureMessage,
     required this.onRetryMission,
+    this.onRetryPlan,
     required this.onOpenContent,
     required this.onCompleteContentless,
   });
 
   final CurrentMissionState missionState;
   final LearningPath? plan;
+  final bool isPlanLoading;
+  final String? planFailureMessage;
   final VoidCallback onRetryMission;
+  final VoidCallback? onRetryPlan;
   final ValueChanged<int> onOpenContent;
   final ValueChanged<int> onCompleteContentless;
 
@@ -49,19 +55,28 @@ class MissionPathPlanView extends StatelessWidget {
         missionState: missionState,
         mission: mission,
         plan: plan,
+        isPlanLoading: isPlanLoading,
+        planFailureMessage: planFailureMessage,
+        onRetryPlan: onRetryPlan,
         onRetryMission: onRetryMission,
         onOpenContent: onOpenContent,
         onCompleteContentless: onCompleteContentless,
       ),
       CurrentMissionOutcome.pathCompleted => _CompletedPath(
+        missionState: missionState,
         mission: mission,
         plan: _matchingPlan(mission, plan) ? plan : null,
+        onRetryMission: onRetryMission,
       ),
       CurrentMissionOutcome.noActivePath => Padding(
         padding: const EdgeInsets.all(DpSpacing.lg),
         child: DpEmpty(
-          title: '아직 학습 경로가 없어요',
-          message: '경로 생성이 끝나면 서버가 확인한 첫 미션을 여기에 표시합니다.',
+          title: missionState.isStale && missionState.failureMessage != null
+              ? '경로 상태를 새로 확인하지 못했어요'
+              : '아직 학습 경로가 없어요',
+          message: missionState.isStale && missionState.failureMessage != null
+              ? '마지막으로 확인한 결과에는 활성 경로가 없어요. 서버 상태를 다시 확인해 주세요.'
+              : '경로 생성이 끝나면 서버가 확인한 첫 미션을 여기에 표시합니다.',
           actionLabel: '현재 경로 다시 확인',
           onAction: onRetryMission,
         ),
@@ -83,6 +98,9 @@ class _AvailablePath extends StatelessWidget {
     required this.missionState,
     required this.mission,
     required this.plan,
+    required this.isPlanLoading,
+    required this.planFailureMessage,
+    required this.onRetryPlan,
     required this.onRetryMission,
     required this.onOpenContent,
     required this.onCompleteContentless,
@@ -91,6 +109,9 @@ class _AvailablePath extends StatelessWidget {
   final CurrentMissionState missionState;
   final CurrentMission mission;
   final LearningPath? plan;
+  final bool isPlanLoading;
+  final String? planFailureMessage;
+  final VoidCallback? onRetryPlan;
   final VoidCallback onRetryMission;
   final ValueChanged<int> onOpenContent;
   final ValueChanged<int> onCompleteContentless;
@@ -227,6 +248,13 @@ class _AvailablePath extends StatelessWidget {
           if (matchingPlan != null) ...[
             const SizedBox(height: DpSpacing.xl),
             _RoadmapDetails(plan: matchingPlan, currentWeek: mission.weekNum!),
+          ] else if (isPlanLoading || planFailureMessage != null) ...[
+            const SizedBox(height: DpSpacing.xl),
+            _PlanEnrichmentStatus(
+              isLoading: isPlanLoading,
+              failureMessage: planFailureMessage,
+              onRetry: onRetryPlan,
+            ),
           ],
         ],
       ),
@@ -235,10 +263,17 @@ class _AvailablePath extends StatelessWidget {
 }
 
 class _CompletedPath extends StatelessWidget {
-  const _CompletedPath({required this.mission, required this.plan});
+  const _CompletedPath({
+    required this.missionState,
+    required this.mission,
+    required this.plan,
+    required this.onRetryMission,
+  });
 
+  final CurrentMissionState missionState;
   final CurrentMission mission;
   final LearningPath? plan;
+  final VoidCallback onRetryMission;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -257,9 +292,28 @@ class _CompletedPath extends StatelessWidget {
         ),
         const SizedBox(height: DpSpacing.md),
         Text(
-          '완료한 미션 ${mission.tasks.length}개',
+          '마지막 주차 ${mission.tasks.length}개 미션 완료',
           style: Theme.of(context).textTheme.titleMedium,
         ),
+        if (missionState.isStale && missionState.failureMessage != null) ...[
+          const SizedBox(height: DpSpacing.sm),
+          Semantics(
+            liveRegion: true,
+            child: Text(
+              '마지막으로 확인한 완료 결과예요.',
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: context.dpColors.danger),
+            ),
+          ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              onPressed: onRetryMission,
+              child: const Text('완료 상태 다시 확인'),
+            ),
+          ),
+        ],
         const SizedBox(height: DpSpacing.sm),
         for (final task in mission.tasks)
           ListTile(
@@ -274,6 +328,38 @@ class _CompletedPath extends StatelessWidget {
         ],
       ],
     ),
+  );
+}
+
+class _PlanEnrichmentStatus extends StatelessWidget {
+  const _PlanEnrichmentStatus({
+    required this.isLoading,
+    required this.failureMessage,
+    required this.onRetry,
+  });
+
+  final bool isLoading;
+  final String? failureMessage;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        isLoading ? '경로 상세를 확인하는 중이에요' : '경로 상세를 불러오지 못했어요',
+        style: Theme.of(context).textTheme.titleSmall,
+      ),
+      const SizedBox(height: DpSpacing.xs),
+      Text(
+        isLoading ? '현재 미션은 바로 진행할 수 있어요.' : failureMessage ?? '현재 미션은 유지됩니다.',
+        style: Theme.of(
+          context,
+        ).textTheme.bodyMedium?.copyWith(color: context.dpColors.textSecondary),
+      ),
+      if (!isLoading && onRetry != null)
+        TextButton(onPressed: onRetry, child: const Text('경로 상세 다시 확인')),
+    ],
   );
 }
 
@@ -347,14 +433,22 @@ class _RoadmapDetails extends StatelessWidget {
           Text('완료한 주차', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: DpSpacing.xs),
           for (final milestone in completed)
-            _MilestoneDisclosure(milestone: milestone, completed: true),
+            _MilestoneDisclosure(
+              key: ValueKey('path-week-${milestone.weekNum}'),
+              milestone: milestone,
+              completed: true,
+            ),
         ],
         if (future.isNotEmpty) ...[
           const SizedBox(height: DpSpacing.lg),
           Text('앞으로의 주차', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: DpSpacing.xs),
           for (final milestone in future)
-            _MilestoneDisclosure(milestone: milestone, completed: false),
+            _MilestoneDisclosure(
+              key: ValueKey('path-week-${milestone.weekNum}'),
+              milestone: milestone,
+              completed: false,
+            ),
         ],
       ],
     );
@@ -363,6 +457,7 @@ class _RoadmapDetails extends StatelessWidget {
 
 class _MilestoneDisclosure extends StatelessWidget {
   const _MilestoneDisclosure({
+    super.key,
     required this.milestone,
     required this.completed,
   });
@@ -372,6 +467,7 @@ class _MilestoneDisclosure extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ExpansionTile(
+    key: ValueKey('path-week-tile-${milestone.weekNum}'),
     tilePadding: EdgeInsets.zero,
     leading: Icon(
       completed ? DpIcons.stepDone : DpIcons.stepPending,

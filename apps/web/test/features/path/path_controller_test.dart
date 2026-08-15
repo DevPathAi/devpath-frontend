@@ -59,6 +59,24 @@ class _DelayedPathClient implements ApiClient {
   dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
 }
 
+class _StubLearningPathApi extends LearningPathApi {
+  _StubLearningPathApi({this.path, this.error}) : super(_MalformedPathClient());
+
+  final LearningPath? path;
+  final Object? error;
+  var currentPathCalls = 0;
+
+  @override
+  Future<LearningPath> currentPath() async {
+    currentPathCalls += 1;
+    if (currentPathCalls == 1) {
+      final failure = error;
+      if (failure != null) throw failure;
+    }
+    return path!;
+  }
+}
+
 Future<void> _flushUntil(bool Function() condition) async {
   for (var i = 0; i < 20 && !condition(); i++) {
     await Future<void>.delayed(Duration.zero);
@@ -67,6 +85,50 @@ Future<void> _flushUntil(bool Function() condition) async {
 }
 
 void main() {
+  test('경로 조회는 공용 LearningPathApi.currentPath 계약을 사용한다', () async {
+    final learningPathApi = _StubLearningPathApi(
+      path: LearningPath.fromJson({...mockLearningPath(), 'pathId': 707}),
+    );
+    final container = ProviderContainer(
+      overrides: [
+        learningPathApiProvider.overrideWithValue(learningPathApi),
+        apiClientProvider.overrideWithValue(_MalformedPathClient()),
+        pathSseConnectProvider.overrideWithValue(
+          () => throw StateError('existing path should not regenerate'),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(pathControllerProvider.notifier).loadOrStart();
+
+    expect(learningPathApi.currentPathCalls, 1);
+    expect(container.read(pathControllerProvider).result?.pathId, 707);
+  });
+
+  test('공용 currentPath의 404도 기존처럼 생성 SSE로 이어진다', () async {
+    final learningPathApi = _StubLearningPathApi(
+      path: LearningPath.fromJson(mockLearningPath()),
+      error: const ApiException(
+        code: ApiErrorCode.unknown,
+        message: '경로 없음',
+        status: 404,
+      ),
+    );
+    final container = ProviderContainer(
+      overrides: [
+        learningPathApiProvider.overrideWithValue(learningPathApi),
+        pathSseConnectProvider.overrideWithValue(() => _emit(kPathStages)),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(pathControllerProvider.notifier).loadOrStart();
+
+    expect(learningPathApi.currentPathCalls, 2);
+    expect(container.read(pathControllerProvider).phase, PathPhase.complete);
+  });
+
   test('reset 중인 GET의 늦은 응답은 idle state를 덮지 않는다', () async {
     final api = _DelayedPathClient();
     final container = ProviderContainer(

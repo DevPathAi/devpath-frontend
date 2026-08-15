@@ -25,6 +25,8 @@ class PathPage extends ConsumerStatefulWidget {
 }
 
 class _PathPageState extends ConsumerState<PathPage> {
+  LearningPath? _missionRefetchedForPlan;
+
   @override
   void initState() {
     super.initState();
@@ -59,18 +61,7 @@ class _PathPageState extends ConsumerState<PathPage> {
         : null;
 
     if (missionSpineEnabled) {
-      ref.listen<PathState>(pathControllerProvider, (previous, next) {
-        final generated =
-            previous?.phase == PathPhase.streaming &&
-            next.phase == PathPhase.complete;
-        if (generated) {
-          unawaited(
-            ref
-                .read(currentMissionControllerProvider.notifier)
-                .invalidateAndRefetch(),
-          );
-        }
-      });
+      _scheduleMissionRefreshForReadyPath(s, missionState!);
     }
 
     // 완료(PathPlanView)는 자체 콘텐츠를 SliverList로 헤더와 함께 스크롤한다.
@@ -190,6 +181,16 @@ class _PathPageState extends ConsumerState<PathPage> {
       child: MissionPathPlanView(
         missionState: missionState,
         plan: pathState.phase == PathPhase.complete ? pathState.result : null,
+        isPlanLoading:
+            pathState.phase == PathPhase.idle ||
+            pathState.phase == PathPhase.streaming,
+        planFailureMessage: switch (pathState.phase) {
+          PathPhase.partial => pathState.error ?? '경로 상세 생성이 중단됐어요.',
+          PathPhase.failed ||
+          PathPhase.killSwitch => pathState.error ?? '경로 상세를 불러오지 못했어요.',
+          _ => null,
+        },
+        onRetryPlan: pathNotifier.loadOrStart,
         onRetryMission: () => unawaited(
           ref
               .read(currentMissionControllerProvider.notifier)
@@ -203,6 +204,43 @@ class _PathPageState extends ConsumerState<PathPage> {
         ),
       ),
     );
+  }
+
+  void _scheduleMissionRefreshForReadyPath(
+    PathState pathState,
+    CurrentMissionState missionState,
+  ) {
+    final plan = pathState.phase == PathPhase.complete
+        ? pathState.result
+        : null;
+    if (plan == null) {
+      _missionRefetchedForPlan = null;
+      return;
+    }
+    if (missionState.mission?.outcome != CurrentMissionOutcome.noActivePath ||
+        identical(_missionRefetchedForPlan, plan)) {
+      return;
+    }
+
+    // A completed plan may already exist on first paint, or arrive through
+    // idle/streaming -> complete. Record the exact projection before scheduling
+    // so a failed NO_ACTIVE_PATH refresh cannot create a rebuild loop.
+    _missionRefetchedForPlan = plan;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final currentPathState = ref.read(pathControllerProvider);
+      if (currentPathState.phase != PathPhase.complete ||
+          !identical(currentPathState.result, plan) ||
+          ref.read(currentMissionControllerProvider).mission?.outcome !=
+              CurrentMissionOutcome.noActivePath) {
+        return;
+      }
+      unawaited(
+        ref
+            .read(currentMissionControllerProvider.notifier)
+            .invalidateAndRefetch(),
+      );
+    });
   }
 }
 
