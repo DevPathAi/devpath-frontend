@@ -60,6 +60,7 @@ sealed class RunTerminal extends RunState {
     this.logs = const [],
     this.persisted = false,
     this.explicitRun = false,
+    this.session,
   });
 
   final SandboxTerminalResult result;
@@ -70,6 +71,10 @@ sealed class RunTerminal extends RunState {
   /// True when this session originated from the user's current Run action.
   /// Reload/session restore deliberately keeps this false.
   final bool explicitRun;
+
+  /// Exact owner-scoped persisted payload returned by Sandbox GET. Rendered
+  /// combined logs are deliberately not used as stdout/stderr evidence.
+  final SandboxSession? session;
   int get approvedContextFieldCount => explicitRun ? 1 : 0;
   @override
   final List<String> logs;
@@ -85,6 +90,7 @@ final class RunCompleted extends RunTerminal {
     super.logs,
     super.persisted,
     super.explicitRun,
+    super.session,
   });
 }
 
@@ -94,6 +100,7 @@ final class RunFailed extends RunTerminal {
     super.logs,
     super.persisted,
     super.explicitRun,
+    super.session,
   });
 }
 
@@ -103,6 +110,7 @@ final class RunKilled extends RunTerminal {
     super.logs,
     super.persisted,
     super.explicitRun,
+    super.session,
   });
 }
 
@@ -112,6 +120,7 @@ final class RunTimedOut extends RunTerminal {
     super.logs,
     super.persisted,
     super.explicitRun,
+    super.session,
   });
 }
 

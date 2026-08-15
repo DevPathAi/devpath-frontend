@@ -19,7 +19,9 @@ import '../features/community/presentation/qna_detail_page.dart';
 import '../features/community/presentation/question_create_page.dart';
 import '../features/dashboard/presentation/dashboard_page.dart';
 import '../features/mentor/presentation/mentor_page.dart';
+import '../features/mentor/state/mentor_scope_key.dart';
 import '../features/mission/presentation/mission_content_route_resolver.dart';
+import '../features/mission/presentation/mission_mentor_route_resolver.dart';
 import '../features/mission/presentation/mission_sandbox_route_resolver.dart';
 import '../features/diagnostic/presentation/diagnostic_page.dart';
 import '../features/diagnostic/application/diagnostic_controller.dart';
@@ -216,6 +218,15 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/mission/:taskId/sandbox',
             builder: (_, state) => MissionSandboxRouteResolver(
               taskId: state.pathParameters['taskId'],
+            ),
+          ),
+          GoRoute(
+            path: '/mission/:taskId/mentor',
+            builder: (_, state) => MissionMentorRouteResolver(
+              taskId: state.pathParameters['taskId'],
+              entryIntent: state.extra is MentorEntryIntent
+                  ? state.extra! as MentorEntryIntent
+                  : null,
             ),
           ),
           GoRoute(path: '/sandbox', builder: (_, _) => const SandboxPage()),

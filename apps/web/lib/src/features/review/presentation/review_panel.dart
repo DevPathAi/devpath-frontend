@@ -20,12 +20,14 @@ class ReviewPanel extends ConsumerStatefulWidget {
     required this.onRequest,
     this.workspaceKey,
     this.nextAction,
+    this.onAskMentor,
   });
 
   /// 수동 리뷰 요청 또는 재시도 콜백(폴링 재시도 포함).
   final VoidCallback onRequest;
   final MissionWorkspaceKey? workspaceKey;
   final Widget? nextAction;
+  final VoidCallback? onAskMentor;
 
   @override
   ConsumerState<ReviewPanel> createState() => _ReviewPanelState();
@@ -95,6 +97,7 @@ class _ReviewPanelState extends ConsumerState<ReviewPanel> {
       ReviewLoaded(:final review) => _ReviewBody(
         review: review,
         nextAction: widget.nextAction,
+        onAskMentor: widget.onAskMentor,
       ),
     };
   }
@@ -228,9 +231,10 @@ class _ReviewWithStatus extends StatelessWidget {
 }
 
 class _ReviewBody extends StatelessWidget {
-  const _ReviewBody({required this.review, this.nextAction});
+  const _ReviewBody({required this.review, this.nextAction, this.onAskMentor});
   final CodeReview review;
   final Widget? nextAction;
+  final VoidCallback? onAskMentor;
 
   Color _sevColor(BuildContext context, String sev) {
     final c = context.dpColors;
@@ -322,6 +326,18 @@ class _ReviewBody extends StatelessWidget {
             ),
           ],
         ),
+        if (onAskMentor case final callback?) ...[
+          const SizedBox(height: DpSpacing.sm),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
+              onPressed: callback,
+              icon: const Icon(DpIcons.mentor),
+              label: const Text('AI 멘토에게 질문'),
+            ),
+          ),
+        ],
         if (nextAction case final action?) ...[
           const SizedBox(height: DpSpacing.md),
           action,

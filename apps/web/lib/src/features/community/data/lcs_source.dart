@@ -27,6 +27,18 @@ typedef LcsCommit =
 /// 스냅샷이 없으면(404) **null** 을 돌려 패널을 숨긴다(비블로킹).
 typedef LcsByQuestionFetch = Future<LcsSnapshotView?> Function(int questionId);
 
+/// Mentor 전용 draft. Community와 같은 LCS 경계를 쓰되, 한 요청에만 허용한
+/// 편집기/실행/리뷰 맥락을 명시적인 [requestContext]로 전달한다.
+typedef MentorLcsDraftCreate =
+    Future<LcsDraft> Function({
+      int? contentId,
+      required List<String> requestedFields,
+      required Map<String, Object?> requestContext,
+    });
+
+/// Mentor draft는 서버가 private 정책을 이미 결박하므로 commit 본문은 빈 객체다.
+typedef MentorLcsCommit = Future<int> Function({required String draftId});
+
 final lcsDraftProvider = Provider<LcsDraftCreate>((ref) {
   final client = ref.watch(apiClientProvider);
   return ({List<String> requestedFields = const [], int? contentId}) async {
@@ -60,6 +72,55 @@ final lcsCommitProvider = Provider<LcsCommit>((ref) {
     return (json['snapshotId'] as num).toInt();
   };
 });
+
+final mentorLcsDraftProvider = Provider<MentorLcsDraftCreate>((ref) {
+  final client = ref.watch(apiClientProvider);
+  return ({
+    int? contentId,
+    required List<String> requestedFields,
+    required Map<String, Object?> requestContext,
+  }) async {
+    if (contentId != null && (contentId <= 0 || contentId > _maxSafeInteger)) {
+      throw ArgumentError.value(contentId, 'contentId');
+    }
+    final json = await client.post<Map<String, dynamic>>(
+      '/lcs/snapshots/draft',
+      body: {
+        'purpose': 'mentor_prompt',
+        'contentId': ?contentId,
+        'requestedFields': requestedFields,
+        'requestContext': requestContext,
+      },
+    );
+    return LcsDraft.fromJson(json);
+  };
+});
+
+final mentorLcsCommitProvider = Provider<MentorLcsCommit>((ref) {
+  final client = ref.watch(apiClientProvider);
+  return ({required String draftId}) async {
+    if (draftId.trim().isEmpty) {
+      throw const FormatException('Missing Mentor draft ID');
+    }
+    final json = await client.post<Map<String, dynamic>>(
+      '/lcs/snapshots/${Uri.encodeComponent(draftId)}/commit',
+      body: <String, Object?>{},
+    );
+    return _positiveJsSafeSnapshotId(json['snapshotId']);
+  };
+});
+
+const int _maxSafeInteger = 9007199254740991;
+
+int _positiveJsSafeSnapshotId(Object? value) {
+  if (value is! int) {
+    throw const FormatException('Malformed Mentor snapshot ID');
+  }
+  if (value <= 0 || value > _maxSafeInteger) {
+    throw const FormatException('Malformed Mentor snapshot ID');
+  }
+  return value;
+}
 
 final lcsByQuestionProvider = Provider<LcsByQuestionFetch>((ref) {
   final client = ref.watch(apiClientProvider);

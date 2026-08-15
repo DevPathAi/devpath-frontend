@@ -87,6 +87,7 @@ Widget _host(
   ProviderContainer c, {
   MissionWorkspaceKey? workspaceKey,
   VoidCallback? onRequest,
+  VoidCallback? onAskMentor,
 }) => UncontrolledProviderScope(
   container: c,
   child: MaterialApp(
@@ -95,6 +96,7 @@ Widget _host(
       body: ReviewPanel(
         workspaceKey: workspaceKey,
         onRequest: onRequest ?? () {},
+        onAskMentor: onAskMentor,
       ),
     ),
   ),
@@ -176,6 +178,32 @@ void main() {
     await tester.pumpWidget(_host(c));
     expect(find.textContaining('80'), findsWidgets);
     expect(find.textContaining('null 체크'), findsOneWidget);
+  });
+
+  testWidgets('canonical loaded review는 secondary Mentor action을 노출한다', (
+    tester,
+  ) async {
+    const workspaceKey = MissionWorkspaceKey(taskId: 7, contentId: 11);
+    var calls = 0;
+    final c = ProviderContainer(
+      overrides: [
+        currentMissionOwnerKeyProvider.overrideWithValue('owner-1'),
+        reviewControllerFamilyProvider(workspaceKey).overrideWith(
+          () => _FakeReview(
+            const ReviewLoaded(CodeReview(confidence: 80), sessionId: 42),
+          ),
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+    await tester.pumpWidget(
+      _host(c, workspaceKey: workspaceKey, onAskMentor: () => calls += 1),
+    );
+
+    expect(find.text('AI 멘토에게 질문'), findsOneWidget);
+    expect(find.byType(FilledButton), findsNothing);
+    await tester.tap(find.text('AI 멘토에게 질문'));
+    expect(calls, 1);
   });
 
   testWidgets('killSwitch: 점검 배너', (tester) async {

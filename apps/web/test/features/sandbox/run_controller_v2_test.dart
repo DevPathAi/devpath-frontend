@@ -332,6 +332,9 @@ void main() {
           container.read(runControllerFamilyProvider(_key)) as RunTerminal;
       expect(terminal.persisted, isTrue);
       expect(terminal.explicitRun, isTrue);
+      expect(terminal.session?.stdout, 'a\nmissed-tail\n');
+      expect(terminal.session?.stderr, '');
+      expect(terminal.session?.truncated, isFalse);
     },
   );
 

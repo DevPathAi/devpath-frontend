@@ -313,7 +313,12 @@ class RunController extends Notifier<RunState> {
             truncated: session.truncated,
           );
           _terminalReceived = true;
-          state = _terminalState(result, mergedLogs, persisted: true);
+          state = _terminalState(
+            result,
+            mergedLogs,
+            persisted: true,
+            session: session,
+          );
           _completeInFlight();
           return;
         }
@@ -377,6 +382,7 @@ class RunController extends Notifier<RunState> {
         persisted,
         _mergeRecoveredLogs(_logsOf(state), session),
         persisted: true,
+        session: session,
       );
     } on Object {
       // The v2 result itself mirrors a persisted terminal row. A secondary GET
@@ -458,30 +464,35 @@ class RunController extends Notifier<RunState> {
     SandboxTerminalResult result,
     List<String> logs, {
     required bool persisted,
+    SandboxSession? session,
   }) => switch (result.status) {
     SandboxSessionStatus.completed => RunCompleted(
       result: result,
       logs: logs,
       persisted: persisted,
       explicitRun: _explicitRun,
+      session: session,
     ),
     SandboxSessionStatus.failed => RunFailed(
       result: result,
       logs: logs,
       persisted: persisted,
       explicitRun: _explicitRun,
+      session: session,
     ),
     SandboxSessionStatus.killed => RunKilled(
       result: result,
       logs: logs,
       persisted: persisted,
       explicitRun: _explicitRun,
+      session: session,
     ),
     SandboxSessionStatus.timedOut => RunTimedOut(
       result: result,
       logs: logs,
       persisted: persisted,
       explicitRun: _explicitRun,
+      session: session,
     ),
     SandboxSessionStatus.allocating ||
     SandboxSessionStatus.running => throw StateError('non-terminal result'),

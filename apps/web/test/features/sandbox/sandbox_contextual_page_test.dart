@@ -6,6 +6,7 @@ import 'package:devpath_web/src/analytics/journey_analytics.dart';
 import 'package:devpath_web/src/features/auth/application/auth_controller.dart';
 import 'package:devpath_web/src/features/auth/state/auth_state.dart';
 import 'package:devpath_web/src/features/dashboard/application/current_mission_controller.dart';
+import 'package:devpath_web/src/features/mentor/state/mentor_scope_key.dart';
 import 'package:devpath_web/src/features/mission/state/mission_workspace_key.dart';
 import 'package:devpath_web/src/features/review/application/review_controller.dart';
 import 'package:devpath_web/src/features/review/state/review_state.dart';
@@ -329,6 +330,16 @@ Future<ProviderContainer> _pump(
           textDirection: TextDirection.ltr,
         ),
       ),
+      GoRoute(
+        path: '/mission/:taskId/mentor',
+        builder: (_, state) {
+          final intent = state.extra! as MentorEntryIntent;
+          return Text(
+            'MENTOR:${intent.scopeKey.ownerId}:${intent.includeCurrentCode}',
+            textDirection: TextDirection.ltr,
+          );
+        },
+      ),
     ],
   );
   if (routed) addTearDown(router.dispose);
@@ -347,6 +358,31 @@ Future<ProviderContainer> _pump(
 }
 
 void main() {
+  testWidgets(
+    'canonical Sandbox의 secondary Mentor action은 owner/key intent만 push한다',
+    (tester) async {
+      await _pump(
+        tester,
+        track: 'BACKEND_SPRING',
+        routed: true,
+        fixedOwner: '73',
+      );
+
+      expect(find.text('AI 멘토에게 질문'), findsOneWidget);
+      expect(find.byType(DpNextActionBand), findsOneWidget);
+      expect(find.byType(FilledButton), findsNothing);
+      await tester.ensureVisible(find.text('AI 멘토에게 질문'));
+      await tester.tap(find.text('AI 멘토에게 질문'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('MENTOR:73:true'), findsOneWidget);
+      GoRouter.of(tester.element(find.text('MENTOR:73:true'))).pop();
+      await tester.pumpAndSettle();
+      expect(find.byType(SandboxPage), findsOneWidget);
+      expect(find.text('AI 멘토에게 질문'), findsOneWidget);
+    },
+  );
+
   testWidgets(
     'canonical hierarchy는 Mission Header→Context Capsule→단일 Next Action이다',
     (tester) async {

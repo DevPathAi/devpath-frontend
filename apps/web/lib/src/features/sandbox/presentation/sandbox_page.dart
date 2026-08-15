@@ -13,6 +13,7 @@ import '../../auth/state/auth_state.dart';
 import '../../content/application/mission_content_controller.dart';
 import '../../common/application/track_catalog.dart';
 import '../../dashboard/application/current_mission_controller.dart';
+import '../../mentor/state/mentor_scope_key.dart';
 import '../../mission/state/mission_workspace_key.dart';
 import '../../review/application/review_controller.dart';
 import '../../review/presentation/review_panel.dart';
@@ -399,6 +400,21 @@ class _SandboxPageState extends ConsumerState<SandboxPage> {
                                 );
                               },
                       ),
+                    if (!hasCurrentReview) ...[
+                      const SizedBox(height: DpSpacing.sm),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size(0, 44),
+                          ),
+                          onPressed: () =>
+                              _openMentor(key, includeCurrentCode: true),
+                          icon: const Icon(DpIcons.mentor),
+                          label: const Text('AI 멘토에게 질문'),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -459,6 +475,9 @@ class _SandboxPageState extends ConsumerState<SandboxPage> {
     review: ReviewPanel(
       workspaceKey: key,
       nextAction: reviewNextAction,
+      onAskMentor: key == null
+          ? null
+          : () => _openMentor(key, includeCurrentCode: false),
       onRequest: () {
         final sessionId = ref.read(runProvider).sandboxSessionId;
         final message = sessionId == null
@@ -470,6 +489,28 @@ class _SandboxPageState extends ConsumerState<SandboxPage> {
       },
     ),
   );
+
+  void _openMentor(
+    MissionWorkspaceKey key, {
+    required bool includeCurrentCode,
+  }) {
+    final owner = ref.read(currentMissionOwnerKeyProvider);
+    if (owner == null || !_isScheduledWorkspaceCurrent(key, owner)) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('현재 미션을 다시 확인한 뒤 질문해 주세요.')));
+      return;
+    }
+    unawaited(
+      context.push(
+        key.mentorLocation,
+        extra: MentorEntryIntent(
+          scopeKey: MentorScopeKey(ownerId: owner, workspaceKey: key),
+          includeCurrentCode: includeCurrentCode,
+        ),
+      ),
+    );
+  }
 
   Widget _editorPane({
     required MissionWorkspaceKey? key,

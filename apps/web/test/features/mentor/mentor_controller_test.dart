@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:devpath_web/src/features/community/data/lcs_source.dart';
 import 'package:devpath_web/src/features/mentor/application/mentor_controller.dart';
 import 'package:devpath_web/src/features/mentor/data/mentor_sse_source.dart';
 import 'package:devpath_web/src/features/mentor/state/mentor_state.dart';
@@ -12,9 +13,41 @@ Stream<SseEvent> _tokens(List<String> t) async* {
   for (final x in t) {
     yield SseEvent(event: 'token', data: x);
   }
+  yield const SseEvent(event: 'terminal', data: '{"status":"DONE"}');
 }
 
 void main() {
+  test('contextless send는 LCS draft/commit을 호출하지 않는다', () async {
+    var draftCalls = 0;
+    var commitCalls = 0;
+    final c = ProviderContainer(
+      overrides: [
+        mentorLcsDraftProvider.overrideWithValue(({
+          int? contentId,
+          required List<String> requestedFields,
+          required Map<String, Object?> requestContext,
+        }) async {
+          draftCalls += 1;
+          throw StateError('contextless must not draft');
+        }),
+        mentorLcsCommitProvider.overrideWithValue(({required draftId}) async {
+          commitCalls += 1;
+          throw StateError('contextless must not commit');
+        }),
+        mentorSseConnectProvider.overrideWithValue(
+          (question, {String? contentId, int fromStep = 0}) => _tokens(['답변']),
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    await c.read(mentorControllerProvider.notifier).send('전역 질문');
+
+    expect(draftCalls, 0);
+    expect(commitCalls, 0);
+    expect(c.read(mentorControllerProvider).messages.last.text, '답변');
+  });
+
   test('질문 전송 → 사용자+멘토 메시지, 토큰 누적 후 idle', () async {
     final c = ProviderContainer(
       overrides: [
@@ -77,8 +110,7 @@ void main() {
     expect(s.messages.last.text, '부분'); // 보존
   });
 
-  // ENG-REVIEW(F9 인접): 토큰 0개로 끝나면 빈 멘토 버블이 남지 않는다.
-  test('토큰 0개 onDone 시 빈 멘토 버블은 제거된다', () async {
+  test('명시 terminal 전 EOF는 빈 멘토 버블을 제거하고 partial이다', () async {
     final c = ProviderContainer(
       overrides: [
         mentorSseConnectProvider.overrideWithValue(
@@ -91,7 +123,7 @@ void main() {
 
     await c.read(mentorControllerProvider.notifier).send('질문');
     final s = c.read(mentorControllerProvider);
-    expect(s.status, MentorStatus.idle);
+    expect(s.status, MentorStatus.partial);
     // 사용자 버블만 — 빈 멘토 버블 잔류 없음.
     expect(s.messages, hasLength(1));
     expect(s.messages.single.fromUser, isTrue);
@@ -141,6 +173,7 @@ void main() {
           {'contentId': 7, 'slug': 'async', 'title': '비동기'},
         ]),
       );
+      yield const SseEvent(event: 'terminal', data: '{"status":"DONE"}');
     }
 
     final c = ProviderContainer(
@@ -175,5 +208,130 @@ void main() {
     expect(s.status, MentorStatus.idle);
     expect(s.messages.last.text, '토큰');
     expect(s.references, isEmpty);
+  });
+
+  test('토큰 뒤 terminal timeout은 부분답변과 safe retry 상태를 보존한다', () async {
+    Stream<SseEvent> timeout(
+      String question, {
+      String? contentId,
+      int fromStep = 0,
+    }) async* {
+      yield const SseEvent(event: 'token', data: '받은 부분');
+      yield const SseEvent(
+        event: 'terminal',
+        data:
+            '{"status":"FAILED","code":"AI_TIMEOUT",'
+            '"message":"mentor response timed out"}',
+      );
+    }
+
+    final c = ProviderContainer(
+      overrides: [mentorSseConnectProvider.overrideWithValue(timeout)],
+    );
+    addTearDown(c.dispose);
+
+    await c.read(mentorControllerProvider.notifier).send('질문');
+    final state = c.read(mentorControllerProvider);
+    expect(state.status, MentorStatus.partial);
+    expect(state.messages.last.text, '받은 부분');
+    expect(state.error, contains('시간'));
+  });
+
+  test('토큰 전 FAILED terminal은 성공으로 닫지 않고 failed를 보존한다', () async {
+    Stream<SseEvent> failed(
+      String question, {
+      String? contentId,
+      int fromStep = 0,
+    }) async* {
+      yield const SseEvent(
+        event: 'terminal',
+        data:
+            '{"status":"FAILED","code":"PROVIDER_FAILURE",'
+            '"message":"답변을 생성하지 못했어요."}',
+      );
+    }
+
+    final c = ProviderContainer(
+      overrides: [mentorSseConnectProvider.overrideWithValue(failed)],
+    );
+    addTearDown(c.dispose);
+
+    await c.read(mentorControllerProvider.notifier).send('질문');
+    final state = c.read(mentorControllerProvider);
+    expect(state.status, MentorStatus.failed);
+    expect(state.messages, hasLength(1));
+    expect(state.error, '답변을 생성하지 못했어요.');
+  });
+
+  test('pre-SSE MENTOR_BUSY는 quota와 별도 retryable 상태다', () async {
+    final c = ProviderContainer(
+      overrides: [
+        mentorSseConnectProvider.overrideWithValue(
+          (question, {String? contentId, int fromStep = 0}) =>
+              Stream<SseEvent>.error(
+                const ApiException(
+                  code: ApiErrorCode.mentorBusy,
+                  status: 429,
+                  message: 'mentor is busy; retry later',
+                ),
+              ),
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    await c.read(mentorControllerProvider.notifier).send('질문');
+    final state = c.read(mentorControllerProvider);
+    expect(state.status, MentorStatus.busy);
+    expect(state.messages, hasLength(1));
+    expect(state.error, contains('잠시 후'));
+  });
+
+  test('QUOTA_EXCEEDED 429의 기존 failed 상태와 서버 카피는 유지한다', () async {
+    final c = ProviderContainer(
+      overrides: [
+        mentorSseConnectProvider.overrideWithValue(
+          (question, {String? contentId, int fromStep = 0}) =>
+              Stream<SseEvent>.error(
+                const ApiException(
+                  code: ApiErrorCode.quotaExceeded,
+                  status: 429,
+                  message: '질문 한도를 모두 사용했어요.',
+                ),
+              ),
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    await c.read(mentorControllerProvider.notifier).send('질문');
+    final state = c.read(mentorControllerProvider);
+    expect(state.status, MentorStatus.failed);
+    expect(state.error, '질문 한도를 모두 사용했어요.');
+  });
+
+  test('terminal 뒤 late token과 EOF는 완료 답변을 다시 바꾸지 않는다', () async {
+    final stream = StreamController<SseEvent>();
+    final c = ProviderContainer(
+      overrides: [
+        mentorSseConnectProvider.overrideWithValue(
+          (question, {String? contentId, int fromStep = 0}) => stream.stream,
+        ),
+      ],
+    );
+    addTearDown(() async {
+      await stream.close();
+      c.dispose();
+    });
+    final pending = c.read(mentorControllerProvider.notifier).send('질문');
+    stream.add(const SseEvent(event: 'token', data: '완료 답변'));
+    stream.add(const SseEvent(event: 'terminal', data: '{"status":"DONE"}'));
+    await pending;
+    stream.add(const SseEvent(event: 'token', data: '늦은 오염'));
+    await Future<void>.delayed(Duration.zero);
+
+    final state = c.read(mentorControllerProvider);
+    expect(state.status, MentorStatus.idle);
+    expect(state.messages.last.text, '완료 답변');
   });
 }

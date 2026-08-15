@@ -14,6 +14,7 @@ Stream<SseEvent> _tokens(List<String> t) async* {
   for (final x in t) {
     yield SseEvent(event: 'token', data: x);
   }
+  yield const SseEvent(event: 'terminal', data: '{"status":"DONE"}');
 }
 
 // 상태를 직접 주입/추가할 수 있는 MentorController 대역(자동 스크롤 결정적 검증용).
@@ -126,6 +127,7 @@ void main() {
           {'contentId': 9, 'slug': 'streams', 'title': 'Stream 가이드'},
         ]),
       );
+      yield const SseEvent(event: 'terminal', data: '{"status":"DONE"}');
     }
 
     final c = ProviderContainer(

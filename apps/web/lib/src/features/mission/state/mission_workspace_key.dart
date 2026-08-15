@@ -42,6 +42,8 @@ final class MissionWorkspaceKey {
 
   String get sandboxLocation => '/mission/$taskId/sandbox';
 
+  String get mentorLocation => '/mission/$taskId/mentor';
+
   /// Parses the task-only segment used by the canonical Sandbox route.
   static int? tryParseTaskId(String? value) => _parseCanonicalId(value);
 
