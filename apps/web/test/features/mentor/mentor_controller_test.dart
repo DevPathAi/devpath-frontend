@@ -122,22 +122,25 @@ void main() {
     expect(s.messages.last.text, '부분'); // 보존
   });
 
-  test('legacy contextless는 token+EOF를 기존 idle success로 유지한다', () async {
-    final c = ProviderContainer(
-      overrides: [
-        mentorSseConnectProvider.overrideWithValue(
-          (q, {String? contentId, int fromStep = 0}) =>
-              Stream.value(const SseEvent(event: 'token', data: '기존 답변')),
-        ),
-      ],
-    );
-    addTearDown(c.dispose);
+  test(
+    'old FE→new AI: null snapshot legacy token+EOF는 idle success를 유지한다',
+    () async {
+      final c = ProviderContainer(
+        overrides: [
+          mentorSseConnectProvider.overrideWithValue(
+            (q, {String? contentId, int fromStep = 0}) =>
+                Stream.value(const SseEvent(event: 'token', data: '기존 답변')),
+          ),
+        ],
+      );
+      addTearDown(c.dispose);
 
-    await c.read(mentorControllerProvider.notifier).send('질문');
-    final s = c.read(mentorControllerProvider);
-    expect(s.status, MentorStatus.idle);
-    expect(s.messages.last.text, '기존 답변');
-  });
+      await c.read(mentorControllerProvider.notifier).send('질문');
+      final s = c.read(mentorControllerProvider);
+      expect(s.status, MentorStatus.idle);
+      expect(s.messages.last.text, '기존 답변');
+    },
+  );
 
   test('global /mentor는 A pending→B에서 즉시 reset하고 A late event를 무시한다', () async {
     final stream = StreamController<SseEvent>();

@@ -93,6 +93,8 @@ class MentorController extends Notifier<MentorState> {
   int? _lastContextualContentId;
   int? _lastContextSnapshotId;
   List<String> _lastUsedContextFields = const [];
+  ({bool includeCurrentCode, bool includeReviewSummary})?
+  _pendingContextDefaults;
   var _generation = 0;
   var _disposed = false;
   var _contextInitialized = false;
@@ -122,18 +124,14 @@ class MentorController extends Notifier<MentorState> {
   }) {
     final scope = scopeKey;
     if (scope == null) return;
-    final preservesSameQuestionRetry =
-        state.committedSnapshotId != null &&
-        (state.status == MentorStatus.partial ||
-            state.status == MentorStatus.busy ||
-            state.status == MentorStatus.failed);
-    if (_contextInitialized &&
-        (state.status == MentorStatus.streaming ||
-            state.contextPhase == MentorContextPhase.loadingPreview ||
-            state.contextPhase == MentorContextPhase.committing ||
-            preservesSameQuestionRetry)) {
+    if (_mustDeferContextDefaults) {
+      _pendingContextDefaults = (
+        includeCurrentCode: includeCurrentCode,
+        includeReviewSummary: includeReviewSummary,
+      );
       return;
     }
+    _pendingContextDefaults = null;
     if (_contextInitialized) {
       _generation += 1;
       _clearRetryMetadata();
@@ -194,6 +192,7 @@ class MentorController extends Notifier<MentorState> {
       return;
     }
     options[index] = current.copyWith(selected: nextSelected);
+    _pendingContextDefaults = null;
     state = state.copyWith(
       contextOptions: List.unmodifiable(options),
       contextPhase: MentorContextPhase.selecting,
@@ -219,6 +218,7 @@ class MentorController extends Notifier<MentorState> {
     if (!_contextInitialized) {
       initializeContext(includeCurrentCode: false, includeReviewSummary: false);
     } else {
+      _applyPendingContextDefaults();
       refreshContextSources();
     }
     if (!_scopeIsCurrent(scope)) {
@@ -394,6 +394,7 @@ class MentorController extends Notifier<MentorState> {
               committedSnapshotId: null,
             );
             _clearRetryMetadata();
+            _applyPendingContextDefaults();
           } else {
             state = state.copyWith(
               messages: pruned,
@@ -563,6 +564,30 @@ class MentorController extends Notifier<MentorState> {
     );
   }
 
+  bool get _mustDeferContextDefaults =>
+      _contextInitialized &&
+      (state.status == MentorStatus.streaming ||
+          state.status == MentorStatus.partial ||
+          state.status == MentorStatus.busy ||
+          state.status == MentorStatus.failed ||
+          state.contextPhase == MentorContextPhase.loadingPreview ||
+          state.contextPhase == MentorContextPhase.committing ||
+          state.contextPhase == MentorContextPhase.failed);
+
+  void _applyPendingContextDefaults() {
+    final scope = scopeKey;
+    final pending = _pendingContextDefaults;
+    if (scope == null || pending == null) return;
+    _pendingContextDefaults = null;
+    state = state.copyWith(
+      contextOptions: _contextOptions(
+        ref.read(mentorContextEvidenceProvider(scope)),
+        includeCurrentCode: pending.includeCurrentCode,
+        includeReviewSummary: pending.includeReviewSummary,
+      ),
+    );
+  }
+
   bool _scopeIsCurrent(MentorScopeKey scope) =>
       ref.read(mentorScopeValidatorProvider(scope))();
 
@@ -674,6 +699,7 @@ class MentorController extends Notifier<MentorState> {
     unawaited(_sub?.cancel());
     _completeInFlight();
     _clearRetryMetadata();
+    _pendingContextDefaults = null;
     _contextInitialized = false;
     state = const MentorState();
   }
