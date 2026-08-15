@@ -39,6 +39,34 @@ final class _RecordingReview extends ReviewController {
   }
 }
 
+final class _RecoveringReview extends ReviewController {
+  _RecoveringReview(super.workspaceKey, this.calls);
+
+  final List<int> calls;
+
+  @override
+  ReviewState build() =>
+      const ReviewFailed('temporary review failure', sessionId: 42);
+
+  @override
+  Future<void> pollForSession(
+    int sandboxSessionId, {
+    Duration interval = const Duration(seconds: 2),
+    int maxAttempts = 30,
+  }) async {
+    calls.add(sandboxSessionId);
+    state = ReviewLoaded(
+      const CodeReview(
+        id: '501',
+        status: 'DONE',
+        confidence: 93,
+        strengths: ['retry recovered'],
+      ),
+      sessionId: sandboxSessionId,
+    );
+  }
+}
+
 final class _TerminalRun extends RunController {
   _TerminalRun(super.workspaceKey);
 
@@ -55,16 +83,22 @@ final class _TerminalRun extends RunController {
   );
 }
 
-Widget _host(ProviderContainer c, {MissionWorkspaceKey? workspaceKey}) =>
-    UncontrolledProviderScope(
-      container: c,
-      child: MaterialApp(
-        theme: DpTheme.light(),
-        home: Scaffold(
-          body: ReviewPanel(workspaceKey: workspaceKey, onRequest: () {}),
-        ),
+Widget _host(
+  ProviderContainer c, {
+  MissionWorkspaceKey? workspaceKey,
+  VoidCallback? onRequest,
+}) => UncontrolledProviderScope(
+  container: c,
+  child: MaterialApp(
+    theme: DpTheme.light(),
+    home: Scaffold(
+      body: ReviewPanel(
+        workspaceKey: workspaceKey,
+        onRequest: onRequest ?? () {},
       ),
-    );
+    ),
+  ),
+);
 
 // F6-a: context.go('/community')가 동작하도록 GoRouter를 끼운 호스트.
 Widget _hostRouter(ProviderContainer c) {
@@ -232,6 +266,42 @@ void main() {
     await tester.pumpWidget(_host(c));
     expect(find.byType(DpError), findsOneWidget);
     expect(find.textContaining('서버 오류'), findsOneWidget);
+  });
+
+  testWidgets('canonical 최초 ReviewFailed 재시도는 현재 session을 다시 poll해 복구한다', (
+    tester,
+  ) async {
+    const workspaceKey = MissionWorkspaceKey(taskId: 7, contentId: 11);
+    final calls = <int>[];
+    var fallbackCalls = 0;
+    final c = ProviderContainer(
+      overrides: [
+        currentMissionOwnerKeyProvider.overrideWithValue('owner-1'),
+        runControllerFamilyProvider(
+          workspaceKey,
+        ).overrideWith(() => _TerminalRun(workspaceKey)),
+        reviewControllerFamilyProvider(
+          workspaceKey,
+        ).overrideWith(() => _RecoveringReview(workspaceKey, calls)),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    await tester.pumpWidget(
+      _host(c, workspaceKey: workspaceKey, onRequest: () => fallbackCalls += 1),
+    );
+    expect(find.byType(DpError), findsOneWidget);
+
+    await tester.tap(find.text('다시 시도'));
+    await tester.pump();
+
+    expect(calls, [42]);
+    expect(
+      fallbackCalls,
+      0,
+      reason: 'retry must not fall back to snackbar-only',
+    );
+    expect(find.text('retry recovered'), findsOneWidget);
   });
 
   testWidgets('refresh/failure 중에도 마지막 valid review를 계속 보여준다', (tester) async {

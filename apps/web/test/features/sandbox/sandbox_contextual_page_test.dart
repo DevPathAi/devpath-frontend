@@ -435,6 +435,25 @@ void main() {
     });
   }
 
+  testWidgets('1240px ReviewFailed도 화면 primary surface가 정확히 하나다', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1240, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await _pump(
+      tester,
+      track: 'BACKEND_SPRING',
+      fixedReview: const ReviewFailed('temporary failure', sessionId: 91),
+    );
+
+    final primaryCount =
+        find.byKey(const ValueKey('dp-next-action-primary')).evaluate().length +
+        find.byType(FilledButton).evaluate().length;
+    expect(primaryCount, 1);
+  });
+
   testWidgets('FULLSTACK은 runtime 선택 전 비활성이고 명시 선택 뒤 generic을 실행한다', (
     tester,
   ) async {

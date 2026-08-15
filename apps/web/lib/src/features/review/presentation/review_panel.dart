@@ -82,10 +82,16 @@ class _ReviewPanelState extends ConsumerState<ReviewPanel> {
       ReviewQuota(:final retryAfterSeconds) => DpQuota(
         retryAfterSeconds: retryAfterSeconds,
       ),
-      ReviewFailed(:final message) => SupportableError(
-        message: message,
-        onRetry: widget.onRequest,
-      ),
+      ReviewFailed(:final message) =>
+        widget.workspaceKey == null
+            ? SupportableError(
+                message: message,
+                onRetry: _requestCurrentSession,
+              )
+            : _ContextualReviewFailure(
+                message: message,
+                onRetry: _requestCurrentSession,
+              ),
       ReviewLoaded(:final review) => _ReviewBody(
         review: review,
         nextAction: widget.nextAction,
@@ -134,6 +140,30 @@ class _ReviewPanelState extends ConsumerState<ReviewPanel> {
       sessionId: sessionId,
     );
   }
+}
+
+/// The workspace-level Next Action Band remains the sole primary action.
+/// Review retry is contextual recovery, so it stays a secondary action while
+/// retaining the shared support/report affordance.
+class _ContextualReviewFailure extends StatelessWidget {
+  const _ContextualReviewFailure({
+    required this.message,
+    required this.onRetry,
+  });
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    children: [
+      Expanded(child: SupportableError(message: message)),
+      Padding(
+        padding: const EdgeInsets.only(bottom: DpSpacing.md),
+        child: TextButton(onPressed: onRetry, child: const Text('다시 시도')),
+      ),
+    ],
+  );
 }
 
 class _ReviewWithStatus extends StatelessWidget {
