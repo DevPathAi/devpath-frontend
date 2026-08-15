@@ -180,6 +180,8 @@ class MentorController extends Notifier<MentorState> {
 
   void toggleContextField(String field) {
     if (!_contextInitialized) return;
+    final updatesNextRequestOnly = _mustDeferContextDefaults;
+    _applyPendingContextDefaults();
     final index = state.contextOptions.indexWhere(
       (option) => option.id == field,
     );
@@ -192,7 +194,10 @@ class MentorController extends Notifier<MentorState> {
       return;
     }
     options[index] = current.copyWith(selected: nextSelected);
-    _pendingContextDefaults = null;
+    if (updatesNextRequestOnly) {
+      state = state.copyWith(contextOptions: List.unmodifiable(options));
+      return;
+    }
     state = state.copyWith(
       contextOptions: List.unmodifiable(options),
       contextPhase: MentorContextPhase.selecting,

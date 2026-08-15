@@ -74,6 +74,7 @@ final class _Harness {
     MentorContextEvidence? evidence,
     this.draftCompleter,
     this.mentorStream,
+    this.mentorStreamFactory,
     this.secondaryScope,
   }) : now = now ?? DateTime.utc(2026, 8, 16, 12),
        evidence =
@@ -129,6 +130,9 @@ final class _Harness {
           int fromStep = 0,
         }) {
           sseCalls.add((question: question, snapshotId: contextSnapshotId));
+          if (mentorStreamFactory != null) {
+            return mentorStreamFactory!(sseCalls.length);
+          }
           if (mentorStream != null) return mentorStream!.stream;
           if (partialFirst && sseCalls.length == 1) {
             return _partial();
@@ -156,6 +160,7 @@ final class _Harness {
   MentorContextEvidence evidence;
   final Completer<LcsDraft>? draftCompleter;
   final StreamController<SseEvent>? mentorStream;
+  final Stream<SseEvent> Function(int call)? mentorStreamFactory;
   final MentorScopeKey? secondaryScope;
   bool scopeValid;
   bool partialFirst;
@@ -385,7 +390,7 @@ void main() {
   });
 
   test(
-    'Review streaming 중 direct 재진입은 현재 send를 보존하고 다음 draft만 content-only다',
+    'Review streaming→direct→output toggle은 현재 send를 보존하고 다음 draft에만 적용된다',
     () async {
       final stream = StreamController<SseEvent>();
       final h = _Harness(mentorStream: stream);
@@ -417,6 +422,7 @@ void main() {
         includeCurrentCode: false,
         includeReviewSummary: false,
       );
+      controller.toggleContextField('recent_output');
 
       final during = h.container.read(
         contextualMentorControllerProvider(_scope),
@@ -426,7 +432,10 @@ void main() {
       expect(during.committedSnapshotId, before.committedSnapshotId);
       expect(during.previewQuestion, before.previewQuestion);
       expect(during.messages, before.messages);
-      expect(during.selectedContextFields, before.selectedContextFields);
+      expect(during.selectedContextFields, {
+        'current_content',
+        'recent_output',
+      });
 
       stream.add(const SseEvent(event: 'token', data: '답변'));
       stream.add(const SseEvent(event: 'terminal', data: '{"status":"DONE"}'));
@@ -435,55 +444,94 @@ void main() {
       var state = h.container.read(contextualMentorControllerProvider(_scope));
       expect(state.status, MentorStatus.idle);
       expect(state.messages.last.text, '답변');
-      expect(state.selectedContextFields, {'current_content'});
+      expect(state.selectedContextFields, {'current_content', 'recent_output'});
 
       await controller.preparePreview('새 질문');
-      expect(h.draftRequests[1].fields, ['current_content']);
+      expect(h.draftRequests[1].fields, ['current_content', 'recent_output']);
       state = h.container.read(contextualMentorControllerProvider(_scope));
-      expect(state.contextPreview?.fieldsAvailable, ['current_content']);
+      expect(state.contextPreview?.fieldsAvailable, [
+        'current_content',
+        'recent_output',
+      ]);
     },
   );
 
-  test('partial snapshot 재시도는 기존 ID를 쓰고 direct 재진입은 다음 draft에만 적용된다', () async {
-    final h = _Harness(partialFirst: true);
-    addTearDown(h.dispose);
-    final controller = h.container.read(
-      contextualMentorControllerProvider(_scope).notifier,
-    );
-    controller.initializeContext(
-      includeCurrentCode: false,
-      includeReviewSummary: true,
-    );
-    await controller.preparePreview('부분 질문');
-    await controller.commitAndSend();
+  test(
+    'Review streaming→direct→output toggle 후 partial retry는 snapshot 71을 보존한다',
+    () async {
+      final stream = StreamController<SseEvent>();
+      final h = _Harness(
+        mentorStreamFactory: (call) => call == 1
+            ? stream.stream
+            : Stream.fromIterable(const [
+                SseEvent(event: 'token', data: '복구'),
+                SseEvent(event: 'terminal', data: '{"status":"DONE"}'),
+              ]),
+      );
+      addTearDown(() async {
+        await stream.close();
+        h.dispose();
+      });
+      final controller = h.container.read(
+        contextualMentorControllerProvider(_scope).notifier,
+      );
+      controller.initializeContext(
+        includeCurrentCode: false,
+        includeReviewSummary: true,
+      );
+      await controller.preparePreview('부분 질문');
+      final sending = controller.commitAndSend();
+      await Future<void>.delayed(Duration.zero);
 
-    final before = h.container.read(contextualMentorControllerProvider(_scope));
-    expect(before.status, MentorStatus.partial);
-    expect(before.committedSnapshotId, 71);
+      final before = h.container.read(
+        contextualMentorControllerProvider(_scope),
+      );
+      expect(before.status, MentorStatus.streaming);
+      expect(before.committedSnapshotId, 71);
 
-    controller.initializeContext(
-      includeCurrentCode: false,
-      includeReviewSummary: false,
-    );
-    final queued = h.container.read(contextualMentorControllerProvider(_scope));
-    expect(queued.messages, before.messages);
-    expect(queued.contextPreview?.draftId, before.contextPreview?.draftId);
-    expect(queued.committedSnapshotId, 71);
-    expect(queued.selectedContextFields, before.selectedContextFields);
+      controller.initializeContext(
+        includeCurrentCode: false,
+        includeReviewSummary: false,
+      );
+      controller.toggleContextField('recent_output');
+      final queued = h.container.read(
+        contextualMentorControllerProvider(_scope),
+      );
+      expect(queued.messages, before.messages);
+      expect(queued.contextPreview?.draftId, before.contextPreview?.draftId);
+      expect(queued.previewQuestion, before.previewQuestion);
+      expect(queued.committedSnapshotId, 71);
+      expect(queued.selectedContextFields, {
+        'current_content',
+        'recent_output',
+      });
 
-    await controller.retry();
-    expect(h.commitCalls, 1);
-    expect(h.sseCalls.map((call) => call.snapshotId), [71, 71]);
-    expect(
-      h.container
-          .read(contextualMentorControllerProvider(_scope))
-          .selectedContextFields,
-      {'current_content'},
-    );
+      stream.add(const SseEvent(event: 'token', data: '부분'));
+      stream.addError(StateError('disconnect'));
+      await sending;
+      final partial = h.container.read(
+        contextualMentorControllerProvider(_scope),
+      );
+      expect(partial.status, MentorStatus.partial);
+      expect(partial.committedSnapshotId, 71);
+      expect(partial.contextPreview?.draftId, before.contextPreview?.draftId);
+      expect(partial.previewQuestion, before.previewQuestion);
+      expect(partial.messages.last.text, '부분');
 
-    await controller.preparePreview('다음 질문');
-    expect(h.draftRequests[1].fields, ['current_content']);
-  });
+      await controller.retry();
+      expect(h.commitCalls, 1);
+      expect(h.sseCalls.map((call) => call.snapshotId), [71, 71]);
+      expect(
+        h.container
+            .read(contextualMentorControllerProvider(_scope))
+            .selectedContextFields,
+        {'current_content', 'recent_output'},
+      );
+
+      await controller.preparePreview('다음 질문');
+      expect(h.draftRequests[1].fields, ['current_content', 'recent_output']);
+    },
+  );
 
   test(
     'editor draft pending 중 direct 재진입은 late preview를 바꾸지 않고 다음 draft의 code를 끈다',
