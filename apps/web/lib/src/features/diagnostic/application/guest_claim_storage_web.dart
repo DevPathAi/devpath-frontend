@@ -5,18 +5,18 @@ import 'guest_claim_storage.dart';
 class _WebGuestClaimStorage implements GuestClaimStorage {
   @override
   String? read() => readDiagnosticContinuationStorage(
-    getItem: web.window.sessionStorage.getItem,
-    removeItem: web.window.sessionStorage.removeItem,
+    getItem: (key) => web.window.sessionStorage.getItem(key),
+    removeItem: (key) => web.window.sessionStorage.removeItem(key),
   );
   @override
   void write(String rawContinuation) => writeDiagnosticContinuationStorage(
     rawContinuation,
-    setItem: web.window.sessionStorage.setItem,
-    removeItem: web.window.sessionStorage.removeItem,
+    setItem: (key, value) => web.window.sessionStorage.setItem(key, value),
+    removeItem: (key) => web.window.sessionStorage.removeItem(key),
   );
   @override
   void clear() => clearDiagnosticContinuationStorage(
-    removeItem: web.window.sessionStorage.removeItem,
+    removeItem: (key) => web.window.sessionStorage.removeItem(key),
   );
 }
 
