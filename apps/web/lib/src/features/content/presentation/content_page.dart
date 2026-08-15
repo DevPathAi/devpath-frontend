@@ -39,6 +39,7 @@ class _ContentPageState extends ConsumerState<ContentPage>
   ContentState? _latestState;
   int _dwellSec = 0;
   bool _posting = false;
+  ContentProgressFlush? _failedFlush;
 
   /// 마지막으로 실측에 성공한 스크롤 진행률. dispose 시점에는 스크롤 위치를
   /// 잴 수 없어(자식 먼저 unmount → `hasClients == false`) 이 값이 필요하다.
@@ -141,10 +142,48 @@ class _ContentPageState extends ConsumerState<ContentPage>
                 onRetry: () => _contentController.load(widget.contentId),
               ),
             ),
-            ContentLoaded(:final content) => SliverPadding(
-              padding: const EdgeInsets.all(DpSpacing.lg),
-              sliver: SliverToBoxAdapter(child: _ContentBody(content: content)),
-            ),
+            ContentLoaded(:final content, :final progressError) =>
+              SliverPadding(
+                padding: const EdgeInsets.all(DpSpacing.lg),
+                sliver: SliverToBoxAdapter(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (progressError != null) ...[
+                        Semantics(
+                          liveRegion: true,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: c.surfaceMuted,
+                              border: Border.all(color: c.danger),
+                              borderRadius: BorderRadius.circular(
+                                context.appTokens.panelRadius,
+                              ),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(DpSpacing.md),
+                              child: Row(
+                                children: [
+                                  Expanded(child: Text(progressError)),
+                                  const SizedBox(width: DpSpacing.sm),
+                                  TextButton(
+                                    onPressed: _posting
+                                        ? null
+                                        : _retryFailedProgress,
+                                    child: const Text('진행률 저장 다시 시도'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: DpSpacing.md),
+                      ],
+                      _ContentBody(content: content),
+                    ],
+                  ),
+                ),
+              ),
           },
         ],
       ),
@@ -171,6 +210,7 @@ class _ContentPageState extends ConsumerState<ContentPage>
     _trackedContentKey = null;
     _dwellSec = 0;
     _posting = false;
+    _failedFlush = null;
     // 다른 콘텐츠로 넘어가면 이전 글의 진행률이 새어나가면 안 된다.
     _lastObservedScrollPct = null;
   }
@@ -249,13 +289,27 @@ class _ContentPageState extends ConsumerState<ContentPage>
             scrollPct: flush.scrollPct,
             dwellSec: flush.dwellSec,
           );
-      if (response?.completed != true || !mounted) return;
+      if (response == null) {
+        _failedFlush = flush;
+        return;
+      }
+      _failedFlush = null;
+      if (!response.completed || !mounted) return;
       _tracker?.markCompleted();
       await ref.read(pathControllerProvider.notifier).loadOrStart();
       await ref.read(dashboardControllerProvider.notifier).load();
     } finally {
       _posting = false;
     }
+  }
+
+  void _retryFailedProgress() {
+    final flush = _failedFlush;
+    if (flush != null) {
+      unawaited(_postProgress(flush));
+      return;
+    }
+    _maybeFlushProgress(force: true);
   }
 
   void _flushCachedProgressOnDispose() {
