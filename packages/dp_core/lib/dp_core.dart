@@ -16,6 +16,7 @@ export 'src/sse/sse_client.dart';
 export 'src/models/enums.dart';
 export 'src/models/user.dart';
 export 'src/models/learning_path.dart';
+export 'src/models/current_mission.dart';
 export 'src/models/learning_content.dart';
 export 'src/models/path_sse_event.dart';
 export 'src/models/code_review.dart';
@@ -30,6 +31,7 @@ export 'src/models/community_report.dart';
 export 'src/models/lcs_snapshot.dart';
 export 'src/models/assessment.dart';
 export 'src/api/assessment_api.dart';
+export 'src/api/learning_path_api.dart';
 export 'src/mock/mock_http_adapter.dart';
 export 'src/mock/mock_sse_source.dart';
 
