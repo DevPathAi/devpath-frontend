@@ -76,6 +76,8 @@ void main() {
     await _pump(tester, _container(fake));
 
     expect(find.text('스팸 글'), findsOneWidget);
+    expect(find.text('미처리'), findsOneWidget);
+    expect(find.text('(OPEN)'), findsOneWidget);
     expect(find.text('광고'), findsWidgets, reason: 'AD 는 한글 라벨로 보여야 한다');
     expect(
       find.textContaining('3'),
@@ -122,7 +124,9 @@ void main() {
     final c = _container(fake);
     await _pump(tester, c);
 
-    await tester.tap(find.text('기각됨'));
+    await tester.tap(find.byType(DropdownButton<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('기각됨 (REJECTED)').last);
     await tester.pumpAndSettle();
 
     final s = c.read(reportsProvider);

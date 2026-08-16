@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../shell/presentation/admin_shell.dart';
+import '../../../design/admin_status_catalog.dart';
+import '../../../widgets/admin_status_widgets.dart';
 import '../application/support_controller.dart';
 import '../data/support_request.dart';
 import '../state/support_state.dart';
@@ -10,14 +12,6 @@ import '../state/support_state.dart';
 /// 오류 신고·문의 처리 화면.
 class SupportPage extends ConsumerWidget {
   const SupportPage({super.key});
-
-  /// (라벨, status). **명사**다 — 전이 버튼(동사)과 겹치지 않게 한다.
-  static const _statusFilters = <(String, String?)>[
-    ('접수됨', 'OPEN'),
-    ('처리중', 'IN_PROGRESS'),
-    ('처리됨', 'RESOLVED'),
-    ('보류', 'WONTFIX'),
-  ];
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -33,14 +27,10 @@ class SupportPage extends ConsumerWidget {
             title: adminHeaderTitleFor('/support'),
             description: '사용자가 보낸 오류와 문의를 처리합니다',
             filters: [
-              SegmentedButton<String?>(
-                segments: [
-                  for (final (label, value) in _statusFilters)
-                    ButtonSegment(value: value, label: Text(label)),
-                ],
-                selected: {current},
-                showSelectedIcon: false,
-                onSelectionChanged: (sel) => n.load(status: sel.first),
+              AdminStatusFilter(
+                domain: AdminStatusDomain.support,
+                selectedWire: current,
+                onSelected: (wire) => n.load(status: wire),
               ),
             ],
           ),
@@ -60,14 +50,14 @@ class SupportPage extends ConsumerWidget {
                 // dp_design 은 data_table_2 에서 DataColumn2·DataRow2 만 re-export 한다.
                 // ColumnSize 는 export 되지 않으므로 쓰지 않는다(users_page 와 동일).
                 child: DpDataTable(
-                  minWidth: 900,
+                  minWidth: 1040,
                   columns: [
                     DataColumn2(label: const Text('번호'), fixedWidth: 72),
                     DataColumn2(label: const Text('유형'), fixedWidth: 72),
                     DataColumn2(label: const Text('제목')),
                     DataColumn2(label: const Text('경로')),
                     DataColumn2(label: const Text('실패'), fixedWidth: 64),
-                    DataColumn2(label: const Text('상태'), fixedWidth: 88),
+                    DataColumn2(label: const Text('상태'), fixedWidth: 220),
                     DataColumn2(label: const Text('접수 시각')),
                   ],
                   rows: [
@@ -82,7 +72,12 @@ class SupportPage extends ConsumerWidget {
                           ),
                           DataCell(Text(r.pagePath ?? '-')),
                           DataCell(Text('${r.failureCount}')),
-                          DataCell(Text(r.statusLabel)),
+                          DataCell(
+                            AdminStatusText(
+                              domain: AdminStatusDomain.support,
+                              wire: r.status,
+                            ),
+                          ),
                           DataCell(Text(r.createdAt ?? '-')),
                         ],
                       ),
@@ -120,6 +115,8 @@ class _SupportDetailDialogState extends ConsumerState<_SupportDetailDialog> {
   late final TextEditingController _note = TextEditingController(
     text: widget.detail.adminNote ?? '',
   );
+  bool _pending = false;
+  String? _error;
 
   /// **동사** — 상태 필터(명사)와 낱말이 겹치지 않게 한다.
   static const _transitions = <(String, String)>[
@@ -142,13 +139,18 @@ class _SupportDetailDialogState extends ConsumerState<_SupportDetailDialog> {
 
     return AlertDialog(
       title: Text('#${d.id} ${d.title}'),
-      content: SizedBox(
-        width: 640,
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 640),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              AdminStatusText(
+                domain: AdminStatusDomain.support,
+                wire: d.status,
+              ),
+              const SizedBox(height: DpSpacing.md),
               Text(d.body),
               const SizedBox(height: DpSpacing.md),
               _kv(context, '경로', d.pagePath),
@@ -165,7 +167,9 @@ class _SupportDetailDialogState extends ConsumerState<_SupportDetailDialog> {
               if (d.failures.isEmpty)
                 Text(
                   '기록 없음',
-                  style: TextStyle(fontSize: 12, color: c.textSecondary),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: c.textSecondary),
                 ),
               for (final f in d.failures)
                 ListTile(
@@ -177,11 +181,15 @@ class _SupportDetailDialogState extends ConsumerState<_SupportDetailDialog> {
                     '${f.statusLabel}'
                     '${f.errorCode == null ? '' : ' · ${f.errorCode}'}'
                     '${f.message == null ? '' : '\n${f.message}'}',
-                    style: TextStyle(fontSize: 12, color: c.textSecondary),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: c.textSecondary),
                   ),
                   trailing: Text(
                     f.occurredAt ?? '-',
-                    style: TextStyle(fontSize: 11, color: c.textSecondary),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.labelSmall?.copyWith(color: c.textSecondary),
                   ),
                 ),
               const SizedBox(height: DpSpacing.md),
@@ -194,19 +202,34 @@ class _SupportDetailDialogState extends ConsumerState<_SupportDetailDialog> {
                   border: OutlineInputBorder(),
                 ),
               ),
+              if (_error != null) ...[
+                const SizedBox(height: DpSpacing.sm),
+                Semantics(
+                  liveRegion: true,
+                  label: '상태 저장 실패: $_error',
+                  child: ExcludeSemantics(
+                    child: Text(
+                      _error!,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodyMedium?.copyWith(color: c.danger),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: _pending ? null : () => Navigator.of(context).pop(),
           child: const Text('닫기'),
         ),
         for (final (label, status) in _transitions)
           if (status != d.status)
             FilledButton.tonal(
-              onPressed: () => _transition(status),
+              onPressed: _pending ? null : () => _transition(status),
               child: Text(label),
             ),
       ],
@@ -215,19 +238,33 @@ class _SupportDetailDialogState extends ConsumerState<_SupportDetailDialog> {
 
   Future<void> _transition(String status) async {
     final note = _note.text.trim();
-    await ref
+    setState(() {
+      _pending = true;
+      _error = null;
+    });
+    final error = await ref
         .read(supportListProvider.notifier)
         .updateStatus(
           widget.detail.id,
           status,
           adminNote: note.isEmpty ? null : note,
         );
-    if (mounted) Navigator.of(context).pop();
+    if (!mounted) return;
+    if (error == null) {
+      Navigator.of(context).pop();
+      return;
+    }
+    setState(() {
+      _pending = false;
+      _error = error;
+    });
   }
 
   Widget _kv(BuildContext context, String k, String? v) {
     if (v == null || v.isEmpty) return const SizedBox.shrink();
     final c = context.dpColors;
+    final text = Theme.of(context).textTheme;
+    final usesCodeFont = const {'경로', '빌드', '화면', '오류 코드', 'trace'}.contains(k);
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
       child: Row(
@@ -237,10 +274,17 @@ class _SupportDetailDialogState extends ConsumerState<_SupportDetailDialog> {
             width: 88,
             child: Text(
               k,
-              style: TextStyle(fontSize: 12, color: c.textSecondary),
+              style: text.bodySmall?.copyWith(color: c.textSecondary),
             ),
           ),
-          Expanded(child: Text(v, style: const TextStyle(fontSize: 12))),
+          Expanded(
+            child: Text(
+              v,
+              style: text.bodySmall?.copyWith(
+                fontFamily: usesCodeFont ? DpTypography.codeFamily : null,
+              ),
+            ),
+          ),
         ],
       ),
     );

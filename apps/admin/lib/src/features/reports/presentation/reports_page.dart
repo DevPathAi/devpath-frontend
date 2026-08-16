@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../shell/presentation/admin_shell.dart';
+import '../../../design/admin_status_catalog.dart';
+import '../../../widgets/admin_status_widgets.dart';
 import '../application/reports_controller.dart';
 import '../data/report.dart';
 import '../state/reports_state.dart';
@@ -13,17 +15,6 @@ import '../state/reports_state.dart';
 /// 대신 대상 경로를 함께 보여줘 수동 대응 경로를 남긴다.
 class ReportsPage extends ConsumerWidget {
   const ReportsPage({super.key});
-
-  /// (라벨, status 값). null 은 전체.
-  ///
-  /// 필터는 **상태**, 버튼은 **행동**이라 말을 구분한다 — 둘 다 "처리완료"로 두면 화면에
-  /// 같은 낱말이 두 뜻으로 나타난다.
-  static const _filters = <(String, String?)>[
-    ('미처리', 'OPEN'),
-    ('처리됨', 'RESOLVED'),
-    ('기각됨', 'REJECTED'),
-    ('전체', null),
-  ];
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -42,14 +33,10 @@ class ReportsPage extends ConsumerWidget {
               title: adminHeaderTitleFor('/reports'),
               description: '커뮤니티 신고를 검토하고 판정합니다',
               filters: [
-                SegmentedButton<String?>(
-                  segments: [
-                    for (final (label, value) in _filters)
-                      ButtonSegment(value: value, label: Text(label)),
-                  ],
-                  selected: {current},
-                  showSelectedIcon: false,
-                  onSelectionChanged: (sel) => n.load(status: sel.first),
+                AdminStatusFilter(
+                  domain: AdminStatusDomain.report,
+                  selectedWire: current,
+                  onSelected: (wire) => n.load(status: wire),
                 ),
               ],
             ),
@@ -112,21 +99,19 @@ class _ReportCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            Wrap(
+              spacing: DpSpacing.xs,
+              runSpacing: DpSpacing.xs,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 DpTag(label: r.targetTypeLabel),
-                const SizedBox(width: DpSpacing.xs),
                 DpTag(label: r.categoryLabel, tone: c.chart4),
-                if (r.reportCount > 1) ...[
-                  const SizedBox(width: DpSpacing.xs),
+                if (r.reportCount > 1)
                   DpTag(label: '${r.reportCount}명 신고', tone: c.danger),
-                ],
-                const Spacer(),
-                if (r.status != 'OPEN')
-                  Text(
-                    r.status == 'RESOLVED' ? '처리됨' : '기각됨',
-                    style: TextStyle(color: c.textSecondary, fontSize: 12),
-                  ),
+                AdminStatusText(
+                  domain: AdminStatusDomain.report,
+                  wire: r.status,
+                ),
               ],
             ),
             const SizedBox(height: DpSpacing.xs),
@@ -143,33 +128,44 @@ class _ReportCard extends StatelessWidget {
                 r.targetExcerpt!,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: c.textSecondary, fontSize: 12),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: c.textSecondary),
               ),
             ],
             if (r.reason != null && r.reason!.isNotEmpty) ...[
               const SizedBox(height: DpSpacing.xs),
               Text(
                 '신고 사유: ${r.reason}',
-                style: TextStyle(color: c.textSecondary, fontSize: 12),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: c.textSecondary),
               ),
             ],
             const SizedBox(height: DpSpacing.xs),
-            Row(
-              children: [
-                // 조치 기능이 없는 대신 대상 위치를 노출해 수동 대응 경로를 남긴다.
-                if (r.targetPath != null)
-                  Text(
-                    r.targetPath!,
-                    style: TextStyle(color: c.textSecondary, fontSize: 11),
-                  ),
-                const Spacer(),
-                if (r.status == 'OPEN') ...[
-                  TextButton(onPressed: onReject, child: const Text('기각')),
-                  const SizedBox(width: DpSpacing.xs),
-                  FilledButton(onPressed: onResolve, child: const Text('처리완료')),
-                ],
-              ],
-            ),
+            // 조치 기능이 없는 대신 대상 위치를 노출해 수동 대응 경로를 남긴다.
+            if (r.targetPath != null)
+              Text(
+                r.targetPath!,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: c.textSecondary,
+                  fontFamily: DpTypography.codeFamily,
+                ),
+              ),
+            if (r.status == 'OPEN')
+              Align(
+                alignment: Alignment.centerRight,
+                child: Wrap(
+                  spacing: DpSpacing.xs,
+                  children: [
+                    TextButton(onPressed: onReject, child: const Text('기각')),
+                    FilledButton(
+                      onPressed: onResolve,
+                      child: const Text('처리완료'),
+                    ),
+                  ],
+                ),
+              ),
           ],
         ),
       ),

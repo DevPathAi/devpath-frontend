@@ -38,7 +38,31 @@ void main() {
     final s = c.read(adminUsersProvider);
     expect(s.rows.map((e) => e.id), ['u2']);
     expect(s.statusFilter, 'SUSPENDED');
+
+    await c.read(adminUsersProvider.notifier).setStatusFilter(null);
+    expect(c.read(adminUsersProvider).statusFilter, isNull);
+    expect(c.read(adminUsersProvider).rows, hasLength(2));
   });
+
+  test(
+    'sanction sends the existing action wire through its provider seam',
+    () async {
+      String? sentId;
+      String? sentAction;
+      final c = ProviderContainer(
+        overrides: [
+          adminUserSanctionProvider.overrideWithValue((id, action) async {
+            sentId = id;
+            sentAction = action;
+          }),
+        ],
+      );
+      addTearDown(c.dispose);
+
+      await c.read(adminUsersProvider.notifier).sanction('u9', '영구 밴');
+      expect((sentId, sentAction), ('u9', '영구 밴'));
+    },
+  );
 
   test('bulkApprove: 선택 id로 POST 후 재조회·선택 초기화', () async {
     List<int>? sentIds;

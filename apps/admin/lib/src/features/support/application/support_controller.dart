@@ -1,8 +1,8 @@
 import 'package:dp_core/dp_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../providers/api_providers.dart';
 import '../data/support_request.dart';
+import '../data/support_source.dart';
 import '../state/support_state.dart';
 
 /// 제보 처리.
@@ -21,18 +21,11 @@ class SupportListController extends Notifier<SupportListState> {
   Future<void> load({String? status = 'OPEN', String? type}) async {
     state = const SupportListLoading();
     try {
-      final json = await ref
-          .read(apiClientProvider)
-          .get<Map<String, dynamic>>(
-            '/admin/support-requests',
-            query: {'status': ?status, 'type': ?type, 'limit': _pageSize},
-          );
-      final rows = (json['data'] as List? ?? const [])
-          .map(
-            (o) =>
-                SupportRequestRow.fromJson((o as Map).cast<String, dynamic>()),
-          )
-          .toList();
+      final rows = await ref.read(supportListFetchProvider)(
+        status: status,
+        type: type,
+        limit: _pageSize,
+      );
       state = SupportListLoaded(rows, status: status, type: type);
     } on ApiException catch (e) {
       state = SupportListFailed(e.message);
@@ -40,29 +33,32 @@ class SupportListController extends Notifier<SupportListState> {
   }
 
   Future<SupportRequestDetail> detail(int id) async {
-    final json = await ref
-        .read(apiClientProvider)
-        .get<Map<String, dynamic>>('/admin/support-requests/$id');
-    return SupportRequestDetail.fromJson(json);
+    return ref.read(supportDetailFetchProvider)(id);
   }
 
   /// 상태 전이 후 현재 필터로 재조회한다.
-  Future<void> updateStatus(int id, String status, {String? adminNote}) async {
+  /// 실패 문자열을 반환하며, 기존 목록·필터는 그대로 보존한다.
+  Future<String?> updateStatus(
+    int id,
+    String status, {
+    String? adminNote,
+  }) async {
     final current = state;
     final keepStatus = current is SupportListLoaded ? current.status : 'OPEN';
     final keepType = current is SupportListLoaded ? current.type : null;
     try {
-      await ref
-          .read(apiClientProvider)
-          .post<Map<String, dynamic>>(
-            '/admin/support-requests/$id/status',
-            body: {'status': status, 'adminNote': ?adminNote},
-          );
+      await ref.read(supportStatusUpdateProvider)(
+        id,
+        status,
+        adminNote: adminNote,
+      );
     } on ApiException catch (e) {
-      state = SupportListFailed(e.message);
-      return;
+      return e.message;
+    } on Object {
+      return '상태를 저장하지 못했어요.';
     }
     await load(status: keepStatus, type: keepType);
+    return null;
   }
 }
 
