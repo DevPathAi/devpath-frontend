@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../providers/api_providers.dart';
 import '../../../services/connectivity_service.dart';
 import '../../auth/application/auth_controller.dart';
+import '../../auth/application/credential_mutation_coordinator.dart';
 import '../../today/application/today_controller.dart';
 import '../data/content_offline_store.dart';
 
@@ -81,12 +82,18 @@ class ContentProgressSyncController extends Notifier<int> {
     String ownerKey,
     String routeKey,
   ) async {
+    final ownerGeneration = ref
+        .read(credentialMutationCoordinatorProvider)
+        .generation;
     ContentProgressUpdateResponse? latestResponse;
-    while (ref.mounted && ref.read(currentOwnerKeyProvider) == ownerKey) {
+    while (_isCurrentBoundary(ownerKey, ownerGeneration)) {
       final pending = await ref
           .read(contentProgressQueueProvider)
           .read(ownerKey, routeKey);
       if (pending == null) return latestResponse;
+      if (!_isCurrentBoundary(ownerKey, ownerGeneration)) {
+        return latestResponse;
+      }
       try {
         final json = await ref
             .read(apiClientProvider)
@@ -98,14 +105,20 @@ class ContentProgressSyncController extends Notifier<int> {
               },
             );
         final response = ContentProgressUpdateResponse.fromJson(json);
-        if (!ref.mounted || ref.read(currentOwnerKeyProvider) != ownerKey) {
+        if (!_isCurrentBoundary(ownerKey, ownerGeneration)) {
           return latestResponse;
         }
         latestResponse = response;
         await ref
             .read(contentOfflineStoreProvider)
             .applyServerProgress(ownerKey, routeKey, response);
+        if (!_isCurrentBoundary(ownerKey, ownerGeneration)) {
+          return latestResponse;
+        }
         await ref.read(contentProgressQueueProvider).acknowledge(pending);
+        if (!_isCurrentBoundary(ownerKey, ownerGeneration)) {
+          return latestResponse;
+        }
         state += 1;
         if (response.completed) {
           if (ref.exists(todayControllerProvider)) {
@@ -117,20 +130,24 @@ class ContentProgressSyncController extends Notifier<int> {
           }
         }
       } on ApiException catch (error) {
+        if (!_isCurrentBoundary(ownerKey, ownerGeneration)) {
+          return latestResponse;
+        }
         if (_isUnauthorized(error)) {
           await ref
               .read(contentProgressQueueProvider)
               .remove(ownerKey, routeKey);
-          if (ref.mounted) {
-            await ref
-                .read(authControllerProvider.notifier)
-                .invalidateUnauthorized(error.message);
+          if (!_isCurrentBoundary(ownerKey, ownerGeneration)) {
+            return latestResponse;
           }
+          await ref
+              .read(authControllerProvider.notifier)
+              .invalidateUnauthorized(error.message);
         } else if (_isPermanentClientError(error)) {
           await ref
               .read(contentProgressQueueProvider)
               .discardIfMatches(pending);
-          if (ref.mounted) state += 1;
+          if (_isCurrentBoundary(ownerKey, ownerGeneration)) state += 1;
         }
         // Transport, throttling and 5xx retain the durable row for reconnect.
         return latestResponse;
@@ -148,6 +165,12 @@ class ContentProgressSyncController extends Notifier<int> {
     }
     return latestResponse;
   }
+
+  bool _isCurrentBoundary(String ownerKey, int ownerGeneration) =>
+      ref.mounted &&
+      ref.read(currentOwnerKeyProvider) == ownerKey &&
+      ref.read(credentialMutationCoordinatorProvider).generation ==
+          ownerGeneration;
 
   bool _isUnauthorized(ApiException error) =>
       error.status == 401 || error.code == ApiErrorCode.unauthorized;
