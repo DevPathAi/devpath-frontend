@@ -9,6 +9,7 @@ import '../state/reports_state.dart';
 /// community-svc 의 신고 API 에 도달하지 못한다.
 class ReportsController extends Notifier<ReportsState> {
   static const _pageSize = 50;
+  int _loadRequest = 0;
 
   @override
   ReportsState build() {
@@ -17,6 +18,7 @@ class ReportsController extends Notifier<ReportsState> {
   }
 
   Future<void> load({String? status = 'OPEN'}) async {
+    final request = ++_loadRequest;
     state = ReportsLoading(status: status);
     try {
       final list = await ref.read(reportsListFetchProvider)(
@@ -24,10 +26,13 @@ class ReportsController extends Notifier<ReportsState> {
         page: 0,
         size: _pageSize,
       );
+      if (request != _loadRequest) return;
       state = ReportsLoaded(list, status: status);
     } on ApiException catch (e) {
+      if (request != _loadRequest) return;
       state = ReportsFailed(e.message, status: status);
     } on Object {
+      if (request != _loadRequest) return;
       state = ReportsFailed('신고를 불러오지 못했어요.', status: status);
     }
   }
@@ -35,7 +40,6 @@ class ReportsController extends Notifier<ReportsState> {
   /// [action] = RESOLVE(처리완료) | REJECT(기각). 처리 후 현재 필터로 재조회한다.
   Future<String?> resolve(int id, String action) async {
     final current = state;
-    final keep = current is ReportsLoaded ? current.status : 'OPEN';
     final canDecide =
         current is ReportsLoaded &&
         current.reports.any(
@@ -51,7 +55,7 @@ class ReportsController extends Notifier<ReportsState> {
     } on Object {
       return '신고 판정을 저장하지 못했어요.';
     }
-    await load(status: keep);
+    await load(status: state.status);
     return null;
   }
 }

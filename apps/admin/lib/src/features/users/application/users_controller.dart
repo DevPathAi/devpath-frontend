@@ -7,10 +7,13 @@ import '../data/users_source.dart';
 import '../state/users_state.dart';
 
 class UsersController extends Notifier<UsersState> {
+  int _loadRequest = 0;
+
   @override
   UsersState build() => const UsersState();
 
   Future<void> load() async {
+    final request = ++_loadRequest;
     final previous = state;
     state = UsersState(
       phase: UsersPhase.loading,
@@ -22,8 +25,9 @@ class UsersController extends Notifier<UsersState> {
     );
     try {
       final page = await ref.read(adminUsersFetchProvider)(
-        status: state.statusFilter,
+        status: previous.statusFilter,
       );
+      if (request != _loadRequest) return;
       state = UsersState(
         rows: page.data,
         nextCursor: page.nextCursor,
@@ -37,12 +41,14 @@ class UsersController extends Notifier<UsersState> {
         },
       );
     } on ApiException catch (e) {
+      if (request != _loadRequest) return;
       state = previous.copyWith(
         phase: UsersPhase.failed,
         nextCursor: previous.nextCursor,
         error: e.message,
       );
     } on Object {
+      if (request != _loadRequest) return;
       state = previous.copyWith(
         phase: UsersPhase.failed,
         nextCursor: previous.nextCursor,

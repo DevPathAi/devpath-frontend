@@ -12,6 +12,7 @@ import '../state/support_state.dart';
 /// 게이트웨이의 `/admin/**` 선점이 오히려 유리하게 작용해 우회 경로가 필요 없다.
 class SupportListController extends Notifier<SupportListState> {
   static const _pageSize = 50;
+  int _loadRequest = 0;
 
   @override
   SupportListState build() {
@@ -20,6 +21,7 @@ class SupportListController extends Notifier<SupportListState> {
   }
 
   Future<void> load({String? status = 'OPEN', String? type}) async {
+    final request = ++_loadRequest;
     state = SupportListLoading(status: status, type: type);
     try {
       final rows = await ref.read(supportListFetchProvider)(
@@ -27,10 +29,13 @@ class SupportListController extends Notifier<SupportListState> {
         type: type,
         limit: _pageSize,
       );
+      if (request != _loadRequest) return;
       state = SupportListLoaded(rows, status: status, type: type);
     } on ApiException catch (e) {
+      if (request != _loadRequest) return;
       state = SupportListFailed(e.message, status: status, type: type);
     } on Object {
+      if (request != _loadRequest) return;
       state = SupportListFailed(
         '제보 목록을 불러오지 못했어요.',
         status: status,
@@ -51,8 +56,6 @@ class SupportListController extends Notifier<SupportListState> {
     String? adminNote,
   }) async {
     final current = state;
-    final keepStatus = current is SupportListLoaded ? current.status : 'OPEN';
-    final keepType = current is SupportListLoaded ? current.type : null;
     SupportRequestRow? currentRow;
     if (current is SupportListLoaded) {
       for (final row in current.rows) {
@@ -81,7 +84,7 @@ class SupportListController extends Notifier<SupportListState> {
     } on Object {
       return '상태를 저장하지 못했어요.';
     }
-    await load(status: keepStatus, type: keepType);
+    await load(status: state.status, type: state.type);
     return null;
   }
 }

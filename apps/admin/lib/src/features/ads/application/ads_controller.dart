@@ -8,10 +8,13 @@ import '../data/ads_source.dart';
 import '../state/ads_state.dart';
 
 class AdsController extends Notifier<AdsState> {
+  int _loadRequest = 0;
+
   @override
   AdsState build() => const AdsState();
 
   Future<void> load() async {
+    final request = ++_loadRequest;
     final previous = state;
     state = AdsState(
       phase: AdsPhase.loading,
@@ -24,10 +27,12 @@ class AdsController extends Notifier<AdsState> {
     );
     try {
       final rows = await ref.read(adsListProvider)(
-        slot: state.slotFilter,
-        status: state.statusFilter,
+        slot: previous.slotFilter,
+        status: previous.statusFilter,
       );
+      if (request != _loadRequest) return;
       final enabled = await ref.read(adSettingsGetProvider)();
+      if (request != _loadRequest) return;
       // 슬롯 설정은 부가 기능이다. 조회 실패가 광고 목록 화면 전체를 무너뜨리지
       // 않게 여기서 흡수한다(백엔드 미배포·권한·네트워크).
       List<AdSlotConfigRow> configs = const [];
@@ -36,6 +41,7 @@ class AdsController extends Notifier<AdsState> {
       } on ApiException {
         configs = const [];
       }
+      if (request != _loadRequest) return;
       state = AdsState(
         rows: rows,
         phase: AdsPhase.loaded,
@@ -50,8 +56,10 @@ class AdsController extends Notifier<AdsState> {
         },
       );
     } on ApiException catch (e) {
+      if (request != _loadRequest) return;
       state = previous.copyWith(phase: AdsPhase.failed, error: e.message);
     } on Object {
+      if (request != _loadRequest) return;
       state = previous.copyWith(
         phase: AdsPhase.failed,
         error: '광고 목록을 불러오지 못했어요.',
