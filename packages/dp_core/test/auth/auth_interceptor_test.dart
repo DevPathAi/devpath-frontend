@@ -192,11 +192,11 @@ void main() {
     expect(captured.headers['Authorization'], 'Bearer NEW'); // 새 토큰으로 재시도
   });
 
-  test('refresh 실패 시 토큰을 비운다', () async {
+  test('authoritative refresh rejection clears tokens', () async {
     final store = InMemoryTokenStore()..save(access: 'old', refresh: 'RRR');
     final interceptor = AuthInterceptor(
       store: store,
-      refresh: (_) async => throw StateError('refresh failed'),
+      refresh: (_) async => null,
       retry: (_) async => Response(requestOptions: RequestOptions(path: '/')),
     );
     // 요청은 당시의 현재 토큰(old)을 사용 — refresh 경로 진입 조건(가드 통과 아님).
@@ -215,6 +215,63 @@ void main() {
       (_, _) {},
     );
     expect(await store.readAccess(), isNull);
+  });
+
+  test('refresh transport failure retains the existing credential', () async {
+    final store = InMemoryTokenStore()..save(access: 'old', refresh: 'RRR');
+    final interceptor = AuthInterceptor(
+      store: store,
+      refresh: (_) async => throw DioException(
+        requestOptions: RequestOptions(path: '/auth/refresh'),
+        type: DioExceptionType.connectionError,
+      ),
+      retry: (_) async => Response(requestOptions: RequestOptions(path: '/')),
+    );
+    final request = RequestOptions(path: '/resource')
+      ..headers['Authorization'] = 'Bearer old';
+    final error = DioException(
+      requestOptions: request,
+      response: Response(requestOptions: request, statusCode: 401),
+      type: DioExceptionType.badResponse,
+    );
+    final handler = _InspectableErrorHandler();
+    final consumed = handler.consume();
+
+    await interceptor.onError(error, handler);
+    await consumed;
+
+    expect(await store.readAccess(), 'old');
+    expect(await store.readRefresh(), 'RRR');
+    expect(handler.advanced, isTrue);
+  });
+
+  test('resource retry failure retains the refreshed credential', () async {
+    final store = InMemoryTokenStore()..save(access: 'old', refresh: 'RRR');
+    final interceptor = AuthInterceptor(
+      store: store,
+      refresh: (_) async =>
+          const TokenPair(access: 'NEW', refresh: 'NEW-REFRESH'),
+      retry: (request) async => throw DioException(
+        requestOptions: request,
+        type: DioExceptionType.connectionError,
+      ),
+    );
+    final request = RequestOptions(path: '/resource')
+      ..headers['Authorization'] = 'Bearer old';
+    final error = DioException(
+      requestOptions: request,
+      response: Response(requestOptions: request, statusCode: 401),
+      type: DioExceptionType.badResponse,
+    );
+    final handler = _InspectableErrorHandler();
+    final consumed = handler.consume();
+
+    await interceptor.onError(error, handler);
+    await consumed;
+
+    expect(await store.readAccess(), 'NEW');
+    expect(await store.readRefresh(), 'NEW-REFRESH');
+    expect(handler.advanced, isTrue);
   });
 
   test('readRefresh==null이어도 refresh(null)을 시도하여 재시도한다(쿠키 기반)', () async {
