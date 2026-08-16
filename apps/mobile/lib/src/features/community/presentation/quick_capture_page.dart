@@ -130,13 +130,13 @@ class _QuickCapturePageState extends ConsumerState<QuickCapturePage> {
       if (!_isCurrent(owner, generation)) return;
       // 목록 갱신 후 닫기.
       await ref.read(communityControllerProvider.notifier).load();
-      if (!_isCurrent(owner, generation)) return;
+      if (!mounted || !_isCurrent(owner, generation)) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('질문을 게시했어요.')));
       context.pop();
     } on ApiException catch (e) {
-      if (!_isCurrent(owner, generation)) return;
+      if (!mounted || !_isCurrent(owner, generation)) return;
       setState(() => _submitting = false);
       ScaffoldMessenger.of(
         context,
