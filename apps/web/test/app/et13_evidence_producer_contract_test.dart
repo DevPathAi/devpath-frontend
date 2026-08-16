@@ -107,6 +107,14 @@ void main() {
       );
       expect(index, isNot(contains('cdnjs')));
       expect(index, isNot(contains('unpkg')));
+      expect(index, contains('monaco.editor.onDidChangeMarkers'));
+      expect(index, contains("pendingRuntime !== 'NODE'"));
+      expect(index, contains('changedResources.some(function (resource) {'));
+      expect(
+        index,
+        isNot(contains('if (!readySent) { readySent = true; onReady(); }')),
+        reason: 'editor creation alone does not mean language markers settled',
+      );
     },
   );
 

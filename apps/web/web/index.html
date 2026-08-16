@@ -92,11 +92,38 @@
       var monacoReady = false;
       var disposed = false;
       var readySent = false;
+      var readyListener = null;
       function monacoLanguage(value) {
         if (value === 'JAVA') return 'java';
         if (value === 'NODE') return 'javascript';
         if (value === 'PYTHON') return 'python';
         return null;
+      }
+      function signalReadyAfterPaint() {
+        if (readySent || disposed) return;
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () {
+            if (readySent || disposed) return;
+            readySent = true;
+            onReady();
+          });
+        });
+      }
+      function waitForInitialEditorState() {
+        if (pendingRuntime !== 'NODE') {
+          signalReadyAfterPaint();
+          return;
+        }
+        var modelUri = editor.getModel().uri.toString();
+        readyListener = monaco.editor.onDidChangeMarkers(function (changedResources) {
+          var changed = changedResources.some(function (resource) {
+            return resource.toString() === modelUri;
+          });
+          if (!changed) return;
+          readyListener.dispose();
+          readyListener = null;
+          signalReadyAfterPaint();
+        });
       }
       function renderPending() {
         if (!monacoReady || disposed) return;
@@ -116,7 +143,7 @@
           editor.onDidChangeModelContent(function () { onChange(editor.getValue()); });
           // F5-c DD7: Esc 시 Monaco 밖(dart sentinel)으로 포커스를 넘긴다.
           editor.addCommand(monaco.KeyCode.Escape, function () { onEscape(); });
-          if (!readySent) { readySent = true; onReady(); }
+          waitForInitialEditorState();
           return;
         }
         if (editor.getValue() !== pendingCode) editor.setValue(pendingCode);
@@ -129,6 +156,7 @@
       return {
         dispose: function () {
           disposed = true;
+          if (readyListener) { readyListener.dispose(); readyListener = null; }
           if (editor) { editor.dispose(); editor = null; }
         }, // F5-a
         layout:  function () { if (editor) editor.layout(); },  // F5-b
