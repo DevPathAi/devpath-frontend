@@ -135,12 +135,11 @@ class ContentProgressSyncController extends Notifier<int> {
         // Transport, throttling and 5xx retain the durable row for reconnect.
         return latestResponse;
       } on FormatException {
-        await ref.read(contentProgressQueueProvider).discardIfMatches(pending);
-        if (ref.mounted) state += 1;
+        // A malformed success payload is not authoritative. Retain the
+        // durable request and cached content for a later healthy reconnect.
         return latestResponse;
       } on TypeError {
-        await ref.read(contentProgressQueueProvider).discardIfMatches(pending);
-        if (ref.mounted) state += 1;
+        // JSON type mismatches follow the same retryable trust-boundary rule.
         return latestResponse;
       } on Object {
         // Non-HTTP transport/platform failures remain retryable.
