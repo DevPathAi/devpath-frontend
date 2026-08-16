@@ -51,6 +51,10 @@ void main() {
       String? sentAction;
       final c = ProviderContainer(
         overrides: [
+          adminUsersFetchProvider.overrideWithValue(
+            ({cursor, status}) async =>
+                Page(data: [_r('u9', 'ACTIVE')], limit: 20),
+          ),
           adminUserSanctionProvider.overrideWithValue((id, action) async {
             sentId = id;
             sentAction = action;
@@ -59,6 +63,7 @@ void main() {
       );
       addTearDown(c.dispose);
 
+      await c.read(adminUsersProvider.notifier).load();
       await c.read(adminUsersProvider.notifier).sanction('u9', '영구 밴');
       expect((sentId, sentAction), ('u9', '영구 밴'));
     },
@@ -90,4 +95,99 @@ void main() {
     expect(sentIds, [1, 2]);
     expect(c.read(adminUsersProvider).selectedIds, isEmpty);
   });
+
+  test(
+    'selection and bulk approval admit only current BETA_PENDING rows',
+    () async {
+      List<int>? sentIds;
+      final c = ProviderContainer(
+        overrides: [
+          adminUsersFetchProvider.overrideWithValue(
+            ({cursor, status}) async => Page(
+              data: [
+                _r('1', 'BETA_PENDING'),
+                _r('2', 'ACTIVE'),
+                _r('3', 'VENDOR_ESCALATED'),
+              ],
+              limit: 20,
+            ),
+          ),
+          adminUsersBulkApproveProvider.overrideWithValue((ids) async {
+            sentIds = ids;
+          }),
+        ],
+      );
+      addTearDown(c.dispose);
+
+      await c.read(adminUsersProvider.notifier).load();
+      final notifier = c.read(adminUsersProvider.notifier);
+      notifier.toggleSelect('1');
+      notifier.toggleSelect('2');
+      notifier.toggleSelect('3');
+
+      expect(c.read(adminUsersProvider).selectedIds, {'1'});
+      await notifier.bulkApprove();
+      expect(sentIds, [
+        1,
+      ], reason: 'sanctioned/unknown rows must never reach the API');
+    },
+  );
+
+  test(
+    'approve and sanction reject unknown/stale row status without throwing',
+    () async {
+      var approveCalls = 0;
+      var sanctionCalls = 0;
+      final c = ProviderContainer(
+        overrides: [
+          adminUsersFetchProvider.overrideWithValue(
+            ({cursor, status}) async =>
+                Page(data: [_r('8', 'VENDOR_ESCALATED')], limit: 20),
+          ),
+          adminUsersApproveProvider.overrideWithValue((id) async {
+            approveCalls++;
+          }),
+          adminUserSanctionProvider.overrideWithValue((id, action) async {
+            sanctionCalls++;
+          }),
+        ],
+      );
+      addTearDown(c.dispose);
+
+      await c.read(adminUsersProvider.notifier).load();
+      final notifier = c.read(adminUsersProvider.notifier);
+      expect(await notifier.approve('8'), isNotNull);
+      expect(await notifier.sanction('8', '영구 밴'), isNotNull);
+      expect((approveCalls, sanctionCalls), (0, 0));
+    },
+  );
+
+  test(
+    'bulk approval failure returns error and preserves loaded selection',
+    () async {
+      final c = ProviderContainer(
+        overrides: [
+          adminUsersFetchProvider.overrideWithValue(
+            ({cursor, status}) async =>
+                Page(data: [_r('1', 'BETA_PENDING')], limit: 20),
+          ),
+          adminUsersBulkApproveProvider.overrideWithValue(
+            (ids) async => throw const ApiException(
+              code: ApiErrorCode.unknown,
+              message: '일괄 승인 실패',
+            ),
+          ),
+        ],
+      );
+      addTearDown(c.dispose);
+
+      await c.read(adminUsersProvider.notifier).load();
+      final notifier = c.read(adminUsersProvider.notifier)..toggleSelect('1');
+      final before = c.read(adminUsersProvider);
+
+      expect(await notifier.bulkApprove(), '일괄 승인 실패');
+      expect(c.read(adminUsersProvider), same(before));
+      expect(c.read(adminUsersProvider).selectedIds, {'1'});
+    },
+  );
 }

@@ -7,7 +7,8 @@ Future<bool?> showAdminDangerDialog({
   required String title,
   required String impact,
   required String confirmLabel,
-  required Future<void> Function() onConfirm,
+  required Future<dynamic> Function() onConfirm,
+  String? confirmationValue,
 }) => showDialog<bool>(
   context: context,
   builder: (_) => AdminDangerDialog(
@@ -15,6 +16,7 @@ Future<bool?> showAdminDangerDialog({
     impact: impact,
     confirmLabel: confirmLabel,
     onConfirm: onConfirm,
+    confirmationValue: confirmationValue,
   ),
 );
 
@@ -29,20 +31,41 @@ class AdminDangerDialog extends StatefulWidget {
     required this.impact,
     required this.confirmLabel,
     required this.onConfirm,
+    this.confirmationValue,
   });
 
   final String title;
   final String impact;
   final String confirmLabel;
-  final Future<void> Function() onConfirm;
+  final Future<dynamic> Function() onConfirm;
+
+  /// Optional typed guard for especially consequential decisions.
+  /// It is local confirmation only and is never added to an API payload.
+  final String? confirmationValue;
 
   @override
   State<AdminDangerDialog> createState() => _AdminDangerDialogState();
 }
 
 class _AdminDangerDialogState extends State<AdminDangerDialog> {
+  late final TextEditingController _confirmation = TextEditingController()
+    ..addListener(_confirmationChanged);
   bool _pending = false;
   String? _error;
+
+  bool get _confirmationMatches =>
+      widget.confirmationValue == null ||
+      _confirmation.text == widget.confirmationValue;
+
+  @override
+  void dispose() {
+    _confirmation
+      ..removeListener(_confirmationChanged)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _confirmationChanged() => setState(() {});
 
   @override
   Widget build(BuildContext context) {
@@ -63,6 +86,15 @@ class _AdminDangerDialogState extends State<AdminDangerDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(widget.impact, style: text.bodyMedium),
+              if (widget.confirmationValue case final value?) ...[
+                const SizedBox(height: DpSpacing.md),
+                TextField(
+                  key: const ValueKey('admin-danger-confirmation-input'),
+                  controller: _confirmation,
+                  enabled: !_pending,
+                  decoration: InputDecoration(labelText: '확인을 위해 "$value" 입력'),
+                ),
+              ],
               if (_error != null) ...[
                 const SizedBox(height: DpSpacing.md),
                 Semantics(
@@ -85,7 +117,7 @@ class _AdminDangerDialogState extends State<AdminDangerDialog> {
             child: const Text('취소'),
           ),
           TextButton(
-            onPressed: _pending ? null : _confirm,
+            onPressed: _pending || !_confirmationMatches ? null : _confirm,
             style: TextButton.styleFrom(foregroundColor: colors.danger),
             child: _pending
                 ? const SizedBox.square(
@@ -105,7 +137,15 @@ class _AdminDangerDialogState extends State<AdminDangerDialog> {
       _error = null;
     });
     try {
-      await widget.onConfirm();
+      final result = await widget.onConfirm();
+      if (result is String && result.isNotEmpty) {
+        if (!mounted) return;
+        setState(() {
+          _pending = false;
+          _error = result;
+        });
+        return;
+      }
       if (mounted) Navigator.of(context).pop(true);
     } on Object catch (error) {
       if (!mounted) return;

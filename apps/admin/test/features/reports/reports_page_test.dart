@@ -41,8 +41,9 @@ class _Fake extends ReportsController {
   ReportsState build() => ReportsLoaded(initial);
 
   @override
-  Future<void> resolve(int id, String action) async {
+  Future<String?> resolve(int id, String action) async {
     calls.add((id: id, action: action));
+    return null;
   }
 
   @override
@@ -92,6 +93,13 @@ void main() {
 
     await tester.tap(find.text('기각'));
     await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('admin-danger-confirmation-input')),
+      '신고 #7',
+    );
+    await tester.pump();
+    await tester.tap(find.text('기각 확정'));
+    await tester.pumpAndSettle();
 
     expect(fake.calls, [(id: 7, action: 'REJECT')]);
   });
@@ -101,6 +109,13 @@ void main() {
     await _pump(tester, _container(fake));
 
     await tester.tap(find.text('처리완료'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('admin-danger-confirmation-input')),
+      '신고 #9',
+    );
+    await tester.pump();
+    await tester.tap(find.text('처리 완료 확정'));
     await tester.pumpAndSettle();
 
     expect(fake.calls, [(id: 9, action: 'RESOLVE')]);

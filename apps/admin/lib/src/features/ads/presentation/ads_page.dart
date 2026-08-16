@@ -117,10 +117,26 @@ class _AdsPageState extends ConsumerState<AdminAdsPage> {
                 rows: [
                   for (final r in s.rows)
                     DataRow2(
+                      specificRowHeight:
+                          MediaQuery.textScalerOf(context).scale(14) >= 20
+                          ? 144
+                          : 88,
                       selected: s.selectedIds.contains(r.id),
-                      onSelectChanged: (_) => n.toggleSelect(r.id!),
+                      onSelectChanged:
+                          AdminStatusCatalog.isKnown(
+                            AdminStatusDomain.ad,
+                            r.status,
+                          )
+                          ? (_) => n.toggleSelect(r.id!)
+                          : null,
                       cells: [
-                        DataCell(Text(r.title)),
+                        DataCell(
+                          Text(
+                            r.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                         DataCell(Text(r.slot)),
                         DataCell(Text('${r.weight}')),
                         DataCell(
@@ -183,6 +199,12 @@ class _AdsPageState extends ConsumerState<AdminAdsPage> {
   }
 
   Widget _rowMenu(BuildContext context, AdsController n, AdRow r) {
+    if (!AdminStatusCatalog.isKnown(AdminStatusDomain.ad, r.status)) {
+      return const Tooltip(
+        message: '알 수 없는 상태는 읽기 전용입니다',
+        child: Icon(DpIcons.error),
+      );
+    }
     return MenuAnchor(
       builder: (context, controller, child) => IconButton(
         icon: const Icon(DpIcons.moreVert),
@@ -289,7 +311,7 @@ class _AdSlotFilter extends StatelessWidget {
   }
 }
 
-class _AdsOperationsBar extends StatelessWidget {
+class _AdsOperationsBar extends StatefulWidget {
   const _AdsOperationsBar({
     required this.globalEnabled,
     required this.onGlobalChanged,
@@ -297,8 +319,16 @@ class _AdsOperationsBar extends StatelessWidget {
   });
 
   final bool globalEnabled;
-  final ValueChanged<bool> onGlobalChanged;
+  final Future<String?> Function(bool) onGlobalChanged;
   final VoidCallback onOpenSlotConfig;
+
+  @override
+  State<_AdsOperationsBar> createState() => _AdsOperationsBarState();
+}
+
+class _AdsOperationsBarState extends State<_AdsOperationsBar> {
+  bool _pending = false;
+  String? _error;
 
   @override
   Widget build(BuildContext context) => Material(
@@ -316,60 +346,144 @@ class _AdsOperationsBar extends StatelessWidget {
         children: [
           Semantics(
             label: '전역 광고 노출',
-            toggled: globalEnabled,
+            toggled: widget.globalEnabled,
+            enabled: !_pending,
+            button: true,
+            onTap: _pending ? null : () => _change(!widget.globalEnabled),
             child: ExcludeSemantics(
               child: Wrap(
                 spacing: DpSpacing.xs,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   Text(
-                    globalEnabled ? '전역 노출 켜짐' : '전역 노출 꺼짐',
+                    widget.globalEnabled ? '전역 노출 켜짐' : '전역 노출 꺼짐',
                     style: Theme.of(context).textTheme.labelLarge,
                   ),
-                  Switch(value: globalEnabled, onChanged: onGlobalChanged),
+                  Switch(
+                    value: widget.globalEnabled,
+                    onChanged: _pending ? null : _change,
+                  ),
                 ],
               ),
             ),
           ),
           OutlinedButton(
-            onPressed: onOpenSlotConfig,
+            onPressed: _pending ? null : widget.onOpenSlotConfig,
             child: const Text('슬롯 설정'),
           ),
+          if (_error != null)
+            Semantics(
+              liveRegion: true,
+              label: '전역 광고 설정 실패: $_error',
+              child: ExcludeSemantics(
+                child: Text(
+                  _error!,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: context.dpColors.danger,
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     ),
   );
+
+  Future<void> _change(bool enabled) async {
+    setState(() {
+      _pending = true;
+      _error = null;
+    });
+    final error = await widget.onGlobalChanged(enabled);
+    if (!mounted) return;
+    setState(() {
+      _pending = false;
+      _error = error;
+    });
+  }
 }
 
-class _AdStatusSwitch extends StatelessWidget {
+class _AdStatusSwitch extends StatefulWidget {
   const _AdStatusSwitch({required this.row, required this.onChanged});
 
   final AdRow row;
-  final VoidCallback onChanged;
+  final Future<String?> Function() onChanged;
+
+  @override
+  State<_AdStatusSwitch> createState() => _AdStatusSwitchState();
+}
+
+class _AdStatusSwitchState extends State<_AdStatusSwitch> {
+  bool _pending = false;
+  String? _error;
 
   @override
   Widget build(BuildContext context) {
+    final row = widget.row;
     final status = AdminStatusCatalog.resolve(AdminStatusDomain.ad, row.status);
     final active = row.status == 'ACTIVE';
+    final enabled = status.isKnown && !_pending;
     return Semantics(
+      key: ValueKey('ad-status-switch-${row.id}'),
       label: '${row.title} 광고 상태: ${status.displayLabel}',
       toggled: active,
+      enabled: enabled,
+      button: true,
+      onTap: enabled ? _change : null,
       child: ExcludeSemantics(
-        child: Row(
+        child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Flexible(
-              child: AdminStatusText(
-                domain: AdminStatusDomain.ad,
-                wire: row.status,
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: AdminStatusText(
+                      domain: AdminStatusDomain.ad,
+                      wire: row.status,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: DpSpacing.xs),
+                Switch(
+                  value: active,
+                  onChanged: enabled ? (_) => _change() : null,
+                ),
+              ],
             ),
-            const SizedBox(width: DpSpacing.xs),
-            Switch(value: active, onChanged: (_) => onChanged()),
+            if (_error != null)
+              Semantics(
+                liveRegion: true,
+                label: '${row.title} 광고 상태 저장 실패: $_error',
+                child: ExcludeSemantics(
+                  child: Text(
+                    _error!,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: context.dpColors.danger,
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _change() async {
+    if (_pending) return;
+    setState(() {
+      _pending = true;
+      _error = null;
+    });
+    final error = await widget.onChanged();
+    if (!mounted) return;
+    setState(() {
+      _pending = false;
+      _error = error;
+    });
   }
 }
 
@@ -379,7 +493,7 @@ class _AdStatusSwitch extends StatelessWidget {
 class _AdFormDialog extends StatefulWidget {
   const _AdFormDialog({required this.existing, required this.onSave});
   final AdRow? existing;
-  final Future<void> Function(AdRow draft) onSave;
+  final Future<String?> Function(AdRow draft) onSave;
   @override
   State<_AdFormDialog> createState() => _AdFormDialogState();
 }
@@ -551,7 +665,15 @@ class _AdFormDialogState extends State<_AdFormDialog> {
       _error = null;
     });
     try {
-      await widget.onSave(draft);
+      final error = await widget.onSave(draft);
+      if (error != null) {
+        if (!mounted) return;
+        setState(() {
+          _pending = false;
+          _error = error;
+        });
+        return;
+      }
       if (mounted) Navigator.of(context).pop();
     } on Object catch (error) {
       if (!mounted) return;

@@ -1,6 +1,7 @@
 import 'package:dp_core/dp_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../design/admin_status_catalog.dart';
 import '../data/ad_row.dart';
 import '../data/ad_slot_config_row.dart';
 import '../data/ads_source.dart';
@@ -11,12 +12,15 @@ class AdsController extends Notifier<AdsState> {
   AdsState build() => const AdsState();
 
   Future<void> load() async {
+    final previous = state;
     state = AdsState(
       phase: AdsPhase.loading,
-      slotFilter: state.slotFilter,
-      statusFilter: state.statusFilter,
-      globalEnabled: state.globalEnabled,
-      slotConfigs: state.slotConfigs,
+      rows: previous.rows,
+      slotFilter: previous.slotFilter,
+      statusFilter: previous.statusFilter,
+      globalEnabled: previous.globalEnabled,
+      selectedIds: previous.selectedIds,
+      slotConfigs: previous.slotConfigs,
     );
     try {
       final rows = await ref.read(adsListProvider)(
@@ -35,13 +39,23 @@ class AdsController extends Notifier<AdsState> {
       state = AdsState(
         rows: rows,
         phase: AdsPhase.loaded,
-        slotFilter: state.slotFilter,
-        statusFilter: state.statusFilter,
+        slotFilter: previous.slotFilter,
+        statusFilter: previous.statusFilter,
         globalEnabled: enabled,
         slotConfigs: configs,
+        selectedIds: {
+          for (final row in rows)
+            if (row.id case final id?)
+              if (previous.selectedIds.contains(id) && _isKnown(row)) id,
+        },
       );
     } on ApiException catch (e) {
-      state = state.copyWith(phase: AdsPhase.failed, error: e.message);
+      state = previous.copyWith(phase: AdsPhase.failed, error: e.message);
+    } on Object {
+      state = previous.copyWith(
+        phase: AdsPhase.failed,
+        error: '광고 목록을 불러오지 못했어요.',
+      );
     }
   }
 
@@ -78,22 +92,48 @@ class AdsController extends Notifier<AdsState> {
     await load();
   }
 
-  Future<void> create(AdRow draft) async {
-    await ref.read(adCreateProvider)(draft);
-    await load();
+  Future<String?> create(AdRow draft) async {
+    if (!_isKnown(draft)) return '알 수 없는 상태의 광고는 저장할 수 없어요.';
+    try {
+      await ref.read(adCreateProvider)(draft);
+      await load();
+      return null;
+    } on Object catch (error) {
+      return _mutationError(error, '광고를 저장하지 못했어요.');
+    }
   }
 
-  Future<void> update(int id, AdRow draft) async {
-    await ref.read(adUpdateProvider)(id, draft);
-    await load();
+  Future<String?> update(int id, AdRow draft) async {
+    final current = _row(id);
+    if (current == null || !_isKnown(current) || !_isKnown(draft)) {
+      return '알 수 없는 상태의 광고는 변경할 수 없어요.';
+    }
+    try {
+      await ref.read(adUpdateProvider)(id, draft);
+      await load();
+      return null;
+    } on Object catch (error) {
+      return _mutationError(error, '광고를 저장하지 못했어요.');
+    }
   }
 
-  Future<void> remove(int id) async {
-    await ref.read(adDeleteProvider)(id);
-    await load();
+  Future<String?> remove(int id) async {
+    final current = _row(id);
+    if (current == null || !_isKnown(current)) {
+      return '알 수 없는 상태의 광고는 삭제할 수 없어요.';
+    }
+    try {
+      await ref.read(adDeleteProvider)(id);
+      await load();
+      return null;
+    } on Object catch (error) {
+      return _mutationError(error, '광고를 삭제하지 못했어요.');
+    }
   }
 
   void toggleSelect(int id) {
+    final row = _row(id);
+    if (row == null || !_isKnown(row)) return;
     final next = {...state.selectedIds};
     next.contains(id) ? next.remove(id) : next.add(id);
     state = state.copyWith(selectedIds: next);
@@ -101,28 +141,57 @@ class AdsController extends Notifier<AdsState> {
 
   void selectAll(bool selected) => state = state.copyWith(
     selectedIds: selected
-        ? state.rows.map((r) => r.id).whereType<int>().toSet()
+        ? state.rows.where(_isKnown).map((r) => r.id).whereType<int>().toSet()
         : <int>{},
   );
 
   void clearSelection() => state = state.copyWith(selectedIds: <int>{});
 
   /// 선택된 광고 일괄 삭제 후 목록 재조회(새 state로 선택 초기화).
-  Future<void> bulkDelete() async {
-    if (state.selectedIds.isEmpty) return;
-    await ref.read(adBulkDeleteProvider)(state.selectedIds.toList());
-    await load();
+  Future<String?> bulkDelete() async {
+    if (state.selectedIds.isEmpty) return null;
+    final eligible = state.rows
+        .where((row) => _isKnown(row) && state.selectedIds.contains(row.id))
+        .map((row) => row.id)
+        .whereType<int>()
+        .toList();
+    if (eligible.isEmpty) return '삭제할 수 있는 광고가 없어요.';
+    try {
+      await ref.read(adBulkDeleteProvider)(eligible);
+      clearSelection();
+      await load();
+      return null;
+    } on Object catch (error) {
+      return _mutationError(error, '광고를 삭제하지 못했어요.');
+    }
   }
 
-  Future<void> toggleStatus(AdRow row) async {
-    final next = row.status == 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
-    await ref.read(adUpdateProvider)(row.id!, row.copyWith(status: next));
-    await load();
+  Future<String?> toggleStatus(AdRow row) async {
+    final current = row.id == null ? null : _row(row.id!);
+    if (current == null || !_isKnown(current)) {
+      return '알 수 없는 상태의 광고는 변경할 수 없어요.';
+    }
+    final next = current.status == 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
+    try {
+      await ref.read(adUpdateProvider)(
+        current.id!,
+        current.copyWith(status: next),
+      );
+      await load();
+      return null;
+    } on Object catch (error) {
+      return _mutationError(error, '광고 상태를 저장하지 못했어요.');
+    }
   }
 
-  Future<void> toggleGlobal(bool enabled) async {
-    final result = await ref.read(adSettingsSetProvider)(enabled);
-    state = state.copyWith(globalEnabled: result);
+  Future<String?> toggleGlobal(bool enabled) async {
+    try {
+      final result = await ref.read(adSettingsSetProvider)(enabled);
+      state = state.copyWith(globalEnabled: result);
+      return null;
+    } on Object catch (error) {
+      return _mutationError(error, '전역 광고 설정을 저장하지 못했어요.');
+    }
   }
 
   Future<void> uploadImage(
@@ -134,6 +203,19 @@ class AdsController extends Notifier<AdsState> {
     await ref.read(adImageUploadProvider)(id, bytes, filename, contentType);
     await load();
   }
+
+  AdRow? _row(int id) {
+    for (final row in state.rows) {
+      if (row.id == id) return row;
+    }
+    return null;
+  }
+
+  static bool _isKnown(AdRow row) =>
+      AdminStatusCatalog.isKnown(AdminStatusDomain.ad, row.status);
+
+  static String _mutationError(Object error, String fallback) =>
+      error is ApiException ? error.message : fallback;
 }
 
 final adsProvider = NotifierProvider<AdsController, AdsState>(

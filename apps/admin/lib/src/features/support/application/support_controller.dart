@@ -1,6 +1,7 @@
 import 'package:dp_core/dp_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../design/admin_status_catalog.dart';
 import '../data/support_request.dart';
 import '../data/support_source.dart';
 import '../state/support_state.dart';
@@ -19,7 +20,7 @@ class SupportListController extends Notifier<SupportListState> {
   }
 
   Future<void> load({String? status = 'OPEN', String? type}) async {
-    state = const SupportListLoading();
+    state = SupportListLoading(status: status, type: type);
     try {
       final rows = await ref.read(supportListFetchProvider)(
         status: status,
@@ -28,7 +29,13 @@ class SupportListController extends Notifier<SupportListState> {
       );
       state = SupportListLoaded(rows, status: status, type: type);
     } on ApiException catch (e) {
-      state = SupportListFailed(e.message);
+      state = SupportListFailed(e.message, status: status, type: type);
+    } on Object {
+      state = SupportListFailed(
+        '제보 목록을 불러오지 못했어요.',
+        status: status,
+        type: type,
+      );
     }
   }
 
@@ -46,6 +53,23 @@ class SupportListController extends Notifier<SupportListState> {
     final current = state;
     final keepStatus = current is SupportListLoaded ? current.status : 'OPEN';
     final keepType = current is SupportListLoaded ? current.type : null;
+    SupportRequestRow? currentRow;
+    if (current is SupportListLoaded) {
+      for (final row in current.rows) {
+        if (row.id == id) {
+          currentRow = row;
+          break;
+        }
+      }
+    }
+    if (currentRow == null ||
+        !AdminStatusCatalog.isKnown(
+          AdminStatusDomain.support,
+          currentRow.status,
+        ) ||
+        !AdminStatusCatalog.isKnown(AdminStatusDomain.support, status)) {
+      return '알 수 없는 상태의 제보는 변경할 수 없어요.';
+    }
     try {
       await ref.read(supportStatusUpdateProvider)(
         id,

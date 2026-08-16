@@ -53,6 +53,7 @@ void main() {
       ],
     );
     addTearDown(c.dispose);
+    await c.read(adsProvider.notifier).load();
     await c
         .read(adsProvider.notifier)
         .toggleStatus(_ad(id: 9, status: 'ACTIVE'));
@@ -117,4 +118,70 @@ void main() {
     expect(sentIds, [1, 2]);
     expect(c.read(adsProvider).selectedIds, isEmpty);
   });
+
+  test(
+    'unknown ad status is read-only for selection and status mutation',
+    () async {
+      var updateCalls = 0;
+      final unknown = _ad(id: 7, status: 'VENDOR_ESCALATED');
+      final c = ProviderContainer(
+        overrides: [
+          adsListProvider.overrideWithValue(
+            ({slot, status}) async => [unknown],
+          ),
+          adSettingsGetProvider.overrideWithValue(() async => true),
+          adSlotConfigListProvider.overrideWithValue(() async => []),
+          adUpdateProvider.overrideWithValue((id, draft) async {
+            updateCalls++;
+            return draft;
+          }),
+        ],
+      );
+      addTearDown(c.dispose);
+
+      await c.read(adsProvider.notifier).load();
+      final notifier = c.read(adsProvider.notifier);
+      notifier.toggleSelect(7);
+      expect(c.read(adsProvider).selectedIds, isEmpty);
+      expect(await notifier.toggleStatus(unknown), isNotNull);
+      expect(updateCalls, 0);
+    },
+  );
+
+  test(
+    'global and row status failures return errors and retain loaded state',
+    () async {
+      final row = _ad(id: 9);
+      final c = ProviderContainer(
+        overrides: [
+          adsListProvider.overrideWithValue(({slot, status}) async => [row]),
+          adSettingsGetProvider.overrideWithValue(() async => true),
+          adSlotConfigListProvider.overrideWithValue(() async => []),
+          adSettingsSetProvider.overrideWithValue(
+            (enabled) async => throw const ApiException(
+              code: ApiErrorCode.unknown,
+              message: '전역 저장 실패',
+            ),
+          ),
+          adUpdateProvider.overrideWithValue(
+            (id, draft) async => throw const ApiException(
+              code: ApiErrorCode.unknown,
+              message: '상태 저장 실패',
+            ),
+          ),
+        ],
+      );
+      addTearDown(c.dispose);
+
+      await c.read(adsProvider.notifier).load();
+      final notifier = c.read(adsProvider.notifier)..toggleSelect(9);
+      final before = c.read(adsProvider);
+
+      expect(await notifier.toggleGlobal(false), '전역 저장 실패');
+      expect(c.read(adsProvider), same(before));
+      expect(await notifier.toggleStatus(row), '상태 저장 실패');
+      expect(c.read(adsProvider), same(before));
+      expect(c.read(adsProvider).selectedIds, {9});
+    },
+  );
 }

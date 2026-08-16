@@ -1,3 +1,4 @@
+import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,7 +18,7 @@ class SupportPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(supportListProvider);
     final n = ref.read(supportListProvider.notifier);
-    final current = s is SupportListLoaded ? s.status : 'OPEN';
+    final current = s.status;
 
     return Scaffold(
       body: Column(
@@ -92,19 +93,16 @@ class SupportPage extends ConsumerWidget {
   }
 
   Future<void> _openDetail(BuildContext context, WidgetRef ref, int id) async {
-    final n = ref.read(supportListProvider.notifier);
-    final detail = await n.detail(id);
-    if (!context.mounted) return;
     await showDialog<void>(
       context: context,
-      builder: (_) => _SupportDetailDialog(detail: detail),
+      builder: (_) => _SupportDetailDialog(id: id),
     );
   }
 }
 
 class _SupportDetailDialog extends ConsumerStatefulWidget {
-  const _SupportDetailDialog({required this.detail});
-  final SupportRequestDetail detail;
+  const _SupportDetailDialog({required this.id});
+  final int id;
 
   @override
   ConsumerState<_SupportDetailDialog> createState() =>
@@ -112,9 +110,10 @@ class _SupportDetailDialog extends ConsumerStatefulWidget {
 }
 
 class _SupportDetailDialogState extends ConsumerState<_SupportDetailDialog> {
-  late final TextEditingController _note = TextEditingController(
-    text: widget.detail.adminNote ?? '',
-  );
+  final TextEditingController _note = TextEditingController();
+  SupportRequestDetail? _detail;
+  bool _loading = true;
+  String? _loadError;
   bool _pending = false;
   String? _error;
 
@@ -127,6 +126,12 @@ class _SupportDetailDialogState extends ConsumerState<_SupportDetailDialog> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  @override
   void dispose() {
     _note.dispose();
     super.dispose();
@@ -134,91 +139,18 @@ class _SupportDetailDialogState extends ConsumerState<_SupportDetailDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final d = widget.detail;
-    final c = context.dpColors;
+    final d = _detail;
 
     return AlertDialog(
-      title: Text('#${d.id} ${d.title}'),
+      title: Text(d == null ? '제보 #${widget.id} 상세' : '#${d.id} ${d.title}'),
       content: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 640),
         child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              AdminStatusText(
-                domain: AdminStatusDomain.support,
-                wire: d.status,
-              ),
-              const SizedBox(height: DpSpacing.md),
-              Text(d.body),
-              const SizedBox(height: DpSpacing.md),
-              _kv(context, '경로', d.pagePath),
-              _kv(context, '빌드', d.appVersion),
-              _kv(context, '화면', d.viewport),
-              _kv(context, '브라우저', d.userAgent),
-              _kv(context, '오류 코드', d.errorCode),
-              _kv(context, 'trace', d.traceId),
-              _kv(context, '발생 시각', d.occurredAt),
-              _kv(context, '접수자', d.reporterId?.toString()),
-              const SizedBox(height: DpSpacing.md),
-              Text('최근 API 실패', style: Theme.of(context).textTheme.titleSmall),
-              const SizedBox(height: DpSpacing.xs),
-              if (d.failures.isEmpty)
-                Text(
-                  '기록 없음',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: c.textSecondary),
-                ),
-              for (final f in d.failures)
-                ListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  leading: Text('${f.seq}'),
-                  title: Text('${f.method} ${f.path}'),
-                  subtitle: Text(
-                    '${f.statusLabel}'
-                    '${f.errorCode == null ? '' : ' · ${f.errorCode}'}'
-                    '${f.message == null ? '' : '\n${f.message}'}',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodySmall?.copyWith(color: c.textSecondary),
-                  ),
-                  trailing: Text(
-                    f.occurredAt ?? '-',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.labelSmall?.copyWith(color: c.textSecondary),
-                  ),
-                ),
-              const SizedBox(height: DpSpacing.md),
-              TextField(
-                key: const ValueKey('support-admin-note'),
-                controller: _note,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: '내부 메모 (덮어쓰기)',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              if (_error != null) ...[
-                const SizedBox(height: DpSpacing.sm),
-                Semantics(
-                  liveRegion: true,
-                  label: '상태 저장 실패: $_error',
-                  child: ExcludeSemantics(
-                    child: Text(
-                      _error!,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodyMedium?.copyWith(color: c.danger),
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
+          child: _loading
+              ? const DpLoading(label: '제보 상세를 불러오는 중입니다')
+              : _loadError != null
+              ? _detailError(context)
+              : _detailContent(context, d!),
         ),
       ),
       actions: [
@@ -226,14 +158,170 @@ class _SupportDetailDialogState extends ConsumerState<_SupportDetailDialog> {
           onPressed: _pending ? null : () => Navigator.of(context).pop(),
           child: const Text('닫기'),
         ),
-        for (final (label, status) in _transitions)
-          if (status != d.status)
-            FilledButton.tonal(
-              onPressed: _pending ? null : () => _transition(status),
-              child: Text(label),
-            ),
+        if (d != null &&
+            AdminStatusCatalog.isKnown(AdminStatusDomain.support, d.status))
+          for (final (label, status) in _transitions)
+            if (status != d.status)
+              FilledButton.tonal(
+                onPressed: _pending ? null : () => _transition(status),
+                child: Text(label),
+              ),
       ],
     );
+  }
+
+  Widget _detailError(BuildContext context) => Semantics(
+    liveRegion: true,
+    label: '상세 조회 실패: $_loadError',
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          _loadError!,
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: context.dpColors.danger),
+        ),
+        const SizedBox(height: DpSpacing.md),
+        OutlinedButton(onPressed: _load, child: const Text('다시 시도')),
+      ],
+    ),
+  );
+
+  Widget _detailContent(BuildContext context, SupportRequestDetail d) {
+    final c = context.dpColors;
+    final known = AdminStatusCatalog.isKnown(
+      AdminStatusDomain.support,
+      d.status,
+    );
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AdminStatusText(domain: AdminStatusDomain.support, wire: d.status),
+        const SizedBox(height: DpSpacing.md),
+        Text(d.body),
+        const SizedBox(height: DpSpacing.md),
+        _kv(context, '경로', d.pagePath),
+        _kv(context, '빌드', d.appVersion),
+        _kv(context, '화면', d.viewport),
+        _kv(context, '브라우저', d.userAgent),
+        _kv(context, '오류 코드', d.errorCode),
+        _kv(context, 'trace', d.traceId),
+        _kv(context, '발생 시각', d.occurredAt),
+        _kv(context, '접수자', d.reporterId?.toString()),
+        const SizedBox(height: DpSpacing.md),
+        Text('최근 API 실패', style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: DpSpacing.xs),
+        if (d.failures.isEmpty)
+          Text(
+            '기록 없음',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: c.textSecondary),
+          ),
+        for (final f in d.failures)
+          Padding(
+            padding: const EdgeInsets.only(bottom: DpSpacing.sm),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                border: Border.all(color: c.border),
+                borderRadius: BorderRadius.circular(DpRadius.card),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(DpSpacing.sm),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      spacing: DpSpacing.xs,
+                      runSpacing: DpSpacing.xs,
+                      children: [
+                        Text('#${f.seq}'),
+                        Text(
+                          '${f.method} ${f.path}',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(fontFamily: DpTypography.codeFamily),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: DpSpacing.xs),
+                    Text(
+                      '${f.statusLabel}'
+                      '${f.errorCode == null ? '' : ' · ${f.errorCode}'}'
+                      '${f.message == null ? '' : '\n${f.message}'}',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: c.textSecondary),
+                    ),
+                    const SizedBox(height: DpSpacing.xs),
+                    Text(
+                      f.occurredAt ?? '-',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: c.textSecondary,
+                        fontFamily: DpTypography.codeFamily,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        const SizedBox(height: DpSpacing.md),
+        TextField(
+          key: const ValueKey('support-admin-note'),
+          controller: _note,
+          enabled: known && !_pending,
+          maxLines: 3,
+          decoration: InputDecoration(
+            labelText: known ? '내부 메모 (덮어쓰기)' : '알 수 없는 상태 · 읽기 전용',
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        if (_error != null) ...[
+          const SizedBox(height: DpSpacing.sm),
+          Semantics(
+            liveRegion: true,
+            label: '상태 저장 실패: $_error',
+            child: ExcludeSemantics(
+              child: Text(
+                _error!,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: c.danger),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
+    try {
+      final detail = await ref
+          .read(supportListProvider.notifier)
+          .detail(widget.id);
+      if (!mounted) return;
+      _note.text = detail.adminNote ?? '';
+      setState(() {
+        _detail = detail;
+        _loading = false;
+      });
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _loadError = error is ApiException
+            ? error.message
+            : '제보 상세를 불러오지 못했어요.';
+      });
+    }
   }
 
   Future<void> _transition(String status) async {
@@ -245,7 +333,7 @@ class _SupportDetailDialogState extends ConsumerState<_SupportDetailDialog> {
     final error = await ref
         .read(supportListProvider.notifier)
         .updateStatus(
-          widget.detail.id,
+          _detail!.id,
           status,
           adminNote: note.isEmpty ? null : note,
         );

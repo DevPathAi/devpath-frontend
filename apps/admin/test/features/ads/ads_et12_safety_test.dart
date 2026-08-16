@@ -1,3 +1,5 @@
+import 'dart:ui' show Tristate;
+
 import 'package:devpath_admin/src/features/ads/application/ads_controller.dart';
 import 'package:devpath_admin/src/features/ads/data/ad_row.dart';
 import 'package:devpath_admin/src/features/ads/data/ads_source.dart';
@@ -8,6 +10,7 @@ import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 AdRow _ad() => const AdRow(
@@ -18,6 +21,18 @@ AdRow _ad() => const AdRow(
   slot: 'DASHBOARD_TOP',
   weight: 1,
   status: 'ACTIVE',
+  startsAt: null,
+  endsAt: null,
+);
+
+AdRow _unknownAd() => const AdRow(
+  id: 2,
+  title: '외부 상태 광고',
+  imageUrl: null,
+  linkUrl: 'https://example.com/unknown',
+  slot: 'DASHBOARD_TOP',
+  weight: 1,
+  status: 'VENDOR_ESCALATED',
   startsAt: null,
   endsAt: null,
 );
@@ -154,5 +169,107 @@ void main() {
     expect(find.text('보존할 광고 제목'), findsOneWidget);
     expect(find.text('https://example.com/ad'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'row switch exposes one enabled tap action and invokes update once',
+    (tester) async {
+      var updates = 0;
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            adsListProvider.overrideWithValue(
+              ({slot, status}) async => [_ad()],
+            ),
+            adSettingsGetProvider.overrideWithValue(() async => true),
+            adSlotConfigListProvider.overrideWithValue(() async => []),
+            adUpdateProvider.overrideWithValue((id, draft) async {
+              updates++;
+              return draft;
+            }),
+          ],
+          child: MaterialApp(
+            theme: DpTheme.light(),
+            home: const AdminAdsPage(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final node = tester.getSemantics(
+        find.byKey(const ValueKey('ad-status-switch-1')),
+      );
+      final data = node.getSemanticsData();
+      expect(data.flagsCollection.isEnabled, Tristate.isTrue);
+      expect(data.hasAction(SemanticsAction.tap), isTrue);
+
+      tester.semantics.tap(find.semantics.byLabel('첫 배너 광고 상태: 노출 중 (ACTIVE)'));
+      await tester.pumpAndSettle();
+      expect(updates, 1);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('global and row switch failures stay visible without throwing', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          adsListProvider.overrideWithValue(({slot, status}) async => [_ad()]),
+          adSettingsGetProvider.overrideWithValue(() async => true),
+          adSlotConfigListProvider.overrideWithValue(() async => []),
+          adSettingsSetProvider.overrideWithValue(
+            (enabled) async => throw const ApiException(
+              code: ApiErrorCode.unknown,
+              message: '전역 저장 실패',
+            ),
+          ),
+          adUpdateProvider.overrideWithValue(
+            (id, draft) async => throw const ApiException(
+              code: ApiErrorCode.unknown,
+              message: '상태 저장 실패',
+            ),
+          ),
+        ],
+        child: MaterialApp(theme: DpTheme.light(), home: const AdminAdsPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(Switch).first);
+    await tester.pumpAndSettle();
+    expect(find.text('전역 저장 실패'), findsOneWidget);
+
+    await tester.tap(find.byType(Switch).last);
+    await tester.pumpAndSettle();
+    expect(find.text('상태 저장 실패'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('unknown ad status is raw-only with disabled semantics/actions', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          adsListProvider.overrideWithValue(
+            ({slot, status}) async => [_unknownAd()],
+          ),
+          adSettingsGetProvider.overrideWithValue(() async => true),
+          adSlotConfigListProvider.overrideWithValue(() async => []),
+        ],
+        child: MaterialApp(theme: DpTheme.light(), home: const AdminAdsPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final data = tester
+        .getSemantics(find.byKey(const ValueKey('ad-status-switch-2')))
+        .getSemanticsData();
+    expect(data.flagsCollection.isEnabled, Tristate.isFalse);
+    expect(data.hasAction(SemanticsAction.tap), isFalse);
+    expect(find.byIcon(DpIcons.moreVert), findsNothing);
+    expect(find.byType(Checkbox), findsNothing);
   });
 }

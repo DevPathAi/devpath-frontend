@@ -17,9 +17,10 @@ class _SpyController extends UsersController {
   final List<String> preApprovedEmails = [];
 
   @override
-  Future<void> approve(String userId) async {
+  Future<String?> approve(String userId) async {
     approvedIds.add(userId);
     // load()를 실제 호출하지 않으므로 state를 직접 갱신하지 않음
+    return null;
   }
 
   @override
@@ -123,6 +124,9 @@ void main() {
     expect(find.text('영구 밴'), findsNothing); // BETA_PENDING엔 제재 없음
 
     await tester.tap(find.widgetWithText(MenuItemButton, '승인'));
+    await tester.pumpAndSettle();
+    expect(find.text('사용자 승인'), findsOneWidget);
+    await tester.tap(find.text('승인 확정'));
     await tester.pumpAndSettle();
     expect(spy.approvedIds, contains('u-pending'));
   });

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../shell/presentation/admin_shell.dart';
 import '../../../design/admin_status_catalog.dart';
+import '../../../widgets/admin_danger_dialog.dart';
 import '../../../widgets/admin_status_widgets.dart';
 import '../application/reports_controller.dart';
 import '../data/report.dart';
@@ -20,7 +21,7 @@ class ReportsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(reportsProvider);
     final n = ref.read(reportsProvider.notifier);
-    final current = s is ReportsLoaded ? s.status : 'OPEN';
+    final current = s.status;
 
     // 문서형 화면 — 헤더(필터 슬롯 포함)를 첫 sliver로 실어 본문과 함께
     // 스크롤시킨다(DESIGN.md §9). 필터는 Task 9에서 이미 헤더 슬롯으로 옮겼다.
@@ -65,8 +66,9 @@ class ReportsPage extends ConsumerWidget {
                   for (final r in reports)
                     _ReportCard(
                       report: r,
-                      onResolve: () => n.resolve(r.id, 'RESOLVE'),
-                      onReject: () => n.resolve(r.id, 'REJECT'),
+                      onResolve: () =>
+                          _confirmDecision(context, n, r, 'RESOLVE'),
+                      onReject: () => _confirmDecision(context, n, r, 'REJECT'),
                     ),
                 ],
               ),
@@ -74,6 +76,25 @@ class ReportsPage extends ConsumerWidget {
           },
         ],
       ),
+    );
+  }
+
+  Future<void> _confirmDecision(
+    BuildContext context,
+    ReportsController controller,
+    AdminReport report,
+    String action,
+  ) async {
+    final rejecting = action == 'REJECT';
+    await showAdminDangerDialog(
+      context: context,
+      title: rejecting ? '신고 기각' : '신고 처리 완료',
+      impact:
+          '신고 #${report.id} 판정은 즉시 반영되며 현재 목록에서 사라질 수 있습니다. '
+          '${rejecting ? '기각' : '처리 완료'} 여부를 다시 확인해 주세요.',
+      confirmLabel: rejecting ? '기각 확정' : '처리 완료 확정',
+      confirmationValue: '신고 #${report.id}',
+      onConfirm: () => controller.resolve(report.id, action),
     );
   }
 }

@@ -46,21 +46,21 @@ final Map<String, MockFixture> adminMockFixtures = {
     {
       'data': [
         {
-          'id': 'u1',
+          'id': '1',
           'nickname': '지수',
           'email': 'a@x.com',
           'role': 'LEARNER',
-          'status': 'ACTIVE',
+          'status': 'BETA_PENDING',
         },
         {
-          'id': 'u2',
+          'id': '2',
           'nickname': '민준',
           'email': 'b@x.com',
           'role': 'PRO',
-          'status': 'WARNED',
+          'status': 'ACTIVE',
         },
         {
-          'id': 'u3',
+          'id': '3',
           'nickname': '서연',
           'email': 'c@x.com',
           'role': 'LEARNER',
@@ -71,7 +71,8 @@ final Map<String, MockFixture> adminMockFixtures = {
       'limit': 20,
     },
   ),
-  'POST /admin/users/u1/sanction': (200, {'ok': true}),
+  'POST /admin/users/1/approve': (204, <String, dynamic>{}),
+  'POST /admin/users/2/sanction': (200, {'ok': true}),
   'POST /admin/users/bulk-approve': (204, <String, dynamic>{}),
   'POST /admin/ads/bulk-delete': (204, <String, dynamic>{}),
   // 신고(A-006). 경로가 /admin/reports 가 아니라 /community/admin/reports 인 이유는

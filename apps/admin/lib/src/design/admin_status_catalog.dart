@@ -64,4 +64,7 @@ abstract final class AdminStatusCatalog {
       isKnown: false,
     );
   }
+
+  static bool isKnown(AdminStatusDomain domain, String wire) =>
+      resolve(domain, wire).isKnown;
 }

@@ -37,6 +37,13 @@ class _S extends ConsumerState<AdminUsersPage> {
   }
 
   Widget _rowMenu(BuildContext context, UsersController n, AdminUserRow r) {
+    final known = AdminStatusCatalog.isKnown(AdminStatusDomain.user, r.status);
+    if (!known) {
+      return const Tooltip(
+        message: '알 수 없는 상태는 읽기 전용입니다',
+        child: Icon(DpIcons.error),
+      );
+    }
     return MenuAnchor(
       builder: (context, controller, child) => IconButton(
         icon: const Icon(DpIcons.moreVert),
@@ -47,7 +54,7 @@ class _S extends ConsumerState<AdminUsersPage> {
       menuChildren: r.status == 'BETA_PENDING'
           ? [
               MenuItemButton(
-                onPressed: () => n.approve(r.id),
+                onPressed: () => _confirmApprove(context, n, r),
                 child: const Text('승인'),
               ),
             ]
@@ -102,7 +109,8 @@ class _S extends ConsumerState<AdminUsersPage> {
                     key: const Key('users-bulk-bar'),
                     count: s.selectedIds.length,
                     actionLabel: '승인',
-                    onAction: n.bulkApprove,
+                    onAction: () =>
+                        _confirmBulkApprove(context, n, s.selectedIds.length),
                     onClear: n.clearSelection,
                   ),
           ),
@@ -135,7 +143,14 @@ class _S extends ConsumerState<AdminUsersPage> {
                   for (final r in s.rows)
                     DataRow2(
                       selected: s.selectedIds.contains(r.id),
-                      onSelectChanged: (_) => n.toggleSelect(r.id),
+                      onSelectChanged:
+                          r.status == 'BETA_PENDING' &&
+                              AdminStatusCatalog.isKnown(
+                                AdminStatusDomain.user,
+                                r.status,
+                              )
+                          ? (_) => n.toggleSelect(r.id)
+                          : null,
                       cells: [
                         DataCell(Text(r.nickname)),
                         DataCell(Text(r.email)),
@@ -172,6 +187,38 @@ class _S extends ConsumerState<AdminUsersPage> {
           '계정 사용에 즉시 영향을 줄 수 있습니다.',
       confirmLabel: '조치 적용',
       onConfirm: () => controller.sanction(row.id, action),
+    );
+  }
+
+  Future<void> _confirmApprove(
+    BuildContext context,
+    UsersController controller,
+    AdminUserRow row,
+  ) async {
+    await showAdminDangerDialog(
+      context: context,
+      title: '사용자 승인',
+      impact:
+          '${row.nickname} (${row.email}) 사용자에게 베타 접근 권한을 부여합니다. '
+          '승인 즉시 서비스를 이용할 수 있습니다.',
+      confirmLabel: '승인 확정',
+      onConfirm: () => controller.approve(row.id),
+    );
+  }
+
+  Future<void> _confirmBulkApprove(
+    BuildContext context,
+    UsersController controller,
+    int count,
+  ) async {
+    await showAdminDangerDialog(
+      context: context,
+      title: '선택한 사용자 $count명 승인',
+      impact:
+          '선택한 승인 대기 사용자 $count명에게 베타 접근 권한을 부여합니다. '
+          '현재 상태를 다시 검증한 뒤 승인 가능한 사용자만 처리합니다.',
+      confirmLabel: '$count명 승인',
+      onConfirm: controller.bulkApprove,
     );
   }
 }
