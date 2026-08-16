@@ -76,7 +76,7 @@ void main() {
   testWidgets('수신 메시지 → 목록에 제목·본문 표시', (tester) async {
     final (:container, :push) = _setup();
     await _emit(tester, container, push, const [
-      PushMessage(id: '1', title: '새 멘토 답변', body: '리뷰가 도착했어요'),
+      PushMessage.local(id: '1', title: '새 멘토 답변', body: '리뷰가 도착했어요'),
     ]);
 
     await tester.pumpWidget(_host(container));
@@ -90,7 +90,7 @@ void main() {
   testWidgets('진입 시 미읽음을 읽음 처리(markAllRead) + 목록 유지', (tester) async {
     final (:container, :push) = _setup();
     await _emit(tester, container, push, const [
-      PushMessage(id: '1', title: 'A', body: 'a'),
+      PushMessage.local(id: '1', title: 'A', body: 'a'),
     ]);
     expect(container.read(notificationControllerProvider).unreadCount, 1);
 

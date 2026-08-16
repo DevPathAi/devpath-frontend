@@ -131,7 +131,7 @@ void main() {
       final (:container, :push) = _setup();
       final sub = container.listen(notificationControllerProvider, (_, _) {});
       addTearDown(sub.close);
-      const duplicate = PushMessage(id: 'same', title: 'A', body: 'a');
+      const duplicate = PushMessage.local(id: 'same', title: 'A', body: 'a');
 
       push.add(duplicate);
       push.add(duplicate);
@@ -148,8 +148,8 @@ void main() {
       final sub = container.listen(notificationControllerProvider, (_, _) {});
       addTearDown(sub.close);
 
-      push.add(const PushMessage(id: '1', title: '첫 알림', body: '본문1'));
-      push.add(const PushMessage(id: '2', title: '둘째 알림', body: '본문2'));
+      push.add(const PushMessage.local(id: '1', title: '첫 알림', body: '본문1'));
+      push.add(const PushMessage.local(id: '2', title: '둘째 알림', body: '본문2'));
       await pumpEventQueue();
 
       final s = container.read(notificationControllerProvider);
@@ -163,7 +163,7 @@ void main() {
       addTearDown(sub.close);
 
       push.add(
-        const PushMessage(
+        const PushMessage.ownerScoped(
           id: 'owner-b-only',
           title: 'B 전용',
           body: 'A에게 보이면 안 됨',
@@ -175,12 +175,33 @@ void main() {
       expect(container.read(notificationControllerProvider).messages, isEmpty);
     });
 
+    test('비어 있는 production owner scope는 저장하거나 열지 않는다', () async {
+      final (:container, :push) = _setup();
+      final sub = container.listen(notificationControllerProvider, (_, _) {});
+      addTearDown(sub.close);
+      const unscoped = PushMessage.ownerScoped(
+        id: 'unscoped',
+        title: '잘못된 원격 알림',
+        body: '폐기',
+        intendedOwnerKey: '   ',
+        target: PushTarget.today(pathId: 301),
+      );
+
+      push.add(unscoped);
+      await pumpEventQueue();
+      container.read(notificationControllerProvider.notifier).open(unscoped);
+
+      final state = container.read(notificationControllerProvider);
+      expect(state.messages, isEmpty);
+      expect(state.navigationTarget, isNull);
+    });
+
     test('markAllRead는 미읽음을 0으로 만들고 목록은 유지한다', () async {
       final (:container, :push) = _setup();
       final sub = container.listen(notificationControllerProvider, (_, _) {});
       addTearDown(sub.close);
 
-      push.add(const PushMessage(id: '1', title: 'A', body: 'a'));
+      push.add(const PushMessage.local(id: '1', title: 'A', body: 'a'));
       await pumpEventQueue();
       expect(container.read(notificationControllerProvider).unreadCount, 1);
 
@@ -195,10 +216,11 @@ void main() {
       'cold/warm notification taps expose only typed native targets',
       () async {
         final push = _FakeInteractivePush(
-          initial: const PushMessage(
+          initial: const PushMessage.ownerScoped(
             id: 'cold',
             title: 'Today',
             body: '이어하기',
+            intendedOwnerKey: 'owner-a',
             target: PushTarget.today(pathId: 301),
           ),
         );
@@ -232,10 +254,11 @@ void main() {
             .consumeNavigation();
 
         push.openedController.add(
-          const PushMessage(
+          const PushMessage.ownerScoped(
             id: 'warm',
             title: 'Content',
             body: '이어하기',
+            intendedOwnerKey: 'owner-a',
             target: PushTarget.content(taskId: 302, contentId: 77),
           ),
         );
@@ -273,7 +296,9 @@ void main() {
           (_, _) {},
         );
         addTearDown(subscription.close);
-        pushController.add(const PushMessage(id: '1', title: 'A', body: 'a'));
+        pushController.add(
+          const PushMessage.local(id: '1', title: 'A', body: 'a'),
+        );
         await pumpEventQueue();
         expect(container.read(notificationControllerProvider).unreadCount, 1);
 
@@ -308,10 +333,11 @@ void main() {
 
       container.read(_ownerProvider.notifier).setOwner(null);
       push.openedController.add(
-        const PushMessage(
+        const PushMessage.ownerScoped(
           id: 'owner-a-after-logout',
           title: 'A 전용',
           body: 'B에게 보이면 안 됨',
+          intendedOwnerKey: 'owner-a',
           target: PushTarget.today(pathId: 301),
         ),
       );
@@ -348,10 +374,11 @@ void main() {
       addTearDown(subscription.close);
 
       push.openedController.add(
-        const PushMessage(
+        const PushMessage.ownerScoped(
           id: 'late-owner-a',
           title: 'A 전용',
           body: '지연',
+          intendedOwnerKey: 'owner-a',
           target: PushTarget.content(taskId: 302, contentId: 77),
         ),
       );

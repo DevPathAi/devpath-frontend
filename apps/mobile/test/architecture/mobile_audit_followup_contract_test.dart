@@ -24,9 +24,7 @@ void main() {
     );
     expect(
       manifest,
-      contains(
-        'android:pathAdvancedPattern="/path/[1-9][0-9]{0,14}/today"',
-      ),
+      contains('android:pathAdvancedPattern="/path/[1-9][0-9]{0,14}/today"'),
     );
     expect(
       manifest,
@@ -34,7 +32,10 @@ void main() {
         'android:pathAdvancedPattern="/mission/[1-9][0-9]{0,14}/content/[1-9][0-9]{0,14}"',
       ),
     );
-    expect(manifest, contains('<uri-relative-filter-group android:allow="false">'));
+    expect(
+      manifest,
+      contains('<uri-relative-filter-group android:allow="false">'),
+    );
     expect(manifest, contains('android:queryPattern=".*"'));
     expect(manifest, contains('android:fragmentPattern=".*"'));
     expect(manifest, isNot(contains('android:pathPattern=')));
@@ -63,9 +64,7 @@ void main() {
 
       expect(resolves('https://app.leva.ai.kr/path/301/today'), isTrue);
       expect(
-        resolves(
-          'https://app.leva.ai.kr/mission/999999999999999/content/77',
-        ),
+        resolves('https://app.leva.ai.kr/mission/999999999999999/content/77'),
         isTrue,
       );
       for (final rejected in [
@@ -77,6 +76,8 @@ void main() {
         'https://app.leva.ai.kr/mission/0/content/77',
         'https://app.leva.ai.kr/path/9007199254740992/today',
         'https://app.leva.ai.kr/path/301/today?source=push',
+        'https://app.leva.ai.kr/mission/302/content/9007199254740992',
+        'https://app.leva.ai.kr/mission/302/content/77?source=push',
         'https://app.leva.ai.kr/path/301/today#content',
       ]) {
         expect(resolves(rejected), isFalse, reason: rejected);
@@ -107,6 +108,8 @@ void main() {
       'https://app.leva.ai.kr/path/301/today',
       'https://app.leva.ai.kr/path/9007199254740992/today',
       'https://app.leva.ai.kr/path/301/today?source=push',
+      'https://app.leva.ai.kr/mission/302/content/9007199254740992',
+      'https://app.leva.ai.kr/mission/302/content/77?source=push',
       'https://app.leva.ai.kr/path/301/today#content',
       '--adb',
     ]) {

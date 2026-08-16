@@ -7,13 +7,24 @@ import '../providers/api_providers.dart';
 /// 수신 푸시 메시지 1건. 실 FCM `RemoteMessage`를 이 형태로 매핑한다(후속).
 /// 알림센터 목록·미읽음 배지의 단위.
 class PushMessage {
-  const PushMessage({
+  /// Explicit local-only path used by deterministic fakes and in-process
+  /// notifications. Production FCM payloads must use [ownerScoped].
+  const PushMessage.local({
     required this.id,
     required this.title,
     required this.body,
     this.target,
-    this.intendedOwnerKey,
-  });
+  }) : intendedOwnerKey = null,
+       scope = PushMessageScope.local;
+
+  /// A production message whose owner was supplied by the trusted backend.
+  const PushMessage.ownerScoped({
+    required this.id,
+    required this.title,
+    required this.body,
+    required this.intendedOwnerKey,
+    this.target,
+  }) : scope = PushMessageScope.remoteOwner;
 
   /// 메시지 식별자(FCM `messageId`). 목록 키·중복 제거에 사용.
   final String id;
@@ -21,7 +32,19 @@ class PushMessage {
   final String body;
   final PushTarget? target;
   final String? intendedOwnerKey;
+  final PushMessageScope scope;
+
+  bool isForOwner(String ownerKey) => switch (scope) {
+    PushMessageScope.local => true,
+    PushMessageScope.remoteOwner =>
+      intendedOwnerKey != null &&
+          intendedOwnerKey!.isNotEmpty &&
+          intendedOwnerKey == intendedOwnerKey!.trim() &&
+          intendedOwnerKey == ownerKey,
+  };
 }
+
+enum PushMessageScope { local, remoteOwner }
 
 enum PushTargetKind { today, content }
 
@@ -131,13 +154,17 @@ class StubPushService
 }
 
 /// FCM `RemoteMessage` → [PushMessage] 매핑(순수 함수). 단위 테스트 대상.
-PushMessage pushMessageFromRemote(RemoteMessage m) => PushMessage(
-  id: m.messageId ?? '',
-  title: m.notification?.title ?? '',
-  body: m.notification?.body ?? '',
-  target: PushTarget.fromData(m.data),
-  intendedOwnerKey: _pushOwnerKey(m.data),
-);
+PushMessage? pushMessageFromRemote(RemoteMessage m) {
+  final ownerKey = _pushOwnerKey(m.data);
+  if (ownerKey == null) return null;
+  return PushMessage.ownerScoped(
+    id: m.messageId ?? '',
+    title: m.notification?.title ?? '',
+    body: m.notification?.body ?? '',
+    target: PushTarget.fromData(m.data),
+    intendedOwnerKey: ownerKey,
+  );
+}
 
 String? _pushOwnerKey(Map<String, dynamic> data) {
   final raw = data['ownerKey'] ?? data['userId'];
@@ -180,8 +207,10 @@ class FcmPushService
   Future<String?> getToken() => _fm.getToken();
 
   @override
-  Stream<PushMessage> get incoming =>
-      FirebaseMessaging.onMessage.map(pushMessageFromRemote);
+  Stream<PushMessage> get incoming => FirebaseMessaging.onMessage
+      .map(pushMessageFromRemote)
+      .where((message) => message != null)
+      .cast<PushMessage>();
 
   @override
   Future<PushMessage?> initialMessage() async {
@@ -190,8 +219,10 @@ class FcmPushService
   }
 
   @override
-  Stream<PushMessage> get opened =>
-      FirebaseMessaging.onMessageOpenedApp.map(pushMessageFromRemote);
+  Stream<PushMessage> get opened => FirebaseMessaging.onMessageOpenedApp
+      .map(pushMessageFromRemote)
+      .where((message) => message != null)
+      .cast<PushMessage>();
 
   @override
   Future<bool> requestPermission() async {

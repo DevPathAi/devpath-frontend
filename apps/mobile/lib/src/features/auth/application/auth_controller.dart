@@ -108,18 +108,39 @@ class AuthController extends Notifier<AuthState> {
       final json = await _client.get<Map<String, dynamic>>('/users/me');
       if (!_isCurrent(epoch)) return;
       final user = User.fromJson(json);
+      var switchRevocationFailed = false;
       final saved = await _mutateCredentials(() async {
         if (!_isCurrent(epoch)) return false;
         if (previousUser != null && previousUser.id != user.id) {
-          await ref.read(accountEpochStoreProvider).advance();
-          await ref
-              .read(accountDataCleanerProvider)
-              .clearOwner(previousUser.id);
+          switchRevocationFailed = !await _revokePush(previousUser.id);
+          try {
+            await ref.read(accountEpochStoreProvider).advance();
+            await ref
+                .read(accountDataCleanerProvider)
+                .clearOwner(previousUser.id);
+          } finally {
+            if (switchRevocationFailed) {
+              await _store.clear();
+              await ref.read(verifiedSessionStoreProvider).clear();
+              await ref
+                  .read(keyValueStoreProvider)
+                  .delete(PendingDeepLinkController.storageKey);
+            }
+          }
+          if (switchRevocationFailed) return _isCurrent(epoch);
         }
+        if (!_isCurrent(epoch)) return false;
         await ref.read(verifiedSessionStoreProvider).write(user);
         return _isCurrent(epoch);
       });
       if (!saved) return;
+      if (switchRevocationFailed) {
+        ref.read(pendingDeepLinkProvider.notifier).consume();
+        state = const AuthUnauthenticated(
+          error: '이전 계정의 알림 연결을 해제하지 못했어요. 다시 로그인해 주세요.',
+        );
+        return;
+      }
       state = AuthAuthenticated(user);
     } on ApiException catch (e) {
       if (!_isCurrent(epoch)) return;
@@ -284,12 +305,14 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
-  Future<void> _revokePush(String? ownerKey) async {
-    if (ownerKey == null) return;
+  Future<bool> _revokePush(String? ownerKey) async {
+    if (ownerKey == null) return true;
     try {
       await ref.read(deviceRegistrarProvider).unregister(ownerKey);
+      return true;
     } on Object {
       // Credential and owner cleanup must remain fail-closed locally.
+      return false;
     }
   }
 

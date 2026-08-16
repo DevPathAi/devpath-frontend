@@ -42,9 +42,11 @@
                 <data android:scheme="devpath" android:host="open"/>
             </intent-filter>
         </activity>
-        <!-- Android's exact pathAdvancedPattern exists from API 31. The alias
-             is disabled on older releases so they leave every HTTPS link in
-             the browser instead of degrading to a host-wide match. -->
+        <!-- URI-relative deny groups exist from API 35. The alias is disabled
+             on older releases so query/fragment-bearing HTTPS links remain in
+             the browser instead of degrading to a host-wide match. Android's
+             15-digit ID envelope is intentionally stricter than Dart's full
+             JavaScript-safe range. -->
         <activity-alias
             android:name=".MissionLinkActivity"
             android:targetActivity=".MainActivity"
@@ -54,13 +56,31 @@
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
-                <data android:scheme="https" android:host="app.leva.ai.kr" android:pathAdvancedPattern="/path/[1-9][0-9]*/today"/>
+                <data android:scheme="https" android:host="app.leva.ai.kr"/>
+                <uri-relative-filter-group android:allow="false">
+                    <data android:queryPattern=".*"/>
+                </uri-relative-filter-group>
+                <uri-relative-filter-group android:allow="false">
+                    <data android:fragmentPattern=".*"/>
+                </uri-relative-filter-group>
+                <uri-relative-filter-group android:allow="true">
+                    <data android:pathAdvancedPattern="/path/[1-9][0-9]{0,14}/today"/>
+                </uri-relative-filter-group>
             </intent-filter>
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
-                <data android:scheme="https" android:host="app.leva.ai.kr" android:pathAdvancedPattern="/mission/[1-9][0-9]*/content/[1-9][0-9]*"/>
+                <data android:scheme="https" android:host="app.leva.ai.kr"/>
+                <uri-relative-filter-group android:allow="false">
+                    <data android:queryPattern=".*"/>
+                </uri-relative-filter-group>
+                <uri-relative-filter-group android:allow="false">
+                    <data android:fragmentPattern=".*"/>
+                </uri-relative-filter-group>
+                <uri-relative-filter-group android:allow="true">
+                    <data android:pathAdvancedPattern="/mission/[1-9][0-9]{0,14}/content/[1-9][0-9]{0,14}"/>
+                </uri-relative-filter-group>
             </intent-filter>
         </activity-alias>
         <!-- Don't delete the meta-data below.

@@ -34,7 +34,7 @@ void main() {
           data: {'ownerKey': 'owner-a', 'targetType': 'TODAY', 'pathId': '301'},
         ),
       );
-      expect(owned.intendedOwnerKey, 'owner-a');
+      expect(owned?.intendedOwnerKey, 'owner-a');
 
       final rejected = pushMessageFromRemote(
         const RemoteMessage(
@@ -49,22 +49,27 @@ void main() {
       expect(rejected?.target, isNull);
     });
 
-    test('production remote messages without a nonempty owner are rejected', () {
-      for (final data in [
-        <String, dynamic>{'targetType': 'TODAY', 'pathId': '301'},
-        <String, dynamic>{
-          'ownerKey': '   ',
-          'targetType': 'TODAY',
-          'pathId': '301',
-        },
-      ]) {
-        expect(
-          pushMessageFromRemote(RemoteMessage(messageId: 'unscoped', data: data)),
-          isNull,
-          reason: data.toString(),
-        );
-      }
-    });
+    test(
+      'production remote messages without a nonempty owner are rejected',
+      () {
+        for (final data in [
+          <String, dynamic>{'targetType': 'TODAY', 'pathId': '301'},
+          <String, dynamic>{
+            'ownerKey': '   ',
+            'targetType': 'TODAY',
+            'pathId': '301',
+          },
+        ]) {
+          expect(
+            pushMessageFromRemote(
+              RemoteMessage(messageId: 'unscoped', data: data),
+            ),
+            isNull,
+            reason: data.toString(),
+          );
+        }
+      },
+    );
 
     test('incoming은 빈 스트림이다(스텁: 포그라운드 수신 없음)', () async {
       final svc = StubPushService();

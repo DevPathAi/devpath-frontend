@@ -36,8 +36,14 @@ void main(List<String> args) {
   final androidLinkDefault = File(
     '${root.path}/apps/mobile/android/app/src/main/res/values/bools.xml',
   );
-  final androidLinkV31 = File(
-    '${root.path}/apps/mobile/android/app/src/main/res/values-v31/bools.xml',
+  final androidLinkV35 = File(
+    '${root.path}/apps/mobile/android/app/src/main/res/values-v35/bools.xml',
+  );
+  final androidLinkProbe = File(
+    '${root.path}/apps/mobile/tools/mobile_android_link_contract.dart',
+  );
+  final companionReleaseGates = File(
+    '${root.path}/apps/mobile/docs/MISSION_COMPANION_RELEASE_GATES.md',
   );
   final mobileLib = Directory('${root.path}/apps/mobile/lib');
 
@@ -50,7 +56,9 @@ void main(List<String> args) {
     iosFirebaseExample,
     fcmDocs,
     androidLinkDefault,
-    androidLinkV31,
+    androidLinkV35,
+    androidLinkProbe,
+    companionReleaseGates,
   ]) {
     if (!required.existsSync()) _fail('missing ${required.path}');
   }
@@ -92,10 +100,15 @@ void main(List<String> args) {
         'android:enabled="@bool/enable_exact_app_links"',
       ) ||
       !manifestSource.contains(
-        'android:pathAdvancedPattern="/path/[1-9][0-9]*/today"',
+        'android:pathAdvancedPattern="/path/[1-9][0-9]{0,14}/today"',
       ) ||
       !manifestSource.contains(
-        'android:pathAdvancedPattern="/mission/[1-9][0-9]*/content/[1-9][0-9]*"',
+        'android:pathAdvancedPattern="/mission/[1-9][0-9]{0,14}/content/[1-9][0-9]{0,14}"',
+      ) ||
+      !manifestSource.contains('android:queryPattern=".*"') ||
+      !manifestSource.contains('android:fragmentPattern=".*"') ||
+      !manifestSource.contains(
+        '<uri-relative-filter-group android:allow="false">',
       ) ||
       manifestSource.contains('android:pathPattern=') ||
       manifestSource.contains('android:pathPrefix="/mission/"')) {
@@ -106,10 +119,33 @@ void main(List<String> args) {
   if (!androidLinkDefault.readAsStringSync().contains(
         '<bool name="enable_exact_app_links">false</bool>',
       ) ||
-      !androidLinkV31.readAsStringSync().contains(
+      !androidLinkV35.readAsStringSync().contains(
         '<bool name="enable_exact_app_links">true</bool>',
       )) {
-    _fail('Android exact-link alias does not fail closed before API 31');
+    _fail('Android exact-link alias does not fail closed before API 35');
+  }
+  if (Directory(
+    '${root.path}/apps/mobile/android/app/src/main/res/values-v31',
+  ).existsSync()) {
+    _fail('Android exact-link alias must not activate before API 35');
+  }
+  final linkProbeResult = Process.runSync(Platform.resolvedExecutable, [
+    androidLinkProbe.path,
+  ]);
+  if (linkProbeResult.exitCode != 0) {
+    _fail('Android link source probe failed: ${linkProbeResult.stderr}');
+  }
+  final releaseGateSource = companionReleaseGates.readAsStringSync();
+  for (final marker in [
+    'API 35',
+    '999999999999999',
+    'query',
+    'fragment',
+    '--adb',
+  ]) {
+    if (!releaseGateSource.contains(marker)) {
+      _fail('mobile link release gate is missing: $marker');
+    }
   }
 
   final workflowSource = workflow.readAsStringSync();

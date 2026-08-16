@@ -90,7 +90,7 @@ void main() {
     final ctrl = StreamController<PushMessage>();
     addTearDown(ctrl.close);
     // 셸이 컨트롤러를 watch → 구독 시점에 버퍼된 수신이 전달되어 미읽음 1.
-    ctrl.add(const PushMessage(id: '1', title: '새 알림', body: '본문'));
+    ctrl.add(const PushMessage.local(id: '1', title: '새 알림', body: '본문'));
 
     await tester.pumpWidget(_host(_testRouter(), push: _FakePush(ctrl)));
     await tester.pumpAndSettle();

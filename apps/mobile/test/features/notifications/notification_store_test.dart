@@ -9,7 +9,7 @@ void main() {
     () async {
       final store = NotificationStore(InMemoryOwnerDataStore());
       final first = DateTime.utc(2026, 8, 16, 1);
-      const message = PushMessage(
+      const message = PushMessage.local(
         id: 'm1',
         title: '계속 학습',
         body: 'Async',
@@ -31,7 +31,7 @@ void main() {
     'concurrent delivery of one message ID increments durable state once',
     () async {
       final store = NotificationStore(InMemoryOwnerDataStore());
-      const message = PushMessage(id: 'same', title: 'A', body: 'a');
+      const message = PushMessage.local(id: 'same', title: 'A', body: 'a');
 
       final added = await Future.wait([
         store.add('owner-a', message, receivedAt: DateTime.utc(2026, 8, 16, 1)),
@@ -40,6 +40,40 @@ void main() {
 
       expect(added.where((value) => value), hasLength(1));
       expect(await store.list('owner-a'), hasLength(1));
+    },
+  );
+
+  test(
+    'owner-scoped rows reject mismatches and preserve the exact owner',
+    () async {
+      final store = NotificationStore(InMemoryOwnerDataStore());
+      const message = PushMessage.ownerScoped(
+        id: 'remote',
+        title: 'A only',
+        body: 'owner boundary',
+        intendedOwnerKey: 'owner-a',
+      );
+
+      expect(
+        await store.add(
+          'owner-b',
+          message,
+          receivedAt: DateTime.utc(2026, 8, 16),
+        ),
+        isFalse,
+      );
+      expect(
+        await store.add(
+          'owner-a',
+          message,
+          receivedAt: DateTime.utc(2026, 8, 16),
+        ),
+        isTrue,
+      );
+      expect(
+        (await store.list('owner-a')).single.message.intendedOwnerKey,
+        'owner-a',
+      );
     },
   );
 }

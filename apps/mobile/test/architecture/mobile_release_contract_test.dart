@@ -38,9 +38,7 @@ void main() {
     expect(android, contains('android:host="app.leva.ai.kr"'));
     expect(
       android,
-      contains(
-        'android:pathAdvancedPattern="/path/[1-9][0-9]{0,14}/today"',
-      ),
+      contains('android:pathAdvancedPattern="/path/[1-9][0-9]{0,14}/today"'),
     );
     expect(
       android,

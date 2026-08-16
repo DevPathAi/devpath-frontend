@@ -27,33 +27,58 @@ class DeviceRegistrar {
   StreamSubscription<String>? _refreshSubscription;
   Future<void> _operationTail = Future<void>.value();
   String? _activeOwner;
+  String? _approvedOwner;
+  int? _approvedEpoch;
+  String? _subscriptionOwner;
+  int? _subscriptionEpoch;
   var _lifecycleEpoch = 0;
 
   /// Called only after the authenticated user has completed explicit consent.
   /// Permission is requested before FCM token creation/registration.
-  Future<void> activate(String ownerKey) {
+  Future<void> activate(String ownerKey) async {
     _activeOwner = ownerKey;
     final epoch = ++_lifecycleEpoch;
-    _ensureRefreshSubscription();
-    return _serialize(() async {
-      if (!_isCurrent(ownerKey, epoch)) return;
-      final lifecycle = _push is PushTokenLifecycleService
-          ? _push as PushTokenLifecycleService
-          : null;
-      if (lifecycle != null && !await lifecycle.requestPermission()) return;
-      if (!_isCurrent(ownerKey, epoch)) return;
+    // Invalidate the old permission grant synchronously. A refresh callback
+    // already queued by the previous account must fail before async cleanup.
+    _approvedOwner = null;
+    _approvedEpoch = null;
+    await _cancelRefreshSubscription();
+    if (!_isCurrent(ownerKey, epoch)) return;
+    final lifecycle = _push is PushTokenLifecycleService
+        ? _push as PushTokenLifecycleService
+        : null;
+    try {
+      if (lifecycle != null && !await lifecycle.requestPermission()) {
+        if (_clearDeniedActivation(ownerKey, epoch)) {
+          await _serialize(
+            () => _unregisterNow(ownerKey, deletePlatformToken: true),
+          );
+        }
+        return;
+      }
+    } on Object {
+      if (_clearDeniedActivation(ownerKey, epoch)) {
+        await _serialize(
+          () => _unregisterNow(ownerKey, deletePlatformToken: true),
+        );
+      }
+      rethrow;
+    }
+    if (!_isCurrent(ownerKey, epoch)) return;
+    _approvedOwner = ownerKey;
+    _approvedEpoch = epoch;
+    final registration = _serialize(() async {
+      if (!_isApproved(ownerKey, epoch)) return;
       final token = await _push.getToken();
-      if (token == null || token.isEmpty || !_isCurrent(ownerKey, epoch)) {
+      if (token == null || token.isEmpty || !_isApproved(ownerKey, epoch)) {
         return;
       }
       await _registerToken(ownerKey, token, epoch: epoch);
     });
-  }
-
-  Future<void> register([String ownerKey = '__legacy__']) async {
-    final token = await _push.getToken();
-    if (token == null || token.isEmpty) return;
-    await _registerToken(ownerKey, token);
+    // `_serialize` updates the tail synchronously, so even a synchronous
+    // refresh emission is ordered after the initial approved registration.
+    _ensureRefreshSubscription(ownerKey, epoch);
+    await registration;
   }
 
   Future<void> _registerToken(
@@ -82,81 +107,137 @@ class DeviceRegistrar {
   /// Revokes the server registration while the bearer credential still
   /// exists, then invalidates the platform token even if the server is down.
   Future<void> unregister(String ownerKey) {
-    if (_activeOwner == ownerKey) _activeOwner = null;
-    _lifecycleEpoch += 1;
-    return _serialize(() async {
-      String? token;
+    final shouldDeletePlatformToken =
+        _activeOwner == null || _activeOwner == ownerKey;
+    if (_activeOwner == ownerKey || _approvedOwner == ownerKey) {
+      _activeOwner = null;
+      _approvedOwner = null;
+      _approvedEpoch = null;
+      _lifecycleEpoch += 1;
+    }
+    return _serialize(
+      () => _unregisterNow(
+        ownerKey,
+        deletePlatformToken: shouldDeletePlatformToken,
+      ),
+    );
+  }
+
+  Future<void> _unregisterNow(
+    String ownerKey, {
+    required bool deletePlatformToken,
+  }) async {
+    await _cancelRefreshSubscription(ownerKey: ownerKey);
+    Object? failure;
+    StackTrace? failureStack;
+    void capture(Object error, StackTrace stackTrace) {
+      failure ??= error;
+      failureStack ??= stackTrace;
+    }
+
+    String? token;
+    try {
+      token = (await _registrations.read(
+        ownerKey,
+        _bucket,
+        _platform,
+      ))?.payload;
+    } on Object catch (error, stackTrace) {
+      capture(error, stackTrace);
+      // A damaged/unavailable local index must not skip FCM invalidation.
+    }
+    if (token != null && token.isNotEmpty) {
       try {
-        token = (await _registrations.read(
-          ownerKey,
-          _bucket,
-          _platform,
-        ))?.payload;
-      } on Object {
-        // A damaged/unavailable local index must not skip FCM invalidation.
+        await _serverUnregister(token);
+      } on Object catch (error, stackTrace) {
+        capture(error, stackTrace);
       }
-      if (token == null || token.isEmpty) {
-        try {
-          token = await _push.getToken();
-        } on Object {
-          // deleteToken below is still required when token lookup fails.
-        }
-      }
+    }
+    final lifecycle = _push is PushTokenLifecycleService
+        ? _push as PushTokenLifecycleService
+        : null;
+    if (lifecycle != null && deletePlatformToken) {
       try {
-        if (token != null && token.isNotEmpty) {
-          await _bestEffortServerUnregister(token);
-        }
-      } finally {
-        final lifecycle = _push is PushTokenLifecycleService
-            ? _push as PushTokenLifecycleService
-            : null;
-        if (lifecycle != null) {
-          try {
-            await lifecycle.deleteToken();
-          } on Object {
-            // Local account cleanup must continue if the platform rejects it.
-          }
-        }
-        try {
-          await _registrations.delete(ownerKey, _bucket, _platform);
-        } on Object {
-          // AccountDataCleaner remains the final owner-wide deletion boundary.
-        }
+        await lifecycle.deleteToken();
+      } on Object catch (error, stackTrace) {
+        capture(error, stackTrace);
+        // Local account cleanup must continue if the platform rejects it.
       }
-    });
+    }
+    try {
+      await _registrations.delete(ownerKey, _bucket, _platform);
+    } on Object catch (error, stackTrace) {
+      capture(error, stackTrace);
+      // AccountDataCleaner remains the final owner-wide deletion boundary.
+    }
+    if (failure != null) {
+      Error.throwWithStackTrace(failure!, failureStack!);
+    }
+  }
+
+  Future<void> _serverUnregister(String token) {
+    return _client.delete<dynamic>(
+      '/notifications/devices',
+      body: {'token': token, 'platform': _platform},
+    );
   }
 
   Future<void> _bestEffortServerUnregister(String token) async {
     try {
-      await _client.delete<dynamic>(
-        '/notifications/devices',
-        body: {'token': token, 'platform': _platform},
-      );
+      await _serverUnregister(token);
     } on Object {
       // A 401/offline server cannot prevent local token invalidation.
     }
   }
 
-  void _ensureRefreshSubscription() {
+  void _ensureRefreshSubscription(String ownerKey, int epoch) {
     if (_refreshSubscription != null || _push is! PushTokenLifecycleService) {
       return;
     }
     final lifecycle = _push as PushTokenLifecycleService;
+    _subscriptionOwner = ownerKey;
+    _subscriptionEpoch = epoch;
     _refreshSubscription = lifecycle.tokenRefresh.listen((token) {
-      final owner = _activeOwner;
-      final epoch = _lifecycleEpoch;
-      if (owner == null || token.isEmpty) return;
+      if (token.isEmpty || !_isRefreshCurrent(ownerKey, epoch)) return;
       unawaited(
         _serialize(() async {
-          if (!_isCurrent(owner, epoch)) return;
-          await _registerToken(owner, token, epoch: epoch);
+          if (!_isRefreshCurrent(ownerKey, epoch)) return;
+          await _registerToken(ownerKey, token, epoch: epoch);
         }).catchError((_) {}),
       );
     });
   }
 
+  Future<void> _cancelRefreshSubscription({String? ownerKey}) async {
+    if (ownerKey != null && _subscriptionOwner != ownerKey) return;
+    final subscription = _refreshSubscription;
+    _refreshSubscription = null;
+    _subscriptionOwner = null;
+    _subscriptionEpoch = null;
+    await subscription?.cancel();
+  }
+
+  bool _clearDeniedActivation(String ownerKey, int epoch) {
+    if (!_isCurrent(ownerKey, epoch)) return false;
+    _activeOwner = null;
+    _approvedOwner = null;
+    _approvedEpoch = null;
+    _lifecycleEpoch += 1;
+    return true;
+  }
+
   bool _isCurrent(String ownerKey, int epoch) =>
       _activeOwner == ownerKey && _lifecycleEpoch == epoch;
+
+  bool _isApproved(String ownerKey, int epoch) =>
+      _isCurrent(ownerKey, epoch) &&
+      _approvedOwner == ownerKey &&
+      _approvedEpoch == epoch;
+
+  bool _isRefreshCurrent(String ownerKey, int epoch) =>
+      _isApproved(ownerKey, epoch) &&
+      _subscriptionOwner == ownerKey &&
+      _subscriptionEpoch == epoch;
 
   Future<T> _serialize<T>(Future<T> Function() operation) {
     final result = _operationTail.then((_) => operation());
@@ -168,8 +249,11 @@ class DeviceRegistrar {
   }
 
   Future<void> dispose() async {
-    await _refreshSubscription?.cancel();
-    _refreshSubscription = null;
+    _activeOwner = null;
+    _approvedOwner = null;
+    _approvedEpoch = null;
+    _lifecycleEpoch += 1;
+    await _cancelRefreshSubscription();
   }
 }
 

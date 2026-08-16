@@ -30,7 +30,9 @@ class NotificationStore {
     PushMessage message, {
     required DateTime receivedAt,
   }) {
-    if (message.id.isEmpty) return Future.value(false);
+    if (message.id.isEmpty || !message.isForOwner(ownerKey)) {
+      return Future.value(false);
+    }
     final key = '$ownerKey\u0000${message.id}';
     final previous = _addTails[key] ?? Future<void>.value();
     final result = previous.then((_) async {
@@ -124,6 +126,7 @@ class NotificationStore {
       'id': notification.message.id,
       'title': notification.message.title,
       'body': notification.message.body,
+      'scope': notification.message.scope.name,
       'intendedOwnerKey': notification.message.intendedOwnerKey,
       'targetType': target?.kind.name,
       'primaryId': target?.primaryId,
@@ -143,14 +146,32 @@ class NotificationStore {
       ),
       _ => null,
     };
-    return StoredNotification(
-      message: PushMessage(
-        id: json['id'] as String,
-        title: json['title'] as String? ?? '',
-        body: json['body'] as String? ?? '',
+    final id = json['id'] as String;
+    final title = json['title'] as String? ?? '';
+    final body = json['body'] as String? ?? '';
+    final intendedOwnerKey = json['intendedOwnerKey'] as String?;
+    final message = switch (json['scope']) {
+      'local' => PushMessage.local(
+        id: id,
+        title: title,
+        body: body,
         target: target,
-        intendedOwnerKey: json['intendedOwnerKey'] as String?,
       ),
+      'remoteOwner'
+          when intendedOwnerKey != null &&
+              intendedOwnerKey.isNotEmpty &&
+              intendedOwnerKey == intendedOwnerKey.trim() =>
+        PushMessage.ownerScoped(
+          id: id,
+          title: title,
+          body: body,
+          target: target,
+          intendedOwnerKey: intendedOwnerKey,
+        ),
+      _ => throw const FormatException('unscoped persisted notification'),
+    };
+    return StoredNotification(
+      message: message,
       receivedAt: DateTime.parse(json['receivedAt'] as String).toUtc(),
       isRead: json['isRead'] as bool? ?? false,
     );

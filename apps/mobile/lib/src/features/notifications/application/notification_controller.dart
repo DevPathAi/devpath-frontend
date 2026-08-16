@@ -132,11 +132,12 @@ class NotificationController extends Notifier<NotificationState> {
       ref.read(currentOwnerKeyProvider) == boundary.ownerKey;
 
   bool _matchesIntendedOwner(PushMessage message, String ownerKey) {
-    final intended = message.intendedOwnerKey;
-    return intended == null || intended == ownerKey;
+    return message.isForOwner(ownerKey);
   }
 
   void open(PushMessage message) {
+    final owner = _ownerKey;
+    if (owner == null || !message.isForOwner(owner)) return;
     final target = message.target;
     if (target == null) return;
     state = NotificationState(
