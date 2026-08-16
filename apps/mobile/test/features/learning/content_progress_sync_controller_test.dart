@@ -585,6 +585,68 @@ void main() {
   );
 
   test(
+    '401 cannot invalidate B between credential tail result and continuation',
+    () async {
+      final client = ApiClient.create(
+        const ApiConfig(baseUrl: 'https://api.example.test'),
+      );
+      client.dio.httpClientAdapter = MockHttpAdapter({
+        'POST /contents/77/progress': (
+          401,
+          {
+            'error': {'code': 'UNAUTHORIZED', 'message': 'expired A request'},
+          },
+        ),
+      });
+      final tokens = InMemoryTokenStore();
+      final data = InMemoryOwnerDataStore();
+      final queue = ContentProgressQueue(data);
+      final mutations = _LatchedResultCredentialCoordinator();
+      await tokens.save(access: 'token-a', refresh: 'refresh-a');
+      await data.write('owner-b', 'test', 'safe', 'B data');
+      final container = ProviderContainer(
+        overrides: [
+          authControllerProvider.overrideWith(_TrackingAuthController.new),
+          credentialMutationCoordinatorProvider.overrideWithValue(mutations),
+          tokenStoreProvider.overrideWithValue(tokens),
+          ownerDataStoreProvider.overrideWithValue(data),
+          apiClientProvider.overrideWithValue(client),
+          contentProgressQueueProvider.overrideWithValue(queue),
+          contentOfflineStoreProvider.overrideWithValue(
+            ContentOfflineStore(data),
+          ),
+          connectivityProvider.overrideWith((_) => const Stream.empty()),
+        ],
+      );
+      addTearDown(container.dispose);
+      final auth =
+          container.read(authControllerProvider.notifier)
+              as _TrackingAuthController;
+      final subscription = container.listen(
+        contentProgressSyncControllerProvider,
+        (_, _) {},
+      );
+      addTearDown(subscription.close);
+
+      final syncing = container
+          .read(contentProgressSyncControllerProvider.notifier)
+          .enqueueAndSync(_progress);
+      await mutations.resultReady.future;
+      mutations.invalidate();
+      auth.switchTo(_user('owner-b'));
+      await tokens.save(access: 'token-b', refresh: 'refresh-b');
+      mutations.releaseResult.complete();
+      await syncing;
+
+      expect(container.read(currentOwnerKeyProvider), 'owner-b');
+      expect(container.read(authControllerProvider), isA<AuthAuthenticated>());
+      expect(auth.invalidations, 0);
+      expect(await tokens.readAccess(), 'token-b');
+      expect(await data.read('owner-b', 'test', 'safe'), isNotNull);
+    },
+  );
+
+  test(
     'enqueue at empty-read flight tail drains without external reconnect',
     () async {
       final client = ApiClient.create(
@@ -783,6 +845,22 @@ class _LatchedRemoveQueue extends ContentProgressQueue {
     removeStarted.complete();
     await releaseRemove.future;
     await super.remove(ownerKey, routeKey);
+  }
+}
+
+class _LatchedResultCredentialCoordinator
+    extends CredentialMutationCoordinator {
+  final resultReady = Completer<void>();
+  final releaseResult = Completer<void>();
+
+  @override
+  Future<T> run<T>(Future<T> Function() mutation) async {
+    final result = await super.run(mutation);
+    if (!resultReady.isCompleted) {
+      resultReady.complete();
+      await releaseResult.future;
+    }
+    return result;
   }
 }
 
