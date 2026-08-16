@@ -92,6 +92,24 @@ void main() {
     }
   });
 
+  test(
+    'vendored Monaco worker resolves from the same-origin release build',
+    () {
+      final index = File('../../apps/web/web/index.html').readAsStringSync();
+      expect(index, contains('window.MonacoEnvironment ='));
+      expect(index, contains('getWorkerUrl: function'));
+      expect(
+        index,
+        contains(
+          "new URL('vendor/monaco/vs/base/worker/workerMain.js', "
+          'window.location.href).toString()',
+        ),
+      );
+      expect(index, isNot(contains('cdnjs')));
+      expect(index, isNot(contains('unpkg')));
+    },
+  );
+
   test('release producer has strict evidence and baseline schemas', () {
     for (final path in [
       '../../evidence/et13/evidence.schema.json',

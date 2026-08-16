@@ -70,6 +70,16 @@
   <script src="flutter_bootstrap.js" async></script>
   <!-- Monaco is vendored and hash-locked by evidence/et13/assets.lock.json.
        Production and ET13 capture must never depend on a live CDN. -->
+  <script>
+    // The AMD fallback otherwise launches a blob worker with a relative base
+    // URL, which WorkerGlobalScope cannot resolve. Keep the worker on the same
+    // origin so every language module is loaded from the vendored release tree.
+    window.MonacoEnvironment = {
+      getWorkerUrl: function () {
+        return new URL('vendor/monaco/vs/base/worker/workerMain.js', window.location.href).toString();
+      },
+    };
+  </script>
   <script src="vendor/monaco/vs/loader.js"></script>
   <script>
     require.config({ paths: { vs: 'vendor/monaco/vs' }});
