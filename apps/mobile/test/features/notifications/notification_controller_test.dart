@@ -502,6 +502,57 @@ void main() {
     );
 
     test(
+      'cold initial message waits for its verified owner during AuthLoading',
+      () async {
+        final push = _FakeInteractivePush(
+          initial: const PushMessage.ownerScoped(
+            id: 'cold-auth-loading',
+            title: 'Today',
+            body: '인증 복원 뒤 이어하기',
+            intendedOwnerKey: 'owner-a',
+            target: PushTarget.today(pathId: 301),
+          ),
+        );
+        addTearDown(push.close);
+        final data = InMemoryOwnerDataStore();
+        final store = NotificationStore(data);
+        final container = ProviderContainer(
+          overrides: [
+            pushServiceProvider.overrideWithValue(push),
+            keyValueStoreProvider.overrideWithValue(InMemoryKeyValueStore()),
+            currentOwnerKeyProvider.overrideWith(
+              (ref) => ref.watch(_ownerProvider),
+            ),
+            notificationStoreProvider.overrideWithValue(store),
+          ],
+        );
+        addTearDown(container.dispose);
+        container.read(_ownerProvider.notifier).setOwner(null);
+        final subscription = container.listen(
+          notificationControllerProvider,
+          (_, _) {},
+        );
+        addTearDown(subscription.close);
+        await pumpEventQueue();
+        expect(
+          container.read(notificationControllerProvider).messages,
+          isEmpty,
+        );
+
+        container.read(_ownerProvider.notifier).setOwner('owner-a');
+        await pumpEventQueue(times: 4);
+
+        final state = container.read(notificationControllerProvider);
+        expect(state.messages.map((message) => message.id), [
+          'cold-auth-loading',
+        ]);
+        expect(state.unreadCount, 1);
+        expect(state.navigationTarget?.location, '/path/301/today');
+        expect(await store.list('owner-a'), hasLength(1));
+      },
+    );
+
+    test(
       'owner epoch transition clears in-memory notifications and badge',
       () async {
         final pushController = StreamController<PushMessage>();
