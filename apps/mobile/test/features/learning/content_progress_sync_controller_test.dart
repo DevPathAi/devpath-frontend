@@ -439,6 +439,152 @@ void main() {
   );
 
   test(
+    'success mutation cannot overwrite same-owner content after epoch clear',
+    () async {
+      final client = ApiClient.create(
+        const ApiConfig(baseUrl: 'https://api.example.test'),
+      );
+      client.dio.httpClientAdapter = MockHttpAdapter({
+        'POST /contents/77/progress': (
+          200,
+          {
+            'scrollPct': 0.8,
+            'dwellSec': 45,
+            'completed': false,
+            'completedAt': null,
+          },
+        ),
+      });
+      final data = InMemoryOwnerDataStore();
+      final queue = ContentProgressQueue(data);
+      final cache = _LatchedApplyContentStore(data);
+      final oldCachedAt = DateTime.utc(2026, 8, 16, 1);
+      await cache.write(
+        'owner-a',
+        '77',
+        _content(title: 'old A content', scrollPct: 0.2),
+        cachedAt: oldCachedAt,
+      );
+      final container = ProviderContainer(
+        overrides: [
+          apiClientProvider.overrideWithValue(client),
+          currentOwnerKeyProvider.overrideWithValue('owner-a'),
+          contentProgressQueueProvider.overrideWithValue(queue),
+          contentOfflineStoreProvider.overrideWithValue(cache),
+          connectivityProvider.overrideWith((_) => const Stream.empty()),
+        ],
+      );
+      addTearDown(container.dispose);
+      final subscription = container.listen(
+        contentProgressSyncControllerProvider,
+        (_, _) {},
+      );
+      addTearDown(subscription.close);
+
+      final syncing = container
+          .read(contentProgressSyncControllerProvider.notifier)
+          .enqueueAndSync(_progress);
+      await cache.applyStarted.future;
+      final mutations = container.read(credentialMutationCoordinatorProvider);
+      mutations.invalidate();
+      final replacement = mutations.run(() async {
+        await data.clearOwner('owner-a');
+        await ContentOfflineStore(data).write(
+          'owner-a',
+          '77',
+          _content(title: 'new A session content', scrollPct: 0.1),
+          cachedAt: oldCachedAt.add(const Duration(hours: 1)),
+        );
+        await queue.enqueue(
+          const QueuedContentProgress(
+            ownerKey: 'owner-a',
+            routeKey: '77',
+            scrollPct: 0.1,
+            dwellSec: 5,
+            requestCompletion: false,
+          ),
+        );
+      });
+      await pumpEventQueue();
+      cache.releaseApply.complete();
+      await Future.wait<void>([syncing, replacement]);
+
+      final retained = await cache.read(
+        'owner-a',
+        '77',
+        now: oldCachedAt.add(const Duration(hours: 2)),
+      );
+      expect(retained?.content.title, 'new A session content');
+      expect(retained?.content.progress.scrollPct, 0.1);
+      expect(retained?.content.progress.dwellSec, 5);
+      expect((await queue.read('owner-a', '77'))?.scrollPct, 0.1);
+    },
+  );
+
+  test(
+    'late 401 remove cannot delete same-owner queue after epoch clear',
+    () async {
+      final client = ApiClient.create(
+        const ApiConfig(baseUrl: 'https://api.example.test'),
+      );
+      client.dio.httpClientAdapter = MockHttpAdapter({
+        'POST /contents/77/progress': (
+          401,
+          {
+            'error': {'code': 'UNAUTHORIZED', 'message': 'old session'},
+          },
+        ),
+      });
+      final data = InMemoryOwnerDataStore();
+      final queue = _LatchedRemoveQueue(data);
+      final container = ProviderContainer(
+        overrides: [
+          apiClientProvider.overrideWithValue(client),
+          currentOwnerKeyProvider.overrideWithValue('owner-a'),
+          contentProgressQueueProvider.overrideWithValue(queue),
+          contentOfflineStoreProvider.overrideWithValue(
+            ContentOfflineStore(data),
+          ),
+          connectivityProvider.overrideWith((_) => const Stream.empty()),
+        ],
+      );
+      addTearDown(container.dispose);
+      final subscription = container.listen(
+        contentProgressSyncControllerProvider,
+        (_, _) {},
+      );
+      addTearDown(subscription.close);
+
+      final syncing = container
+          .read(contentProgressSyncControllerProvider.notifier)
+          .enqueueAndSync(_progress);
+      await queue.removeStarted.future;
+      final mutations = container.read(credentialMutationCoordinatorProvider);
+      mutations.invalidate();
+      final replacement = mutations.run(() async {
+        await data.clearOwner('owner-a');
+        await queue.enqueue(
+          const QueuedContentProgress(
+            ownerKey: 'owner-a',
+            routeKey: '77',
+            scrollPct: 0.95,
+            dwellSec: 120,
+            requestCompletion: true,
+          ),
+        );
+      });
+      await pumpEventQueue();
+      queue.releaseRemove.complete();
+      await Future.wait<void>([syncing, replacement]);
+
+      final retained = await queue.read('owner-a', '77');
+      expect(retained?.scrollPct, 0.95);
+      expect(retained?.dwellSec, 120);
+      expect(retained?.requestCompletion, isTrue);
+    },
+  );
+
+  test(
     'enqueue at empty-read flight tail drains without external reconnect',
     () async {
       final client = ApiClient.create(
@@ -498,6 +644,16 @@ const _progress = QueuedContentProgress(
   dwellSec: 45,
   requestCompletion: true,
 );
+
+LearningContent _content({required String title, required double scrollPct}) =>
+    LearningContent(
+      id: 77,
+      slug: '77',
+      title: title,
+      track: 'BACKEND',
+      markdown: '# $title',
+      progress: ContentProgress(scrollPct: scrollPct, dwellSec: 5),
+    );
 
 class _StoreCleaner implements AccountDataCleaner {
   _StoreCleaner(this.data);
@@ -596,6 +752,38 @@ class _LatchedResponseAdapter implements HttpClientAdapter {
 
   @override
   void close({bool force = false}) {}
+}
+
+class _LatchedApplyContentStore extends ContentOfflineStore {
+  _LatchedApplyContentStore(super.data);
+
+  final applyStarted = Completer<void>();
+  final releaseApply = Completer<void>();
+
+  @override
+  Future<void> applyServerProgress(
+    String ownerKey,
+    String routeKey,
+    ContentProgressUpdateResponse response,
+  ) async {
+    applyStarted.complete();
+    await releaseApply.future;
+    await super.applyServerProgress(ownerKey, routeKey, response);
+  }
+}
+
+class _LatchedRemoveQueue extends ContentProgressQueue {
+  _LatchedRemoveQueue(super.data);
+
+  final removeStarted = Completer<void>();
+  final releaseRemove = Completer<void>();
+
+  @override
+  Future<void> remove(String ownerKey, String routeKey) async {
+    removeStarted.complete();
+    await releaseRemove.future;
+    await super.remove(ownerKey, routeKey);
+  }
 }
 
 class _FlightTailQueue extends ContentProgressQueue {
