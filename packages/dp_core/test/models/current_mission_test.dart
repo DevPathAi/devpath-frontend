@@ -227,6 +227,32 @@ void main() {
       expectMalformed(availableJson(tasks: [taskJson(taskId: 1.5)]));
     });
 
+    test(
+      'link-bearing mission IDs are limited to the JS-safe positive range',
+      () {
+        const maxSafe = 9007199254740991;
+        const overflow = 9007199254740992;
+        final maxTask = taskJson(taskId: maxSafe, contentId: maxSafe);
+        final accepted = CurrentMission.fromJson(
+          availableJson(pathId: maxSafe, tasks: [maxTask], nextTask: maxTask),
+        );
+        expect(accepted.outcome, CurrentMissionOutcome.available);
+        expect(accepted.pathId, maxSafe);
+        expect(accepted.tasks.single.taskId, maxSafe);
+        expect(accepted.tasks.single.contentId, maxSafe);
+
+        expectMalformed(availableJson(pathId: overflow));
+        final overflowTask = taskJson(taskId: overflow);
+        expectMalformed(
+          availableJson(tasks: [overflowTask], nextTask: overflowTask),
+        );
+        final overflowContent = taskJson(contentId: overflow);
+        expectMalformed(
+          availableJson(tasks: [overflowContent], nextTask: overflowContent),
+        );
+      },
+    );
+
     test('outcome과 pathCompleted/null/목록 shape가 섞이면 malformed다', () {
       expectMalformed(availableJson(pathCompleted: true));
       expectMalformed({
