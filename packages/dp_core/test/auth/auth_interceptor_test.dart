@@ -17,6 +17,7 @@ class _MockRetrier extends Mock {
 class _InspectableErrorHandler extends ErrorInterceptorHandler {
   bool advanced = false;
   bool resolved = false;
+  DioException? advancedError;
 
   Future<void> consume() async {
     try {
@@ -29,6 +30,7 @@ class _InspectableErrorHandler extends ErrorInterceptorHandler {
   @override
   void next(DioException error) {
     advanced = true;
+    advancedError = error;
     super.next(error);
   }
 
@@ -306,56 +308,94 @@ void main() {
     expect(await store.readAccess(), 'NEW');
     expect(await store.readRefresh(), 'NEW-REFRESH');
     expect(handler.advanced, isTrue);
+    expect(handler.advancedError?.type, DioExceptionType.connectionError);
   });
 
   for (final branch in ['rotation', 'refreshed']) {
-    for (final status in [401, 403]) {
-      for (final normalized in [false, true]) {
-        test(
-          '$branch retry $status ${normalized ? 'ApiException' : 'DioException'} '
-          'clears the captured credential',
-          () async {
-            final store = InMemoryTokenStore()
-              ..save(
-                access: branch == 'rotation' ? 'rotated' : 'old',
-                refresh: 'refresh',
-              );
-            var refreshCalls = 0;
-            var terminalSignals = 0;
-            final interceptor = AuthInterceptor(
-              store: store,
-              onSessionInvalidated: (_) async => terminalSignals += 1,
-              refresh: (_) async {
-                refreshCalls += 1;
-                return const TokenPair(access: 'NEW', refresh: 'NEW-REFRESH');
-              },
-              retry: (request) async => throw _retryFailure(
-                request,
-                status: status,
-                normalized: normalized,
-              ),
+    for (final normalized in [false, true]) {
+      test(
+        '$branch retry 401 ${normalized ? 'ApiException' : 'DioException'} '
+        'clears the captured credential and forwards retry rejection',
+        () async {
+          final store = InMemoryTokenStore()
+            ..save(
+              access: branch == 'rotation' ? 'rotated' : 'old',
+              refresh: 'refresh',
             );
-            final request = RequestOptions(path: '/resource')
-              ..headers['Authorization'] = 'Bearer old';
-            final error = DioException(
-              requestOptions: request,
-              response: Response(requestOptions: request, statusCode: 401),
-              type: DioExceptionType.badResponse,
-            );
-            final handler = _InspectableErrorHandler();
-            final consumed = handler.consume();
+          var refreshCalls = 0;
+          var terminalSignals = 0;
+          final interceptor = AuthInterceptor(
+            store: store,
+            onSessionInvalidated: (_) async => terminalSignals += 1,
+            refresh: (_) async {
+              refreshCalls += 1;
+              return const TokenPair(access: 'NEW', refresh: 'NEW-REFRESH');
+            },
+            retry: (request) async => throw _retryFailure(
+              request,
+              status: 401,
+              normalized: normalized,
+            ),
+          );
+          final request = RequestOptions(path: '/resource')
+            ..headers['Authorization'] = 'Bearer old';
+          final error = DioException(
+            requestOptions: request,
+            response: Response(requestOptions: request, statusCode: 401),
+            type: DioExceptionType.badResponse,
+          );
+          final handler = _InspectableErrorHandler();
+          final consumed = handler.consume();
 
-            await interceptor.onError(error, handler);
-            await consumed;
+          await interceptor.onError(error, handler);
+          await consumed;
 
-            expect(await store.readAccess(), isNull);
-            expect(await store.readRefresh(), isNull);
-            expect(refreshCalls, branch == 'rotation' ? 0 : 1);
-            expect(terminalSignals, 1);
-            expect(handler.advanced, isTrue);
-          },
+          expect(await store.readAccess(), isNull);
+          expect(await store.readRefresh(), isNull);
+          expect(refreshCalls, branch == 'rotation' ? 0 : 1);
+          expect(terminalSignals, 1);
+          expect(_errorStatus(handler.advancedError), 401);
+        },
+      );
+    }
+
+    for (final normalized in [false, true]) {
+      test('$branch retry 403 ${normalized ? 'ApiException' : 'DioException'} '
+          'retains credential and forwards resource rejection', () async {
+        final store = InMemoryTokenStore()
+          ..save(
+            access: branch == 'rotation' ? 'rotated' : 'old',
+            refresh: 'refresh',
+          );
+        var terminalSignals = 0;
+        final interceptor = AuthInterceptor(
+          store: store,
+          onSessionInvalidated: (_) async => terminalSignals += 1,
+          refresh: (_) async =>
+              const TokenPair(access: 'NEW', refresh: 'NEW-REFRESH'),
+          retry: (request) async =>
+              throw _retryFailure(request, status: 403, normalized: normalized),
         );
-      }
+        final request = RequestOptions(path: '/resource')
+          ..headers['Authorization'] = 'Bearer old';
+        final error = DioException(
+          requestOptions: request,
+          response: Response(requestOptions: request, statusCode: 401),
+          type: DioExceptionType.badResponse,
+        );
+        final handler = _InspectableErrorHandler();
+        final consumed = handler.consume();
+
+        await interceptor.onError(error, handler);
+        await consumed;
+
+        expect(
+          await store.readAccess(),
+          branch == 'rotation' ? 'rotated' : 'NEW',
+        );
+        expect(terminalSignals, 0);
+        expect(_errorStatus(handler.advancedError), 403);
+      });
     }
   }
 
@@ -403,7 +443,13 @@ void main() {
             branch == 'rotation' ? 'rotated' : 'NEW',
           );
           expect(terminalSignals, 0);
-          expect(handler.advanced, isTrue);
+          expect(handler.advancedError?.response?.statusCode, status);
+          if (status == null) {
+            expect(
+              handler.advancedError?.type,
+              DioExceptionType.connectionError,
+            );
+          }
         },
       );
     }
@@ -860,4 +906,10 @@ Object _retryFailure(
     response: Response(requestOptions: request, statusCode: status),
     type: DioExceptionType.badResponse,
   );
+}
+
+int? _errorStatus(DioException? error) {
+  final normalized = error?.error;
+  return error?.response?.statusCode ??
+      (normalized is ApiException ? normalized.status : null);
 }
