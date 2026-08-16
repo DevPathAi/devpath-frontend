@@ -119,7 +119,7 @@ class ContentProgressSyncController extends Notifier<int> {
             await ref.read(contentProgressQueueProvider).acknowledge(pending);
           },
         );
-        if (!committed) {
+        if (!committed || !_isCurrentBoundary(ownerKey, ownerGeneration)) {
           return latestResponse;
         }
         state += 1;
@@ -144,7 +144,7 @@ class ContentProgressSyncController extends Notifier<int> {
                 .read(contentProgressQueueProvider)
                 .remove(ownerKey, routeKey),
           );
-          if (!removed) {
+          if (!removed || !_isCurrentBoundary(ownerKey, ownerGeneration)) {
             return latestResponse;
           }
           await ref
@@ -160,7 +160,9 @@ class ContentProgressSyncController extends Notifier<int> {
                   .discardIfMatches(pending);
             },
           );
-          if (discarded) state += 1;
+          if (discarded && _isCurrentBoundary(ownerKey, ownerGeneration)) {
+            state += 1;
+          }
         }
         // Transport, throttling and 5xx retain the durable row for reconnect.
         return latestResponse;
