@@ -148,6 +148,40 @@ class _FailingMarkWriteData extends InMemoryOwnerDataStore {
   }
 }
 
+class _ConcurrentMarkData extends InMemoryOwnerDataStore {
+  var blockMarkedWrites = false;
+  var markedWriteCount = 0;
+  final firstMarkedWriteStarted = Completer<void>();
+  final releaseMarkedWrites = Completer<void>();
+
+  @override
+  Future<void> write(
+    String ownerKey,
+    String bucket,
+    String recordKey,
+    String payload, {
+    DateTime? updatedAt,
+  }) async {
+    if (blockMarkedWrites &&
+        ownerKey == 'owner-a' &&
+        bucket == NotificationStore.bucket &&
+        payload.contains('"isRead":true')) {
+      markedWriteCount += 1;
+      if (!firstMarkedWriteStarted.isCompleted) {
+        firstMarkedWriteStarted.complete();
+      }
+      await releaseMarkedWrites.future;
+    }
+    await super.write(
+      ownerKey,
+      bucket,
+      recordKey,
+      payload,
+      updatedAt: updatedAt,
+    );
+  }
+}
+
 final _ownerProvider = NotifierProvider<_OwnerController, String?>(
   _OwnerController.new,
 );
@@ -354,6 +388,55 @@ void main() {
 
         expect(uncaught, isEmpty);
         expect(container.read(notificationControllerProvider).unreadCount, 2);
+      },
+    );
+
+    test(
+      'concurrent mark-all calls share one flight and preserve new unread',
+      () async {
+        final data = _ConcurrentMarkData();
+        final store = NotificationStore(data);
+        await _seedUnread(store, 'owner-a', 'a-1');
+        final push = StreamController<PushMessage>();
+        addTearDown(push.close);
+        final container = ProviderContainer(
+          overrides: [
+            pushServiceProvider.overrideWithValue(_FakePush(push)),
+            currentOwnerKeyProvider.overrideWithValue('owner-a'),
+            notificationStoreProvider.overrideWithValue(store),
+          ],
+        );
+        addTearDown(container.dispose);
+        final subscription = container.listen(
+          notificationControllerProvider,
+          (_, _) {},
+        );
+        addTearDown(subscription.close);
+        await pumpEventQueue();
+        expect(container.read(notificationControllerProvider).unreadCount, 1);
+
+        data.blockMarkedWrites = true;
+        final notifier = container.read(
+          notificationControllerProvider.notifier,
+        );
+        final first = notifier.markAllRead();
+        await data.firstMarkedWriteStarted.future;
+
+        push.add(const PushMessage.local(id: 'a-2', title: 'new', body: 'new'));
+        await pumpEventQueue();
+        expect(container.read(notificationControllerProvider).unreadCount, 2);
+        final second = notifier.markAllRead();
+        await pumpEventQueue();
+
+        data.releaseMarkedWrites.complete();
+        await Future.wait([first, second]);
+
+        expect(data.markedWriteCount, 1);
+        expect(container.read(notificationControllerProvider).unreadCount, 1);
+        expect(
+          (await store.list('owner-a')).where((item) => !item.isRead),
+          hasLength(1),
+        );
       },
     );
 
