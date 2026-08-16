@@ -253,33 +253,51 @@ void main() {
     });
   }
 
-  test('refresh transport failure retains the existing credential', () async {
-    final store = InMemoryTokenStore()..save(access: 'old', refresh: 'RRR');
-    final interceptor = AuthInterceptor(
-      store: store,
-      refresh: (_) async => throw DioException(
-        requestOptions: RequestOptions(path: '/auth/refresh'),
-        type: DioExceptionType.connectionError,
-      ),
-      retry: (_) async => Response(requestOptions: RequestOptions(path: '/')),
-    );
-    final request = RequestOptions(path: '/resource')
-      ..headers['Authorization'] = 'Bearer old';
-    final error = DioException(
-      requestOptions: request,
-      response: Response(requestOptions: request, statusCode: 401),
-      type: DioExceptionType.badResponse,
-    );
-    final handler = _InspectableErrorHandler();
-    final consumed = handler.consume();
+  for (final normalized in [false, true]) {
+    test('refresh transport ${normalized ? 'ApiException' : 'DioException'} '
+        'retains credentials and forwards the refresh failure', () async {
+      final store = InMemoryTokenStore()..save(access: 'old', refresh: 'RRR');
+      final interceptor = AuthInterceptor(
+        store: store,
+        refresh: (_) async => throw normalized
+            ? const ApiException(
+                code: ApiErrorCode.network,
+                message: 'refresh offline',
+              )
+            : DioException(
+                requestOptions: RequestOptions(path: '/auth/refresh'),
+                type: DioExceptionType.connectionError,
+              ),
+        retry: (_) async => Response(requestOptions: RequestOptions(path: '/')),
+      );
+      final request = RequestOptions(path: '/resource')
+        ..headers['Authorization'] = 'Bearer old';
+      final error = DioException(
+        requestOptions: request,
+        response: Response(requestOptions: request, statusCode: 401),
+        type: DioExceptionType.badResponse,
+      );
+      final handler = _InspectableErrorHandler();
+      final consumed = handler.consume();
 
-    await interceptor.onError(error, handler);
-    await consumed;
+      await interceptor.onError(error, handler);
+      await consumed;
 
-    expect(await store.readAccess(), 'old');
-    expect(await store.readRefresh(), 'RRR');
-    expect(handler.advanced, isTrue);
-  });
+      expect(await store.readAccess(), 'old');
+      expect(await store.readRefresh(), 'RRR');
+      expect(handler.advanced, isTrue);
+      if (normalized) {
+        expect(handler.advancedError?.error, isA<ApiException>());
+        expect(
+          (handler.advancedError?.error as ApiException).code,
+          ApiErrorCode.network,
+        );
+      } else {
+        expect(handler.advancedError?.type, DioExceptionType.connectionError);
+      }
+      expect(handler.advancedError?.response?.statusCode, isNot(401));
+    });
+  }
 
   test('resource retry failure retains the refreshed credential', () async {
     final store = InMemoryTokenStore()..save(access: 'old', refresh: 'RRR');

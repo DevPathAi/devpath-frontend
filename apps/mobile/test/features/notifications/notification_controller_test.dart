@@ -26,10 +26,11 @@ class _FakePush implements PushService {
 }
 
 class _FakeInteractivePush implements PushService, PushInteractionService {
-  _FakeInteractivePush({this.initial, this.initialFuture});
+  _FakeInteractivePush({this.initial, this.initialFuture, this.initialError});
 
   final PushMessage? initial;
   final Future<PushMessage?>? initialFuture;
+  final Object? initialError;
   final incomingController = StreamController<PushMessage>();
   final openedController = StreamController<PushMessage>();
 
@@ -40,8 +41,10 @@ class _FakeInteractivePush implements PushService, PushInteractionService {
   Stream<PushMessage> get incoming => incomingController.stream;
 
   @override
-  Future<PushMessage?> initialMessage() async =>
-      await (initialFuture ?? Future<PushMessage?>.value(initial));
+  Future<PushMessage?> initialMessage() async {
+    if (initialError case final error?) throw error;
+    return await (initialFuture ?? Future<PushMessage?>.value(initial));
+  }
 
   @override
   Stream<PushMessage> get opened => openedController.stream;
@@ -973,6 +976,57 @@ void main() {
       expect(uncaught, isEmpty);
       expect(await store.list('owner-a'), isEmpty);
     });
+
+    test(
+      'initial message channel failure is contained and warm opens still work',
+      () async {
+        final push = _FakeInteractivePush(
+          initialError: StateError('initial channel unavailable'),
+        );
+        addTearDown(push.close);
+        final store = NotificationStore(InMemoryOwnerDataStore());
+        final uncaught = <Object>[];
+
+        await runZonedGuarded<Future<void>>(() async {
+          final container = ProviderContainer(
+            overrides: [
+              pushServiceProvider.overrideWithValue(push),
+              keyValueStoreProvider.overrideWithValue(InMemoryKeyValueStore()),
+              currentOwnerKeyProvider.overrideWithValue('owner-a'),
+              notificationStoreProvider.overrideWithValue(store),
+            ],
+          );
+          final subscription = container.listen(
+            notificationControllerProvider,
+            (_, _) {},
+          );
+          await pumpEventQueue(times: 3);
+          push.openedController.add(
+            const PushMessage.ownerScoped(
+              id: 'warm-after-initial-error',
+              title: 'Today',
+              body: 'open',
+              intendedOwnerKey: 'owner-a',
+              target: PushTarget.today(pathId: 301),
+            ),
+          );
+          await pumpEventQueue(times: 4);
+
+          expect(
+            container
+                .read(notificationControllerProvider)
+                .navigationTarget
+                ?.location,
+            '/path/301/today',
+          );
+          subscription.close();
+          container.dispose();
+        }, (error, _) => uncaught.add(error));
+
+        expect(uncaught, isEmpty);
+        expect(await store.list('owner-a'), hasLength(1));
+      },
+    );
 
     test('Loading push is discarded on unauthenticated terminal', () async {
       final push = _FakeInteractivePush();

@@ -10,8 +10,8 @@ import '../features/auth/application/auth_controller.dart';
 import '../features/auth/application/deep_link_service.dart';
 import '../features/auth/application/pending_deep_link_controller.dart';
 import '../features/auth/state/auth_state.dart';
-import '../features/notifications/application/device_registrar.dart';
 import '../features/notifications/application/notification_controller.dart';
+import '../features/notifications/application/push_consent_coordinator.dart';
 import '../features/learning/application/content_progress_sync_controller.dart';
 import '../providers/theme_provider.dart';
 import 'router.dart';
@@ -33,7 +33,7 @@ class _DevPathMobileAppState extends ConsumerState<DevPathMobileApp>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     final service = DeepLinkService(
-      AppLinks(),
+      AppLinksDeepLinkSource(AppLinks()),
       onCode: (code) =>
           ref.read(authControllerProvider.notifier).completeFromCode(code),
       onRoute: (location) {
@@ -64,6 +64,7 @@ class _DevPathMobileAppState extends ConsumerState<DevPathMobileApp>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed) return;
     final auth = ref.read(authControllerProvider);
+    ref.read(pushConsentCoordinatorProvider).resume(auth);
     final needsRefresh = switch (auth) {
       AuthSessionUnavailable() || AuthOfflineAuthenticated() => true,
       AuthAuthenticated(:final user) =>
@@ -78,22 +79,7 @@ class _DevPathMobileAppState extends ConsumerState<DevPathMobileApp>
 
   @override
   Widget build(BuildContext context) {
-    // 인증 진입(전이) 시 1회 FCM 디바이스 토큰 등록(트랙 C). 부가 기능이라 실패는 무시.
-    ref.listen(authControllerProvider, (prev, next) {
-      final wasConsented =
-          prev is AuthAuthenticated &&
-          prev.user.consentStatus == ConsentStatus.done;
-      if (next is AuthAuthenticated &&
-          next.user.consentStatus == ConsentStatus.done &&
-          (!wasConsented || prev.ownerKey != next.user.id)) {
-        unawaited(
-          ref
-              .read(deviceRegistrarProvider)
-              .activate(next.user.id)
-              .catchError((_) {}),
-        );
-      }
-    });
+    ref.watch(pushConsentCoordinatorProvider);
     final router = ref.watch(routerProvider);
     ref.watch(contentProgressSyncControllerProvider);
     ref.listen(notificationControllerProvider, (previous, next) {

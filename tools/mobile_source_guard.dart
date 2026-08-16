@@ -32,6 +32,7 @@ void main(List<String> args) {
   final iosProject = File(
     '${root.path}/apps/mobile/ios/Runner.xcodeproj/project.pbxproj',
   );
+  final iosInfo = File('${root.path}/apps/mobile/ios/Runner/Info.plist');
   final iosFirebaseExample = File(
     '${root.path}/apps/mobile/ios/Runner/GoogleService-Info.plist.example',
   );
@@ -57,6 +58,7 @@ void main(List<String> args) {
     gradleWrapper,
     manifest,
     iosProject,
+    iosInfo,
     iosFirebaseExample,
     fcmDocs,
     androidLinkDefault,
@@ -73,6 +75,12 @@ void main(List<String> args) {
   }
 
   final source = _guardDartSource(mobileLib);
+  if (source.contains('setAutoInitEnabled(true)')) {
+    _fail('FCM auto-init must never be enabled before or after consent');
+  }
+  if (!source.contains('Future<void> disableAutoInit()')) {
+    _fail('push lifecycle must expose a disable-only auto-init boundary');
+  }
   if (source.contains("'/onboarding'") || source.contains('"/onboarding"')) {
     _fail('obsolete native onboarding route/API is present');
   }
@@ -120,6 +128,26 @@ void main(List<String> args) {
       'Android verified links are not exact canonical Today/Content filters',
     );
   }
+  for (final marker in [
+    'android:name="firebase_messaging_auto_init_enabled" '
+        'android:value="false"',
+    'android:name="firebase_analytics_collection_enabled" '
+        'android:value="false"',
+    'android:name="flutter_deeplinking_enabled" android:value="false"',
+  ]) {
+    if (!manifestSource.contains(marker)) {
+      _fail('mobile native opt-in boundary is missing: $marker');
+    }
+  }
+  final iosInfoSource = iosInfo.readAsStringSync();
+  for (final key in [
+    'FirebaseMessagingAutoInitEnabled',
+    'FlutterDeepLinkingEnabled',
+  ]) {
+    if (!RegExp('<key>$key</key>\\s*<false/>').hasMatch(iosInfoSource)) {
+      _fail('iOS native opt-in boundary is missing: $key=false');
+    }
+  }
   if (!androidLinkDefault.readAsStringSync().contains(
         '<bool name="enable_exact_app_links">false</bool>',
       ) ||
@@ -154,6 +182,8 @@ void main(List<String> args) {
 
   final workflowSource = workflow.readAsStringSync();
   _guardWorkflowActions(workflowSource);
+  final toolchainViolation = mobileWorkflowToolchainViolation(workflowSource);
+  if (toolchainViolation != null) _fail(toolchainViolation);
   if (!workflowSource.contains("flutter-version: '3.44.1'")) {
     _fail('Flutter toolchain is not pinned to 3.44.1');
   }
@@ -161,9 +191,10 @@ void main(List<String> args) {
     'runs-on: ubuntu-24.04',
     'runs-on: macos-26',
     '"dartSdkVersion": "3.12.1"',
-    "java-version: '17'",
+    "java-version: '17.0.19+10'",
+    'OpenJDK Runtime Environment Temurin-17.0.19+10 '
+        '(build 17.0.19+10)',
     'platforms/android-36/android.jar',
-    "xcode-version: '26.4'",
     'xcodebuild -version',
     '--dart-define=USE_MOCK=true',
     '--dart-define=USE_MOCK=false',
@@ -221,6 +252,33 @@ void main(List<String> args) {
   }
 
   stdout.writeln('mobile source guard: OK');
+}
+
+String? mobileWorkflowToolchainViolation(String workflowSource) {
+  const exactJavaToolchain = [
+    "java-version: '17.0.19+10'",
+    'OpenJDK Runtime Environment Temurin-17.0.19+10 '
+        '(build 17.0.19+10)',
+  ];
+  for (final marker in exactJavaToolchain) {
+    if (!workflowSource.contains(marker)) {
+      return 'mobile CI must pin Temurin 17.0.19+10 runtime and build: '
+          'missing $marker';
+    }
+  }
+  const exactAppleToolchain = [
+    "xcode-version: '26.4.1'",
+    "xcodebuild -version | grep -q '^Xcode 26.4.1\$'",
+    "xcodebuild -version | grep -q '^Build version 17E202\$'",
+    "xcrun --sdk iphoneos --show-sdk-version | grep -q '^26.4\$'",
+  ];
+  for (final marker in exactAppleToolchain) {
+    if (!workflowSource.contains(marker)) {
+      return 'mobile CI must pin Xcode 26.4.1 build 17E202 and SDK 26.4: '
+          'missing $marker';
+    }
+  }
+  return null;
 }
 
 void _guardWorkflowActions(String workflowSource) {

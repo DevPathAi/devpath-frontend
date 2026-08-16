@@ -20,6 +20,14 @@ void main() {
       expect(workflow, contains('pubspec.lock'));
       expect(workflow, contains('runs-on: ubuntu-24.04'));
       expect(workflow, contains('runs-on: macos-26'));
+      expect(workflow, contains("java-version: '17.0.19+10'"));
+      expect(
+        workflow,
+        contains(
+          'OpenJDK Runtime Environment Temurin-17.0.19+10 '
+          '(build 17.0.19+10)',
+        ),
+      );
       expect(workflow, isNot(contains('secrets.')));
 
       final wrapper = _read('android/gradle/wrapper/gradle-wrapper.properties');
@@ -105,6 +113,29 @@ void main() {
     );
   });
 
+  test('source guard rejects exact Temurin patch and build drift', () {
+    final workflow = _read('../../.github/workflows/mobile.yml');
+    expect(source_guard.mobileWorkflowToolchainViolation(workflow), isNull);
+
+    final versionDrift = workflow.replaceFirst(
+      "java-version: '17.0.19+10'",
+      "java-version: '17'",
+    );
+    expect(
+      source_guard.mobileWorkflowToolchainViolation(versionDrift),
+      contains('Temurin 17.0.19+10'),
+    );
+
+    final runtimeDrift = workflow.replaceFirst(
+      'OpenJDK Runtime Environment Temurin-17.0.19+10 (build 17.0.19+10)',
+      'OpenJDK Runtime Environment Temurin-17.0.18+8 (build 17.0.18+8)',
+    );
+    expect(
+      source_guard.mobileWorkflowToolchainViolation(runtimeDrift),
+      contains('Temurin 17.0.19+10'),
+    );
+  });
+
   test('release Android build cannot silently use the debug signing key', () {
     final gradle = _read('android/app/build.gradle.kts');
     final properties = _read('android/gradle.properties');
@@ -143,6 +174,46 @@ void main() {
       'Release': 'Runner/RunnerRelease.entitlements',
       'Profile': 'Runner/RunnerRelease.entitlements',
     });
+  });
+
+  test('native delivery is opt-in and AppLinks is the only link owner', () {
+    final android = _read('android/app/src/main/AndroidManifest.xml');
+    final ios = _read('ios/Runner/Info.plist');
+    final push = _read('lib/src/services/push_service.dart');
+    final main = _read('lib/main.dart');
+
+    expect(
+      android,
+      contains(
+        'android:name="firebase_messaging_auto_init_enabled" '
+        'android:value="false"',
+      ),
+    );
+    expect(
+      android,
+      contains(
+        'android:name="firebase_analytics_collection_enabled" '
+        'android:value="false"',
+      ),
+    );
+    expect(
+      android,
+      contains(
+        'android:name="flutter_deeplinking_enabled" '
+        'android:value="false"',
+      ),
+    );
+    expect(ios, contains('<key>FirebaseMessagingAutoInitEnabled</key>'));
+    expect(ios, contains('<key>FlutterDeepLinkingEnabled</key>'));
+    expect(
+      RegExp(
+        r'<key>(FirebaseMessagingAutoInitEnabled|FlutterDeepLinkingEnabled)</key>\s*<false/>',
+      ).allMatches(ios),
+      hasLength(2),
+    );
+    expect(push, contains('Future<void> disableAutoInit()'));
+    expect(push, isNot(contains('setAutoInitEnabled(true)')));
+    expect(main, contains('setAutoInitEnabled(false)'));
   });
 }
 

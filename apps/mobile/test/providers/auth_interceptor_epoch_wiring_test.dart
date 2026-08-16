@@ -210,6 +210,7 @@ void main() {
           tokenStoreProvider.overrideWithValue(tokens),
           keyValueStoreProvider.overrideWithValue(kv),
           ownerDataStoreProvider.overrideWithValue(data),
+          accountDataCleanerProvider.overrideWithValue(_OwnerCleaner(data)),
           pushServiceProvider.overrideWithValue(StubPushService()),
           authFlowClientProvider.overrideWithValue(refreshClient),
           appConfigProvider.overrideWithValue(
@@ -338,6 +339,69 @@ void main() {
         isA<AuthUnauthenticated>(),
       );
       expect(await tokens.readAccess(), isNull);
+    },
+  );
+
+  test(
+    'transient refresh failure is forwarded without invalidating mobile auth',
+    () async {
+      final tokens = InMemoryTokenStore();
+      final kv = InMemoryKeyValueStore();
+      final registrar = _CountingRegistrar();
+      await tokens.save(access: 'access-a', refresh: 'refresh-a');
+      await VerifiedSessionStore(kv).write(_user('owner-a'));
+      final refreshClient = ApiClient.create(
+        const ApiConfig(baseUrl: 'https://api.test'),
+      );
+      refreshClient.dio.httpClientAdapter = MockHttpAdapter({
+        'POST /auth/refresh': (
+          503,
+          {
+            'error': {'code': 'UNKNOWN', 'message': 'refresh unavailable'},
+          },
+        ),
+      });
+      final container = ProviderContainer(
+        overrides: [
+          tokenStoreProvider.overrideWithValue(tokens),
+          keyValueStoreProvider.overrideWithValue(kv),
+          ownerDataStoreProvider.overrideWithValue(InMemoryOwnerDataStore()),
+          accountDataCleanerProvider.overrideWithValue(
+            _OwnerCleaner(InMemoryOwnerDataStore()),
+          ),
+          deviceRegistrarProvider.overrideWithValue(registrar),
+          authFlowClientProvider.overrideWithValue(refreshClient),
+          appConfigProvider.overrideWithValue(
+            const AppConfig(baseUrl: 'https://api.test', useMock: false),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      addTearDown(registrar.dispose);
+      final client = container.read(apiClientProvider);
+      client.dio.httpClientAdapter = MockHttpAdapter({
+        'GET /users/me': (200, _userJson('owner-a')),
+        'GET /contents/77': (
+          401,
+          {
+            'error': {'code': 'UNAUTHORIZED', 'message': 'access expired'},
+          },
+        ),
+      });
+      await container.read(authControllerProvider.notifier).bootstrapSession();
+
+      await expectLater(
+        client.get<Map<String, dynamic>>('/contents/77'),
+        throwsA(
+          isA<ApiException>().having((error) => error.status, 'status', 503),
+        ),
+      );
+      await pumpEventQueue(times: 4);
+
+      expect(container.read(authControllerProvider), isA<AuthAuthenticated>());
+      expect(await tokens.readAccess(), 'access-a');
+      expect(await VerifiedSessionStore(kv).read(), isNotNull);
+      expect(registrar.owners, isEmpty);
     },
   );
 }

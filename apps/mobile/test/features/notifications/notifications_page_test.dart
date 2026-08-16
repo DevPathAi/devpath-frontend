@@ -3,9 +3,12 @@ import 'dart:async';
 import 'package:devpath_mobile/src/features/notifications/application/notification_controller.dart';
 import 'package:devpath_mobile/src/features/auth/application/auth_controller.dart';
 import 'package:devpath_mobile/src/features/notifications/data/notification_store.dart';
+import 'package:devpath_mobile/src/data/key_value_store.dart';
 import 'package:devpath_mobile/src/data/owner_data_store.dart';
 import 'package:devpath_mobile/src/features/notifications/presentation/notifications_page.dart';
+import 'package:devpath_mobile/src/providers/api_providers.dart';
 import 'package:devpath_mobile/src/services/push_service.dart';
+import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -34,6 +37,8 @@ Widget _host(ProviderContainer c) => UncontrolledProviderScope(
   final c = ProviderContainer(
     overrides: [
       pushServiceProvider.overrideWithValue(_FakePush(ctrl)),
+      tokenStoreProvider.overrideWithValue(InMemoryTokenStore()),
+      keyValueStoreProvider.overrideWithValue(InMemoryKeyValueStore()),
       currentOwnerKeyProvider.overrideWithValue('owner-a'),
       notificationStoreProvider.overrideWithValue(
         NotificationStore(InMemoryOwnerDataStore()),

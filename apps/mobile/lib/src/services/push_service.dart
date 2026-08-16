@@ -116,6 +116,11 @@ abstract interface class PushService {
 abstract interface class PushTokenLifecycleService {
   Future<bool> requestPermission();
 
+  /// Persistently disables implicit token generation. The deliberately narrow
+  /// API cannot accidentally opt a user in; approved owners request a token
+  /// explicitly after permission instead.
+  Future<void> disableAutoInit();
+
   Stream<String> get tokenRefresh;
 
   Future<void> deleteToken();
@@ -145,6 +150,9 @@ class StubPushService
 
   @override
   Future<bool> requestPermission() async => true;
+
+  @override
+  Future<void> disableAutoInit() async {}
 
   @override
   Stream<String> get tokenRefresh => const Stream.empty();
@@ -236,6 +244,9 @@ class FcmPushService
       _ => false,
     };
   }
+
+  @override
+  Future<void> disableAutoInit() => _fm.setAutoInitEnabled(false);
 
   @override
   Stream<String> get tokenRefresh => _fm.onTokenRefresh;

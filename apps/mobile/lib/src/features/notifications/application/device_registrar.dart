@@ -91,8 +91,13 @@ class DeviceRegistrar {
     if (previous?.payload == token) return;
     if (epoch != null && !_isCurrent(ownerKey, epoch)) return;
     if (previous != null) {
-      await _bestEffortServerUnregister(previous.payload);
+      // Token rotation must not lose the only durable handle for the previous
+      // backend registration. A failed DELETE is retried on the next
+      // activation/logout; registering and persisting the replacement would
+      // otherwise orphan the old token on the server.
+      await _serverUnregister(previous.payload, suppressTerminal: false);
     }
+    if (epoch != null && !_isApproved(ownerKey, epoch)) return;
     await _client.post<dynamic>(
       '/notifications/devices',
       body: {'token': token, 'platform': _platform},
@@ -148,7 +153,7 @@ class DeviceRegistrar {
     }
     if (token != null && token.isNotEmpty) {
       try {
-        await _serverUnregister(token);
+        await _serverUnregister(token, suppressTerminal: true);
       } on Object catch (error, stackTrace) {
         capture(error, stackTrace);
       }
@@ -157,6 +162,13 @@ class DeviceRegistrar {
         ? _push as PushTokenLifecycleService
         : null;
     if (lifecycle != null && deletePlatformToken) {
+      try {
+        await lifecycle.disableAutoInit();
+      } on Object catch (error, stackTrace) {
+        capture(error, stackTrace);
+        // Token deletion still runs so an auto-init platform failure cannot
+        // retain the current account's local identifier.
+      }
       try {
         await lifecycle.deleteToken();
       } on Object catch (error, stackTrace) {
@@ -175,16 +187,22 @@ class DeviceRegistrar {
     }
   }
 
-  Future<void> _serverUnregister(String token) {
-    return _client.delete<dynamic>(
+  Future<void> _serverUnregister(
+    String token, {
+    required bool suppressTerminal,
+  }) async {
+    await _client.delete<dynamic>(
       '/notifications/devices',
       body: {'token': token, 'platform': _platform},
+      extra: suppressTerminal
+          ? {AuthInterceptor.suppressTerminalNotificationExtra: true}
+          : null,
     );
   }
 
   Future<void> _bestEffortServerUnregister(String token) async {
     try {
-      await _serverUnregister(token);
+      await _serverUnregister(token, suppressTerminal: true);
     } on Object {
       // A 401/offline server cannot prevent local token invalidation.
     }

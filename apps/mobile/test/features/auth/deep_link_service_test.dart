@@ -4,11 +4,7 @@ import 'package:devpath_mobile/src/features/auth/application/deep_link_service.d
 import 'package:flutter_test/flutter_test.dart';
 
 final class _FakeDeepLinkSource implements DeepLinkSource {
-  final initial = Completer<Uri?>();
   final links = StreamController<Uri>.broadcast(sync: true);
-
-  @override
-  Future<Uri?> getInitialLink() => initial.future;
 
   @override
   Stream<Uri> get uriLinkStream => links.stream;
@@ -17,29 +13,26 @@ final class _FakeDeepLinkSource implements DeepLinkSource {
 }
 
 void main() {
-  test(
-    'initial OAuth callback and its first stream replay exchange once',
-    () async {
-      final source = _FakeDeepLinkSource();
-      addTearDown(source.close);
-      final codes = <String>[];
-      final service = DeepLinkService(source, onCode: codes.add);
-      addTearDown(service.dispose);
-      final starting = service.start();
-      source.links.add(Uri.parse('devpath://callback#code=one-use'));
-      source.initial.complete(Uri.parse('devpath://callback?code=one-use'));
+  test('first OAuth event and a later same code are both delivered', () async {
+    final source = _FakeDeepLinkSource();
+    addTearDown(source.close);
+    final codes = <String>[];
+    final service = DeepLinkService(source, onCode: codes.add);
+    addTearDown(service.dispose);
+    await service.start();
 
-      await starting;
-      await pumpEventQueue();
-      source.links.add(Uri.parse('devpath://callback?code=one-use'));
-      await pumpEventQueue();
+    source.links.add(Uri.parse('devpath://callback#code=one-use'));
+    await pumpEventQueue();
+    source.links.add(Uri.parse('devpath://callback?code=one-use'));
+    await pumpEventQueue();
 
-      expect(codes, ['one-use']);
-    },
-  );
+    // AuthController coalesces only concurrent exchange of the exact code;
+    // a later delivery reaches server consumed-code handling.
+    expect(codes, ['one-use', 'one-use']);
+  });
 
   test(
-    'warm route during initial lookup is kept and startup echo deduped',
+    'first route and later intentional same-route tap are delivered',
     () async {
       final source = _FakeDeepLinkSource();
       addTearDown(source.close);
@@ -50,46 +43,18 @@ void main() {
         onRoute: routes.add,
       );
       addTearDown(service.dispose);
+      await service.start();
       final route = Uri.parse('https://app.leva.ai.kr/path/301/today');
-      final starting = service.start();
+
       source.links.add(route);
-      source.initial.complete(route);
-
-      await starting;
-      expect(routes, ['/path/301/today']);
-
       source.links.add(route);
       await pumpEventQueue();
+
       expect(routes, ['/path/301/today', '/path/301/today']);
     },
   );
 
-  test(
-    'dispose before initial lookup completion discards every late link',
-    () async {
-      final source = _FakeDeepLinkSource();
-      addTearDown(source.close);
-      final codes = <String>[];
-      final routes = <String>[];
-      final service = DeepLinkService(
-        source,
-        onCode: codes.add,
-        onRoute: routes.add,
-      );
-      final starting = service.start();
-      source.links.add(Uri.parse('https://app.leva.ai.kr/path/301/today'));
-      await service.dispose();
-      source.initial.complete(Uri.parse('devpath://callback?code=late'));
-
-      await starting;
-      await pumpEventQueue();
-
-      expect(codes, isEmpty);
-      expect(routes, isEmpty);
-    },
-  );
-
-  test('valid warm intent supersedes a stale delayed initial link', () async {
+  test('start is idempotent and keeps one stream subscription', () async {
     final source = _FakeDeepLinkSource();
     addTearDown(source.close);
     final routes = <String>[];
@@ -99,59 +64,46 @@ void main() {
       onRoute: routes.add,
     );
     addTearDown(service.dispose);
-    final starting = service.start();
-    source.links.add(
-      Uri.parse('https://app.leva.ai.kr/mission/302/content/77'),
-    );
-    source.initial.complete(Uri.parse('https://app.leva.ai.kr/path/301/today'));
 
-    await starting;
+    await service.start();
+    await service.start();
+    source.links.add(Uri.parse('https://app.leva.ai.kr/path/18/today'));
 
-    expect(routes, ['/mission/302/content/77']);
+    expect(routes, ['/path/18/today']);
   });
 
-  test('bounded auth-code dedupe refreshes replay recency', () async {
+  test('dispose discards all later links', () async {
     final source = _FakeDeepLinkSource();
     addTearDown(source.close);
     final codes = <String>[];
     final service = DeepLinkService(source, onCode: codes.add);
-    addTearDown(service.dispose);
-    final starting = service.start();
-    source.initial.complete(null);
-    await starting;
+    await service.start();
+    await service.dispose();
 
-    for (var index = 0; index < 16; index += 1) {
-      source.links.add(Uri.parse('devpath://callback?code=code-$index'));
-    }
-    source.links.add(Uri.parse('devpath://callback?code=code-0'));
-    source.links.add(Uri.parse('devpath://callback?code=code-16'));
-    source.links.add(Uri.parse('devpath://callback?code=code-0'));
+    source.links.add(Uri.parse('devpath://callback?code=late'));
     await pumpEventQueue();
 
-    expect(codes.where((code) => code == 'code-0'), hasLength(1));
-    expect(codes, hasLength(17));
+    expect(codes, isEmpty);
   });
 
-  test(
-    'initial lookup failure does not disable subscribed warm links',
-    () async {
-      final source = _FakeDeepLinkSource();
-      addTearDown(source.close);
-      final routes = <String>[];
-      final service = DeepLinkService(
-        source,
-        onCode: (_) {},
-        onRoute: routes.add,
-      );
-      addTearDown(service.dispose);
-      final starting = service.start();
-      source.links.add(
-        Uri.parse('https://app.leva.ai.kr/mission/302/content/77'),
-      );
-      source.initial.completeError(StateError('platform initial-link failure'));
+  test('stream error is contained and later links remain usable', () async {
+    final source = _FakeDeepLinkSource();
+    addTearDown(source.close);
+    final routes = <String>[];
+    final service = DeepLinkService(
+      source,
+      onCode: (_) {},
+      onRoute: routes.add,
+    );
+    addTearDown(service.dispose);
+    await service.start();
 
-      await expectLater(starting, throwsStateError);
-      expect(routes, ['/mission/302/content/77']);
-    },
-  );
+    source.links.addError(StateError('platform stream failure'));
+    source.links.add(
+      Uri.parse('https://app.leva.ai.kr/mission/302/content/77'),
+    );
+    await pumpEventQueue();
+
+    expect(routes, ['/mission/302/content/77']);
+  });
 }

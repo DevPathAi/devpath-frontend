@@ -30,7 +30,7 @@ class ApiClient {
         onError: (e, handler) => handler.reject(
           DioException(
             requestOptions: e.requestOptions,
-            error: ApiException.fromDio(e),
+            error: e.error is ApiException ? e.error : ApiException.fromDio(e),
             response: e.response,
             type: e.type,
           ),
@@ -89,9 +89,15 @@ class ApiClient {
     String path, {
     Object? body,
     Map<String, dynamic>? query,
+    Map<String, dynamic>? extra,
   }) async {
     try {
-      final res = await dio.delete<T>(path, data: body, queryParameters: query);
+      final res = await dio.delete<T>(
+        path,
+        data: body,
+        queryParameters: query,
+        options: extra == null ? null : Options(extra: extra),
+      );
       return res.data as T;
     } on DioException catch (e) {
       throw (e.error is ApiException)

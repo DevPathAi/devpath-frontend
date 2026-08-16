@@ -29,6 +29,7 @@ class AuthController extends Notifier<AuthState> {
   /// PKCE verifier 임시 보관 키(콜백이 새 프로세스로 와도 복원되도록 영속 저장).
   static const _kPkceVerifier = 'dp.auth.pkce_verifier';
   Future<void>? _bootstrapInFlight;
+  Future<void>? _oauthCompletionInFlight;
   var _epoch = 0;
 
   @override
@@ -141,6 +142,7 @@ class AuthController extends Notifier<AuthState> {
             }
           }
           if (switchRevocationFailed) return _isCurrent(epoch);
+          await ref.read(pendingDeepLinkProvider.notifier).consumeAndWait();
         }
         if (!_isCurrent(epoch)) return false;
         await ref.read(verifiedSessionStoreProvider).write(user);
@@ -199,16 +201,41 @@ class AuthController extends Notifier<AuthState> {
 
   /// 딥링크 콜백 code 수신 — 보관한 PKCE verifier와 함께 `/auth/oauth/token`으로 교환,
   /// 토큰 저장 후 세션 복원. verifier가 없거나(만료/유실) 교환 실패 시 미인증으로 둔다.
-  Future<void> completeFromCode(String code) async {
-    final epoch = ++_epoch;
-    _bootstrapInFlight = null;
+  Future<void> completeFromCode(String code) {
+    final active = _oauthCompletionInFlight;
+    // One persisted PKCE verifier authorizes one exchange. A different link
+    // racing the active callback cannot represent an independent login flow.
+    if (active != null) return active;
+    late final Future<void> tracked;
+    tracked = _completeFromCode(code).whenComplete(() {
+      if (identical(_oauthCompletionInFlight, tracked)) {
+        _oauthCompletionInFlight = null;
+      }
+    });
+    _oauthCompletionInFlight = tracked;
+    return tracked;
+  }
+
+  Future<void> _completeFromCode(String code) async {
     final kv = ref.read(keyValueStoreProvider);
+    final observedEpoch = _epoch;
     final verifier = await kv.read(_kPkceVerifier);
     if (verifier == null || verifier.isEmpty) {
-      if (!_isCurrent(epoch)) return;
+      if (_epoch != observedEpoch) return;
+      // `app_links` can redeliver an already-consumed callback. Without a
+      // verifier it is not a new login attempt and must never tear down an
+      // authenticated (or currently restoring) verified session.
+      if (state is AuthAuthenticated ||
+          state is AuthOfflineAuthenticated ||
+          state is AuthLoading) {
+        return;
+      }
       state = const AuthUnauthenticated(error: 'PKCE verifier 없음(로그인 재시도 필요)');
       return;
     }
+    if (_epoch != observedEpoch) return;
+    final epoch = ++_epoch;
+    _bootstrapInFlight = null;
     final previousUser = await ref.read(verifiedSessionStoreProvider).read();
     if (!_isCurrent(epoch)) return;
     try {
@@ -317,6 +344,13 @@ class AuthController extends Notifier<AuthState> {
     final ownerKey =
         state.ownerKey ??
         (await ref.read(verifiedSessionStoreProvider).read())?.id;
+    await _invalidateUnauthorizedOwner(ownerKey, message);
+  }
+
+  Future<void> _invalidateUnauthorizedOwner(
+    String? ownerKey,
+    String? message,
+  ) async {
     final epoch = ++_epoch;
     _bootstrapInFlight = null;
     _invalidateCredentialBoundary();
@@ -335,6 +369,35 @@ class AuthController extends Notifier<AuthState> {
     if (cleared) {
       state = terminal;
     }
+  }
+
+  /// Terminal signal from [AuthInterceptor] after it has cleared an
+  /// authoritative rejected credential. The request-captured durable/live
+  /// tuple prevents a late A rejection from invalidating a replacement B (or
+  /// a new login for the same owner).
+  Future<void> invalidateUnauthorizedIfCurrentSession(
+    Object? capturedSessionEpoch,
+  ) async {
+    if (capturedSessionEpoch == null ||
+        !await _isCapturedSessionCurrent(capturedSessionEpoch)) {
+      return;
+    }
+    final ownerKey =
+        state.ownerKey ??
+        (await ref.read(verifiedSessionStoreProvider).read())?.id;
+    if (ownerKey == null ||
+        !await _isCapturedSessionCurrent(capturedSessionEpoch)) {
+      return;
+    }
+    await _invalidateUnauthorizedOwner(ownerKey, null);
+  }
+
+  Future<bool> _isCapturedSessionCurrent(Object captured) async {
+    final current = (
+      durable: await ref.read(accountEpochStoreProvider).current(),
+      credential: ref.read(credentialMutationCoordinatorProvider).generation,
+    );
+    return ref.mounted && captured == current;
   }
 
   Future<void> _clearVerifiedLocalBoundary([String? knownOwner]) async {

@@ -160,6 +160,33 @@ void main() {
       expect(await store.read(PendingDeepLinkController.storageKey), isNull);
     },
   );
+
+  test(
+    'consume contains a transient delete failure and prevents restart replay',
+    () async {
+      final store = _FailFirstDeleteStore();
+      final uncaught = <Object>[];
+
+      await runZonedGuarded<Future<void>>(() async {
+        final first = _container(store);
+        await first
+            .read(pendingDeepLinkProvider.notifier)
+            .capture('/path/301/today');
+        first.read(pendingDeepLinkProvider.notifier).consume();
+        await pumpEventQueue(times: 6);
+        first.dispose();
+
+        final restarted = _container(store);
+        await restarted.read(pendingDeepLinkProvider.notifier).restore();
+        expect(restarted.read(pendingDeepLinkProvider), isNull);
+        restarted.dispose();
+      }, (error, _) => uncaught.add(error));
+
+      expect(store.deleteCalls, 2);
+      expect(uncaught, isEmpty);
+      expect(await store.read(PendingDeepLinkController.storageKey), isNull);
+    },
+  );
 }
 
 class _DelayedDeleteStore implements KeyValueStore {
@@ -181,6 +208,24 @@ class _DelayedDeleteStore implements KeyValueStore {
       deleteStarted.complete();
       await releaseDelete.future;
     }
+    await _delegate.delete(key);
+  }
+}
+
+class _FailFirstDeleteStore implements KeyValueStore {
+  final _delegate = InMemoryKeyValueStore();
+  var deleteCalls = 0;
+
+  @override
+  Future<String?> read(String key) => _delegate.read(key);
+
+  @override
+  Future<void> write(String key, String value) => _delegate.write(key, value);
+
+  @override
+  Future<void> delete(String key) async {
+    deleteCalls += 1;
+    if (deleteCalls == 1) throw StateError('transient delete failure');
     await _delegate.delete(key);
   }
 }

@@ -109,22 +109,25 @@ void main() {
     }
   });
 
-  test('LearningContent applies the same validation to cached nested progress', () {
-    expect(
-      () => LearningContent.fromJson({
-        'id': 1,
-        'slug': 'unsafe',
-        'title': 'Unsafe',
-        'track': 'BACKEND',
-        'markdown': '# Unsafe',
-        'progress': {
-          'scrollPct': 1.5,
-          'dwellSec': -1,
-          'completed': false,
-          'completedAt': null,
-        },
-      }),
-      throwsFormatException,
-    );
-  });
+  test(
+    'LearningContent applies the same validation to cached nested progress',
+    () {
+      expect(
+        () => LearningContent.fromJson({
+          'id': 1,
+          'slug': 'unsafe',
+          'title': 'Unsafe',
+          'track': 'BACKEND',
+          'markdown': '# Unsafe',
+          'progress': {
+            'scrollPct': 1.5,
+            'dwellSec': -1,
+            'completed': false,
+            'completedAt': null,
+          },
+        }),
+        throwsFormatException,
+      );
+    },
+  );
 }

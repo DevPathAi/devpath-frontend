@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' as developer;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -89,11 +90,37 @@ class PendingDeepLinkController extends Notifier<String?> {
   }
 
   void consume() {
+    unawaited(
+      consumeAndWait().catchError((Object error, StackTrace stackTrace) {
+        // Persistent storage failure is observable but never leaks through an
+        // unawaited zone. Epoch/TTL still fail closed across account changes.
+        developer.log(
+          'pending deep-link delete failed after retries',
+          name: 'devpath.mobile.pending_link',
+          error: error,
+          stackTrace: stackTrace,
+        );
+      }),
+    );
+  }
+
+  Future<void> consumeAndWait() {
     _generation += 1;
     state = null;
-    unawaited(
-      _mutateStorage(() => ref.read(keyValueStoreProvider).delete(storageKey)),
-    );
+    return _mutateStorage(() async {
+      Object? lastError;
+      StackTrace? lastStack;
+      for (var attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          await ref.read(keyValueStoreProvider).delete(storageKey);
+          return;
+        } on Object catch (error, stackTrace) {
+          lastError = error;
+          lastStack = stackTrace;
+        }
+      }
+      Error.throwWithStackTrace(lastError!, lastStack!);
+    });
   }
 
   bool consumeIfMatches(

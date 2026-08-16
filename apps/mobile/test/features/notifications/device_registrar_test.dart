@@ -19,27 +19,47 @@ class _FakePush implements PushService {
 }
 
 class _LifecyclePush implements PushService, PushTokenLifecycleService {
-  _LifecyclePush({Future<bool>? permission})
+  _LifecyclePush({Future<bool>? permission, this.tokenFailures = 0})
     : _permission = permission ?? Future<bool>.value(true);
 
   final Future<bool> _permission;
+  int tokenFailures;
   var deleteCalls = 0;
   var permissionCalls = 0;
+  final events = <String>[];
+  final autoInitValues = <bool>[];
   final refreshes = StreamController<String>.broadcast();
 
   @override
-  Future<String?> getToken() async => 'fcm-tok';
+  Future<String?> getToken() async {
+    events.add('getToken');
+    if (tokenFailures > 0) {
+      tokenFailures -= 1;
+      throw StateError('APNs token is not ready');
+    }
+    return 'fcm-tok';
+  }
 
   @override
   Stream<PushMessage> get incoming => const Stream.empty();
 
   @override
-  Future<void> deleteToken() async => deleteCalls += 1;
+  Future<void> deleteToken() async {
+    deleteCalls += 1;
+    events.add('deleteToken');
+  }
 
   @override
   Future<bool> requestPermission() async {
     permissionCalls += 1;
+    events.add('requestPermission');
     return _permission;
+  }
+
+  @override
+  Future<void> disableAutoInit() async {
+    autoInitValues.add(false);
+    events.add('autoInit:false');
   }
 
   @override
@@ -87,13 +107,59 @@ void main() {
         final registrar = DeviceRegistrar(c, push, 'ANDROID', data);
         addTearDown(registrar.dispose);
         await registrar.activate('owner-a');
+        push.events.clear();
 
         await registrar.unregister('owner-a');
         push.refreshes.add('post-logout-token');
         await pumpEventQueue();
 
         expect(push.deleteCalls, 1);
+        expect(push.events, ['autoInit:false', 'deleteToken']);
+        expect(push.autoInitValues, isNot(contains(true)));
         expect(await data.list('owner-a'), isEmpty);
+      },
+    );
+
+    test(
+      'approved activation creates a token explicitly without enabling auto-init',
+      () async {
+        final push = _LifecyclePush();
+        addTearDown(push.close);
+        final registrar = DeviceRegistrar(
+          _client({'POST /notifications/devices': (200, <String, dynamic>{})}),
+          push,
+          'ANDROID',
+        );
+        addTearDown(registrar.dispose);
+
+        await registrar.activate('owner-a');
+
+        expect(push.events, ['requestPermission', 'getToken']);
+        expect(push.autoInitValues, isNot(contains(true)));
+      },
+    );
+
+    test(
+      'approved activation retries token acquisition on next activation',
+      () async {
+        final push = _LifecyclePush(tokenFailures: 1);
+        addTearDown(push.close);
+        final data = InMemoryOwnerDataStore();
+        final registrar = DeviceRegistrar(
+          _client({'POST /notifications/devices': (200, <String, dynamic>{})}),
+          push,
+          'IOS',
+          data,
+        );
+        addTearDown(registrar.dispose);
+
+        await expectLater(registrar.activate('owner-a'), throwsStateError);
+        expect(await data.list('owner-a'), isEmpty);
+        await registrar.activate('owner-a');
+
+        expect(push.events.where((event) => event == 'getToken'), hasLength(2));
+        expect((await data.list('owner-a')).single.payload, 'fcm-tok');
+        expect(push.autoInitValues, isNot(contains(true)));
       },
     );
 
@@ -131,6 +197,46 @@ void main() {
         isTrue,
       );
     });
+
+    test(
+      'active token rotation DELETE does not suppress auth termination',
+      () async {
+        final c = _client({
+          'POST /notifications/devices': (200, <String, dynamic>{}),
+          'DELETE /notifications/devices': (200, <String, dynamic>{}),
+        });
+        Map<String, dynamic>? deleteExtra;
+        c.dio.interceptors.insert(
+          0,
+          InterceptorsWrapper(
+            onRequest: (options, handler) {
+              if (options.method == 'DELETE') {
+                deleteExtra = Map<String, dynamic>.from(options.extra);
+              }
+              handler.next(options);
+            },
+          ),
+        );
+        final data = InMemoryOwnerDataStore();
+        await data.write(
+          'owner-a',
+          'push-registration-v1',
+          'ANDROID',
+          'old-token',
+        );
+        final push = _LifecyclePush();
+        addTearDown(push.close);
+        final registrar = DeviceRegistrar(c, push, 'ANDROID', data);
+        addTearDown(registrar.dispose);
+
+        await registrar.activate('owner-a');
+
+        expect(
+          deleteExtra?['dp_core.auth.suppress_terminal_notification'],
+          isNot(true),
+        );
+      },
+    );
 
     test('revoke failure is reported only after local token cleanup', () async {
       final push = _LifecyclePush();
@@ -212,9 +318,13 @@ void main() {
         final activating = registrar.activate('owner-a');
         await adapter.firstDeleteStarted.future;
         final loggingOut = registrar.unregister('owner-a');
+        final logoutFailure = expectLater(
+          loggingOut,
+          throwsA(isA<ApiException>()),
+        );
         adapter.releaseFirstDelete.complete();
         await activating;
-        await loggingOut;
+        await logoutFailure;
 
         expect(adapter.postCalls, 0);
         expect(await data.list('owner-a'), isEmpty);

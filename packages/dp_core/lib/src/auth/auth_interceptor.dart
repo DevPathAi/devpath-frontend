@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 
 import '../error/api_error_code.dart';
@@ -6,6 +8,8 @@ import 'token_store.dart';
 
 typedef AuthCredentialMutationRunner =
     Future<T> Function<T>(Future<T> Function() mutation);
+typedef AuthSessionInvalidatedCallback =
+    Future<void> Function(Object? capturedSessionEpoch);
 
 /// 401 시 큐잉 갱신(다중 동시요청을 한 번의 refresh로 직렬화). 참조 샘플 §7.
 ///
@@ -19,9 +23,12 @@ class AuthInterceptor extends QueuedInterceptor {
     required this.retry,
     this.sessionEpoch,
     this.credentialMutation,
+    this.onSessionInvalidated,
   });
 
   static const _sessionEpochExtra = 'dp_core.auth.session_epoch';
+  static const suppressTerminalNotificationExtra =
+      'dp_core.auth.suppress_terminal_notification';
 
   final TokenStore store;
 
@@ -39,6 +46,13 @@ class AuthInterceptor extends QueuedInterceptor {
   /// retries, and failure clears share one serialized mutation tail with
   /// account replacement/logout. Web clients may omit it.
   final AuthCredentialMutationRunner? credentialMutation;
+
+  /// Optional native lifecycle notification emitted after an authoritative
+  /// rejection has cleared the captured credential through
+  /// [credentialMutation]. The captured tuple lets the owner state machine
+  /// reject a late A notification after B has become current.
+  final AuthSessionInvalidatedCallback? onSessionInvalidated;
+  final _terminalNotificationsInFlight = <Object?>{};
 
   @override
   Future<void> onRequest(
@@ -109,8 +123,11 @@ class AuthInterceptor extends QueuedInterceptor {
           return;
         }
         handler.resolve(res);
-      } catch (_) {
-        handler.next(err);
+      } catch (error) {
+        if (_isAuthoritativeResourceRejection(error)) {
+          await _clearAndNotifyIfSameSession(err.requestOptions);
+        }
+        handler.next(_retryError(error, err.requestOptions));
       }
       return;
     }
@@ -127,11 +144,14 @@ class AuthInterceptor extends QueuedInterceptor {
       pair = await refresh(refreshToken); // 쿠키 기반이면 인자 무시
     } catch (error) {
       if (_isAuthoritativeRefreshRejection(error)) {
-        await _clearIfSameSession(err.requestOptions);
+        await _clearAndNotifyIfSameSession(err.requestOptions);
       }
       // A transport/5xx failure does not prove that the credential is invalid;
       // explicit 401/403 is authoritative and clears through the shared tail.
-      handler.next(err);
+      // Forward the refresh failure itself. Re-emitting the original resource
+      // 401 would let downstream consumers mistake a transient refresh outage
+      // for an authoritative session rejection.
+      handler.next(_retryError(error, err.requestOptions));
       return;
     }
     if (!await _isSameSession(err.requestOptions)) {
@@ -140,7 +160,7 @@ class AuthInterceptor extends QueuedInterceptor {
     }
     if (pair == null) {
       // null is the explicit authoritative rejection contract.
-      await _clearIfSameSession(err.requestOptions);
+      await _clearAndNotifyIfSameSession(err.requestOptions);
       handler.next(err);
       return;
     }
@@ -161,7 +181,7 @@ class AuthInterceptor extends QueuedInterceptor {
     } catch (_) {
       // A local persistence failure can leave a partial token pair. Clear it
       // only while the request still belongs to the current account.
-      await _clearIfSameSession(err.requestOptions);
+      await _clearAndNotifyIfSameSession(err.requestOptions);
       handler.next(err);
       return;
     }
@@ -178,17 +198,53 @@ class AuthInterceptor extends QueuedInterceptor {
         return;
       }
       handler.resolve(res); // 재시도 성공 → 원 요청을 해당 응답으로 해결
-    } catch (_) {
+    } catch (error) {
       // The refreshed credential remains valid when only the resource retry
-      // fails due to transport/5xx.
-      handler.next(err);
+      // fails due to transport/403/5xx. Only a retry 401 proves that this
+      // credential itself is rejected; 403 can be resource authorization.
+      if (_isAuthoritativeResourceRejection(error)) {
+        await _clearAndNotifyIfSameSession(err.requestOptions);
+      }
+      handler.next(_retryError(error, err.requestOptions));
     }
   }
 
-  Future<void> _clearIfSameSession(RequestOptions options) =>
-      _mutateCredential(() async {
-        if (await _isSameSession(options)) await store.clear();
-      });
+  Future<void> _clearAndNotifyIfSameSession(RequestOptions options) async {
+    final cleared = await _mutateCredential(() async {
+      if (!await _isSameSession(options)) return false;
+      await store.clear();
+      return _isSameSession(options);
+    });
+    if (!cleared ||
+        options.extra[suppressTerminalNotificationExtra] == true ||
+        !await _isSameSession(options)) {
+      return;
+    }
+    final notify = onSessionInvalidated;
+    if (notify == null) return;
+    final capturedSession = options.extra[_sessionEpochExtra];
+    if (!_terminalNotificationsInFlight.add(capturedSession)) return;
+    // Never await native owner cleanup while Dio's QueuedInterceptor error
+    // queue is held. Cleanup may revoke a device through this same client;
+    // scheduling it lets the original handler release the queue first.
+    unawaited(
+      _notifySessionInvalidated(notify, capturedSession).whenComplete(
+        () => _terminalNotificationsInFlight.remove(capturedSession),
+      ),
+    );
+  }
+
+  Future<void> _notifySessionInvalidated(
+    AuthSessionInvalidatedCallback notify,
+    Object? capturedSession,
+  ) async {
+    try {
+      await notify(capturedSession);
+    } on Object {
+      // Credential rejection remains terminal even if owner cleanup reports a
+      // best-effort platform failure; native state is fail-closed first.
+    }
+  }
 
   Future<T> _mutateCredential<T>(Future<T> Function() mutation) {
     final runner = credentialMutation;
@@ -197,14 +253,47 @@ class AuthInterceptor extends QueuedInterceptor {
 
   bool _isAuthoritativeRefreshRejection(Object error) {
     if (error is ApiException) {
-      return error.status == 401 ||
-          error.status == 403 ||
-          error.code == ApiErrorCode.unauthorized ||
+      final status = error.status;
+      if (status != null) return status == 401 || status == 403;
+      return error.code == ApiErrorCode.unauthorized ||
           error.code == ApiErrorCode.forbidden;
     }
     return error is DioException &&
         (error.response?.statusCode == 401 ||
             error.response?.statusCode == 403);
+  }
+
+  bool _isAuthoritativeResourceRejection(Object error) {
+    if (error is ApiException) {
+      final status = error.status;
+      if (status != null) return status == 401;
+      return error.code == ApiErrorCode.unauthorized;
+    }
+    return error is DioException && error.response?.statusCode == 401;
+  }
+
+  DioException _retryError(Object error, RequestOptions request) {
+    if (error is DioException) return error;
+    if (error is ApiException) {
+      return DioException(
+        requestOptions: request,
+        response: error.status == null
+            ? null
+            : Response<dynamic>(
+                requestOptions: request,
+                statusCode: error.status,
+              ),
+        type: error.status == null
+            ? DioExceptionType.unknown
+            : DioExceptionType.badResponse,
+        error: error,
+      );
+    }
+    return DioException(
+      requestOptions: request,
+      type: DioExceptionType.unknown,
+      error: error,
+    );
   }
 
   Future<bool> _isSameSession(RequestOptions options) async {
