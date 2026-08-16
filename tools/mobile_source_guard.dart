@@ -224,39 +224,76 @@ void main(List<String> args) {
 }
 
 void _guardWorkflowActions(String workflowSource) {
+  final violation = mobileWorkflowActionViolation(workflowSource);
+  if (violation != null) _fail(violation);
+}
+
+const _reviewedMobileActions =
+    <String, ({String sha, String version, int count})>{
+      'actions/checkout': (
+        sha: 'd23441a48e516b6c34aea4fa41551a30e30af803',
+        version: 'v6.1.0',
+        count: 2,
+      ),
+      'subosito/flutter-action': (
+        sha: '1a449444c387b1966244ae4d4f8c696479add0b2',
+        version: 'v2.23.0',
+        count: 2,
+      ),
+      'actions/setup-java': (
+        sha: 'cf277c60eb25467037889841efdb72551f06f6c3',
+        version: 'v4.9.1',
+        count: 1,
+      ),
+      'actions/upload-artifact': (
+        sha: 'ea165f8d65b6e75b540449e92b4886f43607fa02',
+        version: 'v4.6.2',
+        count: 2,
+      ),
+      'maxim-lobanov/setup-xcode': (
+        sha: 'ed7a3b1fda3918c0306d1b724322adc0b8cc0a90',
+        version: 'v1.7.0',
+        count: 1,
+      ),
+    };
+
+String? mobileWorkflowActionViolation(String workflowSource) {
   final uses = RegExp(
     r'^\s*(?:-\s+)?uses: ([^@\s]+)@([^\s#]+)(?:\s+#\s*(\S+))?\s*$',
     multiLine: true,
   ).allMatches(workflowSource).toList();
-  const expectedActions = {
-    'actions/checkout',
-    'subosito/flutter-action',
-    'actions/setup-java',
-    'actions/upload-artifact',
-    'maxim-lobanov/setup-xcode',
-  };
-  if (uses.isEmpty ||
-      uses
-          .map((match) => match.group(1))
-          .toSet()
-          .difference(expectedActions)
-          .isNotEmpty ||
-      expectedActions
-          .difference(uses.map((match) => match.group(1)!).toSet())
-          .isNotEmpty) {
-    _fail('mobile CI action set differs from the reviewed allowlist');
+  final rawUseCount = RegExp(
+    r'^\s*(?:-\s+)?uses:',
+    multiLine: true,
+  ).allMatches(workflowSource).length;
+  if (uses.length != rawUseCount) {
+    return 'mobile CI contains an unparseable action reference';
   }
-  final shaPattern = RegExp(r'^[0-9a-f]{40}$');
-  final versionPattern = RegExp(r'^v\d+(?:\.\d+){0,2}$');
-  for (final use in uses) {
-    if (!shaPattern.hasMatch(use.group(2)!)) {
-      _fail('${use.group(1)} is not pinned to an immutable commit SHA');
+  final unknown = uses
+      .map((match) => match.group(1)!)
+      .where((name) => !_reviewedMobileActions.containsKey(name))
+      .toSet();
+  if (unknown.isNotEmpty) {
+    return 'mobile CI action set contains unreviewed action(s): '
+        '${unknown.join(', ')}';
+  }
+  for (final reviewed in _reviewedMobileActions.entries) {
+    final actionUses = uses
+        .where((match) => match.group(1) == reviewed.key)
+        .toList();
+    if (actionUses.length != reviewed.value.count) {
+      return '${reviewed.key} must occur exactly '
+          '${reviewed.value.count} time(s)';
     }
-    final version = use.group(3);
-    if (version == null || !versionPattern.hasMatch(version)) {
-      _fail('${use.group(1)} lacks a reviewed version comment');
+    for (final use in actionUses) {
+      if (use.group(2) != reviewed.value.sha ||
+          use.group(3) != reviewed.value.version) {
+        return '${reviewed.key} must use reviewed pin '
+            '${reviewed.value.sha} # ${reviewed.value.version}';
+      }
     }
   }
+  return null;
 }
 
 String _guardDartSource(Directory directory) {
