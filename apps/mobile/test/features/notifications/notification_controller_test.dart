@@ -633,6 +633,189 @@ void main() {
     );
 
     test(
+      'incoming message waits through AuthLoading without navigation',
+      () async {
+        final push = _FakeInteractivePush();
+        addTearDown(push.close);
+        final store = NotificationStore(InMemoryOwnerDataStore());
+        final container = ProviderContainer(
+          overrides: [
+            pushServiceProvider.overrideWithValue(push),
+            keyValueStoreProvider.overrideWithValue(InMemoryKeyValueStore()),
+            authControllerProvider.overrideWith(
+              _NotificationAuthController.new,
+            ),
+            notificationStoreProvider.overrideWithValue(store),
+          ],
+        );
+        addTearDown(container.dispose);
+        final subscription = container.listen(
+          notificationControllerProvider,
+          (_, _) {},
+        );
+        addTearDown(subscription.close);
+        push.incomingController.add(
+          const PushMessage.ownerScoped(
+            id: 'incoming-auth-loading',
+            title: 'Today',
+            body: 'persist after auth',
+            intendedOwnerKey: 'owner-a',
+            target: PushTarget.today(pathId: 301),
+          ),
+        );
+        await pumpEventQueue();
+        final auth =
+            container.read(authControllerProvider.notifier)
+                as _NotificationAuthController;
+        auth.authenticate('owner-a');
+        await pumpEventQueue(times: 6);
+
+        final state = container.read(notificationControllerProvider);
+        expect(state.messages.map((message) => message.id), [
+          'incoming-auth-loading',
+        ]);
+        expect(state.unreadCount, 1);
+        expect(state.navigationTarget, isNull);
+        expect(await store.list('owner-a'), hasLength(1));
+      },
+    );
+
+    test(
+      'Loading incoming is dropped for a different verified owner',
+      () async {
+        final push = _FakeInteractivePush();
+        addTearDown(push.close);
+        final store = NotificationStore(InMemoryOwnerDataStore());
+        final container = ProviderContainer(
+          overrides: [
+            pushServiceProvider.overrideWithValue(push),
+            keyValueStoreProvider.overrideWithValue(InMemoryKeyValueStore()),
+            authControllerProvider.overrideWith(
+              _NotificationAuthController.new,
+            ),
+            notificationStoreProvider.overrideWithValue(store),
+          ],
+        );
+        addTearDown(container.dispose);
+        final subscription = container.listen(
+          notificationControllerProvider,
+          (_, _) {},
+        );
+        addTearDown(subscription.close);
+        push.incomingController.add(
+          const PushMessage.ownerScoped(
+            id: 'incoming-a-to-b',
+            title: 'Today',
+            body: 'discard',
+            intendedOwnerKey: 'owner-a',
+            target: PushTarget.today(pathId: 301),
+          ),
+        );
+        await pumpEventQueue();
+        final auth =
+            container.read(authControllerProvider.notifier)
+                as _NotificationAuthController;
+        auth.authenticate('owner-b');
+        await pumpEventQueue(times: 5);
+
+        expect(
+          container.read(notificationControllerProvider).messages,
+          isEmpty,
+        );
+        expect(await store.list('owner-a'), isEmpty);
+        expect(await store.list('owner-b'), isEmpty);
+      },
+    );
+
+    test(
+      'Loading incoming upgraded by same-id open persists and navigates once',
+      () async {
+        final push = _FakeInteractivePush();
+        addTearDown(push.close);
+        final store = NotificationStore(InMemoryOwnerDataStore());
+        final container = ProviderContainer(
+          overrides: [
+            pushServiceProvider.overrideWithValue(push),
+            keyValueStoreProvider.overrideWithValue(InMemoryKeyValueStore()),
+            authControllerProvider.overrideWith(
+              _NotificationAuthController.new,
+            ),
+            notificationStoreProvider.overrideWithValue(store),
+          ],
+        );
+        addTearDown(container.dispose);
+        final subscription = container.listen(
+          notificationControllerProvider,
+          (_, _) {},
+        );
+        addTearDown(subscription.close);
+        const message = PushMessage.ownerScoped(
+          id: 'loading-upgrade',
+          title: 'Content',
+          body: 'open after auth',
+          intendedOwnerKey: 'owner-a',
+          target: PushTarget.content(taskId: 302, contentId: 77),
+        );
+        push.incomingController.add(message);
+        push.openedController.add(message);
+        await pumpEventQueue();
+        final auth =
+            container.read(authControllerProvider.notifier)
+                as _NotificationAuthController;
+        auth.authenticate('owner-a');
+        await pumpEventQueue(times: 6);
+
+        final state = container.read(notificationControllerProvider);
+        expect(state.messages.map((message) => message.id), [
+          'loading-upgrade',
+        ]);
+        expect(state.unreadCount, 1);
+        expect(state.navigationTarget?.location, '/mission/302/content/77');
+        expect(await store.list('owner-a'), hasLength(1));
+      },
+    );
+
+    test(
+      'online incoming then same-id open navigates without duplicating',
+      () async {
+        final push = _FakeInteractivePush();
+        addTearDown(push.close);
+        final store = NotificationStore(InMemoryOwnerDataStore());
+        final container = ProviderContainer(
+          overrides: [
+            pushServiceProvider.overrideWithValue(push),
+            keyValueStoreProvider.overrideWithValue(InMemoryKeyValueStore()),
+            currentOwnerKeyProvider.overrideWithValue('owner-a'),
+            notificationStoreProvider.overrideWithValue(store),
+          ],
+        );
+        addTearDown(container.dispose);
+        final subscription = container.listen(
+          notificationControllerProvider,
+          (_, _) {},
+        );
+        addTearDown(subscription.close);
+        const message = PushMessage.ownerScoped(
+          id: 'online-upgrade',
+          title: 'Today',
+          body: 'open',
+          intendedOwnerKey: 'owner-a',
+          target: PushTarget.today(pathId: 301),
+        );
+        push.incomingController.add(message);
+        await pumpEventQueue();
+        push.openedController.add(message);
+        await pumpEventQueue(times: 3);
+
+        final state = container.read(notificationControllerProvider);
+        expect(state.messages.map((message) => message.id), ['online-upgrade']);
+        expect(state.unreadCount, 1);
+        expect(state.navigationTarget?.location, '/path/301/today');
+        expect(await store.list('owner-a'), hasLength(1));
+      },
+    );
+
+    test(
       'AuthLoading tap buffer keeps only the latest sixteen unique messages',
       () async {
         final push = _FakeInteractivePush();
