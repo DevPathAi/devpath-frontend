@@ -82,7 +82,9 @@ async function serve(root, port) {
       response.writeHead(400).end('invalid path');
       return;
     }
+    const fileSize = statSync(target).size;
     response.setHeader('Cache-Control', 'no-store');
+    response.setHeader('Content-Length', String(fileSize));
     response.setHeader('Content-Type', mime(target));
     createReadStream(target)
       .on('error', () => response.writeHead(404).end('not found'))

@@ -53,6 +53,14 @@ void main() {
     expect(capture, contains('PNG axes differ from its catalog profile'));
     expect(capture, contains("page.on('requestfailed'"));
     expect(capture, contains("page.on('response'"));
+    expect(
+      capture,
+      contains("response.setHeader('Content-Length', String(fileSize))"),
+      reason:
+          'the local evidence server must frame exact static-file bytes; '
+          'chunked FontManifest responses can complete and still surface as '
+          'net::ERR_ABORTED in Chromium',
+    );
     expect(RegExp(r'assertClean\(\);').allMatches(capture), hasLength(3));
     expect(capture, isNot(contains('updateSnapshot')));
 
