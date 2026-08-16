@@ -98,6 +98,56 @@ class _DelayedNotificationData extends InMemoryOwnerDataStore {
   }
 }
 
+class _BlockedMarkListData extends InMemoryOwnerDataStore {
+  var blockNextMarkList = false;
+  final listStarted = Completer<void>();
+  final releaseList = Completer<void>();
+
+  @override
+  Future<List<OwnerDataRecord>> list(String ownerKey, [String? bucket]) async {
+    final rows = await super.list(ownerKey, bucket);
+    if (blockNextMarkList &&
+        ownerKey == 'owner-a' &&
+        bucket == NotificationStore.bucket) {
+      blockNextMarkList = false;
+      if (!listStarted.isCompleted) listStarted.complete();
+      await releaseList.future;
+    }
+    return rows;
+  }
+}
+
+class _FailingMarkWriteData extends InMemoryOwnerDataStore {
+  var failNextMarkWrite = false;
+  final writeStarted = Completer<void>();
+  final releaseWrite = Completer<void>();
+
+  @override
+  Future<void> write(
+    String ownerKey,
+    String bucket,
+    String recordKey,
+    String payload, {
+    DateTime? updatedAt,
+  }) async {
+    if (failNextMarkWrite &&
+        ownerKey == 'owner-a' &&
+        bucket == NotificationStore.bucket) {
+      failNextMarkWrite = false;
+      if (!writeStarted.isCompleted) writeStarted.complete();
+      await releaseWrite.future;
+      throw StateError('late mark-all failure');
+    }
+    await super.write(
+      ownerKey,
+      bucket,
+      recordKey,
+      payload,
+      updatedAt: updatedAt,
+    );
+  }
+}
+
 final _ownerProvider = NotifierProvider<_OwnerController, String?>(
   _OwnerController.new,
 );
@@ -211,6 +261,99 @@ void main() {
       expect(s.unreadCount, 0);
       expect(s.messages, hasLength(1));
     });
+
+    test(
+      'A mark-all snapshot cannot resurrect A rows after purge and B switch',
+      () async {
+        final data = _BlockedMarkListData();
+        final store = NotificationStore(data);
+        await _seedUnread(store, 'owner-a', 'a-1');
+        await _seedUnread(store, 'owner-b', 'b-1');
+        await _seedUnread(store, 'owner-b', 'b-2');
+        final push = StreamController<PushMessage>();
+        addTearDown(push.close);
+        final container = ProviderContainer(
+          overrides: [
+            pushServiceProvider.overrideWithValue(_FakePush(push)),
+            currentOwnerKeyProvider.overrideWith(
+              (ref) => ref.watch(_ownerProvider),
+            ),
+            notificationStoreProvider.overrideWithValue(store),
+          ],
+        );
+        addTearDown(container.dispose);
+        final subscription = container.listen(
+          notificationControllerProvider,
+          (_, _) {},
+        );
+        addTearDown(subscription.close);
+        await pumpEventQueue();
+        expect(container.read(notificationControllerProvider).unreadCount, 1);
+
+        data.blockNextMarkList = true;
+        container.read(notificationControllerProvider.notifier).markAllRead();
+        await data.listStarted.future;
+        await data.clearOwner('owner-a');
+        container.read(_ownerProvider.notifier).setOwner('owner-b');
+        await pumpEventQueue();
+        expect(container.read(notificationControllerProvider).unreadCount, 2);
+
+        data.releaseList.complete();
+        await pumpEventQueue(times: 5);
+
+        expect(await store.list('owner-a'), isEmpty);
+        expect(container.read(notificationControllerProvider).unreadCount, 2);
+      },
+    );
+
+    test(
+      'late A mark-all failure is contained and cannot change restored B UI',
+      () async {
+        final data = _FailingMarkWriteData();
+        final store = NotificationStore(data);
+        await _seedUnread(store, 'owner-a', 'a-1');
+        await _seedUnread(store, 'owner-b', 'b-1');
+        await _seedUnread(store, 'owner-b', 'b-2');
+        final push = StreamController<PushMessage>();
+        addTearDown(push.close);
+        final container = ProviderContainer(
+          overrides: [
+            pushServiceProvider.overrideWithValue(_FakePush(push)),
+            currentOwnerKeyProvider.overrideWith(
+              (ref) => ref.watch(_ownerProvider),
+            ),
+            notificationStoreProvider.overrideWithValue(store),
+          ],
+        );
+        addTearDown(container.dispose);
+        final subscription = container.listen(
+          notificationControllerProvider,
+          (_, _) {},
+        );
+        addTearDown(subscription.close);
+        await pumpEventQueue();
+        expect(container.read(notificationControllerProvider).unreadCount, 1);
+
+        final uncaught = <Object>[];
+        data.failNextMarkWrite = true;
+        runZonedGuarded(
+          () => container
+              .read(notificationControllerProvider.notifier)
+              .markAllRead(),
+          (error, _) => uncaught.add(error),
+        );
+        await data.writeStarted.future;
+        container.read(_ownerProvider.notifier).setOwner('owner-b');
+        await pumpEventQueue();
+        expect(container.read(notificationControllerProvider).unreadCount, 2);
+
+        data.releaseWrite.complete();
+        await pumpEventQueue(times: 5);
+
+        expect(uncaught, isEmpty);
+        expect(container.read(notificationControllerProvider).unreadCount, 2);
+      },
+    );
 
     test(
       'cold/warm notification taps expose only typed native targets',
@@ -395,3 +538,10 @@ void main() {
     });
   });
 }
+
+Future<void> _seedUnread(NotificationStore store, String ownerKey, String id) =>
+    store.add(
+      ownerKey,
+      PushMessage.local(id: id, title: id, body: 'body'),
+      receivedAt: DateTime.utc(2026, 8, 16, 12, 0, id.hashCode.abs() % 60),
+    );
