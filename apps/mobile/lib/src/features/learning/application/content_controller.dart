@@ -17,10 +17,19 @@ class ContentController extends Notifier<ContentState> {
 
   final String routeKey;
   var _loadGeneration = 0;
+  String? _ownerKey;
 
   @override
   ContentState build() {
-    if (ref.read(currentOwnerKeyProvider) != null) {
+    _ownerKey = ref.read(currentOwnerKeyProvider);
+    ref.listen(currentOwnerKeyProvider, (_, owner) {
+      if (owner == _ownerKey) return;
+      _ownerKey = owner;
+      _loadGeneration += 1;
+      state = const ContentLoading();
+      if (owner != null) Future<void>.microtask(load);
+    });
+    if (_ownerKey != null) {
       ref.listen(contentProgressSyncControllerProvider, (previous, next) {
         if (previous != next) unawaited(_refreshFromOfflineStore());
       });
@@ -29,13 +38,14 @@ class ContentController extends Notifier<ContentState> {
   }
 
   Future<void> _refreshFromOfflineStore() async {
-    final owner = ref.read(currentOwnerKeyProvider);
+    final owner = _ownerKey;
+    final generation = _loadGeneration;
     final before = state;
     if (owner == null || before is! ContentLoaded) return;
     final cached = await ref
         .read(contentOfflineStoreProvider)
         .read(owner, routeKey, now: DateTime.now().toUtc());
-    if (!ref.mounted || cached == null) return;
+    if (!_isCurrent(owner, generation) || cached == null) return;
     final latest = state;
     if (latest is! ContentLoaded || !_matches(latest.content)) return;
     state = ContentLoaded(
@@ -53,6 +63,7 @@ class ContentController extends Notifier<ContentState> {
       return;
     }
     final generation = ++_loadGeneration;
+    final owner = _ownerKey;
     final retained = state is ContentLoaded ? state as ContentLoaded : null;
     if (retained == null) {
       state = const ContentLoading();
@@ -66,7 +77,6 @@ class ContentController extends Notifier<ContentState> {
         cachedAt: retained.cachedAt,
       );
     }
-    final owner = ref.read(currentOwnerKeyProvider);
     try {
       final json = await ref
           .read(apiClientProvider)
@@ -75,11 +85,11 @@ class ContentController extends Notifier<ContentState> {
       if (!_matches(content)) {
         throw const FormatException('content identity mismatch');
       }
-      if (!ref.mounted || generation != _loadGeneration) return;
+      if (!_isCurrent(owner, generation)) return;
       final now = DateTime.now().toUtc();
-      if (owner != null && ref.read(currentOwnerKeyProvider) == owner) {
+      if (owner != null) {
         content = await _mergeQueuedProgress(owner, content);
-        if (!ref.mounted || generation != _loadGeneration) return;
+        if (!_isCurrent(owner, generation)) return;
         try {
           await ref
               .read(contentOfflineStoreProvider)
@@ -88,10 +98,10 @@ class ContentController extends Notifier<ContentState> {
           // Local persistence cannot make authoritative content unusable.
         }
       }
-      if (!ref.mounted || generation != _loadGeneration) return;
+      if (!_isCurrent(owner, generation)) return;
       state = ContentLoaded(content, cachedAt: now);
     } on Object catch (error) {
-      if (!ref.mounted || generation != _loadGeneration) return;
+      if (!_isCurrent(owner, generation)) return;
       final message = _loadFailure(error);
       if (retained != null) {
         state = ContentLoaded(
@@ -105,7 +115,7 @@ class ContentController extends Notifier<ContentState> {
         return;
       }
       CachedLearningContent? cached;
-      if (owner != null && ref.read(currentOwnerKeyProvider) == owner) {
+      if (owner != null) {
         try {
           cached = await ref
               .read(contentOfflineStoreProvider)
@@ -114,11 +124,11 @@ class ContentController extends Notifier<ContentState> {
           cached = null;
         }
       }
-      if (!ref.mounted || generation != _loadGeneration) return;
+      if (!_isCurrent(owner, generation)) return;
       final restored = cached == null || owner == null
           ? cached?.content
           : await _mergeQueuedProgress(owner, cached.content);
-      if (!ref.mounted || generation != _loadGeneration) return;
+      if (!_isCurrent(owner, generation)) return;
       state = restored == null
           ? ContentFailed(message)
           : ContentLoaded(
@@ -156,6 +166,8 @@ class ContentController extends Notifier<ContentState> {
   }) async {
     final before = state;
     if (before is! ContentLoaded || !_matches(before.content)) return null;
+    final owner = _ownerKey;
+    final generation = _loadGeneration;
     final localProgress = before.content.progress;
     state = ContentLoaded(
       before.content.copyWith(
@@ -172,7 +184,6 @@ class ContentController extends Notifier<ContentState> {
       cachedAt: before.cachedAt,
     );
 
-    final owner = ref.read(currentOwnerKeyProvider);
     ContentProgressUpdateResponse? response;
     if (owner == null) {
       response = await _postDirect(scrollPct: scrollPct, dwellSec: dwellSec);
@@ -189,7 +200,7 @@ class ContentController extends Notifier<ContentState> {
             ),
           );
     }
-    if (!ref.mounted) return response;
+    if (!_isCurrent(owner, generation)) return response;
     if (response == null) {
       final latest = state;
       if (latest is ContentLoaded && _matches(latest.content)) {
@@ -258,6 +269,9 @@ class ContentController extends Notifier<ContentState> {
 
   bool _matches(LearningContent content) =>
       content.slug == routeKey || content.id.toString() == routeKey;
+
+  bool _isCurrent(String? owner, int generation) =>
+      ref.mounted && owner == _ownerKey && generation == _loadGeneration;
 
   Future<LearningContent> _mergeQueuedProgress(
     String ownerKey,
