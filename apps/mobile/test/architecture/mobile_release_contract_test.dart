@@ -16,7 +16,18 @@ void main() {
       expect(workflow, contains('apksigner'));
       expect(workflow, contains('--no-codesign'));
       expect(workflow, contains('pubspec.lock'));
+      expect(workflow, contains('runs-on: ubuntu-24.04'));
+      expect(workflow, contains('runs-on: macos-26'));
       expect(workflow, isNot(contains('secrets.')));
+
+      final wrapper = _read('android/gradle/wrapper/gradle-wrapper.properties');
+      expect(
+        wrapper,
+        contains(
+          'distributionSha256Sum='
+          'b84e04fa845fecba48551f425957641074fcc00a88a84d2aae5808743b35fc85',
+        ),
+      );
     },
   );
 
