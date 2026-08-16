@@ -27,6 +27,7 @@ void main() {
           .interceptors
           .whereType<AuthInterceptor>()
           .single;
+      expect(interceptor.credentialMutation, isNotNull);
       expect(await interceptor.sessionEpoch!(), 0);
 
       await container.read(accountEpochStoreProvider).advance();
