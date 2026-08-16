@@ -89,6 +89,49 @@ void main() {
     },
   );
 
+  test('valid warm intent supersedes a stale delayed initial link', () async {
+    final source = _FakeDeepLinkSource();
+    addTearDown(source.close);
+    final routes = <String>[];
+    final service = DeepLinkService(
+      source,
+      onCode: (_) {},
+      onRoute: routes.add,
+    );
+    addTearDown(service.dispose);
+    final starting = service.start();
+    source.links.add(
+      Uri.parse('https://app.leva.ai.kr/mission/302/content/77'),
+    );
+    source.initial.complete(Uri.parse('https://app.leva.ai.kr/path/301/today'));
+
+    await starting;
+
+    expect(routes, ['/mission/302/content/77']);
+  });
+
+  test('bounded auth-code dedupe refreshes replay recency', () async {
+    final source = _FakeDeepLinkSource();
+    addTearDown(source.close);
+    final codes = <String>[];
+    final service = DeepLinkService(source, onCode: codes.add);
+    addTearDown(service.dispose);
+    final starting = service.start();
+    source.initial.complete(null);
+    await starting;
+
+    for (var index = 0; index < 16; index += 1) {
+      source.links.add(Uri.parse('devpath://callback?code=code-$index'));
+    }
+    source.links.add(Uri.parse('devpath://callback?code=code-0'));
+    source.links.add(Uri.parse('devpath://callback?code=code-16'));
+    source.links.add(Uri.parse('devpath://callback?code=code-0'));
+    await pumpEventQueue();
+
+    expect(codes.where((code) => code == 'code-0'), hasLength(1));
+    expect(codes, hasLength(17));
+  });
+
   test(
     'initial lookup failure does not disable subscribed warm links',
     () async {
