@@ -20,6 +20,35 @@ void main() {
     },
   );
 
+  test('every external mobile CI action is immutable full-SHA pinned', () {
+    final workflow = _read('../../.github/workflows/mobile.yml');
+    final uses = RegExp(
+      r'^\s*(?:-\s+)?uses: ([^@\s]+)@([^\s#]+)(?:\s+#\s*(\S+))?\s*$',
+      multiLine: true,
+    ).allMatches(workflow).toList();
+
+    expect(uses, isNotEmpty);
+    expect(uses.map((match) => match.group(1)).toSet(), {
+      'actions/checkout',
+      'subosito/flutter-action',
+      'actions/setup-java',
+      'actions/upload-artifact',
+      'maxim-lobanov/setup-xcode',
+    });
+    for (final use in uses) {
+      expect(
+        use.group(2),
+        matches(RegExp(r'^[0-9a-f]{40}$')),
+        reason: '${use.group(1)} must use an immutable commit SHA',
+      );
+      expect(
+        use.group(3),
+        matches(RegExp(r'^v\d+(?:\.\d+){0,2}$')),
+        reason: '${use.group(1)} must retain a human-readable version comment',
+      );
+    }
+  });
+
   test('release Android build cannot silently use the debug signing key', () {
     final gradle = _read('android/app/build.gradle.kts');
     final properties = _read('android/gradle.properties');
