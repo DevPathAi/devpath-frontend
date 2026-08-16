@@ -13,19 +13,13 @@ import '../features/auth/presentation/login_page.dart';
 import '../features/auth/presentation/session_unavailable_page.dart';
 import '../features/auth/state/auth_state.dart';
 import '../features/community/presentation/community_page.dart';
-import '../features/community/application/community_controller.dart';
-import '../features/community/application/qna_detail_controller.dart';
 import '../features/community/presentation/qna_detail_page.dart';
 import '../features/community/presentation/quick_capture_page.dart';
-import '../features/dashboard/application/dashboard_controller.dart';
 import '../features/learning/presentation/content_viewer_page.dart';
-import '../features/learning/application/content_controller.dart';
-import '../features/learning/application/learn_controller.dart';
 import '../features/learning/presentation/learn_page.dart';
 import '../features/mission/presentation/mobile_mission_route_resolvers.dart';
 import '../features/mission/state/mobile_mission_route.dart';
 import '../features/notifications/presentation/notifications_page.dart';
-import '../features/notifications/application/notification_controller.dart';
 import '../features/shell/presentation/mobile_shell.dart';
 import '../features/today/presentation/today_page.dart';
 
@@ -72,19 +66,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   final refresh = ValueNotifier<int>(0);
   ref.onDispose(refresh.dispose);
   void notify() => refresh.value++;
-  ref.listen(authControllerProvider, (previous, next) {
-    final previousOwner = previous?.ownerKey;
-    final nextOwner = next.ownerKey;
-    if (previousOwner != null && previousOwner != nextOwner) {
-      ref.invalidate(contentControllerProvider);
-      ref.invalidate(learnControllerProvider);
-      ref.invalidate(dashboardControllerProvider);
-      ref.invalidate(notificationControllerProvider);
-      ref.invalidate(communityControllerProvider);
-      ref.invalidate(qnaDetailControllerProvider);
-    }
-    notify();
-  });
+  ref.listen(authControllerProvider, (previous, next) => notify());
   ref.listen(pendingDeepLinkProvider, (_, _) => notify());
 
   return GoRouter(

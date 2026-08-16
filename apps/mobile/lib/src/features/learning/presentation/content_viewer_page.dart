@@ -5,6 +5,7 @@ import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../auth/application/auth_controller.dart';
 import '../application/content_controller.dart';
 import '../application/content_progress_tracker.dart';
 import '../state/content_state.dart';
@@ -25,21 +26,26 @@ class ContentViewerPage extends ConsumerStatefulWidget {
 class _ContentViewerPageState extends ConsumerState<ContentViewerPage>
     with WidgetsBindingObserver {
   final _scrollController = ScrollController();
-  late final ContentController _contentController;
+  ContentController? _activeController;
   Timer? _dwellTimer;
   ContentProgressTracker? _tracker;
   String? _trackedSlug;
   ContentState? _latestState;
   int _dwellSec = 0;
-  bool _posting = false;
+  int? _postingGeneration;
+  var _boundaryGeneration = 0;
+  int? _loadStartedGeneration;
+  String? _ownerKey;
 
   @override
   void initState() {
     super.initState();
-    // dispose 시 ref 사용이 불가하므로 의존성을 미리 캐싱(web content_page와 동일 패턴).
-    _contentController = ref.read(
-      contentControllerProvider(widget.slug).notifier,
-    );
+    _ownerKey = ref.read(currentOwnerKeyProvider);
+    ref.listenManual(currentOwnerKeyProvider, (previous, next) {
+      if (_ownerKey == next) return;
+      _ownerKey = next;
+      _resetBoundary();
+    });
     WidgetsBinding.instance.addObserver(this);
     _scrollController.addListener(_maybeFlushProgress);
     _dwellTimer = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -48,9 +54,41 @@ class _ContentViewerPageState extends ConsumerState<ContentViewerPage>
       _dwellSec++;
       _maybeFlushProgress();
     });
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _contentController.load(),
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scheduleLoad();
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant ContentViewerPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.slug == widget.slug) return;
+    _resetBoundary();
+    _scheduleLoad();
+  }
+
+  void _resetBoundary() {
+    _boundaryGeneration += 1;
+    _activeController = null;
+    _tracker = null;
+    _trackedSlug = null;
+    _latestState = null;
+    _dwellSec = 0;
+  }
+
+  void _scheduleLoad() {
+    final slug = widget.slug;
+    final generation = _boundaryGeneration;
+    if (_loadStartedGeneration == generation) return;
+    _loadStartedGeneration = generation;
+    scheduleMicrotask(() {
+      if (!mounted ||
+          slug != widget.slug ||
+          generation != _boundaryGeneration) {
+        return;
+      }
+      unawaited(ref.read(contentControllerProvider(slug).notifier).load());
+    });
   }
 
   @override
@@ -75,6 +113,8 @@ class _ContentViewerPageState extends ConsumerState<ContentViewerPage>
   @override
   Widget build(BuildContext context) {
     final provider = contentControllerProvider(widget.slug);
+    final controller = ref.read(provider.notifier);
+    _activeController = controller;
     final s = ref.watch(provider);
     _latestState = s;
     ref.listen<ContentState>(provider, (_, next) {
@@ -92,7 +132,7 @@ class _ContentViewerPageState extends ConsumerState<ContentViewerPage>
         ContentLoading() => const DpLoading(),
         ContentFailed(:final message) => DpError(
           message: message,
-          onRetry: _contentController.load,
+          onRetry: controller.load,
         ),
         ContentLoaded(:final content)
             when content.slug == widget.slug ||
@@ -104,7 +144,7 @@ class _ContentViewerPageState extends ConsumerState<ContentViewerPage>
             progressFailureMessage: s.progressFailureMessage,
             loadFailureMessage: s.loadFailureMessage,
             fromOfflineCache: s.fromOfflineCache,
-            onComplete: _contentController.markComplete,
+            onComplete: controller.markComplete,
           ),
         ContentLoaded() => const DpLoading(),
       },
@@ -127,7 +167,7 @@ class _ContentViewerPageState extends ConsumerState<ContentViewerPage>
   }
 
   void _maybeFlushProgress({bool force = false}) {
-    if (_posting) return;
+    if (_postingGeneration == _boundaryGeneration) return;
     final state = ref.read(contentControllerProvider(widget.slug));
     _latestState = state;
     if (state is! ContentLoaded) return;
@@ -150,22 +190,34 @@ class _ContentViewerPageState extends ConsumerState<ContentViewerPage>
   }
 
   Future<void> _postProgress(ContentProgressFlush flush) async {
-    _posting = true;
+    final controller = _activeController;
+    if (controller == null) return;
+    final slug = widget.slug;
+    final boundaryGeneration = _boundaryGeneration;
+    _postingGeneration = boundaryGeneration;
     try {
-      final resp = await _contentController.reportProgress(
-        widget.slug,
+      final resp = await controller.reportProgress(
+        slug,
         scrollPct: flush.scrollPct,
         dwellSec: flush.dwellSec,
       );
-      if (resp?.completed == true) _tracker?.markCompleted();
+      if (boundaryGeneration == _boundaryGeneration &&
+          resp?.completed == true) {
+        _tracker?.markCompleted();
+      }
     } finally {
-      _posting = false;
+      if (_postingGeneration == boundaryGeneration) {
+        _postingGeneration = null;
+      }
     }
   }
 
   /// 페이지 이탈 시에도 같은 controller 경계로 보내 완료 무효화와 단조 병합을 유지한다.
   void _flushOnDispose() {
-    if (_posting) return;
+    if (_postingGeneration == _boundaryGeneration) return;
+    final controller = _activeController;
+    if (controller == null) return;
+    final slug = widget.slug;
     final state = _latestState;
     if (state is! ContentLoaded) return;
     _syncTracker(state.content);
@@ -177,11 +229,13 @@ class _ContentViewerPageState extends ConsumerState<ContentViewerPage>
     final flush = recorded ?? tracker.disposeFlush();
     if (flush == null) return;
     unawaited(
-      _contentController.reportProgress(
-        widget.slug,
-        scrollPct: flush.scrollPct,
-        dwellSec: flush.dwellSec,
-      ),
+      Future<void>.microtask(() async {
+        await controller.reportProgress(
+          slug,
+          scrollPct: flush.scrollPct,
+          dwellSec: flush.dwellSec,
+        );
+      }),
     );
   }
 }

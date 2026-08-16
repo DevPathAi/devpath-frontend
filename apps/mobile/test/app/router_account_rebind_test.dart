@@ -7,7 +7,9 @@ import 'package:devpath_mobile/src/features/auth/application/auth_controller.dar
 import 'package:devpath_mobile/src/features/auth/state/auth_state.dart';
 import 'package:devpath_mobile/src/features/community/data/community_source.dart';
 import 'package:devpath_mobile/src/features/community/presentation/community_page.dart';
+import 'package:devpath_mobile/src/features/learning/application/content_controller.dart';
 import 'package:devpath_mobile/src/features/learning/presentation/content_viewer_page.dart';
+import 'package:devpath_mobile/src/features/learning/state/content_state.dart';
 import 'package:devpath_mobile/src/providers/api_providers.dart';
 import 'package:devpath_mobile/src/services/connectivity_service.dart';
 import 'package:devpath_mobile/src/services/push_service.dart';
@@ -54,9 +56,11 @@ void main() {
       expect(router.state.matchedLocation, '/learn/content/future-async-await');
       expect(find.byType(ContentViewerPage), findsOneWidget);
       expect(identical(container.read(apiClientProvider), api), isTrue);
+      expect(container.read(currentOwnerKeyProvider), 'owner-a');
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 25));
-      await _pumpUntil(tester, () => api.getRequests.length == 1);
+      await _pumpUntil(tester, () => api.getRequests.isNotEmpty);
+      expect(api.getRequests, hasLength(1));
       api.getRequests[0].complete(_content('A content'));
       await _pumpUntil(
         tester,
@@ -64,7 +68,15 @@ void main() {
       );
 
       _auth(container).switchTo(_user('owner-b'));
-      await _pumpUntil(tester, () => api.getRequests.length == 2);
+      await tester.pump();
+      expect(container.read(currentOwnerKeyProvider), 'owner-b');
+      expect(find.byType(ContentViewerPage), findsOneWidget);
+      expect(
+        container.read(contentControllerProvider('future-async-await')),
+        isA<ContentLoading>(),
+      );
+      await _pumpUntil(tester, () => api.getRequests.length >= 2);
+      expect(api.getRequests, hasLength(2));
       expect(find.text('A content'), findsNothing);
       api.getRequests[1].complete(_content('B content'));
       await _pumpUntil(
@@ -174,7 +186,9 @@ User _user(String id) => User(
   consentStatus: ConsentStatus.done,
 );
 
-LearningPath _path(String title) => LearningPath.fromJson({
+LearningPath _path(String title) => LearningPath.fromJson(_pathJson(title));
+
+Map<String, dynamic> _pathJson(String title) => {
   'pathId': 1,
   'track': 'BACKEND',
   'totalWeeks': 1,
@@ -192,7 +206,7 @@ LearningPath _path(String title) => LearningPath.fromJson({
       'tasks': <Map<String, dynamic>>[],
     },
   ],
-});
+};
 
 Map<String, dynamic> _content(String title) => {
   'id': 1,
@@ -230,6 +244,23 @@ final class _QueuedContentApi extends ApiClient {
 
   @override
   Future<T> get<T>(String path, {Map<String, dynamic>? query}) async {
+    if (path == '/learning-paths/me') {
+      return _pathJson('Shell path') as T;
+    }
+    if (path == '/learning-paths/me/this-week') {
+      return <String, dynamic>{
+            'outcome': 'NO_ACTIVE_PATH',
+            'pathId': null,
+            'weekNum': null,
+            'tasks': <Object?>[],
+            'nextTask': null,
+            'pathCompleted': false,
+          }
+          as T;
+    }
+    if (path != '/contents/future-async-await') {
+      throw StateError('unexpected GET $path');
+    }
     final request = Completer<Map<String, dynamic>>();
     getRequests.add(request);
     return await request.future as T;

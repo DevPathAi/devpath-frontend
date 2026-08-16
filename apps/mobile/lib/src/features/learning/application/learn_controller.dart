@@ -18,9 +18,18 @@ class LearnController extends Notifier<LearnState> {
       _ownerKey = owner;
       _generation += 1;
       state = const LearnLoading();
-      if (owner != null) Future<void>.microtask(load);
+      if (owner != null) _scheduleLoad();
     });
     return const LearnLoading();
+  }
+
+  void _scheduleLoad() {
+    final scheduledGeneration = _generation;
+    Future<void>.microtask(() {
+      if (ref.mounted && scheduledGeneration == _generation) {
+        return load();
+      }
+    });
   }
 
   Future<void> load() async {

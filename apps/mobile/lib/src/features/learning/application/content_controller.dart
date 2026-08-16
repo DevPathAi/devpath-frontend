@@ -27,7 +27,7 @@ class ContentController extends Notifier<ContentState> {
       _ownerKey = owner;
       _loadGeneration += 1;
       state = const ContentLoading();
-      if (owner != null) Future<void>.microtask(load);
+      if (owner != null) _scheduleLoad();
     });
     if (_ownerKey != null) {
       ref.listen(contentProgressSyncControllerProvider, (previous, next) {
@@ -35,6 +35,15 @@ class ContentController extends Notifier<ContentState> {
       });
     }
     return const ContentLoading();
+  }
+
+  void _scheduleLoad() {
+    final scheduledGeneration = _loadGeneration;
+    Future<void>.microtask(() {
+      if (ref.mounted && scheduledGeneration == _loadGeneration) {
+        return load();
+      }
+    });
   }
 
   Future<void> _refreshFromOfflineStore() async {

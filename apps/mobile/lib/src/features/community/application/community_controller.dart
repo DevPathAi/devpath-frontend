@@ -19,10 +19,19 @@ class CommunityController extends Notifier<CommunityState> {
       _generation += 1;
       state = const CommunityLoading();
       if (owner != null) {
-        Future<void>.microtask(load);
+        _scheduleLoad();
       }
     });
     return const CommunityLoading();
+  }
+
+  void _scheduleLoad() {
+    final scheduledGeneration = _generation;
+    Future<void>.microtask(() {
+      if (ref.mounted && scheduledGeneration == _generation) {
+        return load();
+      }
+    });
   }
 
   Future<void> load() async {
