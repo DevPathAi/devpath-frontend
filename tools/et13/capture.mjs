@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { createReadStream, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { readFileSync, statSync, writeFileSync } from 'node:fs';
 import { mkdir, readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { dirname, extname, resolve, sep } from 'node:path';
@@ -82,13 +82,11 @@ async function serve(root, port) {
       response.writeHead(400).end('invalid path');
       return;
     }
-    const fileSize = statSync(target).size;
+    const bytes = readFileSync(target);
     response.setHeader('Cache-Control', 'no-store');
-    response.setHeader('Content-Length', String(fileSize));
+    response.setHeader('Content-Length', String(bytes.length));
     response.setHeader('Content-Type', mime(target));
-    createReadStream(target)
-      .on('error', () => response.writeHead(404).end('not found'))
-      .pipe(response);
+    response.end(bytes);
   });
   await new Promise((resolveListen, reject) => {
     server.once('error', reject);

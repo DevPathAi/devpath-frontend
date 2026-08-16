@@ -55,12 +55,17 @@ void main() {
     expect(capture, contains("page.on('response'"));
     expect(
       capture,
-      contains("response.setHeader('Content-Length', String(fileSize))"),
+      contains('const bytes = readFileSync(target);'),
       reason:
-          'the local evidence server must frame exact static-file bytes; '
-          'chunked FontManifest responses can complete and still surface as '
-          'net::ERR_ABORTED in Chromium',
+          'the local evidence server must bind framing and response body to '
+          'one immutable byte buffer',
     );
+    expect(
+      capture,
+      contains("response.setHeader('Content-Length', String(bytes.length))"),
+    );
+    expect(capture, contains('response.end(bytes);'));
+    expect(capture, isNot(contains('createReadStream(target)')));
     expect(RegExp(r'assertClean\(\);').allMatches(capture), hasLength(3));
     expect(capture, isNot(contains('updateSnapshot')));
 
