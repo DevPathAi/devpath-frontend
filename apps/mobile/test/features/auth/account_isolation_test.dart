@@ -6,6 +6,7 @@ import 'package:devpath_mobile/src/data/key_value_store.dart';
 import 'package:devpath_mobile/src/data/owner_data_store.dart';
 import 'package:devpath_mobile/src/features/auth/application/auth_controller.dart';
 import 'package:devpath_mobile/src/features/auth/application/account_epoch_store.dart';
+import 'package:devpath_mobile/src/features/auth/application/credential_mutation_coordinator.dart';
 import 'package:devpath_mobile/src/features/auth/application/verified_session_store.dart';
 import 'package:devpath_mobile/src/features/auth/state/auth_state.dart';
 import 'package:devpath_mobile/src/features/notifications/application/device_registrar.dart';
@@ -44,6 +45,25 @@ class _SwitchRegistrar extends DeviceRegistrar {
   Future<void> unregister(String ownerKey) async {
     events.add('revoke:$ownerKey');
     if (fail) throw StateError('local FCM invalidation failed');
+  }
+}
+
+class _ReentrantCredentialRegistrar extends DeviceRegistrar {
+  _ReentrantCredentialRegistrar(this.coordinator)
+    : super(
+        _client(const {}),
+        StubPushService(),
+        'ANDROID',
+        InMemoryOwnerDataStore(),
+      );
+
+  final CredentialMutationCoordinator coordinator;
+
+  @override
+  Future<void> unregister(String ownerKey) {
+    // Models a device-unregister 401 whose AuthInterceptor refresh must enter
+    // the same credential mutation boundary.
+    return coordinator.run(() async {});
   }
 }
 
@@ -403,6 +423,41 @@ void main() {
     expect(await tokens.readAccess(), isNull);
     expect(await AccountEpochStore(kv).current(), 1);
     expect(await VerifiedSessionStore(kv).read(), isNull);
+    expect(container.read(authControllerProvider), isA<AuthUnauthenticated>());
+  });
+
+  test('device revoke auth refresh cannot deadlock logout cleanup', () async {
+    final tokens = InMemoryTokenStore();
+    final kv = InMemoryKeyValueStore();
+    final coordinator = CredentialMutationCoordinator();
+    await tokens.save(access: 'a-access', refresh: 'a-refresh');
+    await VerifiedSessionStore(kv).write(_user('owner-a'));
+    final container = ProviderContainer(
+      overrides: [
+        tokenStoreProvider.overrideWithValue(tokens),
+        keyValueStoreProvider.overrideWithValue(kv),
+        credentialMutationCoordinatorProvider.overrideWithValue(coordinator),
+        accountDataCleanerProvider.overrideWithValue(_Cleaner()),
+        ownerDataStoreProvider.overrideWithValue(InMemoryOwnerDataStore()),
+        deviceRegistrarProvider.overrideWithValue(
+          _ReentrantCredentialRegistrar(coordinator),
+        ),
+        apiClientProvider.overrideWithValue(
+          _client({'GET /users/me': (200, _userJson('owner-a'))}),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    final controller = container.read(authControllerProvider.notifier);
+    await controller.bootstrapSession();
+
+    await expectLater(
+      controller.logout().timeout(const Duration(milliseconds: 200)),
+      completes,
+    );
+
+    expect(await tokens.readAccess(), isNull);
+    expect(await AccountEpochStore(kv).current(), 1);
     expect(container.read(authControllerProvider), isA<AuthUnauthenticated>());
   });
 }
