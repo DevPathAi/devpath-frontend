@@ -12,7 +12,10 @@ class AuthInterceptor extends QueuedInterceptor {
     required this.store,
     required this.refresh,
     required this.retry,
+    this.sessionEpoch,
   });
+
+  static const _sessionEpochExtra = 'dp_core.auth.session_epoch';
 
   final TokenStore store;
 
@@ -21,12 +24,31 @@ class AuthInterceptor extends QueuedInterceptor {
   final Future<TokenPair?> Function(String? refreshToken) refresh;
   final Future<Response<dynamic>> Function(RequestOptions options) retry;
 
+  /// Optional account/session generation used by native clients to prevent an
+  /// old request from being replayed with a replacement account's token.
+  /// Web clients may omit it and retain the token-only rotation guard.
+  final Future<Object?> Function()? sessionEpoch;
+
   @override
   Future<void> onRequest(
     RequestOptions options,
     RequestInterceptorHandler handler,
   ) async {
+    final readEpoch = sessionEpoch;
+    if (readEpoch != null && !options.extra.containsKey(_sessionEpochExtra)) {
+      options.extra[_sessionEpochExtra] = await readEpoch();
+    }
     final access = await store.readAccess();
+    if (!await _isSameSession(options)) {
+      handler.reject(
+        DioException(
+          requestOptions: options,
+          type: DioExceptionType.cancel,
+          error: StateError('authentication session changed before dispatch'),
+        ),
+      );
+      return;
+    }
     if (access != null) {
       options.headers['Authorization'] = 'Bearer $access';
     }
@@ -43,13 +65,26 @@ class AuthInterceptor extends QueuedInterceptor {
       return;
     }
 
+    if (!await _isSameSession(err.requestOptions)) {
+      handler.next(err);
+      return;
+    }
+
     final currentAccess = await store.readAccess();
+    if (!await _isSameSession(err.requestOptions)) {
+      handler.next(err);
+      return;
+    }
     final usedAuth = err.requestOptions.headers['Authorization'] as String?;
 
     // 다른 요청/부트스트랩이 이미 유효 토큰을 확보했다면(요청이 쓴 토큰 != 현재 토큰)
     // refresh 없이 현재 토큰으로 재시도한다. 무토큰 발사(usedAuth==null) 요청도 포함 —
     // 부팅 직후 선발사 요청의 401마다 refresh를 추가 발사(불필요한 회전)하지 않기 위함.
     if (currentAccess != null && usedAuth != 'Bearer $currentAccess') {
+      if (!await _isSameSession(err.requestOptions)) {
+        handler.next(err);
+        return;
+      }
       try {
         final req = err.requestOptions
           ..headers['Authorization'] = 'Bearer $currentAccess';
@@ -64,11 +99,21 @@ class AuthInterceptor extends QueuedInterceptor {
     // 웹: refresh 토큰이 HttpOnly 쿠키라 JS에서 읽을 수 없어 null일 수 있음.
     // null이어도 refresh(null)을 호출해 쿠키 기반 갱신을 시도한다.
     final refreshToken = await store.readRefresh();
+    if (!await _isSameSession(err.requestOptions)) {
+      handler.next(err);
+      return;
+    }
     try {
       final pair = await refresh(refreshToken); // 쿠키 기반이면 인자 무시
+      if (!await _isSameSession(err.requestOptions)) {
+        handler.next(err);
+        return;
+      }
       if (pair == null) {
         // refresh 콜백이 null 반환 → 갱신 불가(쿠키 만료 등)
-        await store.clear();
+        if (await _isSameSession(err.requestOptions)) {
+          await store.clear();
+        }
         handler.next(err);
         return;
       }
@@ -76,13 +121,26 @@ class AuthInterceptor extends QueuedInterceptor {
       // TokenStore.save는 refresh=''를 저장하지만 웹 구현체는 이를 무시한다
       // (readRefresh()는 항상 null을 반환해 쿠키 경로를 유지한다).
       await store.save(access: pair.access, refresh: pair.refresh);
+      if (!await _isSameSession(err.requestOptions)) {
+        handler.next(err);
+        return;
+      }
       final req = err.requestOptions
         ..headers['Authorization'] = 'Bearer ${pair.access}';
       final res = await retry(req);
       handler.resolve(res); // 재시도 성공 → 원 요청을 해당 응답으로 해결
     } catch (_) {
-      await store.clear();
+      if (await _isSameSession(err.requestOptions)) {
+        await store.clear();
+      }
       handler.next(err); // 갱신 실패 → 원 에러 전파(상위에서 로그인 유도)
     }
+  }
+
+  Future<bool> _isSameSession(RequestOptions options) async {
+    final readEpoch = sessionEpoch;
+    if (readEpoch == null) return true;
+    if (!options.extra.containsKey(_sessionEpochExtra)) return false;
+    return options.extra[_sessionEpochExtra] == await readEpoch();
   }
 }

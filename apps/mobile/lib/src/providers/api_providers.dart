@@ -7,6 +7,7 @@ import '../auth/secure_storage_token_store.dart';
 import '../data/key_value_store.dart';
 import '../data/mobile_mock_fixtures.dart';
 import '../data/secure_key_value_store.dart';
+import '../features/auth/application/account_epoch_store.dart';
 
 final appConfigProvider = Provider<AppConfig>(
   (ref) => AppConfig.fromEnvironment(),
@@ -47,6 +48,7 @@ final authFlowClientProvider = Provider<ApiClient>((ref) {
 final apiClientProvider = Provider<ApiClient>((ref) {
   final config = ref.watch(appConfigProvider);
   final store = ref.watch(tokenStoreProvider);
+  final accountEpoch = ref.watch(accountEpochStoreProvider);
   final authFlow = ref.watch(authFlowClientProvider);
   final client = ApiClient.create(
     ApiConfig(baseUrl: config.baseUrl, useMock: config.useMock),
@@ -56,6 +58,7 @@ final apiClientProvider = Provider<ApiClient>((ref) {
     0,
     AuthInterceptor(
       store: store,
+      sessionEpoch: accountEpoch.current,
       // 모바일: 저장된 refresh 토큰을 바디로 전송(백엔드 토큰-바디 계약, 후속).
       refresh: (refreshToken) async {
         if (refreshToken == null || refreshToken.isEmpty) return null;
