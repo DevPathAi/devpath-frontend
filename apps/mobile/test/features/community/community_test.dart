@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:devpath_mobile/src/features/auth/application/auth_controller.dart';
 import 'package:devpath_mobile/src/features/community/application/community_controller.dart';
 import 'package:devpath_mobile/src/features/community/data/community_source.dart';
 import 'package:devpath_mobile/src/features/community/state/community_state.dart';
@@ -7,6 +10,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/mock_api.dart';
+
+final _ownerProvider = NotifierProvider<_OwnerController, String?>(
+  _OwnerController.new,
+);
 
 final Map<String, MockFixture> _postsFx = {
   'GET /community/posts': (
@@ -64,6 +71,47 @@ void main() {
       await c.read(communityControllerProvider.notifier).load();
       expect(c.read(communityControllerProvider), isA<CommunityFailed>());
     });
+
+    test(
+      'A load completion cannot paint after mounted controller moves to B',
+      () async {
+        final aResponse = Completer<List<CommunityPostSummary>>();
+        var calls = 0;
+        final c = ProviderContainer(
+          overrides: [
+            currentOwnerKeyProvider.overrideWith(
+              (ref) => ref.watch(_ownerProvider),
+            ),
+            communityListProvider.overrideWithValue(() {
+              calls += 1;
+              if (calls == 1) return aResponse.future;
+              return Future.value([
+                const CommunityPostSummary(id: 2, title: 'B post'),
+              ]);
+            }),
+          ],
+        );
+        addTearDown(c.dispose);
+        final subscription = c.listen(communityControllerProvider, (_, _) {});
+        addTearDown(subscription.close);
+
+        final aLoad = c.read(communityControllerProvider.notifier).load();
+        await pumpEventQueue();
+        c.read(_ownerProvider.notifier).setOwner('owner-b');
+        await pumpEventQueue();
+        expect(c.read(communityControllerProvider), isA<CommunityLoading>());
+
+        aResponse.complete([
+          const CommunityPostSummary(id: 1, title: 'A post'),
+        ]);
+        await aLoad;
+        expect(c.read(communityControllerProvider), isA<CommunityLoading>());
+
+        await c.read(communityControllerProvider.notifier).load();
+        final b = c.read(communityControllerProvider) as CommunityLoaded;
+        expect(b.posts.single.title, 'B post');
+      },
+    );
   });
 
   group('questionCreate (퀵 캡처)', () {
@@ -75,4 +123,11 @@ void main() {
       expect(detail.title, '새 질문');
     });
   });
+}
+
+class _OwnerController extends Notifier<String?> {
+  @override
+  String? build() => 'owner-a';
+
+  void setOwner(String? owner) => state = owner;
 }

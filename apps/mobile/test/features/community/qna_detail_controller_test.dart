@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:devpath_mobile/src/features/auth/application/auth_controller.dart';
 import 'package:devpath_mobile/src/features/community/application/qna_detail_controller.dart';
 import 'package:devpath_mobile/src/features/community/data/community_source.dart';
 import 'package:devpath_mobile/src/features/community/state/qna_detail_state.dart';
@@ -14,14 +17,19 @@ CommunityAnswer _ans(int id, {bool accepted = false, bool ai = false}) =>
     );
 
 CommunityQuestionDetail _detail({
+  String title = 'Q',
   bool solved = false,
   List<CommunityAnswer> answers = const [],
 }) => CommunityQuestionDetail(
   id: 1,
-  title: 'Q',
+  title: title,
   bodyMd: 'B',
   solved: solved,
   answers: answers,
+);
+
+final _ownerProvider = NotifierProvider<_OwnerController, String?>(
+  _OwnerController.new,
 );
 
 void main() {
@@ -170,4 +178,123 @@ void main() {
     await c.read(qnaDetailControllerProvider.notifier).load(1);
     expect(c.read(qnaDetailControllerProvider), isA<QnaFailed>());
   });
+
+  test(
+    'late A detail cannot paint after mounted controller moves to B',
+    () async {
+      final aResponse = Completer<CommunityQuestionDetail>();
+      var calls = 0;
+      final c = ProviderContainer(
+        overrides: [
+          currentOwnerKeyProvider.overrideWith(
+            (ref) => ref.watch(_ownerProvider),
+          ),
+          qnaDetailFetchProvider.overrideWithValue((id) {
+            calls += 1;
+            return calls == 1
+                ? aResponse.future
+                : Future.value(_detail(title: 'B detail'));
+          }),
+        ],
+      );
+      addTearDown(c.dispose);
+      final subscription = c.listen(qnaDetailControllerProvider, (_, _) {});
+      addTearDown(subscription.close);
+
+      final aLoad = c.read(qnaDetailControllerProvider.notifier).load(1);
+      await pumpEventQueue();
+      c.read(_ownerProvider.notifier).setOwner('owner-b');
+      await pumpEventQueue();
+      final resetBeforeCompletion = c.read(qnaDetailControllerProvider);
+      aResponse.complete(_detail(title: 'A detail'));
+      await aLoad;
+
+      expect(resetBeforeCompletion, isA<QnaLoading>());
+      expect(c.read(qnaDetailControllerProvider), isA<QnaLoading>());
+      await c.read(qnaDetailControllerProvider.notifier).load(1);
+      expect(
+        (c.read(qnaDetailControllerProvider) as QnaLoaded).detail.title,
+        'B detail',
+      );
+    },
+  );
+
+  test('late A mutation refresh cannot paint after owner switch', () async {
+    final fresh = Completer<CommunityQuestionDetail>();
+    final freshStarted = Completer<void>();
+    var fetchCalls = 0;
+    final c = ProviderContainer(
+      overrides: [
+        currentOwnerKeyProvider.overrideWith(
+          (ref) => ref.watch(_ownerProvider),
+        ),
+        qnaDetailFetchProvider.overrideWithValue((id) {
+          fetchCalls += 1;
+          if (fetchCalls == 1) return Future.value(_detail(title: 'A base'));
+          freshStarted.complete();
+          return fresh.future;
+        }),
+        answerAcceptProvider.overrideWithValue((id) async {}),
+      ],
+    );
+    addTearDown(c.dispose);
+    final subscription = c.listen(qnaDetailControllerProvider, (_, _) {});
+    addTearDown(subscription.close);
+    final notifier = c.read(qnaDetailControllerProvider.notifier);
+    await notifier.load(1);
+
+    final mutation = notifier.accept(11);
+    await freshStarted.future;
+    c.read(_ownerProvider.notifier).setOwner('owner-b');
+    await pumpEventQueue();
+    final resetBeforeCompletion = c.read(qnaDetailControllerProvider);
+    fresh.complete(_detail(title: 'A stale refresh'));
+    await mutation;
+
+    expect(resetBeforeCompletion, isA<QnaLoading>());
+    expect(c.read(qnaDetailControllerProvider), isA<QnaLoading>());
+  });
+
+  test('late A mutation error cannot restore A action state for B', () async {
+    final action = Completer<void>();
+    final c = ProviderContainer(
+      overrides: [
+        currentOwnerKeyProvider.overrideWith(
+          (ref) => ref.watch(_ownerProvider),
+        ),
+        qnaDetailFetchProvider.overrideWithValue(
+          (id) async => _detail(title: 'A base'),
+        ),
+        answerAcceptProvider.overrideWithValue((id) => action.future),
+      ],
+    );
+    addTearDown(c.dispose);
+    final subscription = c.listen(qnaDetailControllerProvider, (_, _) {});
+    addTearDown(subscription.close);
+    final notifier = c.read(qnaDetailControllerProvider.notifier);
+    await notifier.load(1);
+
+    final mutation = notifier.accept(11);
+    await pumpEventQueue();
+    c.read(_ownerProvider.notifier).setOwner('owner-b');
+    await pumpEventQueue();
+    final resetBeforeCompletion = c.read(qnaDetailControllerProvider);
+    action.completeError(
+      const ApiException(
+        code: ApiErrorCode.forbidden,
+        message: 'stale A error',
+      ),
+    );
+    await mutation;
+
+    expect(resetBeforeCompletion, isA<QnaLoading>());
+    expect(c.read(qnaDetailControllerProvider), isA<QnaLoading>());
+  });
+}
+
+class _OwnerController extends Notifier<String?> {
+  @override
+  String? build() => 'owner-a';
+
+  void setOwner(String? owner) => state = owner;
 }
