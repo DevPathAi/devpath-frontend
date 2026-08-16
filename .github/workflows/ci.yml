@@ -15,6 +15,15 @@ jobs:
           flutter-version: '3.44.1'
           channel: stable
           cache: true
+      - name: Verify Flutter SDK tuple
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter --version --machine | jq -e '
+            .frameworkVersion == "3.44.1" and
+            .frameworkRevision == "924134a44c189315be2148659913dda1671cbe99" and
+            .dartSdkVersion == "3.12.1"
+          ' >/dev/null
       - name: Resolve and bootstrap locked workspace
         shell: bash
         run: |

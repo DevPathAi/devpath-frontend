@@ -31,6 +31,11 @@ const _kustomizeSha =
     '3669470b454d865c8184d6bce78df05e977c9aea31c30df3c669317d43bcc7a7';
 const _gradleDistributionSha =
     'b84e04fa845fecba48551f425957641074fcc00a88a84d2aae5808743b35fc85';
+const _flutterVersion = '3.44.1';
+const _dartVersion = '3.12.1';
+const _melosVersion = '7.8.1';
+const _melosPackageSha =
+    'b40731f34d3aacb199641a9b4955e52a866b0b0bc93ffc5c8ff21bffc6593134';
 const _zeroSha =
     '0000000000000000000000000000000000000000000000000000000000000000';
 const _lockInvariant =
@@ -66,6 +71,100 @@ List<String> _actionStepBodies(String source, String action) {
   }
 
   return bodies;
+}
+
+List<String> _namedStepBodies(String source, String name) {
+  final lines = source.split('\n');
+  final bodies = <String>[];
+
+  for (var index = 0; index < lines.length; index++) {
+    final line = lines[index];
+    if (line.trim() != '- name: $name') continue;
+
+    final indentation = line.length - line.trimLeft().length;
+    final body = StringBuffer()..writeln(line);
+    for (var next = index + 1; next < lines.length; next++) {
+      final candidate = lines[next];
+      final trimmed = candidate.trimLeft();
+      final candidateIndentation = candidate.length - trimmed.length;
+      if (candidateIndentation == indentation && trimmed.startsWith('- ')) {
+        break;
+      }
+      if (trimmed.isNotEmpty && candidateIndentation < indentation) break;
+      body.writeln(candidate);
+    }
+    bodies.add(body.toString());
+  }
+
+  return bodies;
+}
+
+List<String> _flutterTuplePinErrors(String source) {
+  final errors = <String>[];
+  final steps = _namedStepBodies(source, 'Verify Flutter SDK tuple');
+  if (steps.length != 1) {
+    return ['CI must contain exactly one Flutter SDK tuple verification step'];
+  }
+
+  final step = steps.single;
+  if (!step.contains('shell: bash') ||
+      !step.contains('set -euo pipefail') ||
+      !step.contains('flutter --version --machine | jq -e') ||
+      !step.contains('.frameworkVersion == "$_flutterVersion"') ||
+      !step.contains('.frameworkRevision == "$_flutterRevision"') ||
+      !step.contains('.dartSdkVersion == "$_dartVersion"') ||
+      !step.contains("' >/dev/null")) {
+    errors.add('CI must parse and verify the exact Flutter SDK JSON tuple');
+  }
+
+  final flutterActionIndex = source.indexOf('- uses: $_flutterAction');
+  final tupleStepIndex = source.indexOf('- name: Verify Flutter SDK tuple');
+  final bootstrapIndex = source.indexOf(
+    '- name: Resolve and bootstrap locked workspace',
+  );
+  if (flutterActionIndex < 0 ||
+      tupleStepIndex <= flutterActionIndex ||
+      bootstrapIndex <= tupleStepIndex) {
+    errors.add('Flutter SDK tuple verification must run before bootstrap');
+  }
+
+  return errors;
+}
+
+String? _lockedPackageBlock(String source, String packageName) {
+  final lines = source.replaceAll('\r\n', '\n').split('\n');
+  final start = lines.indexOf('  $packageName:');
+  if (start < 0) return null;
+
+  var end = lines.length;
+  final packageHeader = RegExp(r'^  [a-zA-Z0-9_]+:$');
+  for (var index = start + 1; index < lines.length; index++) {
+    if (packageHeader.hasMatch(lines[index])) {
+      end = index;
+      break;
+    }
+  }
+  return lines.sublist(start, end).join('\n');
+}
+
+List<String> _workspaceLockErrors(String source) {
+  final errors = <String>[];
+  final melos = _lockedPackageBlock(source, 'melos');
+  if (melos == null) return ['pubspec.lock must contain Melos'];
+
+  if (!RegExp(
+    '^    version: "${RegExp.escape(_melosVersion)}"\$',
+    multiLine: true,
+  ).hasMatch(melos)) {
+    errors.add('pubspec.lock must pin Melos $_melosVersion');
+  }
+  if (!RegExp(
+    '^      sha256: ${RegExp.escape(_melosPackageSha)}\$',
+    multiLine: true,
+  ).hasMatch(melos)) {
+    errors.add('pubspec.lock must pin the approved Melos package hash');
+  }
+  return errors;
 }
 
 List<String> _workflowPinErrors(String source) {
@@ -144,6 +243,7 @@ List<String> _workflowPinErrors(String source) {
       source.contains('dart pub global activate melos')) {
     errors.add('CI must use the locked Flutter workspace Melos');
   }
+  errors.addAll(_flutterTuplePinErrors(source));
   if (!source.contains(_kustomizeSha) ||
       !source.contains('sha256sum -c -') ||
       !source.contains('kustomize_v5.4.3_linux_amd64.tar.gz')) {
@@ -190,6 +290,7 @@ void main() {
   late String webDockerfile;
   late String adminDockerfile;
   late String gradleWrapper;
+  late String workspaceLock;
 
   setUpAll(() {
     workflow = File(
@@ -200,6 +301,9 @@ void main() {
     gradleWrapper = File(
       '../mobile/android/gradle/wrapper/gradle-wrapper.properties',
     ).readAsStringSync();
+    workspaceLock = File(
+      '../../pubspec.lock',
+    ).readAsStringSync().replaceAll('\r\n', '\n');
   });
 
   test('ET10 workflow locks the exact approved action and builder graph', () {
@@ -245,6 +349,53 @@ void main() {
     expect(_workflowPinErrors(wrongComment), isNotEmpty);
     expect(_workflowPinErrors(missingComment), isNotEmpty);
     expect(_workflowPinErrors(arbitraryComment), isNotEmpty);
+  });
+
+  test('workflow rejects Flutter machine tuple and parser drift', () {
+    expect(_flutterTuplePinErrors(workflow), isEmpty);
+
+    final versionDrift = workflow.replaceFirst(
+      '.frameworkVersion == "$_flutterVersion"',
+      '.frameworkVersion == "3.44.2"',
+    );
+    final revisionDrift = workflow.replaceFirst(
+      '.frameworkRevision == "$_flutterRevision"',
+      '.frameworkRevision == "0000000000000000000000000000000000000000"',
+    );
+    final dartDrift = workflow.replaceFirst(
+      '.dartSdkVersion == "$_dartVersion"',
+      '.dartSdkVersion == "3.12.2"',
+    );
+    final parserDrift = workflow.replaceFirst(
+      'flutter --version --machine | jq -e',
+      'flutter --version --machine | grep -F',
+    );
+
+    expect(_flutterTuplePinErrors(versionDrift), isNotEmpty);
+    expect(_flutterTuplePinErrors(revisionDrift), isNotEmpty);
+    expect(_flutterTuplePinErrors(dartDrift), isNotEmpty);
+    expect(_flutterTuplePinErrors(parserDrift), isNotEmpty);
+  });
+
+  test('workspace lock pins the exact approved Melos package', () {
+    expect(_workspaceLockErrors(workspaceLock), isEmpty);
+  });
+
+  test('workspace lock rejects Melos version and hash drift', () {
+    final melos = _lockedPackageBlock(workspaceLock, 'melos')!;
+    final versionDrift = workspaceLock.replaceFirst(
+      melos,
+      melos.replaceFirst('version: "$_melosVersion"', 'version: "7.8.2"'),
+    );
+    final hashDrift = workspaceLock.replaceFirst(
+      melos,
+      melos.replaceFirst(_melosPackageSha, _zeroSha),
+    );
+
+    expect(versionDrift, isNot(workspaceLock));
+    expect(hashDrift, isNot(workspaceLock));
+    expect(_workspaceLockErrors(versionDrift), isNotEmpty);
+    expect(_workspaceLockErrors(hashDrift), isNotEmpty);
   });
 
   test('web and admin Dockerfiles lock production build inputs', () {
