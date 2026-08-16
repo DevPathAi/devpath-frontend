@@ -68,7 +68,6 @@ String? gateRedirect(
 
 final routerProvider = Provider<GoRouter>((ref) {
   final refresh = ValueNotifier<int>(0);
-  var pendingConsumeScheduled = false;
   ref.onDispose(refresh.dispose);
   void notify() => refresh.value++;
   ref.listen(authControllerProvider, (previous, next) {
@@ -92,6 +91,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       final location = state.matchedLocation;
       final canonical = MobileMissionRoute.tryParse(location);
       final pending = ref.read(pendingDeepLinkProvider);
+      final pendingController = ref.read(pendingDeepLinkProvider.notifier);
       if (auth.verifiedUser == null &&
           canonical != null &&
           pending != canonical.location) {
@@ -105,13 +105,16 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (redirect == null &&
           pending == location &&
           auth.verifiedUser?.consentStatus == ConsentStatus.done &&
-          auth.verifiedUser?.onboardingStatus == OnboardingStatus.done &&
-          !pendingConsumeScheduled) {
-        pendingConsumeScheduled = true;
+          auth.verifiedUser?.onboardingStatus == OnboardingStatus.done) {
+        final expectedGeneration = pendingController.generation;
         scheduleMicrotask(() {
-          pendingConsumeScheduled = false;
           if (ref.mounted) {
-            ref.read(pendingDeepLinkProvider.notifier).consume();
+            ref
+                .read(pendingDeepLinkProvider.notifier)
+                .consumeIfMatches(
+                  pending,
+                  expectedGeneration: expectedGeneration,
+                );
           }
         });
       }

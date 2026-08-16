@@ -20,6 +20,8 @@ class PendingDeepLinkController extends Notifier<String?> {
   var _generation = 0;
   Future<void> _storageTail = Future<void>.value();
 
+  int get generation => _generation;
+
   @override
   String? build() {
     Future.microtask(restore);
@@ -92,6 +94,17 @@ class PendingDeepLinkController extends Notifier<String?> {
     unawaited(
       _mutateStorage(() => ref.read(keyValueStoreProvider).delete(storageKey)),
     );
+  }
+
+  bool consumeIfMatches(
+    String expectedLocation, {
+    required int expectedGeneration,
+  }) {
+    if (state != expectedLocation || _generation != expectedGeneration) {
+      return false;
+    }
+    consume();
+    return true;
   }
 
   Future<void> _deleteIfUnchanged(String? expected) {
