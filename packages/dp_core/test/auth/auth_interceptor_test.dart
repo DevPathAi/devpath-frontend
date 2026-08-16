@@ -303,4 +303,89 @@ void main() {
     expect(refreshCalls, 1, reason: '동시 401이어도 refresh는 1회');
     expect(results.every((r) => r.statusCode == 200), isTrue);
   });
+
+  test(
+    'old account 401 is never retried with the replacement account token',
+    () async {
+      var epoch = 1;
+      var refreshCalls = 0;
+      final store = InMemoryTokenStore()
+        ..save(access: 'A-access', refresh: 'A-refresh');
+      final retrier = _MockRetrier();
+      final interceptor = AuthInterceptor(
+        store: store,
+        sessionEpoch: () async => epoch,
+        refresh: (_) async {
+          refreshCalls += 1;
+          return const TokenPair(access: 'unexpected', refresh: 'unexpected');
+        },
+        retry: retrier.call,
+      );
+      final request = RequestOptions(
+        path: '/community/questions',
+        method: 'POST',
+      );
+      await interceptor.onRequest(request, RequestInterceptorHandler());
+      expect(request.headers['Authorization'], 'Bearer A-access');
+
+      epoch = 2;
+      await store.save(access: 'B-access', refresh: 'B-refresh');
+      final error = DioException(
+        requestOptions: request,
+        response: Response(requestOptions: request, statusCode: 401),
+        type: DioExceptionType.badResponse,
+      );
+      await runZonedGuarded(
+        () => interceptor.onError(error, ErrorInterceptorHandler()),
+        (_, _) {},
+      );
+
+      verifyNever(() => retrier.call(any()));
+      expect(refreshCalls, 0);
+      expect(await store.readAccess(), 'B-access');
+    },
+  );
+
+  test('same account token rotation still retries exactly once', () async {
+    var epoch = 7;
+    var refreshCalls = 0;
+    final store = InMemoryTokenStore()
+      ..save(access: 'old', refresh: 'same-owner-refresh');
+    final retrier = _MockRetrier();
+    when(() => retrier.call(any())).thenAnswer(
+      (invocation) async => Response(
+        requestOptions: invocation.positionalArguments.single as RequestOptions,
+        statusCode: 200,
+      ),
+    );
+    final interceptor = AuthInterceptor(
+      store: store,
+      sessionEpoch: () async => epoch,
+      refresh: (_) async {
+        refreshCalls += 1;
+        return const TokenPair(access: 'unexpected', refresh: 'unexpected');
+      },
+      retry: retrier.call,
+    );
+    final request = RequestOptions(
+      path: '/contents/1/progress',
+      method: 'POST',
+    );
+    await interceptor.onRequest(request, RequestInterceptorHandler());
+    await store.save(access: 'rotated', refresh: 'same-owner-refresh');
+
+    final error = DioException(
+      requestOptions: request,
+      response: Response(requestOptions: request, statusCode: 401),
+      type: DioExceptionType.badResponse,
+    );
+    await interceptor.onError(error, ErrorInterceptorHandler());
+
+    expect(epoch, 7);
+    expect(refreshCalls, 0);
+    final retried =
+        verify(() => retrier.call(captureAny())).captured.single
+            as RequestOptions;
+    expect(retried.headers['Authorization'], 'Bearer rotated');
+  });
 }
