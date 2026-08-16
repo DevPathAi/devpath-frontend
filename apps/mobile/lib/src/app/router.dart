@@ -107,6 +107,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
       final redirect = gateRedirect(auth, location, pendingLocation: pending);
       if (redirect == null &&
+          pending != null &&
           pending == location &&
           auth.verifiedUser?.consentStatus == ConsentStatus.done &&
           auth.verifiedUser?.onboardingStatus == OnboardingStatus.done) {
