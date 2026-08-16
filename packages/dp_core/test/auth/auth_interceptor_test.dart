@@ -64,9 +64,7 @@ class _CookieOnlyTokenStore implements TokenStore {
 }
 
 class _LatchSaveTokenStore implements TokenStore {
-  _LatchSaveTokenStore({required String access, required String refresh})
-    : _access = access,
-      _refresh = refresh;
+  _LatchSaveTokenStore({required this._access, required this._refresh});
 
   String? _access;
   String? _refresh;
