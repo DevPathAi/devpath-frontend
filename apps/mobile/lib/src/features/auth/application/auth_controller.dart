@@ -7,6 +7,7 @@ import '../../notifications/application/device_registrar.dart';
 import '../state/auth_state.dart';
 import 'oauth_launcher.dart';
 import 'account_epoch_store.dart';
+import 'credential_mutation_coordinator.dart';
 import 'pending_deep_link_controller.dart';
 import 'pkce.dart';
 import 'verified_session_store.dart';
@@ -28,7 +29,6 @@ class AuthController extends Notifier<AuthState> {
   /// PKCE verifier 임시 보관 키(콜백이 새 프로세스로 와도 복원되도록 영속 저장).
   static const _kPkceVerifier = 'dp.auth.pkce_verifier';
   Future<void>? _bootstrapInFlight;
-  Future<void> _credentialMutationTail = Future<void>.value();
   var _epoch = 0;
 
   @override
@@ -68,6 +68,7 @@ class AuthController extends Notifier<AuthState> {
   Future<void> mockLogin() async {
     final epoch = ++_epoch;
     _bootstrapInFlight = null;
+    _invalidateCredentialBoundary();
     final saved = await _mutateCredentials(() async {
       if (!_isCurrent(epoch)) return false;
       await _store.save(access: 'mock-access', refresh: 'mock-refresh');
@@ -96,7 +97,15 @@ class AuthController extends Notifier<AuthState> {
     if (access == null || access.isEmpty) {
       final staleSession = await ref.read(verifiedSessionStoreProvider).read();
       if (staleSession != null) {
-        await _clearVerifiedBoundary(staleSession.id);
+        _invalidateCredentialBoundary();
+        await _revokePush(staleSession.id);
+        if (!_isCurrent(epoch)) return;
+        final cleared = await _mutateCredentials(() async {
+          if (!_isCurrent(epoch)) return false;
+          await _clearVerifiedLocalBoundary(staleSession.id);
+          return _isCurrent(epoch);
+        });
+        if (!cleared) return;
       }
       if (!_isCurrent(epoch)) return;
       state = const AuthUnauthenticated();
@@ -109,10 +118,14 @@ class AuthController extends Notifier<AuthState> {
       if (!_isCurrent(epoch)) return;
       final user = User.fromJson(json);
       var switchRevocationFailed = false;
+      if (previousUser != null && previousUser.id != user.id) {
+        _invalidateCredentialBoundary();
+        switchRevocationFailed = !await _revokePush(previousUser.id);
+        if (!_isCurrent(epoch)) return;
+      }
       final saved = await _mutateCredentials(() async {
         if (!_isCurrent(epoch)) return false;
         if (previousUser != null && previousUser.id != user.id) {
-          switchRevocationFailed = !await _revokePush(previousUser.id);
           try {
             await ref.read(accountEpochStoreProvider).advance();
             await ref
@@ -145,9 +158,12 @@ class AuthController extends Notifier<AuthState> {
     } on ApiException catch (e) {
       if (!_isCurrent(epoch)) return;
       if (e.status == 401 || e.code == ApiErrorCode.unauthorized) {
+        _invalidateCredentialBoundary();
+        await _revokePush(previousUser?.id);
+        if (!_isCurrent(epoch)) return;
         final cleared = await _mutateCredentials(() async {
           if (!_isCurrent(epoch)) return false;
-          await _clearVerifiedBoundary(previousUser?.id);
+          await _clearVerifiedLocalBoundary(previousUser?.id);
           return _isCurrent(epoch);
         });
         if (!cleared) return;
@@ -159,9 +175,12 @@ class AuthController extends Notifier<AuthState> {
       }
     } on Object {
       if (!_isCurrent(epoch)) return;
+      _invalidateCredentialBoundary();
+      await _revokePush(previousUser?.id);
+      if (!_isCurrent(epoch)) return;
       final cleared = await _mutateCredentials(() async {
         if (!_isCurrent(epoch)) return false;
-        await _clearVerifiedBoundary(previousUser?.id);
+        await _clearVerifiedLocalBoundary(previousUser?.id);
         return _isCurrent(epoch);
       });
       if (!cleared) return;
@@ -206,20 +225,22 @@ class AuthController extends Notifier<AuthState> {
           refresh.isEmpty) {
         throw const FormatException('malformed OAuth token payload');
       }
+      _invalidateCredentialBoundary();
       if (previousUser != null) {
         // Stop exposing A before any slow replacement cleanup or B activation.
         state = const AuthUnauthenticated();
       }
       var replacementRejected = false;
+      if (previousUser != null) {
+        replacementRejected = !await _revokePush(previousUser.id);
+        if (!_isCurrent(epoch)) return;
+      }
       final saved = await _mutateCredentials(() async {
         if (!_isCurrent(epoch)) return false;
         if (previousUser != null) {
-          final prepared = await _prepareCredentialReplacement(previousUser.id);
+          await _prepareLocalCredentialReplacement(previousUser.id);
           if (!_isCurrent(epoch)) return false;
-          if (!prepared) {
-            replacementRejected = true;
-            return true;
-          }
+          if (replacementRejected) return true;
         }
         await _store.save(access: access, refresh: refresh);
         return _isCurrent(epoch);
@@ -258,14 +279,17 @@ class AuthController extends Notifier<AuthState> {
         (await ref.read(verifiedSessionStoreProvider).read())?.id;
     final epoch = ++_epoch;
     _bootstrapInFlight = null;
+    _invalidateCredentialBoundary();
     // Drop the in-memory owner boundary before slow server/disk work so no
     // push or deep-link event can attach to the account being removed.
     state = const AuthUnauthenticated();
     ref.read(pendingDeepLinkProvider.notifier).consume();
     try {
+      await _revokePush(ownerKey);
+      if (!_isCurrent(epoch)) return;
       await _mutateCredentials(() async {
+        if (!_isCurrent(epoch)) return false;
         try {
-          await _revokePush(ownerKey);
           await ref.read(accountEpochStoreProvider).advance();
           if (ownerKey != null) {
             await ref.read(accountDataCleanerProvider).clearOwner(ownerKey);
@@ -278,6 +302,7 @@ class AuthController extends Notifier<AuthState> {
               .read(keyValueStoreProvider)
               .delete(PendingDeepLinkController.storageKey);
         }
+        return _isCurrent(epoch);
       });
     } finally {
       if (_isCurrent(epoch)) {
@@ -294,14 +319,17 @@ class AuthController extends Notifier<AuthState> {
         (await ref.read(verifiedSessionStoreProvider).read())?.id;
     final epoch = ++_epoch;
     _bootstrapInFlight = null;
+    _invalidateCredentialBoundary();
     final terminal = AuthUnauthenticated(
       error: message ?? '세션이 만료되었어요. 다시 로그인해 주세요.',
     );
     state = terminal;
     ref.read(pendingDeepLinkProvider.notifier).consume();
+    await _revokePush(ownerKey);
+    if (!_isCurrent(epoch)) return;
     final cleared = await _mutateCredentials(() async {
       if (!_isCurrent(epoch)) return false;
-      await _clearVerifiedBoundary(ownerKey);
+      await _clearVerifiedLocalBoundary(ownerKey);
       return _isCurrent(epoch);
     });
     if (cleared) {
@@ -309,11 +337,10 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
-  Future<void> _clearVerifiedBoundary([String? knownOwner]) async {
+  Future<void> _clearVerifiedLocalBoundary([String? knownOwner]) async {
     final sessionStore = ref.read(verifiedSessionStoreProvider);
     final ownerKey = knownOwner ?? (await sessionStore.read())?.id;
     try {
-      await _revokePush(ownerKey);
       await ref.read(accountEpochStoreProvider).advance();
       if (ownerKey != null) {
         await ref.read(accountDataCleanerProvider).clearOwner(ownerKey);
@@ -341,8 +368,7 @@ class AuthController extends Notifier<AuthState> {
   /// Clears an established account before a replacement credential can be
   /// stored. The durable epoch advances first so in-flight A requests cannot
   /// pass the interceptor rotation guard with B's token.
-  Future<bool> _prepareCredentialReplacement(String ownerKey) async {
-    final revoked = await _revokePush(ownerKey);
+  Future<void> _prepareLocalCredentialReplacement(String ownerKey) async {
     try {
       await ref.read(accountEpochStoreProvider).advance();
       await ref.read(accountDataCleanerProvider).clearOwner(ownerKey);
@@ -354,18 +380,16 @@ class AuthController extends Notifier<AuthState> {
           .delete(PendingDeepLinkController.storageKey);
     }
     ref.read(pendingDeepLinkProvider.notifier).consume();
-    return revoked;
   }
 
   bool _isCurrent(int epoch) => ref.mounted && epoch == _epoch;
 
+  void _invalidateCredentialBoundary() {
+    ref.read(credentialMutationCoordinatorProvider).invalidate();
+  }
+
   Future<T> _mutateCredentials<T>(Future<T> Function() mutation) {
-    final operation = _credentialMutationTail.then((_) => mutation());
-    _credentialMutationTail = operation.then<void>(
-      (_) {},
-      onError: (Object _, StackTrace _) {},
-    );
-    return operation;
+    return ref.read(credentialMutationCoordinatorProvider).run(mutation);
   }
 }
 
