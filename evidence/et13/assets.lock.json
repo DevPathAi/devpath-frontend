@@ -70,14 +70,20 @@
     {
       "id": "monaco-editor",
       "kind": "vendored_tree",
-      "path": "apps/web/web/vendor/monaco/vs",
-      "bytes": 13943834,
-      "sha256": "5b68489953af8b6e52b974221f437c01be19e17045911697931cad9e073d7a5f",
+      "path": "apps/web/web/vendor/monaco",
+      "bytes": 14007996,
+      "sha256": "f60e2ed76e47203a4d01e71ac6fd09a760473552e8f544d97bc2a5b922aba289",
       "source": "https://registry.npmjs.org/monaco-editor/-/monaco-editor-0.52.2.tgz",
       "version": "0.52.2",
       "archive_sha256": "c280cdcf0b0c13d1a2bf01af958d4387ed06d7f6c918401d00c4adcae1bc72b6",
       "archive_integrity": "sha512-GEQWEZmfkOGLdd3XK8ryrfWz3AIP8YymVXiPHEdewrUq7mh0qrKrfHLNCXcbB6sTnMLnOZ3ztSiKcciFUkIJwQ==",
-      "file_count": 103
+      "file_count": 105,
+      "license_path": "LICENSE",
+      "license_bytes": 1098,
+      "license_sha256": "33e4ff1a06ef62ba21788ea162564ee8165269a24a9ce6ef301837447eab0ac6",
+      "notices_path": "ThirdPartyNotices.txt",
+      "notices_bytes": 63064,
+      "notices_sha256": "790537262fc78a764e121e6b92b959bcd3f5c310b47d9d9b9e92e17fe0af5336"
     }
   ]
 }

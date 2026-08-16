@@ -11,5 +11,9 @@
   "timezone": "UTC",
   "device_pixel_ratio": 1,
   "reduced_motion": true,
-  "capture_network": "none"
+  "capture_network": "none",
+  "unexpected_request_policy": "fail",
+  "capture_surface": "flutter_web_release_projection",
+  "device_evidence": false,
+  "external_accessibility_status": "not_satisfied"
 }

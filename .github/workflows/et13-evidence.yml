@@ -1,0 +1,65 @@
+name: ET13 Frontend Evidence
+
+on:
+  pull_request:
+    paths:
+      - 'apps/web/**'
+      - 'apps/admin/**'
+      - 'apps/mobile/**'
+      - 'packages/dp_core/**'
+      - 'packages/dp_design/**'
+      - 'evidence/et13/**'
+      - 'tools/et13_evidence.dart'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - '.gitattributes'
+      - '.github/workflows/et13-evidence.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/**'
+      - 'apps/admin/**'
+      - 'apps/mobile/**'
+      - 'packages/dp_core/**'
+      - 'packages/dp_design/**'
+      - 'evidence/et13/**'
+      - 'tools/et13_evidence.dart'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - '.gitattributes'
+      - '.github/workflows/et13-evidence.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: et13-evidence-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: '3.44.1'
+          cache: true
+      - name: Verify exact checkout and toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          flutter --version --machine | grep -q '"frameworkVersion": "3.44.1"'
+          flutter --version --machine | grep -q '"dartSdkVersion": "3.12.1"'
+      - name: Resolve locked workspace
+        run: flutter pub get --enforce-lockfile
+      - name: Validate immutable ET13 inputs
+        run: dart run tools/et13_evidence.dart validate
+      - name: Run ET13 negative contract tests
+        working-directory: apps/web
+        run: flutter test --no-pub test/app/et13_evidence_catalog_contract_test.dart
+
+  # Capture jobs are added only with the complete release renderers. CI never
+  # updates snapshots or marks pending_external_review baselines as approved.
