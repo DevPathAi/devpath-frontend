@@ -100,9 +100,11 @@ class _AvailableMission extends ConsumerWidget {
     final syncLabel = state.cachedAt == null
         ? null
         : _syncLabel(state.cachedAt!.toLocal());
+    final mutationBlocked =
+        next.contentId == null && (state.isOffline || state.isStale);
     final actionState = state.completingTaskId == next.taskId
         ? DpNextActionState.pending
-        : state.isOffline
+        : mutationBlocked
         ? DpNextActionState.disabled
         : DpNextActionState.ready;
 
@@ -176,8 +178,8 @@ class _AvailableMission extends ConsumerWidget {
                     ? '확인되면 다음 미션을 다시 불러옵니다.'
                     : '같은 경로의 현재 콘텐츠를 엽니다.',
                 state: actionState,
-                disabledReason: state.isOffline
-                    ? '오프라인 완료는 서버 확인으로 표시할 수 없습니다.'
+                disabledReason: mutationBlocked
+                    ? '최신 미션을 확인한 뒤 완료할 수 있습니다.'
                     : null,
                 onPressed: actionState == DpNextActionState.ready
                     ? activate

@@ -1,4 +1,7 @@
 import 'package:devpath_mobile/src/features/community/presentation/quick_capture_page.dart';
+import 'package:devpath_mobile/src/features/auth/application/auth_controller.dart';
+import 'package:devpath_mobile/src/features/community/data/quick_capture_store.dart';
+import 'package:devpath_mobile/src/data/owner_data_store.dart';
 import 'package:devpath_mobile/src/providers/api_providers.dart';
 import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
@@ -48,7 +51,13 @@ Widget _host(ProviderContainer c) => UncontrolledProviderScope(
 void main() {
   testWidgets('빈 입력 제출 → 검증 스낵바', (tester) async {
     final c = ProviderContainer(
-      overrides: [apiClientProvider.overrideWithValue(mockApiClient(_fx))],
+      overrides: [
+        apiClientProvider.overrideWithValue(mockApiClient(_fx)),
+        currentOwnerKeyProvider.overrideWithValue('owner-a'),
+        quickCaptureStoreProvider.overrideWithValue(
+          QuickCaptureStore(InMemoryOwnerDataStore()),
+        ),
+      ],
     );
     addTearDown(c.dispose);
 
@@ -62,7 +71,13 @@ void main() {
 
   testWidgets('정상 제출 → 게시 후 목록으로 복귀', (tester) async {
     final c = ProviderContainer(
-      overrides: [apiClientProvider.overrideWithValue(mockApiClient(_fx))],
+      overrides: [
+        apiClientProvider.overrideWithValue(mockApiClient(_fx)),
+        currentOwnerKeyProvider.overrideWithValue('owner-a'),
+        quickCaptureStoreProvider.overrideWithValue(
+          QuickCaptureStore(InMemoryOwnerDataStore()),
+        ),
+      ],
     );
     addTearDown(c.dispose);
 

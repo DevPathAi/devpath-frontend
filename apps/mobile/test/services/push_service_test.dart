@@ -12,6 +12,24 @@ void main() {
       expect(await svc.getToken(), 'stub-fcm-token');
     });
 
+    test('data target는 Today/Content 타입으로만 파싱한다', () {
+      final content = pushMessageFromRemote(
+        const RemoteMessage(
+          messageId: 'm2',
+          data: {'targetType': 'CONTENT', 'taskId': '302', 'contentId': '77'},
+        ),
+      );
+      expect(content.target?.location, '/mission/302/content/77');
+
+      final rejected = pushMessageFromRemote(
+        const RemoteMessage(
+          messageId: 'm3',
+          data: {'targetType': 'MENTOR', 'taskId': '302'},
+        ),
+      );
+      expect(rejected.target, isNull);
+    });
+
     test('incoming은 빈 스트림이다(스텁: 포그라운드 수신 없음)', () async {
       final svc = StubPushService();
       expect(await svc.incoming.isEmpty, isTrue);

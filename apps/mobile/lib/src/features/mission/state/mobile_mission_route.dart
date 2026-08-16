@@ -63,7 +63,7 @@ final class MobileMissionRoute {
     if (uri.hasQuery || uri.hasFragment || uri.userInfo.isNotEmpty) return null;
     if (uri.scheme.isEmpty) return tryParse(uri.toString());
     if (uri.scheme == 'https' &&
-        uri.host == 'app.devpath.ai' &&
+        uri.host == 'app.leva.ai.kr' &&
         (!uri.hasPort || uri.port == 443)) {
       return tryParse(uri.path);
     }

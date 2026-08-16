@@ -1,4 +1,5 @@
 import 'package:devpath_mobile/src/features/learning/application/content_controller.dart';
+import 'package:devpath_mobile/src/features/auth/application/auth_controller.dart';
 import 'package:devpath_mobile/src/features/learning/state/content_state.dart';
 import 'package:devpath_mobile/src/providers/api_providers.dart';
 import 'package:dp_core/dp_core.dart';
@@ -38,7 +39,10 @@ final Map<String, MockFixture> _fx = {
 
 ProviderContainer _container(Map<String, MockFixture> fx) {
   final c = ProviderContainer(
-    overrides: [apiClientProvider.overrideWithValue(mockApiClient(fx))],
+    overrides: [
+      apiClientProvider.overrideWithValue(mockApiClient(fx)),
+      currentOwnerKeyProvider.overrideWithValue(null),
+    ],
   );
   addTearDown(c.dispose);
   return c;
@@ -49,9 +53,9 @@ void main() {
     test('load 성공 → ContentLoaded(마크다운)', () async {
       final c = _container(_fx);
       await c
-          .read(contentControllerProvider.notifier)
+          .read(contentControllerProvider('future-async-await').notifier)
           .load('future-async-await');
-      final s = c.read(contentControllerProvider);
+      final s = c.read(contentControllerProvider('future-async-await'));
       expect(s, isA<ContentLoaded>());
       expect((s as ContentLoaded).content.title, 'Future/async-await 정리');
       expect(s.content.progress.completed, isFalse);
@@ -59,23 +63,30 @@ void main() {
 
     test('markComplete → 진척 completed=true 반영', () async {
       final c = _container(_fx);
-      final n = c.read(contentControllerProvider.notifier);
+      final n = c.read(
+        contentControllerProvider('future-async-await').notifier,
+      );
       await n.load('future-async-await');
       await n.markComplete('future-async-await');
-      final s = c.read(contentControllerProvider);
+      final s = c.read(contentControllerProvider('future-async-await'));
       expect(s, isA<ContentLoaded>());
       expect((s as ContentLoaded).content.progress.completed, isTrue);
     });
 
     test('load 실패 → ContentFailed', () async {
       final c = _container(const {});
-      await c.read(contentControllerProvider.notifier).load('missing');
-      expect(c.read(contentControllerProvider), isA<ContentFailed>());
+      await c.read(contentControllerProvider('missing').notifier).load();
+      expect(
+        c.read(contentControllerProvider('missing')),
+        isA<ContentFailed>(),
+      );
     });
 
     test('reportProgress → 응답 반환 + 진척(completed) 상태 반영', () async {
       final c = _container(_fx);
-      final n = c.read(contentControllerProvider.notifier);
+      final n = c.read(
+        contentControllerProvider('future-async-await').notifier,
+      );
       await n.load('future-async-await');
 
       final resp = await n.reportProgress(
@@ -86,7 +97,7 @@ void main() {
 
       expect(resp, isNotNull);
       expect(resp!.completed, isTrue);
-      final s = c.read(contentControllerProvider);
+      final s = c.read(contentControllerProvider('future-async-await'));
       expect((s as ContentLoaded).content.progress.completed, isTrue);
     });
 
@@ -96,7 +107,9 @@ void main() {
         final c = _container({
           'GET /contents/future-async-await': (200, _content(completed: false)),
         });
-        final n = c.read(contentControllerProvider.notifier);
+        final n = c.read(
+          contentControllerProvider('future-async-await').notifier,
+        );
         await n.load('future-async-await');
 
         final resp = await n.reportProgress(
@@ -106,7 +119,10 @@ void main() {
         );
 
         expect(resp, isNull);
-        expect(c.read(contentControllerProvider), isA<ContentLoaded>());
+        expect(
+          c.read(contentControllerProvider('future-async-await')),
+          isA<ContentLoaded>(),
+        );
       },
     );
 
@@ -118,7 +134,9 @@ void main() {
           <String, dynamic>{'unexpected': true},
         ),
       });
-      final n = c.read(contentControllerProvider.notifier);
+      final n = c.read(
+        contentControllerProvider('future-async-await').notifier,
+      );
       await n.load('future-async-await');
 
       final response = await n.reportProgress(
@@ -128,9 +146,34 @@ void main() {
       );
 
       expect(response, isNull);
-      final state = c.read(contentControllerProvider);
+      final state = c.read(contentControllerProvider('future-async-await'));
       expect(state, isA<ContentLoaded>());
       expect((state as ContentLoaded).progressFailureMessage, isNotEmpty);
     });
+
+    test(
+      'route family isolates content and failed refresh retains route data',
+      () async {
+        final fixtures = <String, MockFixture>{
+          'GET /contents/future-async-await': (200, _content(completed: false)),
+        };
+        final c = _container(fixtures);
+        final first = contentControllerProvider('future-async-await');
+        final second = contentControllerProvider('another-route');
+        await c.read(first.notifier).load();
+
+        expect(c.read(first), isA<ContentLoaded>());
+        expect(c.read(second), isA<ContentLoading>());
+        fixtures.clear();
+        await c.read(first.notifier).load();
+        await c.read(second.notifier).load();
+
+        final retained = c.read(first);
+        expect(retained, isA<ContentLoaded>());
+        expect((retained as ContentLoaded).isStale, isTrue);
+        expect(retained.loadFailureMessage, isNotEmpty);
+        expect(c.read(second), isA<ContentFailed>());
+      },
+    );
   });
 }

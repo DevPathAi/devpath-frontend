@@ -24,7 +24,28 @@ class AuthSessionUnavailable extends AuthState {
   final String message;
 }
 
+/// A previously server-verified session retained through a transport outage.
+/// Reads may use owner-scoped snapshots; mutations remain server-confirmed.
+class AuthOfflineAuthenticated extends AuthState {
+  const AuthOfflineAuthenticated(this.user, this.message);
+
+  final User user;
+  final String message;
+}
+
 class AuthAuthenticated extends AuthState {
   const AuthAuthenticated(this.user);
   final User user;
+}
+
+extension AuthStateOwner on AuthState {
+  User? get verifiedUser => switch (this) {
+    AuthAuthenticated(:final user) ||
+    AuthOfflineAuthenticated(:final user) => user,
+    _ => null,
+  };
+
+  String? get ownerKey => verifiedUser?.id;
+
+  bool get isServerReachable => this is AuthAuthenticated;
 }

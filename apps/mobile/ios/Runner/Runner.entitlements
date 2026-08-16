@@ -4,7 +4,7 @@
 <dict>
 	<key>com.apple.developer.associated-domains</key>
 	<array>
-		<string>applinks:app.devpath.ai</string>
+		<string>applinks:app.leva.ai.kr</string>
 	</array>
 	<!--
 	  FCM/APNs 푸시 엔타이틀먼트.
@@ -15,7 +15,5 @@
 	  Build Settings의 Code Signing Entitlements = Runner/Runner.entitlements.
 	  자세한 절차: ../../docs/FCM_SETUP.md
 	-->
-	<key>aps-environment</key>
-	<string>development</string>
 </dict>
 </plist>

@@ -5,100 +5,226 @@ import 'package:dp_core/dp_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../providers/api_providers.dart';
+import '../../auth/application/auth_controller.dart';
 import '../../today/application/today_controller.dart';
+import '../data/content_offline_store.dart';
 import '../state/content_state.dart';
+import 'content_progress_sync_controller.dart';
 
-/// 모바일 학습 뷰어 — 콘텐츠 조회 + 완료 표시(진척 보고).
+/// One independent state machine per canonical content route key.
 class ContentController extends Notifier<ContentState> {
+  ContentController(this.routeKey);
+
+  final String routeKey;
   var _loadGeneration = 0;
 
   @override
-  ContentState build() => const ContentLoading();
+  ContentState build() {
+    if (ref.read(currentOwnerKeyProvider) != null) {
+      ref.listen(contentProgressSyncControllerProvider, (previous, next) {
+        if (previous != next) unawaited(_refreshFromOfflineStore());
+      });
+    }
+    return const ContentLoading();
+  }
 
-  Future<void> load(String slug) async {
+  Future<void> _refreshFromOfflineStore() async {
+    final owner = ref.read(currentOwnerKeyProvider);
+    final before = state;
+    if (owner == null || before is! ContentLoaded) return;
+    final cached = await ref
+        .read(contentOfflineStoreProvider)
+        .read(owner, routeKey, now: DateTime.now().toUtc());
+    if (!ref.mounted || cached == null) return;
+    final latest = state;
+    if (latest is! ContentLoaded || !_matches(latest.content)) return;
+    state = ContentLoaded(
+      cached.content,
+      loadFailureMessage: latest.loadFailureMessage,
+      isStale: latest.isStale,
+      fromOfflineCache: latest.fromOfflineCache,
+      cachedAt: latest.cachedAt,
+    );
+  }
+
+  Future<void> load([String? requestedRoute]) async {
+    if (requestedRoute != null && requestedRoute != routeKey) {
+      state = const ContentFailed('콘텐츠 경로가 일치하지 않아요.');
+      return;
+    }
     final generation = ++_loadGeneration;
-    state = const ContentLoading();
+    final retained = state is ContentLoaded ? state as ContentLoaded : null;
+    if (retained == null) {
+      state = const ContentLoading();
+    } else {
+      state = ContentLoaded(
+        retained.content,
+        progressFailureMessage: retained.progressFailureMessage,
+        isRefreshing: true,
+        isStale: retained.isStale,
+        fromOfflineCache: retained.fromOfflineCache,
+        cachedAt: retained.cachedAt,
+      );
+    }
+    final owner = ref.read(currentOwnerKeyProvider);
     try {
       final json = await ref
           .read(apiClientProvider)
-          .get<Map<String, dynamic>>('/contents/$slug');
+          .get<Map<String, dynamic>>('/contents/$routeKey');
       final content = LearningContent.fromJson(json);
-      if (!_matches(content, slug)) {
+      if (!_matches(content)) {
         throw const FormatException('content identity mismatch');
       }
       if (!ref.mounted || generation != _loadGeneration) return;
-      state = ContentLoaded(content);
+      final now = DateTime.now().toUtc();
+      if (owner != null && ref.read(currentOwnerKeyProvider) == owner) {
+        try {
+          await ref
+              .read(contentOfflineStoreProvider)
+              .write(owner, routeKey, content, cachedAt: now);
+        } on Object {
+          // Local persistence cannot make authoritative content unusable.
+        }
+      }
+      if (!ref.mounted || generation != _loadGeneration) return;
+      state = ContentLoaded(content, cachedAt: now);
     } on Object catch (error) {
       if (!ref.mounted || generation != _loadGeneration) return;
-      state = ContentFailed(_loadFailure(error));
+      final message = _loadFailure(error);
+      if (retained != null) {
+        state = ContentLoaded(
+          retained.content,
+          progressFailureMessage: retained.progressFailureMessage,
+          loadFailureMessage: message,
+          isStale: true,
+          fromOfflineCache: retained.fromOfflineCache,
+          cachedAt: retained.cachedAt,
+        );
+        return;
+      }
+      CachedLearningContent? cached;
+      if (owner != null && ref.read(currentOwnerKeyProvider) == owner) {
+        try {
+          cached = await ref
+              .read(contentOfflineStoreProvider)
+              .read(owner, routeKey, now: DateTime.now().toUtc());
+        } on Object {
+          cached = null;
+        }
+      }
+      if (!ref.mounted || generation != _loadGeneration) return;
+      state = cached == null
+          ? ContentFailed(message)
+          : ContentLoaded(
+              cached.content,
+              loadFailureMessage: message,
+              isStale: true,
+              fromOfflineCache: true,
+              cachedAt: cached.cachedAt,
+            );
     }
   }
 
-  /// 완료로 표시 — 진척 보고(scrollPct=1.0) 후 로컬 상태 갱신.
-  Future<void> markComplete(String slug) async {
-    final current = state;
-    if (current is! ContentLoaded || !_matches(current.content, slug)) return;
-    try {
-      final json = await ref
-          .read(apiClientProvider)
-          .post<Map<String, dynamic>>(
-            '/contents/$slug/progress',
-            body: {'scrollPct': 1.0, 'dwellSec': 60},
+  Future<void> markComplete([String? requestedRoute]) async {
+    if (requestedRoute != null && requestedRoute != routeKey) return;
+    await _reportProgress(scrollPct: 1, dwellSec: 60, requestCompletion: true);
+  }
+
+  Future<ContentProgressUpdateResponse?> reportProgress(
+    String requestedRoute, {
+    required double scrollPct,
+    required int dwellSec,
+  }) {
+    if (requestedRoute != routeKey) return Future.value(null);
+    return _reportProgress(
+      scrollPct: scrollPct,
+      dwellSec: dwellSec,
+      requestCompletion: false,
+    );
+  }
+
+  Future<ContentProgressUpdateResponse?> _reportProgress({
+    required double scrollPct,
+    required int dwellSec,
+    required bool requestCompletion,
+  }) async {
+    final before = state;
+    if (before is! ContentLoaded || !_matches(before.content)) return null;
+    final localProgress = before.content.progress;
+    state = ContentLoaded(
+      before.content.copyWith(
+        progress: ContentProgress(
+          scrollPct: math.max(localProgress.scrollPct, scrollPct),
+          dwellSec: math.max(localProgress.dwellSec, dwellSec),
+          completed: localProgress.completed,
+          completedAt: localProgress.completedAt,
+        ),
+      ),
+      loadFailureMessage: before.loadFailureMessage,
+      isStale: before.isStale,
+      fromOfflineCache: before.fromOfflineCache,
+      cachedAt: before.cachedAt,
+    );
+
+    final owner = ref.read(currentOwnerKeyProvider);
+    ContentProgressUpdateResponse? response;
+    if (owner == null) {
+      response = await _postDirect(scrollPct: scrollPct, dwellSec: dwellSec);
+    } else {
+      response = await ref
+          .read(contentProgressSyncControllerProvider.notifier)
+          .enqueueAndSync(
+            QueuedContentProgress(
+              ownerKey: owner,
+              routeKey: routeKey,
+              scrollPct: scrollPct.clamp(0, 1).toDouble(),
+              dwellSec: math.max(0, dwellSec),
+              requestCompletion: requestCompletion,
+            ),
           );
-      final resp = ContentProgressUpdateResponse.fromJson(json);
-      if (!ref.mounted || state is! ContentLoaded) return;
-      _applyProgress(slug, resp);
-    } on Object catch (error) {
-      if (!ref.mounted) return;
+    }
+    if (!ref.mounted) return response;
+    if (response == null) {
       final latest = state;
-      if (latest is ContentLoaded && _matches(latest.content, slug)) {
+      if (latest is ContentLoaded && _matches(latest.content)) {
         state = ContentLoaded(
           latest.content,
-          progressFailureMessage: _progressFailure(error),
+          progressFailureMessage: '진행률을 동기화하지 못했어요.',
+          loadFailureMessage: latest.loadFailureMessage,
+          isStale: latest.isStale,
+          fromOfflineCache: latest.fromOfflineCache,
+          cachedAt: latest.cachedAt,
         );
       }
+      return null;
     }
+    _applyServerProgress(response, invalidateToday: owner == null);
+    return response;
   }
 
-  /// 스크롤·체류 기반 자동 진척 보고. 완료 응답이면 진척 상태를 갱신하고 응답을 반환한다.
-  /// 자동 보고 실패는 학습 흐름을 막지 않도록 조용히 무시한다(null 반환, 상태 유지).
-  Future<ContentProgressUpdateResponse?> reportProgress(
-    String slug, {
+  Future<ContentProgressUpdateResponse?> _postDirect({
     required double scrollPct,
     required int dwellSec,
   }) async {
-    final before = state;
-    if (before is! ContentLoaded || !_matches(before.content, slug)) {
-      return null;
-    }
     try {
       final json = await ref
           .read(apiClientProvider)
           .post<Map<String, dynamic>>(
-            '/contents/$slug/progress',
+            '/contents/$routeKey/progress',
             body: {'scrollPct': scrollPct, 'dwellSec': dwellSec},
           );
-      final resp = ContentProgressUpdateResponse.fromJson(json);
-      if (!ref.mounted) return resp;
-      _applyProgress(slug, resp);
-      return resp;
-    } on Object catch (error) {
-      if (ref.mounted) {
-        final latest = state;
-        if (latest is ContentLoaded && _matches(latest.content, slug)) {
-          state = ContentLoaded(
-            latest.content,
-            progressFailureMessage: _progressFailure(error),
-          );
-        }
-      }
+      return ContentProgressUpdateResponse.fromJson(json);
+    } on Object {
       return null;
     }
   }
 
-  void _applyProgress(String slug, ContentProgressUpdateResponse response) {
+  void _applyServerProgress(
+    ContentProgressUpdateResponse response, {
+    required bool invalidateToday,
+  }) {
     final latest = state;
-    if (latest is! ContentLoaded || !_matches(latest.content, slug)) return;
+    if (latest is! ContentLoaded || !_matches(latest.content)) return;
     final previous = latest.content.progress;
     final completedNow = !previous.completed && response.completed;
     state = ContentLoaded(
@@ -110,15 +236,21 @@ class ContentController extends Notifier<ContentState> {
           completedAt: response.completedAt ?? previous.completedAt,
         ),
       ),
+      loadFailureMessage: latest.loadFailureMessage,
+      isStale: latest.isStale,
+      fromOfflineCache: latest.fromOfflineCache,
+      cachedAt: latest.cachedAt,
     );
-    if (completedNow && ref.exists(todayControllerProvider)) {
+    if (invalidateToday &&
+        completedNow &&
+        ref.exists(todayControllerProvider)) {
       unawaited(
         ref.read(todayControllerProvider.notifier).invalidateAndRefetch(),
       );
     }
   }
 
-  bool _matches(LearningContent content, String routeKey) =>
+  bool _matches(LearningContent content) =>
       content.slug == routeKey || content.id.toString() == routeKey;
 
   String _loadFailure(Object error) => switch (error) {
@@ -126,12 +258,9 @@ class ContentController extends Notifier<ContentState> {
     FormatException() => '미션과 콘텐츠 연결을 확인하지 못했어요.',
     _ => '콘텐츠 형식을 확인하지 못했어요.',
   };
-
-  String _progressFailure(Object error) => switch (error) {
-    ApiException(:final message) => message,
-    _ => '진행률을 저장하지 못했어요.',
-  };
 }
 
 final contentControllerProvider =
-    NotifierProvider<ContentController, ContentState>(ContentController.new);
+    NotifierProvider.family<ContentController, ContentState, String>(
+      ContentController.new,
+    );

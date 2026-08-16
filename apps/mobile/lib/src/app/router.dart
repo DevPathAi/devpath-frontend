@@ -23,6 +23,7 @@ import '../features/learning/presentation/learn_page.dart';
 import '../features/mission/presentation/mobile_mission_route_resolvers.dart';
 import '../features/mission/state/mobile_mission_route.dart';
 import '../features/notifications/presentation/notifications_page.dart';
+import '../features/notifications/application/notification_controller.dart';
 import '../features/shell/presentation/mobile_shell.dart';
 import '../features/today/presentation/today_page.dart';
 
@@ -43,16 +44,17 @@ String? gateRedirect(
   if (auth is AuthSessionUnavailable) {
     return atSessionUnavailable ? null : '/session-unavailable';
   }
-  if (auth is! AuthAuthenticated) {
+  final user = auth.verifiedUser;
+  if (user == null) {
     return atLogin ? null : '/login';
   }
 
   final atConsent = location == '/consent';
   final atActivation = location == '/activation';
-  if (auth.user.consentStatus != ConsentStatus.done) {
+  if (user.consentStatus != ConsentStatus.done) {
     return atConsent ? null : '/consent';
   }
-  if (auth.user.onboardingStatus != OnboardingStatus.done) {
+  if (user.onboardingStatus != OnboardingStatus.done) {
     return atActivation ? null : '/activation';
   }
   if (pendingLocation != null && location != pendingLocation) {
@@ -70,18 +72,13 @@ final routerProvider = Provider<GoRouter>((ref) {
   ref.onDispose(refresh.dispose);
   void notify() => refresh.value++;
   ref.listen(authControllerProvider, (previous, next) {
-    final previousOwner = switch (previous) {
-      AuthAuthenticated(:final user) => user.id,
-      _ => null,
-    };
-    final nextOwner = switch (next) {
-      AuthAuthenticated(:final user) => user.id,
-      _ => null,
-    };
+    final previousOwner = previous?.ownerKey;
+    final nextOwner = next.ownerKey;
     if (previousOwner != null && previousOwner != nextOwner) {
       ref.invalidate(contentControllerProvider);
       ref.invalidate(learnControllerProvider);
       ref.invalidate(dashboardControllerProvider);
+      ref.invalidate(notificationControllerProvider);
     }
     notify();
   });
@@ -95,7 +92,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       final location = state.matchedLocation;
       final canonical = MobileMissionRoute.tryParse(location);
       final pending = ref.read(pendingDeepLinkProvider);
-      if (auth is! AuthAuthenticated &&
+      if (auth.verifiedUser == null &&
           canonical != null &&
           pending != canonical.location) {
         unawaited(
@@ -107,9 +104,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       final redirect = gateRedirect(auth, location, pendingLocation: pending);
       if (redirect == null &&
           pending == location &&
-          auth is AuthAuthenticated &&
-          auth.user.consentStatus == ConsentStatus.done &&
-          auth.user.onboardingStatus == OnboardingStatus.done &&
+          auth.verifiedUser?.consentStatus == ConsentStatus.done &&
+          auth.verifiedUser?.onboardingStatus == OnboardingStatus.done &&
           !pendingConsumeScheduled) {
         pendingConsumeScheduled = true;
         scheduleMicrotask(() {

@@ -4,23 +4,42 @@ import 'package:devpath_mobile/src/services/push_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('notification store deduplicates IDs and preserves typed target', () async {
-    final store = NotificationStore(InMemoryOwnerDataStore());
-    final first = DateTime.utc(2026, 8, 16, 1);
-    const message = PushMessage(
-      id: 'm1',
-      title: '계속 학습',
-      body: 'Async',
-      target: PushTarget.content(taskId: 302, contentId: 77),
-    );
-    expect(await store.add('owner-a', message, receivedAt: first), isTrue);
-    expect(await store.add('owner-a', message, receivedAt: first), isFalse);
+  test(
+    'notification store deduplicates IDs and preserves typed target',
+    () async {
+      final store = NotificationStore(InMemoryOwnerDataStore());
+      final first = DateTime.utc(2026, 8, 16, 1);
+      const message = PushMessage(
+        id: 'm1',
+        title: '계속 학습',
+        body: 'Async',
+        target: PushTarget.content(taskId: 302, contentId: 77),
+      );
+      expect(await store.add('owner-a', message, receivedAt: first), isTrue);
+      expect(await store.add('owner-a', message, receivedAt: first), isFalse);
 
-    final saved = await store.list('owner-a');
-    expect(saved, hasLength(1));
-    expect(saved.single.message.target?.location, '/mission/302/content/77');
-    expect(saved.single.isRead, isFalse);
-    await store.markAllRead('owner-a');
-    expect((await store.list('owner-a')).single.isRead, isTrue);
-  });
+      final saved = await store.list('owner-a');
+      expect(saved, hasLength(1));
+      expect(saved.single.message.target?.location, '/mission/302/content/77');
+      expect(saved.single.isRead, isFalse);
+      await store.markAllRead('owner-a');
+      expect((await store.list('owner-a')).single.isRead, isTrue);
+    },
+  );
+
+  test(
+    'concurrent delivery of one message ID increments durable state once',
+    () async {
+      final store = NotificationStore(InMemoryOwnerDataStore());
+      const message = PushMessage(id: 'same', title: 'A', body: 'a');
+
+      final added = await Future.wait([
+        store.add('owner-a', message, receivedAt: DateTime.utc(2026, 8, 16, 1)),
+        store.add('owner-a', message, receivedAt: DateTime.utc(2026, 8, 16, 2)),
+      ]);
+
+      expect(added.where((value) => value), hasLength(1));
+      expect(await store.list('owner-a'), hasLength(1));
+    },
+  );
 }

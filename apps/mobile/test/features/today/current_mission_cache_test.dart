@@ -75,6 +75,22 @@ void main() {
     expect(await cache.read('owner-b', now: now), isNotNull);
   });
 
+  test('late stale cleanup은 같은 owner의 newer snapshot을 지우지 않는다', () async {
+    final cache = InMemoryCurrentMissionCache();
+    final staleAt = DateTime.utc(2026, 8, 16, 1);
+    final freshAt = DateTime.utc(2026, 8, 16, 2);
+    final stale = _mission(1);
+    await cache.write('owner-a', stale, cachedAt: staleAt);
+    await cache.write('owner-a', _mission(2), cachedAt: freshAt);
+
+    await cache.clearIfMatches('owner-a', stale, cachedAt: staleAt);
+
+    expect(
+      (await cache.read('owner-a', now: freshAt))?.mission.nextTask?.taskId,
+      2,
+    );
+  });
+
   test('codec roundtrip은 authoritative outcome과 task pair를 보존한다', () {
     final original = _mission(302);
     final decoded = CurrentMissionCacheCodec.decode(

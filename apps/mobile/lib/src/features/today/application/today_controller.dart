@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../providers/api_providers.dart';
 import '../../auth/application/auth_controller.dart';
-import '../../auth/state/auth_state.dart';
 import '../data/current_mission_cache.dart';
 
 typedef TodayClock = DateTime Function();
@@ -13,14 +12,7 @@ typedef TodayClock = DateTime Function();
 final todayClockProvider = Provider<TodayClock>((ref) => DateTime.now);
 
 final todayOwnerKeyProvider = Provider<String?>((ref) {
-  return ref.watch(
-    authControllerProvider.select(
-      (auth) => switch (auth) {
-        AuthAuthenticated(:final user) => user.id,
-        _ => null,
-      },
-    ),
-  );
+  return ref.watch(currentOwnerKeyProvider);
 });
 
 enum TodayMissionSource { online, offlineCache }
@@ -187,6 +179,7 @@ class TodayController extends Notifier<TodayState> {
     final mission = state.mission;
     final task = mission?.nextTask;
     if (state.isOffline ||
+        state.isStale ||
         mission?.outcome != CurrentMissionOutcome.available ||
         task?.taskId != taskId ||
         task?.contentId != null) {
@@ -223,20 +216,26 @@ class TodayController extends Notifier<TodayState> {
   Future<CurrentMission?> _fetch(int generation, bool hadData) async {
     final ownerKey = _ownerKey;
     if (ownerKey == null) return null;
+    final missionCache = ref.read(currentMissionCacheProvider);
     try {
       final mission = await ref.read(learningPathApiProvider).currentMission();
       if (!_isCurrent(generation, ownerKey)) return null;
       final now = ref.read(todayClockProvider)();
       if (mission.outcome != CurrentMissionOutcome.malformedPath) {
         try {
-          await ref
-              .read(currentMissionCacheProvider)
-              .write(ownerKey, mission, cachedAt: now);
+          await missionCache.write(ownerKey, mission, cachedAt: now);
         } on Object {
           // Online Today remains usable when the local persistence layer fails.
         }
       }
-      if (!_isCurrent(generation, ownerKey)) return null;
+      if (!_isCurrent(generation, ownerKey)) {
+        try {
+          await missionCache.clearIfMatches(ownerKey, mission, cachedAt: now);
+        } on Object {
+          // Account cleanup remains best-effort when local storage is broken.
+        }
+        return null;
+      }
       _onlineCachedAt = now;
       state = state.copyWith(
         mission: mission,

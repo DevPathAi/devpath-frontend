@@ -11,7 +11,10 @@ Production distribution remains fail-closed until all external evidence exists:
 - Apple team, provisioning profile, distribution certificate, and an approved
   TestFlight job on the same source and lock SHA.
 - Hosted `assetlinks.json` and `apple-app-site-association` files for
-  `app.devpath.ai`, verified on physical Android/iOS devices.
+  `app.leva.ai.kr`, verified on physical Android/iOS devices. Hosted AASA and
+  Asset Links must expose only `/path/*/today` and
+  `/mission/*/content/*`; Sandbox, Review, Mentor and broad `/mission/*`
+  association are release blockers.
 - VoiceOver and TalkBack evidence for Today, reading, stale/offline state, and a
   canonical task deep link.
 

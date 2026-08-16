@@ -1,6 +1,9 @@
 import 'dart:async';
 
 import 'package:devpath_mobile/src/features/notifications/application/notification_controller.dart';
+import 'package:devpath_mobile/src/features/auth/application/auth_controller.dart';
+import 'package:devpath_mobile/src/features/notifications/data/notification_store.dart';
+import 'package:devpath_mobile/src/data/owner_data_store.dart';
 import 'package:devpath_mobile/src/features/notifications/presentation/notifications_page.dart';
 import 'package:devpath_mobile/src/services/push_service.dart';
 import 'package:dp_design/dp_design.dart';
@@ -29,7 +32,13 @@ Widget _host(ProviderContainer c) => UncontrolledProviderScope(
   final ctrl = StreamController<PushMessage>();
   addTearDown(ctrl.close);
   final c = ProviderContainer(
-    overrides: [pushServiceProvider.overrideWithValue(_FakePush(ctrl))],
+    overrides: [
+      pushServiceProvider.overrideWithValue(_FakePush(ctrl)),
+      currentOwnerKeyProvider.overrideWithValue('owner-a'),
+      notificationStoreProvider.overrideWithValue(
+        NotificationStore(InMemoryOwnerDataStore()),
+      ),
+    ],
   );
   addTearDown(c.dispose);
   return (container: c, push: ctrl);

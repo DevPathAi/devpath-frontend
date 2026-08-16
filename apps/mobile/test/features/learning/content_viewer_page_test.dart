@@ -1,4 +1,5 @@
 import 'package:devpath_mobile/src/features/learning/presentation/content_viewer_page.dart';
+import 'package:devpath_mobile/src/features/auth/application/auth_controller.dart';
 import 'package:devpath_mobile/src/providers/api_providers.dart';
 import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
@@ -56,7 +57,10 @@ Widget _host(ProviderContainer c) => UncontrolledProviderScope(
 
 ProviderContainer _container(Map<String, MockFixture> fx) {
   final c = ProviderContainer(
-    overrides: [apiClientProvider.overrideWithValue(mockApiClient(fx))],
+    overrides: [
+      apiClientProvider.overrideWithValue(mockApiClient(fx)),
+      currentOwnerKeyProvider.overrideWithValue(null),
+    ],
   );
   addTearDown(c.dispose);
   return c;
@@ -101,7 +105,8 @@ void main() {
     await _pumpLoad(tester);
 
     expect(find.textContaining('8분'), findsOneWidget);
-    expect(find.textContaining('APPLY'), findsOneWidget);
+    expect(find.textContaining('적용하기'), findsOneWidget);
+    expect(find.byType(DpContextCapsule), findsOneWidget);
     expect(find.textContaining('난이도'), findsOneWidget);
     expect(find.text('#future'), findsOneWidget);
   });

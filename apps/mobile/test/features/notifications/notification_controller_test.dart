@@ -1,6 +1,9 @@
 import 'dart:async';
 
 import 'package:devpath_mobile/src/features/notifications/application/notification_controller.dart';
+import 'package:devpath_mobile/src/features/auth/application/auth_controller.dart';
+import 'package:devpath_mobile/src/features/notifications/data/notification_store.dart';
+import 'package:devpath_mobile/src/data/owner_data_store.dart';
 import 'package:devpath_mobile/src/services/push_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -18,11 +21,53 @@ class _FakePush implements PushService {
   Stream<PushMessage> get incoming => _controller.stream;
 }
 
+class _FakeInteractivePush implements PushService, PushInteractionService {
+  _FakeInteractivePush({this.initial});
+
+  final PushMessage? initial;
+  final incomingController = StreamController<PushMessage>();
+  final openedController = StreamController<PushMessage>();
+
+  @override
+  Future<String?> getToken() async => 'fake-token';
+
+  @override
+  Stream<PushMessage> get incoming => incomingController.stream;
+
+  @override
+  Future<PushMessage?> initialMessage() async => initial;
+
+  @override
+  Stream<PushMessage> get opened => openedController.stream;
+
+  Future<void> close() async {
+    await incomingController.close();
+    await openedController.close();
+  }
+}
+
+class _OwnerController extends Notifier<String?> {
+  @override
+  String? build() => 'owner-a';
+
+  void setOwner(String? owner) => state = owner;
+}
+
+final _ownerProvider = NotifierProvider<_OwnerController, String?>(
+  _OwnerController.new,
+);
+
 ({ProviderContainer container, StreamController<PushMessage> push}) _setup() {
   final ctrl = StreamController<PushMessage>();
   addTearDown(ctrl.close);
   final c = ProviderContainer(
-    overrides: [pushServiceProvider.overrideWithValue(_FakePush(ctrl))],
+    overrides: [
+      pushServiceProvider.overrideWithValue(_FakePush(ctrl)),
+      currentOwnerKeyProvider.overrideWithValue('owner-a'),
+      notificationStoreProvider.overrideWithValue(
+        NotificationStore(InMemoryOwnerDataStore()),
+      ),
+    ],
   );
   addTearDown(c.dispose);
   return (container: c, push: ctrl);
@@ -34,6 +79,21 @@ void main() {
       final s = _setup().container.read(notificationControllerProvider);
       expect(s.messages, isEmpty);
       expect(s.unreadCount, 0);
+    });
+
+    test('같은 message ID는 durable/in-memory 목록과 badge에서 중복 제거한다', () async {
+      final (:container, :push) = _setup();
+      final sub = container.listen(notificationControllerProvider, (_, _) {});
+      addTearDown(sub.close);
+      const duplicate = PushMessage(id: 'same', title: 'A', body: 'a');
+
+      push.add(duplicate);
+      push.add(duplicate);
+      await pumpEventQueue();
+
+      final state = container.read(notificationControllerProvider);
+      expect(state.messages, hasLength(1));
+      expect(state.unreadCount, 1);
     });
 
     test('수신 메시지는 최신순으로 누적되고 미읽음이 증가한다', () async {
@@ -66,5 +126,97 @@ void main() {
       expect(s.unreadCount, 0);
       expect(s.messages, hasLength(1));
     });
+
+    test(
+      'cold/warm notification taps expose only typed native targets',
+      () async {
+        final push = _FakeInteractivePush(
+          initial: const PushMessage(
+            id: 'cold',
+            title: 'Today',
+            body: '이어하기',
+            target: PushTarget.today(pathId: 301),
+          ),
+        );
+        addTearDown(push.close);
+        final container = ProviderContainer(
+          overrides: [
+            pushServiceProvider.overrideWithValue(push),
+            currentOwnerKeyProvider.overrideWithValue('owner-a'),
+            notificationStoreProvider.overrideWithValue(
+              NotificationStore(InMemoryOwnerDataStore()),
+            ),
+          ],
+        );
+        addTearDown(container.dispose);
+        final subscription = container.listen(
+          notificationControllerProvider,
+          (_, _) {},
+        );
+        addTearDown(subscription.close);
+        await pumpEventQueue();
+        expect(
+          container
+              .read(notificationControllerProvider)
+              .navigationTarget
+              ?.location,
+          '/path/301/today',
+        );
+        container
+            .read(notificationControllerProvider.notifier)
+            .consumeNavigation();
+
+        push.openedController.add(
+          const PushMessage(
+            id: 'warm',
+            title: 'Content',
+            body: '이어하기',
+            target: PushTarget.content(taskId: 302, contentId: 77),
+          ),
+        );
+        await pumpEventQueue();
+        expect(
+          container
+              .read(notificationControllerProvider)
+              .navigationTarget
+              ?.location,
+          '/mission/302/content/77',
+        );
+      },
+    );
+
+    test(
+      'owner epoch transition clears in-memory notifications and badge',
+      () async {
+        final pushController = StreamController<PushMessage>();
+        addTearDown(pushController.close);
+        final container = ProviderContainer(
+          overrides: [
+            pushServiceProvider.overrideWithValue(_FakePush(pushController)),
+            currentOwnerKeyProvider.overrideWith(
+              (ref) => ref.watch(_ownerProvider),
+            ),
+            notificationStoreProvider.overrideWithValue(
+              NotificationStore(InMemoryOwnerDataStore()),
+            ),
+          ],
+        );
+        addTearDown(container.dispose);
+        final subscription = container.listen(
+          notificationControllerProvider,
+          (_, _) {},
+        );
+        addTearDown(subscription.close);
+        pushController.add(const PushMessage(id: '1', title: 'A', body: 'a'));
+        await pumpEventQueue();
+        expect(container.read(notificationControllerProvider).unreadCount, 1);
+
+        container.read(_ownerProvider.notifier).setOwner(null);
+        await pumpEventQueue();
+        final state = container.read(notificationControllerProvider);
+        expect(state.messages, isEmpty);
+        expect(state.unreadCount, 0);
+      },
+    );
   });
 }

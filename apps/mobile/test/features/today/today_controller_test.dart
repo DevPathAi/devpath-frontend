@@ -121,6 +121,24 @@ void main() {
     expect(state.failureMessage, isNotEmpty);
   });
 
+  test('stale Today never starts a mutation', () async {
+    final api = _QueuedApi();
+    final container = _container(api, clock: DateTime.now);
+    final controller = container.read(todayControllerProvider.notifier);
+    final initial = controller.load();
+    api.missionRequests[0].complete(_mission(taskId: 3, contentId: null));
+    await initial;
+    final refresh = controller.invalidateAndRefetch();
+    api.missionRequests[1].completeError(StateError('offline'));
+    await refresh;
+
+    await expectLater(
+      controller.completeContentlessTask(3),
+      throwsA(isA<StateError>()),
+    );
+    expect(api.completionCalls, 0);
+  });
+
   test('초기 네트워크 실패는 같은 owner의 24h 이내 snapshot만 복구한다', () async {
     final now = DateTime.utc(2026, 8, 16);
     final cache = InMemoryCurrentMissionCache();

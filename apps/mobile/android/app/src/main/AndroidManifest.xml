@@ -45,8 +45,13 @@
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
-                <data android:scheme="https" android:host="app.devpath.ai" android:pathPrefix="/path/"/>
-                <data android:scheme="https" android:host="app.devpath.ai" android:pathPrefix="/mission/"/>
+                <data android:scheme="https" android:host="app.leva.ai.kr" android:pathPattern="/path/.*/today"/>
+            </intent-filter>
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https" android:host="app.leva.ai.kr" android:pathPattern="/mission/.*/content/.*"/>
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.

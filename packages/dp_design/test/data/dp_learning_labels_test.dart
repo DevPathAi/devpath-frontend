@@ -10,4 +10,12 @@ void main() {
     expect(DpLearningLabels.syncStatus('SYNC_PENDING'), '동기화 대기');
     expect(DpLearningLabels.track('NEW_TRACK'), '학습 경로');
   });
+
+  test('Bloom/difficulty wire values never leak into learner copy', () {
+    expect(DpLearningLabels.bloomLevel('APPLY'), '적용하기');
+    expect(DpLearningLabels.bloomLevel('FUTURE_VALUE'), '학습하기');
+    expect(DpLearningLabels.difficulty(0.2), '입문');
+    expect(DpLearningLabels.difficulty(0.5), '중급');
+    expect(DpLearningLabels.difficulty(0.9), '심화');
+  });
 }

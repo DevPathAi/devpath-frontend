@@ -1,4 +1,6 @@
 import 'package:devpath_mobile/src/providers/theme_provider.dart';
+import 'package:devpath_mobile/src/providers/api_providers.dart';
+import 'package:devpath_mobile/src/data/key_value_store.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -30,5 +32,23 @@ void main() {
     final c = _container();
     c.read(themeModeProvider.notifier).set(ThemeMode.light);
     expect(c.read(themeModeProvider), ThemeMode.light);
+  });
+
+  test('appearance is restored from durable storage', () async {
+    final store = InMemoryKeyValueStore();
+    final first = ProviderContainer(
+      overrides: [keyValueStoreProvider.overrideWithValue(store)],
+    );
+    first.read(themeModeProvider.notifier).set(ThemeMode.dark);
+    await pumpEventQueue();
+    first.dispose();
+
+    final restored = ProviderContainer(
+      overrides: [keyValueStoreProvider.overrideWithValue(store)],
+    );
+    addTearDown(restored.dispose);
+    restored.read(themeModeProvider);
+    await pumpEventQueue();
+    expect(restored.read(themeModeProvider), ThemeMode.dark);
   });
 }

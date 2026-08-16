@@ -1,6 +1,9 @@
 import 'dart:async';
 
 import 'package:devpath_mobile/src/features/shell/presentation/mobile_shell.dart';
+import 'package:devpath_mobile/src/features/auth/application/auth_controller.dart';
+import 'package:devpath_mobile/src/features/notifications/data/notification_store.dart';
+import 'package:devpath_mobile/src/data/owner_data_store.dart';
 import 'package:devpath_mobile/src/services/push_service.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
@@ -44,7 +47,13 @@ GoRouter _testRouter() => GoRouter(
 );
 
 Widget _host(GoRouter router, {PushService? push}) => ProviderScope(
-  overrides: [pushServiceProvider.overrideWithValue(push ?? StubPushService())],
+  overrides: [
+    pushServiceProvider.overrideWithValue(push ?? StubPushService()),
+    currentOwnerKeyProvider.overrideWithValue('owner-a'),
+    notificationStoreProvider.overrideWithValue(
+      NotificationStore(InMemoryOwnerDataStore()),
+    ),
+  ],
   child: MaterialApp.router(theme: DpTheme.light(), routerConfig: router),
 );
 

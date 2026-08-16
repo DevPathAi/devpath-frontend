@@ -2,9 +2,12 @@ import 'package:dp_core/dp_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:dp_design/dp_design.dart';
 
 import '../application/community_controller.dart';
 import '../data/community_source.dart';
+import '../data/quick_capture_store.dart';
+import '../../auth/application/auth_controller.dart';
 
 /// 퀵 캡처 — 제목·본문·태그로 질문을 빠르게 게시(`POST /community/questions`).
 class QuickCapturePage extends ConsumerStatefulWidget {
@@ -19,13 +22,57 @@ class _QuickCapturePageState extends ConsumerState<QuickCapturePage> {
   final _bodyCtrl = TextEditingController();
   final _tagsCtrl = TextEditingController();
   bool _submitting = false;
+  bool _restoring = true;
+  String? _ownerKey;
+
+  @override
+  void initState() {
+    super.initState();
+    _ownerKey = ref.read(currentOwnerKeyProvider);
+    for (final controller in [_titleCtrl, _bodyCtrl, _tagsCtrl]) {
+      controller.addListener(_saveDraft);
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _restoreDraft());
+  }
 
   @override
   void dispose() {
+    for (final controller in [_titleCtrl, _bodyCtrl, _tagsCtrl]) {
+      controller.removeListener(_saveDraft);
+    }
     _titleCtrl.dispose();
     _bodyCtrl.dispose();
     _tagsCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _restoreDraft() async {
+    final owner = _ownerKey;
+    final draft = owner == null
+        ? null
+        : await ref.read(quickCaptureStoreProvider).read(owner);
+    if (!mounted || owner != _ownerKey) return;
+    if (draft != null) {
+      _titleCtrl.text = draft.title;
+      _bodyCtrl.text = draft.body;
+      _tagsCtrl.text = draft.tags.join(', ');
+    }
+    _restoring = false;
+  }
+
+  void _saveDraft() {
+    final owner = _ownerKey;
+    if (_restoring || owner == null) return;
+    ref
+        .read(quickCaptureStoreProvider)
+        .write(
+          owner,
+          QuickCaptureDraft(
+            title: _titleCtrl.text,
+            body: _bodyCtrl.text,
+            tags: _parseTags(),
+          ),
+        );
   }
 
   List<String> _parseTags() => _tagsCtrl.text
@@ -50,6 +97,10 @@ class _QuickCapturePageState extends ConsumerState<QuickCapturePage> {
         bodyMd: body,
         tags: _parseTags(),
       );
+      final owner = _ownerKey;
+      if (owner != null) {
+        await ref.read(quickCaptureStoreProvider).clear(owner);
+      }
       if (!mounted) return;
       // 목록 갱신 후 닫기.
       await ref.read(communityControllerProvider.notifier).load();
@@ -72,7 +123,7 @@ class _QuickCapturePageState extends ConsumerState<QuickCapturePage> {
     return Scaffold(
       appBar: AppBar(title: const Text('퀵 캡처')),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(DpSpacing.lg),
         children: [
           TextField(
             controller: _titleCtrl,
@@ -82,7 +133,7 @@ class _QuickCapturePageState extends ConsumerState<QuickCapturePage> {
             ),
             textInputAction: TextInputAction.next,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: DpSpacing.md),
           TextField(
             controller: _bodyCtrl,
             decoration: const InputDecoration(
@@ -93,7 +144,7 @@ class _QuickCapturePageState extends ConsumerState<QuickCapturePage> {
             minLines: 4,
             maxLines: 10,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: DpSpacing.md),
           TextField(
             controller: _tagsCtrl,
             decoration: const InputDecoration(
@@ -101,7 +152,7 @@ class _QuickCapturePageState extends ConsumerState<QuickCapturePage> {
               hintText: 'dart, async',
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: DpSpacing.xl),
           FilledButton(
             onPressed: _submitting ? null : _submit,
             child: Text(_submitting ? '게시 중…' : '게시'),

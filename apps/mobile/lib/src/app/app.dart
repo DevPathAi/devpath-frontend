@@ -11,6 +11,8 @@ import '../features/auth/application/deep_link_service.dart';
 import '../features/auth/application/pending_deep_link_controller.dart';
 import '../features/auth/state/auth_state.dart';
 import '../features/notifications/application/device_registrar.dart';
+import '../features/notifications/application/notification_controller.dart';
+import '../features/learning/application/content_progress_sync_controller.dart';
 import '../providers/theme_provider.dart';
 import 'router.dart';
 
@@ -63,7 +65,7 @@ class _DevPathMobileAppState extends ConsumerState<DevPathMobileApp>
     if (state != AppLifecycleState.resumed) return;
     final auth = ref.read(authControllerProvider);
     final needsRefresh = switch (auth) {
-      AuthSessionUnavailable() => true,
+      AuthSessionUnavailable() || AuthOfflineAuthenticated() => true,
       AuthAuthenticated(:final user) =>
         user.consentStatus != ConsentStatus.done ||
             user.onboardingStatus != OnboardingStatus.done,
@@ -78,13 +80,23 @@ class _DevPathMobileAppState extends ConsumerState<DevPathMobileApp>
   Widget build(BuildContext context) {
     // 인증 진입(전이) 시 1회 FCM 디바이스 토큰 등록(트랙 C). 부가 기능이라 실패는 무시.
     ref.listen(authControllerProvider, (prev, next) {
-      if (next is AuthAuthenticated && prev is! AuthAuthenticated) {
+      if (next is AuthAuthenticated && prev?.ownerKey != next.user.id) {
         unawaited(
-          ref.read(deviceRegistrarProvider).register().catchError((_) {}),
+          ref
+              .read(deviceRegistrarProvider)
+              .register(next.user.id)
+              .catchError((_) {}),
         );
       }
     });
     final router = ref.watch(routerProvider);
+    ref.watch(contentProgressSyncControllerProvider);
+    ref.listen(notificationControllerProvider, (previous, next) {
+      final target = next.navigationTarget;
+      if (target == null || previous?.navigationTarget == target) return;
+      router.go(target.location);
+      ref.read(notificationControllerProvider.notifier).consumeNavigation();
+    });
     final themeMode = ref.watch(themeModeProvider);
     return MaterialApp.router(
       title: 'Leva',

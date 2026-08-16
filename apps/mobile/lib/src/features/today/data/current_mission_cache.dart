@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:dp_core/dp_core.dart';
+import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../data/local/app_database.dart';
@@ -18,6 +19,12 @@ abstract interface class CurrentMissionCache {
   Future<CachedCurrentMission?> read(String ownerKey, {required DateTime now});
 
   Future<void> write(
+    String ownerKey,
+    CurrentMission mission, {
+    required DateTime cachedAt,
+  });
+
+  Future<void> clearIfMatches(
     String ownerKey,
     CurrentMission mission, {
     required DateTime cachedAt,
@@ -52,6 +59,18 @@ class InMemoryCurrentMissionCache implements CurrentMissionCache {
       mission: mission,
       cachedAt: cachedAt,
     );
+  }
+
+  @override
+  Future<void> clearIfMatches(
+    String ownerKey,
+    CurrentMission mission, {
+    required DateTime cachedAt,
+  }) async {
+    final entry = _entries[ownerKey];
+    if (entry?.cachedAt == cachedAt && entry?.mission == mission) {
+      _entries.remove(ownerKey);
+    }
   }
 
   @override
@@ -102,6 +121,21 @@ class DriftCurrentMissionCache implements CurrentMissionCache {
             cachedAt: cachedAt,
           ),
         );
+  }
+
+  @override
+  Future<void> clearIfMatches(
+    String ownerKey,
+    CurrentMission mission, {
+    required DateTime cachedAt,
+  }) async {
+    await (_db.delete(_db.currentMissionCacheRows)..where(
+          (table) =>
+              table.ownerKey.equals(ownerKey) &
+              table.payload.equals(CurrentMissionCacheCodec.encode(mission)) &
+              table.cachedAt.equals(cachedAt),
+        ))
+        .go();
   }
 
   @override

@@ -4,7 +4,7 @@ class AppConfig {
   const AppConfig({
     required this.baseUrl,
     required this.useMock,
-    this.webAppUrl = 'https://app.devpath.ai',
+    this.webAppUrl = 'https://app.leva.ai.kr',
     this.sseTimeout = const Duration(seconds: 60),
   });
 
@@ -16,7 +16,7 @@ class AppConfig {
     useMock: bool.fromEnvironment('USE_MOCK', defaultValue: true),
     webAppUrl: String.fromEnvironment(
       'WEB_APP_URL',
-      defaultValue: 'https://app.devpath.ai',
+      defaultValue: 'https://app.leva.ai.kr',
     ),
   );
 

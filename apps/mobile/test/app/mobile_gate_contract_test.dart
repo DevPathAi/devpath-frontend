@@ -68,7 +68,7 @@ void main() {
         pendingLocation: '/mission/302/content/77',
       );
 
-      expect(uri.origin, 'https://app.devpath.ai');
+      expect(uri.origin, 'https://app.leva.ai.kr');
       expect(uri.path, '/consent');
       expect(
         uri.queryParameters['mobile_return_to'],
@@ -97,7 +97,7 @@ void main() {
       );
 
       for (final location in [
-        'https://app.devpath.ai/path/301/today',
+        'https://app.leva.ai.kr/path/301/today',
         '/path/0/today',
         '/path/01/today',
         '/mission/-1/content/77',
@@ -110,10 +110,10 @@ void main() {
       }
     });
 
-    test('Universal Link는 선언된 app.devpath.ai origin만 허용한다', () {
+    test('Universal Link는 선언된 app.leva.ai.kr origin만 허용한다', () {
       expect(
         MobileMissionRoute.tryParseUri(
-          Uri.parse('https://app.devpath.ai/mission/302/content/77'),
+          Uri.parse('https://app.leva.ai.kr/mission/302/content/77'),
         )?.location,
         '/mission/302/content/77',
       );
@@ -124,9 +124,9 @@ void main() {
         isNull,
       );
       for (final location in [
-        'https://app.devpath.ai:444/mission/302/content/77',
-        'https://app.devpath.ai/mission/302/content/77?next=/review',
-        'https://app.devpath.ai/mission/302/content/77#mentor',
+        'https://app.leva.ai.kr:444/mission/302/content/77',
+        'https://app.leva.ai.kr/mission/302/content/77?next=/review',
+        'https://app.leva.ai.kr/mission/302/content/77#mentor',
       ]) {
         expect(
           MobileMissionRoute.tryParseUri(Uri.parse(location)),

@@ -5,8 +5,10 @@ import '../../../providers/api_providers.dart';
 import '../../../data/account_data_cleaner.dart';
 import '../state/auth_state.dart';
 import 'oauth_launcher.dart';
+import 'account_epoch_store.dart';
 import 'pending_deep_link_controller.dart';
 import 'pkce.dart';
+import 'verified_session_store.dart';
 
 /// 모바일 인증 컨트롤러.
 ///
@@ -91,23 +93,45 @@ class AuthController extends Notifier<AuthState> {
     final access = await _store.readAccess();
     if (!_isCurrent(epoch)) return;
     if (access == null || access.isEmpty) {
+      final staleSession = await ref.read(verifiedSessionStoreProvider).read();
+      if (staleSession != null) {
+        await _clearVerifiedBoundary(staleSession.id);
+      }
+      if (!_isCurrent(epoch)) return;
       state = const AuthUnauthenticated();
       return;
     }
+    final previousUser = await ref.read(verifiedSessionStoreProvider).read();
+    if (!_isCurrent(epoch)) return;
     try {
       final json = await _client.get<Map<String, dynamic>>('/users/me');
       if (!_isCurrent(epoch)) return;
-      state = AuthAuthenticated(User.fromJson(json));
+      final user = User.fromJson(json);
+      final saved = await _mutateCredentials(() async {
+        if (!_isCurrent(epoch)) return false;
+        if (previousUser != null && previousUser.id != user.id) {
+          await ref.read(accountEpochStoreProvider).advance();
+          await ref
+              .read(accountDataCleanerProvider)
+              .clearOwner(previousUser.id);
+        }
+        await ref.read(verifiedSessionStoreProvider).write(user);
+        return _isCurrent(epoch);
+      });
+      if (!saved) return;
+      state = AuthAuthenticated(user);
     } on ApiException catch (e) {
       if (!_isCurrent(epoch)) return;
       if (e.status == 401 || e.code == ApiErrorCode.unauthorized) {
         final cleared = await _mutateCredentials(() async {
           if (!_isCurrent(epoch)) return false;
-          await _store.clear();
+          await _clearVerifiedBoundary(previousUser?.id);
           return _isCurrent(epoch);
         });
         if (!cleared) return;
         state = AuthUnauthenticated(error: e.message);
+      } else if (previousUser != null) {
+        state = AuthOfflineAuthenticated(previousUser, e.message);
       } else {
         state = AuthSessionUnavailable(e.message);
       }
@@ -163,20 +187,21 @@ class AuthController extends Notifier<AuthState> {
   }
 
   Future<void> logout() async {
-    final ownerKey = switch (state) {
-      AuthAuthenticated(:final user) => user.id,
-      _ => null,
-    };
+    final ownerKey =
+        state.ownerKey ??
+        (await ref.read(verifiedSessionStoreProvider).read())?.id;
     final epoch = ++_epoch;
     _bootstrapInFlight = null;
     try {
       await _mutateCredentials(() async {
         try {
+          await ref.read(accountEpochStoreProvider).advance();
           if (ownerKey != null) {
             await ref.read(accountDataCleanerProvider).clearOwner(ownerKey);
           }
         } finally {
           await _store.clear();
+          await ref.read(verifiedSessionStoreProvider).clear();
           await ref.read(keyValueStoreProvider).delete(_kPkceVerifier);
           await ref
               .read(keyValueStoreProvider)
@@ -188,6 +213,23 @@ class AuthController extends Notifier<AuthState> {
         ref.read(pendingDeepLinkProvider.notifier).consume();
         state = const AuthUnauthenticated();
       }
+    }
+  }
+
+  Future<void> _clearVerifiedBoundary([String? knownOwner]) async {
+    final sessionStore = ref.read(verifiedSessionStoreProvider);
+    final ownerKey = knownOwner ?? (await sessionStore.read())?.id;
+    try {
+      await ref.read(accountEpochStoreProvider).advance();
+      if (ownerKey != null) {
+        await ref.read(accountDataCleanerProvider).clearOwner(ownerKey);
+      }
+    } finally {
+      await _store.clear();
+      await sessionStore.clear();
+      await ref
+          .read(keyValueStoreProvider)
+          .delete(PendingDeepLinkController.storageKey);
     }
   }
 
@@ -205,4 +247,8 @@ class AuthController extends Notifier<AuthState> {
 
 final authControllerProvider = NotifierProvider<AuthController, AuthState>(
   AuthController.new,
+);
+
+final currentOwnerKeyProvider = Provider<String?>(
+  (ref) => ref.watch(authControllerProvider.select((auth) => auth.ownerKey)),
 );

@@ -33,12 +33,27 @@ class CurrentMissionCacheRows extends Table {
   Set<Column> get primaryKey => {ownerKey};
 }
 
-@DriftDatabase(tables: [DashboardCacheRows, CurrentMissionCacheRows])
+/// Durable account-scoped records for mobile-only caches, drafts and queues.
+/// The composite key makes every feature prove both owner and logical route.
+class OwnerDataRows extends Table {
+  TextColumn get ownerKey => text()();
+  TextColumn get bucket => text()();
+  TextColumn get recordKey => text()();
+  TextColumn get payload => text()();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {ownerKey, bucket, recordKey};
+}
+
+@DriftDatabase(
+  tables: [DashboardCacheRows, CurrentMissionCacheRows, OwnerDataRows],
+)
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -48,6 +63,9 @@ class AppDatabase extends _$AppDatabase {
         await migrator.createTable(currentMissionCacheRows);
         // v1 was ownerless and therefore cannot cross the account boundary.
         await delete(dashboardCacheRows).go();
+      }
+      if (from < 3) {
+        await migrator.createTable(ownerDataRows);
       }
     },
   );

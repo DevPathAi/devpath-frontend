@@ -11,12 +11,65 @@ class PushMessage {
     required this.id,
     required this.title,
     required this.body,
+    this.target,
   });
 
   /// 메시지 식별자(FCM `messageId`). 목록 키·중복 제거에 사용.
   final String id;
   final String title;
   final String body;
+  final PushTarget? target;
+}
+
+enum PushTargetKind { today, content }
+
+/// Closed notification navigation contract. Raw server paths never reach the
+/// router; only the two native companion shapes can be represented.
+class PushTarget {
+  const PushTarget.today({required int pathId})
+    : kind = PushTargetKind.today,
+      primaryId = pathId,
+      secondaryId = null;
+
+  const PushTarget.content({required int taskId, required int contentId})
+    : kind = PushTargetKind.content,
+      primaryId = taskId,
+      secondaryId = contentId;
+
+  static const maxJsSafeId = 9007199254740991;
+  final PushTargetKind kind;
+  final int primaryId;
+  final int? secondaryId;
+
+  String get location => switch (kind) {
+    PushTargetKind.today => '/path/$primaryId/today',
+    PushTargetKind.content => '/mission/$primaryId/content/$secondaryId',
+  };
+
+  static PushTarget? fromData(Map<String, dynamic> data) {
+    int? id(String key) {
+      final value = data[key];
+      final parsed = value is int
+          ? value
+          : int.tryParse(value?.toString() ?? '');
+      return parsed != null && parsed > 0 && parsed <= maxJsSafeId
+          ? parsed
+          : null;
+    }
+
+    if (data['targetType'] == 'TODAY') {
+      final pathId = id('pathId');
+      return pathId == null ? null : PushTarget.today(pathId: pathId);
+    }
+    if (data['targetType'] == 'CONTENT') {
+      final taskId = id('taskId');
+      final contentId = id('contentId');
+      return taskId == null || contentId == null
+          ? null
+          : PushTarget.content(taskId: taskId, contentId: contentId);
+    }
+    return null;
+  }
 }
 
 /// 푸시 추상화 — `connectivityProvider`와 동일한 **교체 경계**다.
@@ -32,13 +85,26 @@ abstract interface class PushService {
   Stream<PushMessage> get incoming;
 }
 
+/// Optional OS-notification interaction channel for cold and warm taps.
+abstract interface class PushInteractionService {
+  Future<PushMessage?> initialMessage();
+
+  Stream<PushMessage> get opened;
+}
+
 /// Firebase 없이 동작하는 스텁. 토큰은 고정값, 수신은 빈 스트림.
-class StubPushService implements PushService {
+class StubPushService implements PushService, PushInteractionService {
   @override
   Future<String?> getToken() async => 'stub-fcm-token';
 
   @override
   Stream<PushMessage> get incoming => const Stream.empty();
+
+  @override
+  Future<PushMessage?> initialMessage() async => null;
+
+  @override
+  Stream<PushMessage> get opened => const Stream.empty();
 }
 
 /// FCM `RemoteMessage` → [PushMessage] 매핑(순수 함수). 단위 테스트 대상.
@@ -46,6 +112,7 @@ PushMessage pushMessageFromRemote(RemoteMessage m) => PushMessage(
   id: m.messageId ?? '',
   title: m.notification?.title ?? '',
   body: m.notification?.body ?? '',
+  target: PushTarget.fromData(m.data),
 );
 
 /// 백그라운드/종료 상태 수신 진입점. **반드시 top-level**(앱이 비활성일 때 별
@@ -70,7 +137,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 ///
 /// `FirebaseMessaging.instance`는 **lazy** 참조 — 생성자에서 Firebase를 건드리지
 /// 않으므로 미초기화 환경에서도 인스턴스화는 가능(실제 토큰·수신 호출 시점에만 초기화 필요).
-class FcmPushService implements PushService {
+class FcmPushService implements PushService, PushInteractionService {
   /// [messaging]은 테스트 주입용(미지정 시 `FirebaseMessaging.instance`를 lazy 사용).
   FcmPushService([this._messaging]);
 
@@ -84,6 +151,16 @@ class FcmPushService implements PushService {
   @override
   Stream<PushMessage> get incoming =>
       FirebaseMessaging.onMessage.map(pushMessageFromRemote);
+
+  @override
+  Future<PushMessage?> initialMessage() async {
+    final message = await _fm.getInitialMessage();
+    return message == null ? null : pushMessageFromRemote(message);
+  }
+
+  @override
+  Stream<PushMessage> get opened =>
+      FirebaseMessaging.onMessageOpenedApp.map(pushMessageFromRemote);
 }
 
 /// 푸시 서비스 주입점(교체 경계). 목 모드=스텁, 실 모드=FCM.

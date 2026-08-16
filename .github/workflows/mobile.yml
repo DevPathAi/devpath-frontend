@@ -38,12 +38,20 @@ jobs:
         with:
           flutter-version: '3.44.1'
           cache: true
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
       - name: Verify exact checkout and toolchain
         shell: bash
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
           flutter --version --machine | grep -q '"frameworkVersion": "3.44.1"'
+          flutter --version --machine | grep -q '"dartSdkVersion": "3.12.1"'
+          java -version 2>&1 | grep -q 'version "17\.'
+          test -n "${ANDROID_HOME}"
+          test -f "${ANDROID_HOME}/platforms/android-36/android.jar"
       - name: Resolve locked workspace
         run: flutter pub get --enforce-lockfile
       - name: Enforce native companion source boundary
@@ -59,9 +67,16 @@ jobs:
       - name: Test shared learning labels
         working-directory: packages/dp_design
         run: flutter test test/data/dp_learning_labels_test.dart
-      - name: Assemble unsigned Android release
+      - name: Compile mock Android release
         working-directory: apps/mobile
-        run: flutter build apk --release --no-pub
+        run: flutter build apk --release --no-pub --dart-define=USE_MOCK=true
+      - name: Compile production Android release without mock transport
+        working-directory: apps/mobile
+        run: >-
+          flutter build apk --release --no-pub
+          --dart-define=USE_MOCK=false
+          --dart-define=API_BASE_URL=https://api.leva.ai.kr
+          --dart-define=WEB_APP_URL=https://app.leva.ai.kr
       - name: Record unsigned Android evidence
         shell: bash
         run: |
@@ -99,13 +114,34 @@ jobs:
         with:
           flutter-version: '3.44.1'
           cache: true
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '26.4'
+      - name: Verify exact checkout and Apple toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          flutter --version --machine | grep -q '"frameworkVersion": "3.44.1"'
+          flutter --version --machine | grep -q '"dartSdkVersion": "3.12.1"'
+          xcodebuild -version | grep -q '^Xcode 26.4$'
+          xcrun --sdk iphoneos --show-sdk-version | grep -q '^26.4$'
       - name: Resolve locked workspace
         run: flutter pub get --enforce-lockfile
       - name: Enforce native companion source boundary
         run: dart run tools/mobile_source_guard.dart
-      - name: Build iOS without signing
+      - name: Compile mock iOS without signing
         working-directory: apps/mobile
-        run: flutter build ios --release --no-codesign --no-pub
+        run: >-
+          flutter build ios --release --no-codesign --no-pub
+          --dart-define=USE_MOCK=true
+      - name: Compile production iOS without signing or mock transport
+        working-directory: apps/mobile
+        run: >-
+          flutter build ios --release --no-codesign --no-pub
+          --dart-define=USE_MOCK=false
+          --dart-define=API_BASE_URL=https://api.leva.ai.kr
+          --dart-define=WEB_APP_URL=https://app.leva.ai.kr
       - name: Record iOS no-codesign evidence
         shell: bash
         run: |

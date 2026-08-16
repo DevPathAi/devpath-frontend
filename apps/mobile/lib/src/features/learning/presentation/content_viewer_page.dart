@@ -37,17 +37,19 @@ class _ContentViewerPageState extends ConsumerState<ContentViewerPage>
   void initState() {
     super.initState();
     // dispose 시 ref 사용이 불가하므로 의존성을 미리 캐싱(web content_page와 동일 패턴).
-    _contentController = ref.read(contentControllerProvider.notifier);
+    _contentController = ref.read(
+      contentControllerProvider(widget.slug).notifier,
+    );
     WidgetsBinding.instance.addObserver(this);
     _scrollController.addListener(_maybeFlushProgress);
     _dwellTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      final state = ref.read(contentControllerProvider);
+      final state = ref.read(contentControllerProvider(widget.slug));
       if (state is! ContentLoaded || state.content.progress.completed) return;
       _dwellSec++;
       _maybeFlushProgress();
     });
     WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _contentController.load(widget.slug),
+      (_) => _contentController.load(),
     );
   }
 
@@ -72,9 +74,10 @@ class _ContentViewerPageState extends ConsumerState<ContentViewerPage>
 
   @override
   Widget build(BuildContext context) {
-    final s = ref.watch(contentControllerProvider);
+    final provider = contentControllerProvider(widget.slug);
+    final s = ref.watch(provider);
     _latestState = s;
-    ref.listen<ContentState>(contentControllerProvider, (_, next) {
+    ref.listen<ContentState>(provider, (_, next) {
       _latestState = next;
       if (next case ContentLoaded(:final content)) _syncTracker(content);
     });
@@ -89,7 +92,7 @@ class _ContentViewerPageState extends ConsumerState<ContentViewerPage>
         ContentLoading() => const DpLoading(),
         ContentFailed(:final message) => DpError(
           message: message,
-          onRetry: () => _contentController.load(widget.slug),
+          onRetry: _contentController.load,
         ),
         ContentLoaded(:final content)
             when content.slug == widget.slug ||
@@ -99,6 +102,9 @@ class _ContentViewerPageState extends ConsumerState<ContentViewerPage>
             content: content,
             controller: _scrollController,
             progressFailureMessage: s.progressFailureMessage,
+            loadFailureMessage: s.loadFailureMessage,
+            fromOfflineCache: s.fromOfflineCache,
+            onComplete: _contentController.markComplete,
           ),
         ContentLoaded() => const DpLoading(),
       },
@@ -122,7 +128,7 @@ class _ContentViewerPageState extends ConsumerState<ContentViewerPage>
 
   void _maybeFlushProgress({bool force = false}) {
     if (_posting) return;
-    final state = ref.read(contentControllerProvider);
+    final state = ref.read(contentControllerProvider(widget.slug));
     _latestState = state;
     if (state is! ContentLoaded) return;
     _syncTracker(state.content);
@@ -186,12 +192,18 @@ class _ContentBody extends ConsumerWidget {
     required this.content,
     required this.controller,
     this.progressFailureMessage,
+    this.loadFailureMessage,
+    this.fromOfflineCache = false,
+    required this.onComplete,
   });
 
   final String slug;
   final LearningContent content;
   final ScrollController controller;
   final String? progressFailureMessage;
+  final String? loadFailureMessage;
+  final bool fromOfflineCache;
+  final Future<void> Function([String?]) onComplete;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -200,17 +212,30 @@ class _ContentBody extends ConsumerWidget {
     final percent = (progress.scrollPct * 100).round().clamp(0, 100);
     final meta = [
       if (content.estimatedMinutes != null) '${content.estimatedMinutes}분',
-      if (content.bloomLevel != null) content.bloomLevel!,
-      if (content.difficulty != null) '난이도 ${content.difficulty}',
+      if (content.bloomLevel != null)
+        DpLearningLabels.bloomLevel(content.bloomLevel!),
+      if (content.difficulty != null)
+        '난이도 ${DpLearningLabels.difficulty(content.difficulty!)}',
     ];
     return Column(
       children: [
+        if (loadFailureMessage != null)
+          DpOfflineBanner(
+            message: fromOfflineCache
+                ? '오프라인에 저장된 콘텐츠예요. $loadFailureMessage'
+                : '읽던 콘텐츠를 유지했어요. $loadFailureMessage',
+          ),
         if (progressFailureMessage != null)
           DpOfflineBanner(
             message: '$progressFailureMessage 읽던 콘텐츠와 로컬 진행률은 유지했어요.',
           ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          padding: const EdgeInsets.fromLTRB(
+            DpSpacing.lg,
+            DpSpacing.sm,
+            DpSpacing.lg,
+            0,
+          ),
           child: Row(
             children: [
               Expanded(
@@ -218,7 +243,7 @@ class _ContentBody extends ConsumerWidget {
                   value: progress.scrollPct.clamp(0, 1).toDouble(),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: DpSpacing.sm),
               Text(
                 completed ? '완료' : '$percent%',
                 style: Theme.of(context).textTheme.labelMedium,
@@ -229,7 +254,7 @@ class _ContentBody extends ConsumerWidget {
         Expanded(
           child: SingleChildScrollView(
             controller: controller,
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(DpSpacing.lg),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -241,10 +266,10 @@ class _ContentBody extends ConsumerWidget {
                     ),
                   ),
                 if (content.conceptTags.isNotEmpty) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: DpSpacing.sm),
                   Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+                    spacing: DpSpacing.sm,
+                    runSpacing: DpSpacing.sm,
                     children: [
                       for (final t in content.conceptTags)
                         Chip(label: Text('#$t')),
@@ -252,7 +277,33 @@ class _ContentBody extends ConsumerWidget {
                   ),
                 ],
                 if (meta.isNotEmpty || content.conceptTags.isNotEmpty)
-                  const SizedBox(height: 16),
+                  const SizedBox(height: DpSpacing.lg),
+                DpContextCapsule(
+                  name: '이 콘텐츠의 학습 맥락',
+                  mode: DpContextCapsuleMode.collapsed,
+                  fields: [
+                    DpContextFieldViewModel(
+                      id: 'track',
+                      label: '학습 경로',
+                      valueSummary: DpLearningLabels.track(content.track),
+                      source: '현재 콘텐츠',
+                      sensitivity: DpContextSensitivity.low,
+                      inclusion: DpContextInclusion.included,
+                    ),
+                    if (content.bloomLevel != null)
+                      DpContextFieldViewModel(
+                        id: 'bloom',
+                        label: '학습 단계',
+                        valueSummary: DpLearningLabels.bloomLevel(
+                          content.bloomLevel!,
+                        ),
+                        source: '현재 콘텐츠',
+                        sensitivity: DpContextSensitivity.low,
+                        inclusion: DpContextInclusion.included,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: DpSpacing.lg),
                 DpMarkdown(data: content.markdown),
               ],
             ),
@@ -261,15 +312,11 @@ class _ContentBody extends ConsumerWidget {
         SafeArea(
           top: false,
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(DpSpacing.lg),
             child: SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: completed
-                    ? null
-                    : () => ref
-                          .read(contentControllerProvider.notifier)
-                          .markComplete(slug),
+                onPressed: completed ? null : () => onComplete(),
                 icon: const Icon(DpIcons.stepDone),
                 label: Text(completed ? '완료됨' : '완료로 표시'),
               ),

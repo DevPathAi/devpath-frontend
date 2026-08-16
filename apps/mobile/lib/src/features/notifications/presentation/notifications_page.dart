@@ -44,17 +44,21 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
   }
 }
 
-class _NotificationTile extends StatelessWidget {
+class _NotificationTile extends ConsumerWidget {
   const _NotificationTile({required this.message});
 
   final PushMessage message;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return ListTile(
       leading: const Icon(DpIcons.notifications),
       title: Text(message.title),
       subtitle: Text(message.body),
+      onTap: message.target == null
+          ? null
+          : () =>
+                ref.read(notificationControllerProvider.notifier).open(message),
     );
   }
 }

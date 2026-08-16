@@ -1,4 +1,5 @@
 import 'package:devpath_mobile/src/features/learning/application/content_controller.dart';
+import 'package:devpath_mobile/src/features/auth/application/auth_controller.dart';
 import 'package:devpath_mobile/src/features/today/application/today_controller.dart';
 import 'package:devpath_mobile/src/features/today/data/current_mission_cache.dart';
 import 'package:devpath_mobile/src/providers/api_providers.dart';
@@ -77,6 +78,7 @@ void main() {
     final container = ProviderContainer(
       overrides: [
         apiClientProvider.overrideWithValue(client),
+        currentOwnerKeyProvider.overrideWithValue(null),
         learningPathApiProvider.overrideWithValue(missionApi),
         todayOwnerKeyProvider.overrideWithValue('owner-a'),
         currentMissionCacheProvider.overrideWithValue(
@@ -86,10 +88,10 @@ void main() {
     );
     addTearDown(container.dispose);
     await container.read(todayControllerProvider.notifier).load();
-    await container.read(contentControllerProvider.notifier).load('1');
+    await container.read(contentControllerProvider('1').notifier).load();
 
     await container
-        .read(contentControllerProvider.notifier)
+        .read(contentControllerProvider('1').notifier)
         .reportProgress('1', scrollPct: 1, dwellSec: 60);
     await pumpEventQueue();
 

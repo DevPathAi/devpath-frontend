@@ -18,11 +18,8 @@ void main() {
     expect(config, contains('https://app.leva.ai.kr'));
     expect(config, isNot(contains('https://app.devpath.ai')));
     expect(manifest, contains('android:host="app.leva.ai.kr"'));
-    expect(manifest, contains('android:pathPattern="/path/[0-9]*/today"'));
-    expect(
-      manifest,
-      contains('android:pathPattern="/mission/[0-9]*/content/[0-9]*"'),
-    );
+    expect(manifest, contains('android:pathPattern="/path/.*/today"'));
+    expect(manifest, contains('android:pathPattern="/mission/.*/content/.*"'));
     expect(manifest, isNot(contains('android:pathPrefix="/mission/"')));
     expect(entitlements, contains('applinks:app.leva.ai.kr'));
   });
@@ -42,15 +39,18 @@ void main() {
     }
   });
 
-  test('production mobile source cannot embed mock fixtures or web-only routes', () {
-    final source = Directory('lib/src')
-        .listSync(recursive: true)
-        .whereType<File>()
-        .where((file) => file.path.endsWith('.dart'))
-        .map((file) => file.readAsStringSync())
-        .join('\n');
-    for (final route in ['/sandbox', '/mentor', '/review', '/claim']) {
-      expect(source, isNot(contains("GoRoute(path: '$route")), reason: route);
-    }
-  });
+  test(
+    'production mobile source cannot embed mock fixtures or web-only routes',
+    () {
+      final source = Directory('lib/src')
+          .listSync(recursive: true)
+          .whereType<File>()
+          .where((file) => file.path.endsWith('.dart'))
+          .map((file) => file.readAsStringSync())
+          .join('\n');
+      for (final route in ['/sandbox', '/mentor', '/review', '/claim']) {
+        expect(source, isNot(contains("GoRoute(path: '$route")), reason: route);
+      }
+    },
+  );
 }

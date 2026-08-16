@@ -30,19 +30,30 @@ void main() {
 
   test('App/Universal Link declarations cover canonical Today and Content', () {
     final android = _read('android/app/src/main/AndroidManifest.xml');
-    final ios = _read('ios/Runner/Runner.entitlements');
+    final iosDebug = _read('ios/Runner/RunnerDebug.entitlements');
+    final iosRelease = _read('ios/Runner/RunnerRelease.entitlements');
     final xcodeProject = _read('ios/Runner.xcodeproj/project.pbxproj');
 
     expect(android, contains('android:autoVerify="true"'));
-    expect(android, contains('android:host="app.devpath.ai"'));
-    expect(android, contains('android:pathPrefix="/path/"'));
-    expect(android, contains('android:pathPrefix="/mission/"'));
-    expect(ios, contains('applinks:app.devpath.ai'));
+    expect(android, contains('android:host="app.leva.ai.kr"'));
+    expect(android, contains('android:pathPattern="/path/.*/today"'));
+    expect(android, contains('android:pathPattern="/mission/.*/content/.*"'));
+    expect(android, isNot(contains('android:pathPrefix="/mission/"')));
+    expect(iosDebug, contains('applinks:app.leva.ai.kr'));
+    expect(iosDebug, contains('<string>development</string>'));
+    expect(iosRelease, contains('applinks:app.leva.ai.kr'));
+    expect(iosRelease, contains('<string>production</string>'));
     expect(
-      'CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;'.allMatches(
+      'CODE_SIGN_ENTITLEMENTS = Runner/RunnerDebug.entitlements;'.allMatches(
         xcodeProject,
       ),
-      hasLength(3),
+      hasLength(1),
+    );
+    expect(
+      'CODE_SIGN_ENTITLEMENTS = Runner/RunnerRelease.entitlements;'.allMatches(
+        xcodeProject,
+      ),
+      hasLength(2),
     );
   });
 }
