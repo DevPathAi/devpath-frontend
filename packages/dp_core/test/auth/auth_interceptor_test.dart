@@ -12,6 +12,31 @@ class _MockRetrier extends Mock {
   Future<Response<dynamic>> call(RequestOptions options);
 }
 
+class _InspectableErrorHandler extends ErrorInterceptorHandler {
+  bool advanced = false;
+  bool resolved = false;
+
+  Future<void> consume() async {
+    try {
+      await future;
+    } on Object {
+      // `next` completes the handler future with the original error state.
+    }
+  }
+
+  @override
+  void next(DioException error) {
+    advanced = true;
+    super.next(error);
+  }
+
+  @override
+  void resolve(Response<dynamic> response) {
+    resolved = true;
+    super.resolve(response);
+  }
+}
+
 /// 웹 HttpOnly 쿠키 시나리오: access만 메모리, refresh는 항상 null(쿠키에 있음).
 class _CookieOnlyTokenStore implements TokenStore {
   // ignore: prefer_initializing_formals
@@ -438,6 +463,60 @@ void main() {
     expect(await store.readAccess(), 'B-access');
     expect(await store.readRefresh(), 'B-refresh');
     expect(retryCalls, 0);
+  });
+
+  test('blocked retry never holds the credential mutation boundary', () async {
+    var epoch = 1;
+    final retryStarted = Completer<void>();
+    final releaseRetry = Completer<void>();
+    final store = InMemoryTokenStore()
+      ..save(access: 'A-access', refresh: 'A-refresh');
+    final coordinator = _CredentialMutationCoordinator();
+    final interceptor = AuthInterceptor(
+      store: store,
+      sessionEpoch: () async => epoch,
+      credentialMutation: coordinator.run,
+      refresh: (_) async =>
+          const TokenPair(access: 'A-refreshed', refresh: 'A-refresh-2'),
+      retry: (request) async {
+        retryStarted.complete();
+        await releaseRetry.future;
+        return Response(requestOptions: request, statusCode: 200);
+      },
+    );
+    final request = RequestOptions(path: '/mutation', method: 'POST');
+    await interceptor.onRequest(request, RequestInterceptorHandler());
+    final error = DioException(
+      requestOptions: request,
+      response: Response(requestOptions: request, statusCode: 401),
+      type: DioExceptionType.badResponse,
+    );
+    final handler = _InspectableErrorHandler();
+    final consumed = handler.consume();
+    final errorDone = interceptor.onError(error, handler);
+
+    await retryStarted.future;
+    epoch = 2;
+    final replacement = coordinator.run(
+      () => store.save(access: 'B-access', refresh: 'B-refresh'),
+    );
+    var replacementCompletedPromptly = true;
+    try {
+      await replacement.timeout(const Duration(milliseconds: 100));
+    } on TimeoutException {
+      replacementCompletedPromptly = false;
+    } finally {
+      releaseRetry.complete();
+      await errorDone;
+      await replacement;
+    }
+
+    expect(replacementCompletedPromptly, isTrue);
+    await consumed;
+    expect(handler.advanced, isTrue);
+    expect(handler.resolved, isFalse);
+    expect(await store.readAccess(), 'B-access');
+    expect(await store.readRefresh(), 'B-refresh');
   });
 
   test('same account token rotation still retries exactly once', () async {
