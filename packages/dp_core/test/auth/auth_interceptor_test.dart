@@ -308,6 +308,138 @@ void main() {
     expect(handler.advanced, isTrue);
   });
 
+  for (final branch in ['rotation', 'refreshed']) {
+    for (final status in [401, 403]) {
+      for (final normalized in [false, true]) {
+        test(
+          '$branch retry $status ${normalized ? 'ApiException' : 'DioException'} '
+          'clears the captured credential',
+          () async {
+            final store = InMemoryTokenStore()
+              ..save(
+                access: branch == 'rotation' ? 'rotated' : 'old',
+                refresh: 'refresh',
+              );
+            var refreshCalls = 0;
+            final interceptor = AuthInterceptor(
+              store: store,
+              refresh: (_) async {
+                refreshCalls += 1;
+                return const TokenPair(access: 'NEW', refresh: 'NEW-REFRESH');
+              },
+              retry: (request) async => throw _retryFailure(
+                request,
+                status: status,
+                normalized: normalized,
+              ),
+            );
+            final request = RequestOptions(path: '/resource')
+              ..headers['Authorization'] = 'Bearer old';
+            final error = DioException(
+              requestOptions: request,
+              response: Response(requestOptions: request, statusCode: 401),
+              type: DioExceptionType.badResponse,
+            );
+            final handler = _InspectableErrorHandler();
+            final consumed = handler.consume();
+
+            await interceptor.onError(error, handler);
+            await consumed;
+
+            expect(await store.readAccess(), isNull);
+            expect(await store.readRefresh(), isNull);
+            expect(refreshCalls, branch == 'rotation' ? 0 : 1);
+            expect(handler.advanced, isTrue);
+          },
+        );
+      }
+    }
+  }
+
+  for (final branch in ['rotation', 'refreshed']) {
+    for (final status in <int?>[null, 408, 425, 429, 500]) {
+      test(
+        '$branch retry transient ${status ?? 'connection'} retains tokens',
+        () async {
+          final store = InMemoryTokenStore()
+            ..save(
+              access: branch == 'rotation' ? 'rotated' : 'old',
+              refresh: 'refresh',
+            );
+          final interceptor = AuthInterceptor(
+            store: store,
+            refresh: (_) async =>
+                const TokenPair(access: 'NEW', refresh: 'NEW-REFRESH'),
+            retry: (request) async => throw DioException(
+              requestOptions: request,
+              response: status == null
+                  ? null
+                  : Response(requestOptions: request, statusCode: status),
+              type: status == null
+                  ? DioExceptionType.connectionError
+                  : DioExceptionType.badResponse,
+            ),
+          );
+          final request = RequestOptions(path: '/resource')
+            ..headers['Authorization'] = 'Bearer old';
+          final error = DioException(
+            requestOptions: request,
+            response: Response(requestOptions: request, statusCode: 401),
+            type: DioExceptionType.badResponse,
+          );
+          final handler = _InspectableErrorHandler();
+          final consumed = handler.consume();
+
+          await interceptor.onError(error, handler);
+          await consumed;
+
+          expect(
+            await store.readAccess(),
+            branch == 'rotation' ? 'rotated' : 'NEW',
+          );
+          expect(handler.advanced, isTrue);
+        },
+      );
+    }
+  }
+
+  test(
+    'ordinary initial 403 neither refreshes nor clears credentials',
+    () async {
+      final store = InMemoryTokenStore()
+        ..save(access: 'access', refresh: 'refresh');
+      var refreshCalls = 0;
+      var retryCalls = 0;
+      final interceptor = AuthInterceptor(
+        store: store,
+        refresh: (_) async {
+          refreshCalls += 1;
+          return null;
+        },
+        retry: (request) async {
+          retryCalls += 1;
+          return Response(requestOptions: request);
+        },
+      );
+      final request = RequestOptions(path: '/forbidden');
+      final error = DioException(
+        requestOptions: request,
+        response: Response(requestOptions: request, statusCode: 403),
+        type: DioExceptionType.badResponse,
+      );
+      final handler = _InspectableErrorHandler();
+      final consumed = handler.consume();
+
+      await interceptor.onError(error, handler);
+      await consumed;
+
+      expect(await store.readAccess(), 'access');
+      expect(refreshCalls, 0);
+      expect(retryCalls, 0);
+      expect(handler.advanced, isTrue);
+    },
+  );
+
   test('readRefresh==null이어도 refresh(null)을 시도하여 재시도한다(쿠키 기반)', () async {
     // 웹 HttpOnly 쿠키 시나리오: store에 refresh 토큰 없음(null), 서버는 쿠키로 인식.
     // InMemoryTokenStore는 save 시 refresh가 항상 저장되므로,
@@ -652,4 +784,23 @@ void main() {
             as RequestOptions;
     expect(retried.headers['Authorization'], 'Bearer rotated');
   });
+}
+
+Object _retryFailure(
+  RequestOptions request, {
+  required int status,
+  required bool normalized,
+}) {
+  if (normalized) {
+    return ApiException(
+      code: status == 401 ? ApiErrorCode.unauthorized : ApiErrorCode.forbidden,
+      message: 'retry rejected',
+      status: status,
+    );
+  }
+  return DioException(
+    requestOptions: request,
+    response: Response(requestOptions: request, statusCode: status),
+    type: DioExceptionType.badResponse,
+  );
 }
