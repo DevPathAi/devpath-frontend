@@ -129,6 +129,37 @@ void main() {
       contains('/mission/302/content/77'),
     );
   });
+
+  test(
+    'A consume and B consume can both schedule without stranding B',
+    () async {
+      final store = InMemoryKeyValueStore();
+      final container = _container(store);
+      addTearDown(container.dispose);
+      final controller = container.read(pendingDeepLinkProvider.notifier);
+      await controller.capture('/path/301/today');
+      final aGeneration = controller.generation;
+      scheduleMicrotask(
+        () => controller.consumeIfMatches(
+          '/path/301/today',
+          expectedGeneration: aGeneration,
+        ),
+      );
+
+      await controller.capture('/mission/302/content/77');
+      final bGeneration = controller.generation;
+      scheduleMicrotask(
+        () => controller.consumeIfMatches(
+          '/mission/302/content/77',
+          expectedGeneration: bGeneration,
+        ),
+      );
+      await pumpEventQueue();
+
+      expect(container.read(pendingDeepLinkProvider), isNull);
+      expect(await store.read(PendingDeepLinkController.storageKey), isNull);
+    },
+  );
 }
 
 class _DelayedDeleteStore implements KeyValueStore {

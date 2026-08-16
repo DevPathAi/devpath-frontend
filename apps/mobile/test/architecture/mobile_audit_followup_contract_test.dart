@@ -202,4 +202,15 @@ void main() {
       expect(guard, contains(marker), reason: marker);
     }
   });
+
+  test(
+    'router consumes each pending generation with CAS, without a global latch',
+    () {
+      final router = _read('lib/src/app/router.dart');
+
+      expect(router, contains('consumeIfMatches'));
+      expect(router, contains('expectedGeneration'));
+      expect(router, isNot(contains('pendingConsumeScheduled')));
+    },
+  );
 }
