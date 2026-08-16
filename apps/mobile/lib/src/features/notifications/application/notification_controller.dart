@@ -17,6 +17,7 @@ class NotificationController extends Notifier<NotificationState> {
   StreamSubscription<PushMessage>? _openedSub;
   String? _ownerKey;
   var _ownerEpoch = 0;
+  final _markAllReadFlights = <String, Future<void>>{};
 
   @override
   NotificationState build() {
@@ -155,19 +156,39 @@ class NotificationController extends Notifier<NotificationState> {
     );
   }
 
-  Future<void> markAllRead() async {
-    if (state.unreadCount == 0) return;
+  Future<void> markAllRead() {
+    if (state.unreadCount == 0) return Future<void>.value();
     final owner = _ownerKey;
-    if (owner == null) return;
+    if (owner == null) return Future<void>.value();
     final boundary = _NotificationOwnerBoundary(
       ownerKey: owner,
       memoryEpoch: _ownerEpoch,
     );
     final capturedUnreadCount = state.unreadCount;
+    final flightKey = '${boundary.ownerKey}\u0000${boundary.memoryEpoch}';
+    final active = _markAllReadFlights[flightKey];
+    if (active != null) return active;
+    late final Future<void> operation;
+    operation = _markAllRead(boundary, capturedUnreadCount).whenComplete(() {
+      if (identical(_markAllReadFlights[flightKey], operation)) {
+        _markAllReadFlights.remove(flightKey);
+      }
+    });
+    _markAllReadFlights[flightKey] = operation;
+    return operation;
+  }
+
+  Future<void> _markAllRead(
+    _NotificationOwnerBoundary boundary,
+    int capturedUnreadCount,
+  ) async {
     try {
       await ref
           .read(notificationStoreProvider)
-          .markAllRead(owner, isCurrent: () => _isCurrent(boundary));
+          .markAllRead(
+            boundary.ownerKey,
+            isCurrent: () => _isCurrent(boundary),
+          );
     } on Object {
       // Reading notifications must remain usable if durable marking fails.
       return;
