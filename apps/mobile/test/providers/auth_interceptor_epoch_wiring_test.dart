@@ -1,11 +1,18 @@
 import 'dart:async';
 
 import 'package:devpath_mobile/src/app/app_config.dart';
+import 'package:devpath_mobile/src/data/account_data_cleaner.dart';
 import 'package:devpath_mobile/src/data/key_value_store.dart';
+import 'package:devpath_mobile/src/data/owner_data_store.dart';
 import 'package:devpath_mobile/src/features/auth/application/account_epoch_store.dart';
 import 'package:devpath_mobile/src/features/auth/application/credential_mutation_coordinator.dart';
 import 'package:devpath_mobile/src/features/auth/application/auth_controller.dart';
+import 'package:devpath_mobile/src/features/auth/application/pending_deep_link_controller.dart';
+import 'package:devpath_mobile/src/features/auth/application/verified_session_store.dart';
+import 'package:devpath_mobile/src/features/auth/state/auth_state.dart';
+import 'package:devpath_mobile/src/features/notifications/application/device_registrar.dart';
 import 'package:devpath_mobile/src/providers/api_providers.dart';
+import 'package:devpath_mobile/src/services/push_service.dart';
 import 'package:dp_core/dp_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -82,4 +89,132 @@ void main() {
       expect(logoutCompleted, isTrue);
     },
   );
+
+  test(
+    'arbitrary resource refresh rejection terminates and purges exact session',
+    () async {
+      final tokens = InMemoryTokenStore();
+      final kv = InMemoryKeyValueStore();
+      final data = InMemoryOwnerDataStore();
+      final cleaner = _OwnerCleaner(data);
+      final registrar = _CountingRegistrar();
+      await tokens.save(access: 'access-a', refresh: 'refresh-a');
+      await VerifiedSessionStore(kv).write(_user('owner-a'));
+      final refreshClient = ApiClient.create(
+        const ApiConfig(baseUrl: 'https://api.test'),
+      );
+      refreshClient.dio.httpClientAdapter = MockHttpAdapter({
+        'POST /auth/refresh': (
+          401,
+          {
+            'error': {'code': 'UNAUTHORIZED', 'message': 'refresh rejected'},
+          },
+        ),
+      });
+      final container = ProviderContainer(
+        overrides: [
+          tokenStoreProvider.overrideWithValue(tokens),
+          keyValueStoreProvider.overrideWithValue(kv),
+          ownerDataStoreProvider.overrideWithValue(data),
+          accountDataCleanerProvider.overrideWithValue(cleaner),
+          deviceRegistrarProvider.overrideWithValue(registrar),
+          authFlowClientProvider.overrideWithValue(refreshClient),
+          appConfigProvider.overrideWithValue(
+            const AppConfig(baseUrl: 'https://api.test', useMock: false),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      addTearDown(registrar.dispose);
+      final client = container.read(apiClientProvider);
+      client.dio.httpClientAdapter = MockHttpAdapter({
+        'GET /users/me': (200, _userJson('owner-a')),
+        'GET /contents/77': (
+          401,
+          {
+            'error': {'code': 'UNAUTHORIZED', 'message': 'access expired'},
+          },
+        ),
+      });
+      final auth = container.read(authControllerProvider.notifier);
+      await auth.bootstrapSession();
+      expect(container.read(authControllerProvider), isA<AuthAuthenticated>());
+      await pumpEventQueue();
+      await container
+          .read(pendingDeepLinkProvider.notifier)
+          .capture('/path/101/today');
+      await data.write('owner-a', 'test', 'secret', 'A data');
+      final epochBefore = await container
+          .read(accountEpochStoreProvider)
+          .current();
+      final generationBefore = container
+          .read(credentialMutationCoordinatorProvider)
+          .generation;
+
+      await expectLater(
+        client.get<Map<String, dynamic>>('/contents/77'),
+        throwsA(isA<ApiException>()),
+      );
+
+      expect(
+        container.read(authControllerProvider),
+        isA<AuthUnauthenticated>(),
+      );
+      expect(await tokens.readAccess(), isNull);
+      expect(await tokens.readRefresh(), isNull);
+      expect(await VerifiedSessionStore(kv).read(), isNull);
+      expect(container.read(pendingDeepLinkProvider), isNull);
+      expect(await kv.read(PendingDeepLinkController.storageKey), isNull);
+      expect(await data.list('owner-a'), isEmpty);
+      expect(cleaner.owners, ['owner-a']);
+      expect(registrar.owners, ['owner-a']);
+      expect(
+        await container.read(accountEpochStoreProvider).current(),
+        epochBefore + 1,
+      );
+      expect(
+        container.read(credentialMutationCoordinatorProvider).generation,
+        generationBefore + 1,
+      );
+    },
+  );
 }
+
+class _OwnerCleaner implements AccountDataCleaner {
+  _OwnerCleaner(this.data);
+
+  final OwnerDataStore data;
+  final owners = <String>[];
+
+  @override
+  Future<void> clearOwner(String ownerKey) async {
+    owners.add(ownerKey);
+    await data.clearOwner(ownerKey);
+  }
+}
+
+class _CountingRegistrar extends DeviceRegistrar {
+  _CountingRegistrar()
+    : super(
+        ApiClient.create(const ApiConfig(baseUrl: 'https://api.test')),
+        StubPushService(),
+        'ANDROID',
+        InMemoryOwnerDataStore(),
+      );
+
+  final owners = <String>[];
+
+  @override
+  Future<void> unregister(String ownerKey) async => owners.add(ownerKey);
+}
+
+User _user(String id) => User.fromJson(_userJson(id));
+
+Map<String, dynamic> _userJson(String id) => {
+  'id': id,
+  'email': '$id@example.com',
+  'nickname': id,
+  'role': 'LEARNER',
+  'onboardingStatus': 'DONE',
+  'consentStatus': 'DONE',
+};

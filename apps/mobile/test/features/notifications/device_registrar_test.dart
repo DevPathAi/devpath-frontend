@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:devpath_mobile/src/data/owner_data_store.dart';
 import 'package:devpath_mobile/src/features/notifications/application/device_registrar.dart';
 import 'package:devpath_mobile/src/services/push_service.dart';
@@ -93,6 +94,41 @@ void main() {
         expect(await data.list('owner-a'), isEmpty);
       },
     );
+
+    test('unregister request suppresses recursive auth termination', () async {
+      final c = _client({
+        'POST /notifications/devices': (200, <String, dynamic>{}),
+        'DELETE /notifications/devices': (200, <String, dynamic>{}),
+      });
+      Map<String, dynamic>? deleteExtra;
+      c.dio.interceptors.insert(
+        0,
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            if (options.method == 'DELETE') {
+              deleteExtra = Map<String, dynamic>.from(options.extra);
+            }
+            handler.next(options);
+          },
+        ),
+      );
+      final data = InMemoryOwnerDataStore();
+      final registrar = DeviceRegistrar(
+        c,
+        _FakePush('fcm-tok'),
+        'ANDROID',
+        data,
+      );
+      addTearDown(registrar.dispose);
+      await registrar.activate('owner-a');
+
+      await registrar.unregister('owner-a');
+
+      expect(
+        deleteExtra?['dp_core.auth.suppress_terminal_notification'],
+        isTrue,
+      );
+    });
 
     test('revoke failure is reported only after local token cleanup', () async {
       final push = _LifecyclePush();
