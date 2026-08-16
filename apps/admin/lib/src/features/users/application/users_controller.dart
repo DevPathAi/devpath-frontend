@@ -71,11 +71,13 @@ class UsersController extends Notifier<UsersState> {
   }
 
   Future<void> loadMore() async {
-    if (!state.hasMore) return;
+    if (!state.hasMore || state.phase != UsersPhase.loaded) return;
+    final request = ++_loadRequest;
     final page = await ref.read(adminUsersFetchProvider)(
       cursor: state.nextCursor,
       status: state.statusFilter,
     );
+    if (request != _loadRequest) return;
     state = state.copyWith(
       rows: [...state.rows, ...page.data],
       nextCursor: page.nextCursor,
