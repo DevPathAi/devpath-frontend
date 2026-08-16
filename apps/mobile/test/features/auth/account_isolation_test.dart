@@ -5,16 +5,43 @@ import 'package:devpath_mobile/src/features/auth/application/auth_controller.dar
 import 'package:devpath_mobile/src/features/auth/application/account_epoch_store.dart';
 import 'package:devpath_mobile/src/features/auth/application/verified_session_store.dart';
 import 'package:devpath_mobile/src/features/auth/state/auth_state.dart';
+import 'package:devpath_mobile/src/features/notifications/application/device_registrar.dart';
 import 'package:devpath_mobile/src/providers/api_providers.dart';
+import 'package:devpath_mobile/src/services/push_service.dart';
 import 'package:dp_core/dp_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _Cleaner implements AccountDataCleaner {
+  _Cleaner([this.events]);
+
+  final List<String>? events;
   final owners = <String>[];
 
   @override
-  Future<void> clearOwner(String ownerKey) async => owners.add(ownerKey);
+  Future<void> clearOwner(String ownerKey) async {
+    owners.add(ownerKey);
+    events?.add('clear:$ownerKey');
+  }
+}
+
+class _SwitchRegistrar extends DeviceRegistrar {
+  _SwitchRegistrar(this.events, {this.fail = false})
+    : super(
+        _client(const {}),
+        StubPushService(),
+        'ANDROID',
+        InMemoryOwnerDataStore(),
+      );
+
+  final List<String> events;
+  final bool fail;
+
+  @override
+  Future<void> unregister(String ownerKey) async {
+    events.add('revoke:$ownerKey');
+    if (fail) throw StateError('local FCM invalidation failed');
+  }
 }
 
 ApiClient _client(Map<String, MockFixture> fixtures) {
@@ -178,4 +205,81 @@ void main() {
     expect(await tokens.readAccess(), isNull);
     expect(container.read(authControllerProvider), isA<AuthUnauthenticated>());
   });
+
+  test('verified A to server B revokes A before clearing and exposing B', () async {
+    final events = <String>[];
+    final tokens = InMemoryTokenStore();
+    final kv = InMemoryKeyValueStore();
+    final cleaner = _Cleaner(events);
+    await tokens.save(access: 'b-access', refresh: 'b-refresh');
+    await VerifiedSessionStore(kv).write(_user('owner-a'));
+    final container = ProviderContainer(
+      overrides: [
+        tokenStoreProvider.overrideWithValue(tokens),
+        keyValueStoreProvider.overrideWithValue(kv),
+        accountDataCleanerProvider.overrideWithValue(cleaner),
+        ownerDataStoreProvider.overrideWithValue(InMemoryOwnerDataStore()),
+        deviceRegistrarProvider.overrideWithValue(_SwitchRegistrar(events)),
+        apiClientProvider.overrideWithValue(
+          _client({'GET /users/me': (200, _userJson('owner-b'))}),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(authControllerProvider.notifier).bootstrapSession();
+
+    expect(events, ['revoke:owner-a', 'clear:owner-a']);
+    expect(container.read(authControllerProvider).ownerKey, 'owner-b');
+    expect((await VerifiedSessionStore(kv).read())?.id, 'owner-b');
+  });
+
+  test('A revoke failure still clears A and never exposes or activates B', () async {
+    final events = <String>[];
+    final tokens = InMemoryTokenStore();
+    final kv = InMemoryKeyValueStore();
+    final cleaner = _Cleaner(events);
+    await tokens.save(access: 'b-access', refresh: 'b-refresh');
+    await VerifiedSessionStore(kv).write(_user('owner-a'));
+    final container = ProviderContainer(
+      overrides: [
+        tokenStoreProvider.overrideWithValue(tokens),
+        keyValueStoreProvider.overrideWithValue(kv),
+        accountDataCleanerProvider.overrideWithValue(cleaner),
+        ownerDataStoreProvider.overrideWithValue(InMemoryOwnerDataStore()),
+        deviceRegistrarProvider.overrideWithValue(
+          _SwitchRegistrar(events, fail: true),
+        ),
+        apiClientProvider.overrideWithValue(
+          _client({'GET /users/me': (200, _userJson('owner-b'))}),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(authControllerProvider.notifier).bootstrapSession();
+
+    expect(events, ['revoke:owner-a', 'clear:owner-a']);
+    expect(container.read(authControllerProvider), isA<AuthUnauthenticated>());
+    expect(await tokens.readAccess(), isNull);
+    expect(await VerifiedSessionStore(kv).read(), isNull);
+  });
 }
+
+User _user(String id) => User(
+  id: id,
+  email: '$id@example.com',
+  nickname: id,
+  role: UserRole.learner,
+  onboardingStatus: OnboardingStatus.done,
+  consentStatus: ConsentStatus.done,
+);
+
+Map<String, dynamic> _userJson(String id) => {
+  'id': id,
+  'email': '$id@example.com',
+  'nickname': id,
+  'role': 'LEARNER',
+  'onboardingStatus': 'DONE',
+  'consentStatus': 'DONE',
+};

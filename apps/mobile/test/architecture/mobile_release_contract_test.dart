@@ -38,14 +38,18 @@ void main() {
     expect(android, contains('android:host="app.leva.ai.kr"'));
     expect(
       android,
-      contains('android:pathAdvancedPattern="/path/[1-9][0-9]*/today"'),
+      contains(
+        'android:pathAdvancedPattern="/path/[1-9][0-9]{0,14}/today"',
+      ),
     );
     expect(
       android,
       contains(
-        'android:pathAdvancedPattern="/mission/[1-9][0-9]*/content/[1-9][0-9]*"',
+        'android:pathAdvancedPattern="/mission/[1-9][0-9]{0,14}/content/[1-9][0-9]{0,14}"',
       ),
     );
+    expect(android, contains('android:queryPattern=".*"'));
+    expect(android, contains('android:fragmentPattern=".*"'));
     expect(android, isNot(contains('android:pathPrefix="/mission/"')));
     expect(iosDebug, contains('applinks:app.leva.ai.kr'));
     expect(iosDebug, contains('<string>development</string>'));

@@ -24,14 +24,19 @@ void main() {
     );
     expect(
       manifest,
-      contains('android:pathAdvancedPattern="/path/[1-9][0-9]*/today"'),
+      contains(
+        'android:pathAdvancedPattern="/path/[1-9][0-9]{0,14}/today"',
+      ),
     );
     expect(
       manifest,
       contains(
-        'android:pathAdvancedPattern="/mission/[1-9][0-9]*/content/[1-9][0-9]*"',
+        'android:pathAdvancedPattern="/mission/[1-9][0-9]{0,14}/content/[1-9][0-9]{0,14}"',
       ),
     );
+    expect(manifest, contains('<uri-relative-filter-group android:allow="false">'));
+    expect(manifest, contains('android:queryPattern=".*"'));
+    expect(manifest, contains('android:fragmentPattern=".*"'));
     expect(manifest, isNot(contains('android:pathPattern=')));
     expect(manifest, isNot(contains('android:pathPrefix="/mission/"')));
     expect(entitlements, contains('applinks:app.leva.ai.kr'));
@@ -45,18 +50,34 @@ void main() {
           .allMatches(manifest)
           .map((match) => RegExp('^${match.group(1)}\$'))
           .toList();
-      bool resolves(String path) =>
-          patterns.any((pattern) => pattern.hasMatch(path));
+      bool resolves(String rawUri) {
+        final uri = Uri.parse(rawUri);
+        if (uri.scheme != 'https' ||
+            uri.host != 'app.leva.ai.kr' ||
+            uri.hasQuery ||
+            uri.hasFragment) {
+          return false;
+        }
+        return patterns.any((pattern) => pattern.hasMatch(uri.path));
+      }
 
-      expect(resolves('/path/301/today'), isTrue);
-      expect(resolves('/mission/302/content/77'), isTrue);
+      expect(resolves('https://app.leva.ai.kr/path/301/today'), isTrue);
+      expect(
+        resolves(
+          'https://app.leva.ai.kr/mission/999999999999999/content/77',
+        ),
+        isTrue,
+      );
       for (final rejected in [
-        '/mission/302/sandbox/content/77',
-        '/mission/302/mentor/content/77',
-        '/mission/302/review',
-        '/mission/302/extra/content/77',
-        '/path/301/extra/today',
-        '/mission/0/content/77',
+        'https://app.leva.ai.kr/mission/302/sandbox/content/77',
+        'https://app.leva.ai.kr/mission/302/mentor/content/77',
+        'https://app.leva.ai.kr/mission/302/review',
+        'https://app.leva.ai.kr/mission/302/extra/content/77',
+        'https://app.leva.ai.kr/path/301/extra/today',
+        'https://app.leva.ai.kr/mission/0/content/77',
+        'https://app.leva.ai.kr/path/9007199254740992/today',
+        'https://app.leva.ai.kr/path/301/today?source=push',
+        'https://app.leva.ai.kr/path/301/today#content',
       ]) {
         expect(resolves(rejected), isFalse, reason: rejected);
       }
@@ -65,11 +86,33 @@ void main() {
         contains('<bool name="enable_exact_app_links">false</bool>'),
       );
       expect(
-        _read('android/app/src/main/res/values-v31/bools.xml'),
+        _read('android/app/src/main/res/values-v35/bools.xml'),
         contains('<bool name="enable_exact_app_links">true</bool>'),
+      );
+      expect(
+        Directory('android/app/src/main/res/values-v31').existsSync(),
+        isFalse,
       );
     },
   );
+
+  test('Android resolver probe locks canonical and rejected URI evidence', () {
+    final probe = _read('tools/mobile_android_link_contract.dart');
+
+    for (final marker in [
+      'cmd',
+      'package',
+      'resolve-activity',
+      'MissionLinkActivity',
+      'https://app.leva.ai.kr/path/301/today',
+      'https://app.leva.ai.kr/path/9007199254740992/today',
+      'https://app.leva.ai.kr/path/301/today?source=push',
+      'https://app.leva.ai.kr/path/301/today#content',
+      '--adb',
+    ]) {
+      expect(probe, contains(marker), reason: marker);
+    }
+  });
 
   test('CI compiles mock+production and asserts all exact toolchains', () {
     final workflow = _read('../../.github/workflows/mobile.yml');

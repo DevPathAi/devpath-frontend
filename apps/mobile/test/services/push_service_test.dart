@@ -16,11 +16,17 @@ void main() {
       final content = pushMessageFromRemote(
         const RemoteMessage(
           messageId: 'm2',
-          data: {'targetType': 'CONTENT', 'taskId': '302', 'contentId': '77'},
+          data: {
+            'ownerKey': 'owner-a',
+            'targetType': 'CONTENT',
+            'taskId': '302',
+            'contentId': '77',
+          },
         ),
       );
-      expect(content.target?.location, '/mission/302/content/77');
-      expect(content.intendedOwnerKey, isNull);
+      expect(content, isNotNull);
+      expect(content!.target?.location, '/mission/302/content/77');
+      expect(content.intendedOwnerKey, 'owner-a');
 
       final owned = pushMessageFromRemote(
         const RemoteMessage(
@@ -33,10 +39,31 @@ void main() {
       final rejected = pushMessageFromRemote(
         const RemoteMessage(
           messageId: 'm3',
-          data: {'targetType': 'MENTOR', 'taskId': '302'},
+          data: {
+            'ownerKey': 'owner-a',
+            'targetType': 'MENTOR',
+            'taskId': '302',
+          },
         ),
       );
-      expect(rejected.target, isNull);
+      expect(rejected?.target, isNull);
+    });
+
+    test('production remote messages without a nonempty owner are rejected', () {
+      for (final data in [
+        <String, dynamic>{'targetType': 'TODAY', 'pathId': '301'},
+        <String, dynamic>{
+          'ownerKey': '   ',
+          'targetType': 'TODAY',
+          'pathId': '301',
+        },
+      ]) {
+        expect(
+          pushMessageFromRemote(RemoteMessage(messageId: 'unscoped', data: data)),
+          isNull,
+          reason: data.toString(),
+        );
+      }
     });
 
     test('incoming은 빈 스트림이다(스텁: 포그라운드 수신 없음)', () async {
@@ -50,17 +77,22 @@ void main() {
       final pm = pushMessageFromRemote(
         const RemoteMessage(
           messageId: 'm1',
+          data: {'ownerKey': 'owner-a'},
           notification: RemoteNotification(title: '제목', body: '본문'),
         ),
       );
-      expect(pm.id, 'm1');
+      expect(pm, isNotNull);
+      expect(pm!.id, 'm1');
       expect(pm.title, '제목');
       expect(pm.body, '본문');
     });
 
     test('결측 필드는 빈 문자열로 매핑한다', () {
-      final pm = pushMessageFromRemote(const RemoteMessage());
-      expect(pm.id, '');
+      final pm = pushMessageFromRemote(
+        const RemoteMessage(data: {'ownerKey': 'owner-a'}),
+      );
+      expect(pm, isNotNull);
+      expect(pm!.id, '');
       expect(pm.title, '');
       expect(pm.body, '');
     });

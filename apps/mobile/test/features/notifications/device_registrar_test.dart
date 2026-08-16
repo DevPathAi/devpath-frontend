@@ -16,6 +16,10 @@ class _FakePush implements PushService {
 }
 
 class _LifecyclePush implements PushService, PushTokenLifecycleService {
+  _LifecyclePush({Future<bool>? permission})
+    : _permission = permission ?? Future<bool>.value(true);
+
+  final Future<bool> _permission;
   var deleteCalls = 0;
   var permissionCalls = 0;
   final refreshes = StreamController<String>.broadcast();
@@ -32,7 +36,7 @@ class _LifecyclePush implements PushService, PushTokenLifecycleService {
   @override
   Future<bool> requestPermission() async {
     permissionCalls += 1;
-    return true;
+    return _permission;
   }
 
   @override
@@ -107,6 +111,37 @@ void main() {
 
         expect((await data.list('owner-a')).single.payload, 'rotated-token');
         expect(await data.list('owner-b'), isEmpty);
+      },
+    );
+
+    test(
+      'permission pending or denied cannot subscribe or apply token refresh',
+      () async {
+        final permission = Completer<bool>();
+        final push = _LifecyclePush(permission: permission.future);
+        addTearDown(push.close);
+        final data = InMemoryOwnerDataStore();
+        final registrar = DeviceRegistrar(
+          _client({
+            'POST /notifications/devices': (200, <String, dynamic>{}),
+          }),
+          push,
+          'ANDROID',
+          data,
+        );
+        addTearDown(registrar.dispose);
+
+        final activating = registrar.activate('owner-a');
+        push.refreshes.add('premature-token');
+        await pumpEventQueue();
+        expect(await data.list('owner-a'), isEmpty);
+
+        permission.complete(false);
+        await activating;
+        push.refreshes.add('denied-token');
+        await pumpEventQueue();
+
+        expect(await data.list('owner-a'), isEmpty);
       },
     );
   });
