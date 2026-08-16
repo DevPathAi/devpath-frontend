@@ -100,6 +100,7 @@ final class _DashboardClient implements ApiClient {
     String path, {
     Object? body,
     Map<String, dynamic>? query,
+    Map<String, dynamic>? extra,
   }) => throw UnimplementedError();
 
   @override
@@ -146,6 +147,7 @@ final class _QueuedDashboardClient implements ApiClient {
     String path, {
     Object? body,
     Map<String, dynamic>? query,
+    Map<String, dynamic>? extra,
   }) => throw UnimplementedError();
 
   @override

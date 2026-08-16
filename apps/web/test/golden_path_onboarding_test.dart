@@ -102,7 +102,8 @@ class _NewUserFirstApiClient implements ApiClient {
     String path, {
     Object? body,
     Map<String, dynamic>? query,
-  }) => _inner.delete<T>(path, body: body, query: query);
+    Map<String, dynamic>? extra,
+  }) => _inner.delete<T>(path, body: body, query: query, extra: extra);
 
   @override
   Stream<SseEvent> sse(String path, {Object? body}) =>

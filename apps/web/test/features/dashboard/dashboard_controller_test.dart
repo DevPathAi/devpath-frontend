@@ -38,6 +38,7 @@ class _CapturingApiClient implements ApiClient {
     String path, {
     Object? body,
     Map<String, dynamic>? query,
+    Map<String, dynamic>? extra,
   }) => throw UnimplementedError();
 
   @override
@@ -84,6 +85,7 @@ class _QueuedApiClient implements ApiClient {
     String path, {
     Object? body,
     Map<String, dynamic>? query,
+    Map<String, dynamic>? extra,
   }) => throw UnimplementedError();
 
   @override

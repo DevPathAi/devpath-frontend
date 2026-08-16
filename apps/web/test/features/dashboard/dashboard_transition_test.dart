@@ -29,6 +29,7 @@ class _NeverApiClient implements ApiClient {
     String path, {
     Object? body,
     Map<String, dynamic>? query,
+    Map<String, dynamic>? extra,
   }) => throw UnimplementedError();
 
   @override
