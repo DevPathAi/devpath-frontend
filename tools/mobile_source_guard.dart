@@ -221,6 +221,10 @@ void main(List<String> args) {
     _fail('Gradle distribution is not pinned by SHA-256');
   }
   final xcodeSource = iosProject.readAsStringSync();
+  final deploymentTargetViolation = mobileIosDeploymentTargetViolation(
+    xcodeSource,
+  );
+  if (deploymentTargetViolation != null) _fail(deploymentTargetViolation);
   final entitlements = _runnerEntitlements(xcodeSource);
   const expectedEntitlements = {
     'Debug': 'Runner/RunnerDebug.entitlements',
@@ -278,6 +282,19 @@ String? mobileWorkflowToolchainViolation(String workflowSource) {
       return 'mobile CI must pin Xcode 26.4.1 build 17E202 and SDK 26.4: '
           'missing $marker';
     }
+  }
+  return null;
+}
+
+String? mobileIosDeploymentTargetViolation(String xcodeProjectSource) {
+  final targets = RegExp(
+    r'IPHONEOS_DEPLOYMENT_TARGET = ([^;]+);',
+  ).allMatches(xcodeProjectSource).map((match) => match.group(1)).toList();
+  if (targets.length != 3) {
+    return 'iOS project must declare exactly 3 deployment targets';
+  }
+  if (targets.any((target) => target != '15.0')) {
+    return 'every iOS deployment target must be 15.0 for Firebase SwiftPM';
   }
   return null;
 }

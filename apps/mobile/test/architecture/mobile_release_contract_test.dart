@@ -170,6 +170,36 @@ void main() {
     expect(properties, contains('kotlin.incremental=false'));
   });
 
+  test('every declared iOS deployment target satisfies Firebase SwiftPM', () {
+    final xcodeProject = _read('ios/Runner.xcodeproj/project.pbxproj');
+    final targets = RegExp(
+      r'IPHONEOS_DEPLOYMENT_TARGET = ([^;]+);',
+    ).allMatches(xcodeProject).map((match) => match.group(1)).toList();
+
+    expect(
+      source_guard.mobileIosDeploymentTargetViolation(xcodeProject),
+      isNull,
+    );
+    expect(targets, hasLength(3));
+    expect(
+      targets,
+      everyElement('15.0'),
+      reason:
+          'firebase-core and firebase-messaging Swift packages require the '
+          'app target to support iOS 15.0 or newer',
+    );
+
+    expect(
+      source_guard.mobileIosDeploymentTargetViolation(
+        xcodeProject.replaceFirst(
+          'IPHONEOS_DEPLOYMENT_TARGET = 15.0;',
+          'IPHONEOS_DEPLOYMENT_TARGET = 14.0;',
+        ),
+      ),
+      contains('every iOS deployment target must be 15.0'),
+    );
+  });
+
   test('App/Universal Link declarations cover canonical Today and Content', () {
     final android = _read('android/app/src/main/AndroidManifest.xml');
     final iosDebug = _read('ios/Runner/RunnerDebug.entitlements');
