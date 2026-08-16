@@ -185,6 +185,69 @@ void main() {
     },
   );
 
+  test('malformed 200 retains the durable queue and cached progress', () async {
+    final client = ApiClient.create(
+      const ApiConfig(baseUrl: 'https://api.example.test'),
+    );
+    client.dio.httpClientAdapter = MockHttpAdapter({
+      'POST /contents/77/progress': (
+        200,
+        {
+          'scrollPct': 2.0,
+          'dwellSec': -1,
+          'completed': true,
+          'completedAt': null,
+        },
+      ),
+    });
+    final data = InMemoryOwnerDataStore();
+    final queue = ContentProgressQueue(data);
+    final cache = ContentOfflineStore(data);
+    final cachedAt = DateTime.utc(2026, 8, 16, 1);
+    await cache.write(
+      'owner-a',
+      '77',
+      const LearningContent(
+        id: 77,
+        slug: 'async-await',
+        title: 'Safe cached content',
+        track: 'BACKEND',
+        markdown: '# Safe',
+        progress: ContentProgress(scrollPct: 0.4, dwellSec: 40),
+      ),
+      cachedAt: cachedAt,
+    );
+    final container = ProviderContainer(
+      overrides: [
+        apiClientProvider.overrideWithValue(client),
+        currentOwnerKeyProvider.overrideWithValue('owner-a'),
+        contentProgressQueueProvider.overrideWithValue(queue),
+        contentOfflineStoreProvider.overrideWithValue(cache),
+        connectivityProvider.overrideWith((_) => const Stream.empty()),
+      ],
+    );
+    addTearDown(container.dispose);
+    final subscription = container.listen(
+      contentProgressSyncControllerProvider,
+      (_, _) {},
+    );
+    addTearDown(subscription.close);
+
+    final response = await container
+        .read(contentProgressSyncControllerProvider.notifier)
+        .enqueueAndSync(_progress);
+
+    expect(response, isNull);
+    expect(await queue.read('owner-a', '77'), isNotNull);
+    final retained = await cache.read(
+      'owner-a',
+      '77',
+      now: cachedAt.add(const Duration(minutes: 1)),
+    );
+    expect(retained?.content.progress.scrollPct, 0.4);
+    expect(retained?.content.progress.dwellSec, 40);
+  });
+
   test(
     'progress 401 invalidates auth and clears the exact owner outbox',
     () async {
