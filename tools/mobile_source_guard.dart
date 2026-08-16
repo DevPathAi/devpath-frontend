@@ -23,6 +23,9 @@ void main(List<String> args) {
   final lock = File('${root.path}/pubspec.lock');
   final workflow = File('${root.path}/.github/workflows/mobile.yml');
   final gradle = File('${root.path}/apps/mobile/android/app/build.gradle.kts');
+  final gradleWrapper = File(
+    '${root.path}/apps/mobile/android/gradle/wrapper/gradle-wrapper.properties',
+  );
   final manifest = File(
     '${root.path}/apps/mobile/android/app/src/main/AndroidManifest.xml',
   );
@@ -51,6 +54,7 @@ void main(List<String> args) {
     lock,
     workflow,
     gradle,
+    gradleWrapper,
     manifest,
     iosProject,
     iosFirebaseExample,
@@ -149,10 +153,13 @@ void main(List<String> args) {
   }
 
   final workflowSource = workflow.readAsStringSync();
+  _guardWorkflowActions(workflowSource);
   if (!workflowSource.contains("flutter-version: '3.44.1'")) {
     _fail('Flutter toolchain is not pinned to 3.44.1');
   }
   for (final requiredMarker in [
+    'runs-on: ubuntu-24.04',
+    'runs-on: macos-26',
     '"dartSdkVersion": "3.12.1"',
     "java-version: '17'",
     'platforms/android-36/android.jar',
@@ -175,6 +182,12 @@ void main(List<String> args) {
   }
   if (gradle.readAsStringSync().contains('signingConfigs.getByName("debug")')) {
     _fail('release Android build is wired to a debug signing key');
+  }
+  if (!gradleWrapper.readAsStringSync().contains(
+    'distributionSha256Sum='
+    'b84e04fa845fecba48551f425957641074fcc00a88a84d2aae5808743b35fc85',
+  )) {
+    _fail('Gradle distribution is not pinned by SHA-256');
   }
   final xcodeSource = iosProject.readAsStringSync();
   final entitlements = _runnerEntitlements(xcodeSource);
@@ -208,6 +221,42 @@ void main(List<String> args) {
   }
 
   stdout.writeln('mobile source guard: OK');
+}
+
+void _guardWorkflowActions(String workflowSource) {
+  final uses = RegExp(
+    r'^\s*(?:-\s+)?uses: ([^@\s]+)@([^\s#]+)(?:\s+#\s*(\S+))?\s*$',
+    multiLine: true,
+  ).allMatches(workflowSource).toList();
+  const expectedActions = {
+    'actions/checkout',
+    'subosito/flutter-action',
+    'actions/setup-java',
+    'actions/upload-artifact',
+    'maxim-lobanov/setup-xcode',
+  };
+  if (uses.isEmpty ||
+      uses
+          .map((match) => match.group(1))
+          .toSet()
+          .difference(expectedActions)
+          .isNotEmpty ||
+      expectedActions
+          .difference(uses.map((match) => match.group(1)!).toSet())
+          .isNotEmpty) {
+    _fail('mobile CI action set differs from the reviewed allowlist');
+  }
+  final shaPattern = RegExp(r'^[0-9a-f]{40}$');
+  final versionPattern = RegExp(r'^v\d+(?:\.\d+){0,2}$');
+  for (final use in uses) {
+    if (!shaPattern.hasMatch(use.group(2)!)) {
+      _fail('${use.group(1)} is not pinned to an immutable commit SHA');
+    }
+    final version = use.group(3);
+    if (version == null || !versionPattern.hasMatch(version)) {
+      _fail('${use.group(1)} lacks a reviewed version comment');
+    }
+  }
 }
 
 String _guardDartSource(Directory directory) {
