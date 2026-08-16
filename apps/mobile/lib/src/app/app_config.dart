@@ -4,6 +4,7 @@ class AppConfig {
   const AppConfig({
     required this.baseUrl,
     required this.useMock,
+    this.webAppUrl = 'https://app.devpath.ai',
     this.sseTimeout = const Duration(seconds: 60),
   });
 
@@ -13,9 +14,14 @@ class AppConfig {
       defaultValue: 'https://mock.devpath.ai',
     ),
     useMock: bool.fromEnvironment('USE_MOCK', defaultValue: true),
+    webAppUrl: String.fromEnvironment(
+      'WEB_APP_URL',
+      defaultValue: 'https://app.devpath.ai',
+    ),
   );
 
   final String baseUrl;
   final bool useMock;
+  final String webAppUrl;
   final Duration sseTimeout;
 }

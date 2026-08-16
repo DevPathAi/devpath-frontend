@@ -3,14 +3,16 @@ import 'dart:async';
 import 'package:app_links/app_links.dart';
 
 import 'auth_callback.dart';
+import '../../mission/state/mobile_mission_route.dart';
 
 /// 앱 콜드/웜 스타트 양쪽에서 `devpath://` 딥링크를 받아 OAuth 콜백 code를 추출한다.
 /// code가 파싱되면 [onCode]를 호출한다(AuthController.completeFromCode 연결).
 class DeepLinkService {
-  DeepLinkService(this._appLinks, {required this.onCode});
+  DeepLinkService(this._appLinks, {required this.onCode, this.onRoute});
 
   final AppLinks _appLinks;
   final void Function(String code) onCode;
+  final void Function(String location)? onRoute;
   StreamSubscription<Uri>? _sub;
 
   /// 콜드 스타트 초기 링크 처리 + 웜 스타트 스트림 구독.
@@ -22,7 +24,12 @@ class DeepLinkService {
 
   void _handle(Uri uri) {
     final code = parseAuthCallbackCode(uri);
-    if (code != null) onCode(code);
+    if (code != null) {
+      onCode(code);
+      return;
+    }
+    final route = MobileMissionRoute.tryParseUri(uri);
+    if (route != null) onRoute?.call(route.location);
   }
 
   Future<void> dispose() async {

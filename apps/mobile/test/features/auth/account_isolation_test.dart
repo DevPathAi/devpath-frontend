@@ -46,7 +46,10 @@ void main() {
 
     await container.read(authControllerProvider.notifier).bootstrapSession();
 
-    expect(container.read(authControllerProvider), isA<AuthSessionUnavailable>());
+    expect(
+      container.read(authControllerProvider),
+      isA<AuthSessionUnavailable>(),
+    );
     expect(await tokens.readAccess(), 'access');
     expect(await tokens.readRefresh(), 'refresh');
   });

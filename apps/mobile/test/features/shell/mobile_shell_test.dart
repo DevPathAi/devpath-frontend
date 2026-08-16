@@ -54,7 +54,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(NavigationBar), findsOneWidget);
-    expect(find.text('홈'), findsOneWidget);
+    expect(find.text('오늘'), findsOneWidget);
     expect(find.text('학습'), findsOneWidget);
     expect(find.text('커뮤니티'), findsOneWidget);
     expect(find.text('알림'), findsOneWidget);

@@ -9,8 +9,9 @@ class ContentLoading extends ContentState {
 }
 
 class ContentLoaded extends ContentState {
-  const ContentLoaded(this.content);
+  const ContentLoaded(this.content, {this.progressFailureMessage});
   final LearningContent content;
+  final String? progressFailureMessage;
 }
 
 class ContentFailed extends ContentState {

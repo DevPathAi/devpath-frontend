@@ -97,7 +97,10 @@ void main() {
     expect(api.missionCalls, 2);
     api.missionRequests[1].complete(_mission(taskId: 2));
     await boundary;
-    expect(container.read(todayControllerProvider).mission?.nextTask?.taskId, 2);
+    expect(
+      container.read(todayControllerProvider).mission?.nextTask?.taskId,
+      2,
+    );
   });
 
   test('refresh 실패는 읽을 수 있는 데이터와 오류를 함께 보존한다', () async {
@@ -139,22 +142,28 @@ void main() {
     expect(state.isStale, isTrue);
   });
 
-  test('contentless 완료는 coalesce하고 성공 뒤 authoritative Today를 refetch한다', () async {
-    final api = _QueuedApi();
-    final container = _container(api, clock: DateTime.now);
-    final controller = container.read(todayControllerProvider.notifier);
-    final initial = controller.load();
-    api.missionRequests[0].complete(_mission(taskId: 10, contentId: null));
-    await initial;
+  test(
+    'contentless 완료는 coalesce하고 성공 뒤 authoritative Today를 refetch한다',
+    () async {
+      final api = _QueuedApi();
+      final container = _container(api, clock: DateTime.now);
+      final controller = container.read(todayControllerProvider.notifier);
+      final initial = controller.load();
+      api.missionRequests[0].complete(_mission(taskId: 10, contentId: null));
+      await initial;
 
-    final first = controller.completeContentlessTask(10);
-    final replay = controller.completeContentlessTask(10);
-    expect(api.completionCalls, 1);
-    api.completionRequests[10]!.complete();
-    await Future<void>.delayed(Duration.zero);
-    api.missionRequests[1].complete(_mission(taskId: 11));
-    await Future.wait([first, replay]);
+      final first = controller.completeContentlessTask(10);
+      final replay = controller.completeContentlessTask(10);
+      expect(api.completionCalls, 1);
+      api.completionRequests[10]!.complete();
+      await Future<void>.delayed(Duration.zero);
+      api.missionRequests[1].complete(_mission(taskId: 11));
+      await Future.wait([first, replay]);
 
-    expect(container.read(todayControllerProvider).mission?.nextTask?.taskId, 11);
-  });
+      expect(
+        container.read(todayControllerProvider).mission?.nextTask?.taskId,
+        11,
+      );
+    },
+  );
 }

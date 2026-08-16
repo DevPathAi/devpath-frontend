@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:devpath_mobile/src/data/key_value_store.dart';
+import 'package:devpath_mobile/src/data/account_data_cleaner.dart';
 import 'package:devpath_mobile/src/features/auth/application/auth_controller.dart';
 import 'package:devpath_mobile/src/features/auth/application/oauth_launcher.dart';
 import 'package:devpath_mobile/src/features/auth/application/pkce.dart';
 import 'package:devpath_mobile/src/features/auth/state/auth_state.dart';
 import 'package:devpath_mobile/src/providers/api_providers.dart';
 import 'package:dp_core/dp_core.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -12,6 +16,11 @@ class _FakeLauncher implements OAuthLauncher {
   String? launched;
   @override
   Future<void> launch(String url) async => launched = url;
+}
+
+class _NoopCleaner implements AccountDataCleaner {
+  @override
+  Future<void> clearOwner(String ownerKey) async {}
 }
 
 ApiClient _client(Map<String, MockFixture> fx) {
@@ -48,6 +57,7 @@ ProviderContainer _container({
       apiClientProvider.overrideWithValue(_client(fixtures ?? _userOk)),
       oauthLauncherProvider.overrideWithValue(launcher ?? _FakeLauncher()),
       keyValueStoreProvider.overrideWithValue(kv ?? InMemoryKeyValueStore()),
+      accountDataCleanerProvider.overrideWithValue(_NoopCleaner()),
     ],
   );
   addTearDown(c.dispose);
@@ -180,35 +190,67 @@ void main() {
       );
     });
 
-    test('/users/me 실패 → 미인증', () async {
+    test('/users/me transport 실패 → 재시도 가능한 세션 장애', () async {
       final store = InMemoryTokenStore();
       await store.save(access: 'x', refresh: 'y');
       final c = _container(store: store, fixtures: const {});
       final n = c.read(authControllerProvider.notifier);
       await n.bootstrapSession();
-      expect(c.read(authControllerProvider), isA<AuthUnauthenticated>());
+      expect(c.read(authControllerProvider), isA<AuthSessionUnavailable>());
+      expect(await store.readAccess(), 'x');
     });
 
-    test('onboardingCompleted → 인증 사용자 교체(갱신 반영)', () async {
-      final c = _container();
-      final n = c.read(authControllerProvider.notifier);
-      await pumpEventQueue();
-      await n.mockLogin();
-
-      n.onboardingCompleted(
-        const User(
-          id: 'u-mock',
-          email: 'learner@devpath.ai',
-          nickname: '완료된지수',
-          role: UserRole.learner,
-          onboardingStatus: OnboardingStatus.done,
-          consentStatus: ConsentStatus.done,
+    test('logout 뒤 늦은 OAuth 교환 응답은 토큰을 되살리지 않는다', () async {
+      final store = InMemoryTokenStore();
+      final kv = InMemoryKeyValueStore();
+      await kv.write(_kVerifier, 'the-verifier');
+      final exchangeStarted = Completer<void>();
+      final releaseExchange = Completer<void>();
+      final client = _client(_userOk);
+      client.dio.interceptors.insert(
+        0,
+        InterceptorsWrapper(
+          onRequest: (options, handler) async {
+            if (options.path != '/auth/oauth/token') {
+              handler.next(options);
+              return;
+            }
+            exchangeStarted.complete();
+            await releaseExchange.future;
+            handler.resolve(
+              Response<Map<String, dynamic>>(
+                requestOptions: options,
+                statusCode: 200,
+                data: const {
+                  'access_token': 'late-access',
+                  'refresh_token': 'late-refresh',
+                },
+              ),
+            );
+          },
         ),
       );
+      final c = ProviderContainer(
+        overrides: [
+          tokenStoreProvider.overrideWithValue(store),
+          apiClientProvider.overrideWithValue(client),
+          keyValueStoreProvider.overrideWithValue(kv),
+          accountDataCleanerProvider.overrideWithValue(_NoopCleaner()),
+        ],
+      );
+      addTearDown(c.dispose);
+      final controller = c.read(authControllerProvider.notifier);
+      await pumpEventQueue();
 
-      final s = c.read(authControllerProvider);
-      expect(s, isA<AuthAuthenticated>());
-      expect((s as AuthAuthenticated).user.nickname, '완료된지수');
+      final completing = controller.completeFromCode('late-code');
+      await exchangeStarted.future;
+      await controller.logout();
+      releaseExchange.complete();
+      await completing;
+
+      expect(c.read(authControllerProvider), isA<AuthUnauthenticated>());
+      expect(await store.readAccess(), isNull);
+      expect(await store.readRefresh(), isNull);
     });
   });
 }

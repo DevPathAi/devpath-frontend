@@ -109,5 +109,28 @@ void main() {
         expect(c.read(contentControllerProvider), isA<ContentLoaded>());
       },
     );
+
+    test('malformed progress 응답도 읽던 콘텐츠를 보존한다', () async {
+      final c = _container({
+        'GET /contents/future-async-await': (200, _content(completed: false)),
+        'POST /contents/future-async-await/progress': (
+          200,
+          <String, dynamic>{'unexpected': true},
+        ),
+      });
+      final n = c.read(contentControllerProvider.notifier);
+      await n.load('future-async-await');
+
+      final response = await n.reportProgress(
+        'future-async-await',
+        scrollPct: 0.5,
+        dwellSec: 30,
+      );
+
+      expect(response, isNull);
+      final state = c.read(contentControllerProvider);
+      expect(state, isA<ContentLoaded>());
+      expect((state as ContentLoaded).progressFailureMessage, isNotEmpty);
+    });
   });
 }

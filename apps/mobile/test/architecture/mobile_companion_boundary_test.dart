@@ -18,4 +18,14 @@ void main() {
     expect(source, isNot(contains("'/onboarding'")));
     expect(source, isNot(contains('"/onboarding"')));
   });
+
+  test('학습 경로 소비자는 shared typed API boundary만 사용한다', () {
+    final source = File(
+      'lib/src/features/learning/application/learn_controller.dart',
+    ).readAsStringSync();
+
+    expect(source, contains('learningPathApiProvider'));
+    expect(source, isNot(contains("'/learning-paths/me'")));
+    expect(source, isNot(contains('apiClientProvider')));
+  });
 }

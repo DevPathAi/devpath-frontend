@@ -44,12 +44,6 @@ class DriftDashboardCache implements DashboardCache {
   }
 }
 
-final appDatabaseProvider = Provider<AppDatabase>((ref) {
-  final db = AppDatabase(openAppDatabase());
-  ref.onDispose(db.close);
-  return db;
-});
-
 /// 프로덕션 대시보드 캐시. 테스트는 이 provider를 [InMemoryDashboardCache]로 오버라이드.
 final dashboardCacheProvider = Provider<DashboardCache>(
   (ref) => DriftDashboardCache(ref.watch(appDatabaseProvider)),

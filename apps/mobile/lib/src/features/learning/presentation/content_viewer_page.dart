@@ -5,7 +5,6 @@ import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../providers/api_providers.dart';
 import '../application/content_controller.dart';
 import '../application/content_progress_tracker.dart';
 import '../state/content_state.dart';
@@ -27,7 +26,6 @@ class _ContentViewerPageState extends ConsumerState<ContentViewerPage>
     with WidgetsBindingObserver {
   final _scrollController = ScrollController();
   late final ContentController _contentController;
-  late final ApiClient _apiClient;
   Timer? _dwellTimer;
   ContentProgressTracker? _tracker;
   String? _trackedSlug;
@@ -40,7 +38,6 @@ class _ContentViewerPageState extends ConsumerState<ContentViewerPage>
     super.initState();
     // dispose 시 ref 사용이 불가하므로 의존성을 미리 캐싱(web content_page와 동일 패턴).
     _contentController = ref.read(contentControllerProvider.notifier);
-    _apiClient = ref.read(apiClientProvider);
     WidgetsBinding.instance.addObserver(this);
     _scrollController.addListener(_maybeFlushProgress);
     _dwellTimer = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -94,11 +91,16 @@ class _ContentViewerPageState extends ConsumerState<ContentViewerPage>
           message: message,
           onRetry: () => _contentController.load(widget.slug),
         ),
-        ContentLoaded(:final content) => _ContentBody(
-          slug: widget.slug,
-          content: content,
-          controller: _scrollController,
-        ),
+        ContentLoaded(:final content)
+            when content.slug == widget.slug ||
+                content.id.toString() == widget.slug =>
+          _ContentBody(
+            slug: widget.slug,
+            content: content,
+            controller: _scrollController,
+            progressFailureMessage: s.progressFailureMessage,
+          ),
+        ContentLoaded() => const DpLoading(),
       },
     );
   }
@@ -155,7 +157,7 @@ class _ContentViewerPageState extends ConsumerState<ContentViewerPage>
     }
   }
 
-  /// 페이지 이탈 시 잔여 진척을 캐싱된 [_apiClient]로 직접 보고한다(ref 미사용 — dispose 안전).
+  /// 페이지 이탈 시에도 같은 controller 경계로 보내 완료 무효화와 단조 병합을 유지한다.
   void _flushOnDispose() {
     if (_posting) return;
     final state = _latestState;
@@ -169,12 +171,11 @@ class _ContentViewerPageState extends ConsumerState<ContentViewerPage>
     final flush = recorded ?? tracker.disposeFlush();
     if (flush == null) return;
     unawaited(
-      _apiClient
-          .post<Map<String, dynamic>>(
-            '/contents/${widget.slug}/progress',
-            body: {'scrollPct': flush.scrollPct, 'dwellSec': flush.dwellSec},
-          )
-          .catchError((_) => <String, dynamic>{}),
+      _contentController.reportProgress(
+        widget.slug,
+        scrollPct: flush.scrollPct,
+        dwellSec: flush.dwellSec,
+      ),
     );
   }
 }
@@ -184,11 +185,13 @@ class _ContentBody extends ConsumerWidget {
     required this.slug,
     required this.content,
     required this.controller,
+    this.progressFailureMessage,
   });
 
   final String slug;
   final LearningContent content;
   final ScrollController controller;
+  final String? progressFailureMessage;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -202,6 +205,10 @@ class _ContentBody extends ConsumerWidget {
     ];
     return Column(
       children: [
+        if (progressFailureMessage != null)
+          DpOfflineBanner(
+            message: '$progressFailureMessage 읽던 콘텐츠와 로컬 진행률은 유지했어요.',
+          ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
           child: Row(

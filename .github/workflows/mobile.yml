@@ -1,0 +1,127 @@
+name: Mobile CI
+
+on:
+  pull_request:
+    paths:
+      - 'apps/mobile/**'
+      - 'packages/dp_core/**'
+      - 'packages/dp_design/**'
+      - 'tools/mobile_source_guard.dart'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - '.github/workflows/mobile.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/mobile/**'
+      - 'packages/dp_core/**'
+      - 'packages/dp_design/**'
+      - 'tools/mobile_source_guard.dart'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - '.github/workflows/mobile.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract-test-android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.1'
+          cache: true
+      - name: Verify exact checkout and toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          flutter --version --machine | grep -q '"frameworkVersion": "3.44.1"'
+      - name: Resolve locked workspace
+        run: flutter pub get --enforce-lockfile
+      - name: Enforce native companion source boundary
+        run: dart run tools/mobile_source_guard.dart
+      - name: Format check
+        run: dart format --set-exit-if-changed apps/mobile packages/dp_core packages/dp_design tools/mobile_source_guard.dart
+      - name: Analyze mobile
+        working-directory: apps/mobile
+        run: flutter analyze
+      - name: Test mobile
+        working-directory: apps/mobile
+        run: flutter test --exclude-tags golden
+      - name: Test shared learning labels
+        working-directory: packages/dp_design
+        run: flutter test test/data/dp_learning_labels_test.dart
+      - name: Assemble unsigned Android release
+        working-directory: apps/mobile
+        run: flutter build apk --release --no-pub
+      - name: Record unsigned Android evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="apps/mobile/build/app/outputs/flutter-apk/app-release.apk"
+          test -f "${apk}"
+          apksigner="$(find "${ANDROID_HOME}/build-tools" -type f -name apksigner -print | sort -V | tail -1)"
+          test -x "${apksigner}"
+          if "${apksigner}" verify "${apk}"; then
+            echo "Expected an unsigned Android evidence artifact" >&2
+            exit 1
+          fi
+          artifact_sha256="$(sha256sum "${apk}" | awk '{print $1}')"
+          lock_sha256="$(sha256sum pubspec.lock | awk '{print $1}')"
+          mkdir -p "${RUNNER_TEMP}/mobile-android"
+          cp "${apk}" "${RUNNER_TEMP}/mobile-android/leva-${GITHUB_SHA}-unsigned.apk"
+          printf '{"source_sha":"%s","flutter_version":"3.44.1","lock_sha256":"%s","artifact_sha256":"%s","signed":false}\n' \
+            "${GITHUB_SHA}" "${lock_sha256}" "${artifact_sha256}" \
+            > "${RUNNER_TEMP}/mobile-android/manifest.json"
+      - name: Preserve Android build evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: leva-android-${{ github.sha }}-unsigned
+          path: ${{ runner.temp }}/mobile-android
+          if-no-files-found: error
+          retention-days: 14
+
+  ios-no-codesign:
+    needs: contract-test-android
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.1'
+          cache: true
+      - name: Resolve locked workspace
+        run: flutter pub get --enforce-lockfile
+      - name: Enforce native companion source boundary
+        run: dart run tools/mobile_source_guard.dart
+      - name: Build iOS without signing
+        working-directory: apps/mobile
+        run: flutter build ios --release --no-codesign --no-pub
+      - name: Record iOS no-codesign evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          ditto -c -k --sequesterRsrc --keepParent apps/mobile/build/ios/iphoneos/Runner.app "${RUNNER_TEMP}/leva-ios-${GITHUB_SHA}-no-codesign.zip"
+          artifact_sha256="$(shasum -a 256 "${RUNNER_TEMP}/leva-ios-${GITHUB_SHA}-no-codesign.zip" | awk '{print $1}')"
+          lock_sha256="$(shasum -a 256 pubspec.lock | awk '{print $1}')"
+          printf '{"source_sha":"%s","flutter_version":"3.44.1","lock_sha256":"%s","artifact_sha256":"%s","signed":false}\n' \
+            "${GITHUB_SHA}" "${lock_sha256}" "${artifact_sha256}" \
+            > "${RUNNER_TEMP}/leva-ios-${GITHUB_SHA}-manifest.json"
+      - name: Preserve iOS build evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: leva-ios-${{ github.sha }}-no-codesign
+          path: |
+            ${{ runner.temp }}/leva-ios-${{ github.sha }}-no-codesign.zip
+            ${{ runner.temp }}/leva-ios-${{ github.sha }}-manifest.json
+          if-no-files-found: error
+          retention-days: 14

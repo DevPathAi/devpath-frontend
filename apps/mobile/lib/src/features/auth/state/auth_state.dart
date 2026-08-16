@@ -15,6 +15,15 @@ class AuthUnauthenticated extends AuthState {
   final String? error;
 }
 
+/// A stored session exists, but its owner could not be verified because the
+/// transport/service is unavailable. This is retryable and must not be treated
+/// as an explicit logout.
+class AuthSessionUnavailable extends AuthState {
+  const AuthSessionUnavailable(this.message);
+
+  final String message;
+}
+
 class AuthAuthenticated extends AuthState {
   const AuthAuthenticated(this.user);
   final User user;

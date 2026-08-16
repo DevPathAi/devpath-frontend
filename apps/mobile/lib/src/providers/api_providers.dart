@@ -77,3 +77,8 @@ final apiClientProvider = Provider<ApiClient>((ref) {
   }
   return client;
 });
+
+/// Web and mobile share this exact authenticated Mission Spine API boundary.
+final learningPathApiProvider = Provider<LearningPathApi>(
+  (ref) => LearningPathApi(ref.watch(apiClientProvider)),
+);

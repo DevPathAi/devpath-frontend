@@ -33,6 +33,21 @@
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="devpath" android:host="callback"/>
             </intent-filter>
+            <!-- Canonical companion links. The Dart parser accepts only exact
+                 Today/Content shapes and rejects Sandbox/Review/Mentor. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="devpath" android:host="open"/>
+            </intent-filter>
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https" android:host="app.devpath.ai" android:pathPrefix="/path/"/>
+                <data android:scheme="https" android:host="app.devpath.ai" android:pathPrefix="/mission/"/>
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

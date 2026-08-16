@@ -2,8 +2,10 @@ import 'package:dp_core/dp_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../providers/api_providers.dart';
+import '../../../data/account_data_cleaner.dart';
 import '../state/auth_state.dart';
 import 'oauth_launcher.dart';
+import 'pending_deep_link_controller.dart';
 import 'pkce.dart';
 
 /// 모바일 인증 컨트롤러.
@@ -22,13 +24,18 @@ class AuthController extends Notifier<AuthState> {
 
   /// PKCE verifier 임시 보관 키(콜백이 새 프로세스로 와도 복원되도록 영속 저장).
   static const _kPkceVerifier = 'dp.auth.pkce_verifier';
+  Future<void>? _bootstrapInFlight;
+  Future<void> _credentialMutationTail = Future<void>.value();
+  var _epoch = 0;
 
   @override
   AuthState build() {
-    var disposed = false;
-    ref.onDispose(() => disposed = true);
+    ref.onDispose(() {
+      _epoch += 1;
+      _bootstrapInFlight = null;
+    });
     Future.microtask(() {
-      if (!disposed) bootstrapSession();
+      if (ref.mounted) bootstrapSession();
     });
     return const AuthLoading();
   }
@@ -39,7 +46,10 @@ class AuthController extends Notifier<AuthState> {
   /// 백엔드가 성공 후 `devpath://callback?code=`(일회용 code) 딥링크로 회신한다(웹은 쿠키).
   Future<void> login() async {
     final pkce = PkcePair.generate();
-    await ref.read(keyValueStoreProvider).write(_kPkceVerifier, pkce.verifier);
+    await _mutateCredentials(
+      () =>
+          ref.read(keyValueStoreProvider).write(_kPkceVerifier, pkce.verifier),
+    );
     final base = ref.read(appConfigProvider).baseUrl;
     await ref
         .read(oauthLauncherProvider)
@@ -53,36 +63,73 @@ class AuthController extends Notifier<AuthState> {
 
   /// 목 모드 로그인 — 코드 교환을 생략하고 가짜 토큰을 저장해 동일 경로로 세션 구성.
   Future<void> mockLogin() async {
-    await _store.save(access: 'mock-access', refresh: 'mock-refresh');
-    if (!ref.mounted) return;
+    final epoch = ++_epoch;
+    _bootstrapInFlight = null;
+    final saved = await _mutateCredentials(() async {
+      if (!_isCurrent(epoch)) return false;
+      await _store.save(access: 'mock-access', refresh: 'mock-refresh');
+      return _isCurrent(epoch);
+    });
+    if (!saved) return;
     await bootstrapSession();
   }
 
   /// 부팅 세션 복원 — 저장된 access 토큰이 있으면 /users/me 로 사용자 조회.
-  Future<void> bootstrapSession() async {
+  Future<void> bootstrapSession() {
+    final active = _bootstrapInFlight;
+    if (active != null) return active;
+    final epoch = _epoch;
+    late final Future<void> tracked;
+    tracked = _bootstrap(epoch).whenComplete(() {
+      if (identical(_bootstrapInFlight, tracked)) _bootstrapInFlight = null;
+    });
+    _bootstrapInFlight = tracked;
+    return tracked;
+  }
+
+  Future<void> _bootstrap(int epoch) async {
     final access = await _store.readAccess();
+    if (!_isCurrent(epoch)) return;
     if (access == null || access.isEmpty) {
-      if (!ref.mounted) return;
       state = const AuthUnauthenticated();
       return;
     }
     try {
       final json = await _client.get<Map<String, dynamic>>('/users/me');
-      if (!ref.mounted) return;
+      if (!_isCurrent(epoch)) return;
       state = AuthAuthenticated(User.fromJson(json));
     } on ApiException catch (e) {
-      if (!ref.mounted) return;
-      state = AuthUnauthenticated(error: e.message);
+      if (!_isCurrent(epoch)) return;
+      if (e.status == 401 || e.code == ApiErrorCode.unauthorized) {
+        final cleared = await _mutateCredentials(() async {
+          if (!_isCurrent(epoch)) return false;
+          await _store.clear();
+          return _isCurrent(epoch);
+        });
+        if (!cleared) return;
+        state = AuthUnauthenticated(error: e.message);
+      } else {
+        state = AuthSessionUnavailable(e.message);
+      }
     }
+  }
+
+  Future<void> retrySession() async {
+    _epoch += 1;
+    _bootstrapInFlight = null;
+    state = const AuthLoading();
+    await bootstrapSession();
   }
 
   /// 딥링크 콜백 code 수신 — 보관한 PKCE verifier와 함께 `/auth/oauth/token`으로 교환,
   /// 토큰 저장 후 세션 복원. verifier가 없거나(만료/유실) 교환 실패 시 미인증으로 둔다.
   Future<void> completeFromCode(String code) async {
+    final epoch = ++_epoch;
+    _bootstrapInFlight = null;
     final kv = ref.read(keyValueStoreProvider);
     final verifier = await kv.read(_kPkceVerifier);
     if (verifier == null || verifier.isEmpty) {
-      if (!ref.mounted) return;
+      if (!_isCurrent(epoch)) return;
       state = const AuthUnauthenticated(error: 'PKCE verifier 없음(로그인 재시도 필요)');
       return;
     }
@@ -91,31 +138,68 @@ class AuthController extends Notifier<AuthState> {
         '/auth/oauth/token',
         body: {'code': code, 'code_verifier': verifier},
       );
-      await _store.save(
-        access: data['access_token'] as String,
-        refresh: data['refresh_token'] as String,
-      );
-      if (!ref.mounted) return;
+      if (!_isCurrent(epoch)) return;
+      final access = data['access_token'] as String;
+      final refresh = data['refresh_token'] as String;
+      final saved = await _mutateCredentials(() async {
+        if (!_isCurrent(epoch)) return false;
+        await _store.save(access: access, refresh: refresh);
+        return _isCurrent(epoch);
+      });
+      if (!saved) return;
       await bootstrapSession();
     } on ApiException catch (e) {
-      if (!ref.mounted) return;
+      if (!_isCurrent(epoch)) return;
       state = AuthUnauthenticated(error: e.message);
     } finally {
       // 1회용 PKCE verifier: code는 교환을 시도한 순간 서버에서 소비되므로
       // 성공/실패와 무관하게 폐기한다(secure_storage에 만료된 비밀 잔존 방지).
-      await kv.delete(_kPkceVerifier);
+      await _mutateCredentials(() async {
+        if (await kv.read(_kPkceVerifier) == verifier) {
+          await kv.delete(_kPkceVerifier);
+        }
+      });
     }
   }
 
   Future<void> logout() async {
-    await _store.clear();
-    if (!ref.mounted) return;
-    state = const AuthUnauthenticated();
+    final ownerKey = switch (state) {
+      AuthAuthenticated(:final user) => user.id,
+      _ => null,
+    };
+    final epoch = ++_epoch;
+    _bootstrapInFlight = null;
+    try {
+      await _mutateCredentials(() async {
+        try {
+          if (ownerKey != null) {
+            await ref.read(accountDataCleanerProvider).clearOwner(ownerKey);
+          }
+        } finally {
+          await _store.clear();
+          await ref.read(keyValueStoreProvider).delete(_kPkceVerifier);
+          await ref
+              .read(keyValueStoreProvider)
+              .delete(PendingDeepLinkController.storageKey);
+        }
+      });
+    } finally {
+      if (_isCurrent(epoch)) {
+        ref.read(pendingDeepLinkProvider.notifier).consume();
+        state = const AuthUnauthenticated();
+      }
+    }
   }
 
-  /// 온보딩 완료 — 갱신된 사용자로 세션 상태를 교체한다(게이트가 진입점으로 통과).
-  void onboardingCompleted(User user) {
-    if (state is AuthAuthenticated) state = AuthAuthenticated(user);
+  bool _isCurrent(int epoch) => ref.mounted && epoch == _epoch;
+
+  Future<T> _mutateCredentials<T>(Future<T> Function() mutation) {
+    final operation = _credentialMutationTail.then((_) => mutation());
+    _credentialMutationTail = operation.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
+    return operation;
   }
 }
 

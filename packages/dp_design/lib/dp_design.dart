@@ -40,6 +40,7 @@ export 'src/data/dp_list_row.dart';
 export 'src/data/dp_data_table.dart';
 export 'src/data/dp_tag.dart';
 export 'src/data/dp_chart_legend.dart';
+export 'src/data/dp_learning_labels.dart';
 export 'src/mission/dp_mission_header.dart';
 export 'src/mission/dp_progress_spine.dart';
 export 'src/mission/dp_context_capsule.dart';

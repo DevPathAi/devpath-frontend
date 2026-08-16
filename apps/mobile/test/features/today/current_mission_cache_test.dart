@@ -1,5 +1,7 @@
 import 'package:devpath_mobile/src/features/today/data/current_mission_cache.dart';
+import 'package:devpath_mobile/src/data/local/app_database.dart';
 import 'package:dp_core/dp_core.dart';
+import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 CurrentMission _mission(int taskId) {
@@ -31,8 +33,14 @@ void main() {
     await cache.write('owner-a', _mission(1), cachedAt: now);
     await cache.write('owner-b', _mission(2), cachedAt: now);
 
-    expect((await cache.read('owner-a', now: now))?.mission.nextTask?.taskId, 1);
-    expect((await cache.read('owner-b', now: now))?.mission.nextTask?.taskId, 2);
+    expect(
+      (await cache.read('owner-a', now: now))?.mission.nextTask?.taskId,
+      1,
+    );
+    expect(
+      (await cache.read('owner-b', now: now))?.mission.nextTask?.taskId,
+      2,
+    );
   });
 
   test('24시간 미만만 표시하고 정확히 24시간은 만료다', () async {
@@ -50,10 +58,7 @@ void main() {
       isNotNull,
     );
     expect(
-      await cache.read(
-        'owner-a',
-        now: cachedAt.add(const Duration(hours: 24)),
-      ),
+      await cache.read('owner-a', now: cachedAt.add(const Duration(hours: 24))),
       isNull,
     );
   });
@@ -80,5 +85,54 @@ void main() {
     expect(decoded.pathId, 301);
     expect(decoded.nextTask?.taskId, 302);
     expect(decoded.nextTask?.contentId, 77);
+  });
+
+  group('DriftCurrentMissionCache', () {
+    late AppDatabase db;
+    late DriftCurrentMissionCache cache;
+
+    setUp(() {
+      db = AppDatabase(NativeDatabase.memory());
+      cache = DriftCurrentMissionCache(db);
+    });
+
+    tearDown(() => db.close());
+
+    test('실제 DB에서도 owner 경계와 해당 owner cleanup을 보존한다', () async {
+      final now = DateTime.utc(2026, 8, 16);
+      await cache.write('owner-a', _mission(1), cachedAt: now);
+      await cache.write('owner-b', _mission(2), cachedAt: now);
+
+      await cache.clearOwner('owner-a');
+
+      expect(await cache.read('owner-a', now: now), isNull);
+      expect(
+        (await cache.read('owner-b', now: now))?.mission.nextTask?.taskId,
+        2,
+      );
+    });
+
+    test('실제 DB에서도 정확히 24시간이면 행을 만료·삭제한다', () async {
+      final cachedAt = DateTime.utc(2026, 8, 15);
+      await cache.write('owner-a', _mission(1), cachedAt: cachedAt);
+
+      expect(
+        await cache.read(
+          'owner-a',
+          now: cachedAt.add(
+            const Duration(hours: 24) - const Duration(microseconds: 1),
+          ),
+        ),
+        isNotNull,
+      );
+      expect(
+        await cache.read(
+          'owner-a',
+          now: cachedAt.add(const Duration(hours: 24)),
+        ),
+        isNull,
+      );
+      expect(await db.select(db.currentMissionCacheRows).get(), isEmpty);
+    });
   });
 }

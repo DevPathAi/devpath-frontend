@@ -32,13 +32,8 @@ android {
         versionName = flutter.versionName
     }
 
-    buildTypes {
-        release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
-        }
-    }
+    // Release signing is intentionally absent from source. CI assembles an
+    // unsigned artifact; distribution signing remains an external release gate.
 }
 
 kotlin {

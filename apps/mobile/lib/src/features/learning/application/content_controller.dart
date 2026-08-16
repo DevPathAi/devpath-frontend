@@ -1,30 +1,43 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:dp_core/dp_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../providers/api_providers.dart';
+import '../../today/application/today_controller.dart';
 import '../state/content_state.dart';
 
 /// 모바일 학습 뷰어 — 콘텐츠 조회 + 완료 표시(진척 보고).
 class ContentController extends Notifier<ContentState> {
+  var _loadGeneration = 0;
+
   @override
   ContentState build() => const ContentLoading();
 
   Future<void> load(String slug) async {
+    final generation = ++_loadGeneration;
     state = const ContentLoading();
     try {
       final json = await ref
           .read(apiClientProvider)
           .get<Map<String, dynamic>>('/contents/$slug');
-      state = ContentLoaded(LearningContent.fromJson(json));
-    } on ApiException catch (e) {
-      state = ContentFailed(e.message);
+      final content = LearningContent.fromJson(json);
+      if (!_matches(content, slug)) {
+        throw const FormatException('content identity mismatch');
+      }
+      if (!ref.mounted || generation != _loadGeneration) return;
+      state = ContentLoaded(content);
+    } on Object catch (error) {
+      if (!ref.mounted || generation != _loadGeneration) return;
+      state = ContentFailed(_loadFailure(error));
     }
   }
 
   /// 완료로 표시 — 진척 보고(scrollPct=1.0) 후 로컬 상태 갱신.
   Future<void> markComplete(String slug) async {
     final current = state;
-    if (current is! ContentLoaded) return;
+    if (current is! ContentLoaded || !_matches(current.content, slug)) return;
     try {
       final json = await ref
           .read(apiClientProvider)
@@ -33,18 +46,17 @@ class ContentController extends Notifier<ContentState> {
             body: {'scrollPct': 1.0, 'dwellSec': 60},
           );
       final resp = ContentProgressUpdateResponse.fromJson(json);
-      state = ContentLoaded(
-        current.content.copyWith(
-          progress: ContentProgress(
-            scrollPct: resp.scrollPct,
-            dwellSec: resp.dwellSec,
-            completed: resp.completed,
-            completedAt: resp.completedAt,
-          ),
-        ),
-      );
-    } on ApiException catch (e) {
-      state = ContentFailed(e.message);
+      if (!ref.mounted || state is! ContentLoaded) return;
+      _applyProgress(slug, resp);
+    } on Object catch (error) {
+      if (!ref.mounted) return;
+      final latest = state;
+      if (latest is ContentLoaded && _matches(latest.content, slug)) {
+        state = ContentLoaded(
+          latest.content,
+          progressFailureMessage: _progressFailure(error),
+        );
+      }
     }
   }
 
@@ -55,6 +67,10 @@ class ContentController extends Notifier<ContentState> {
     required double scrollPct,
     required int dwellSec,
   }) async {
+    final before = state;
+    if (before is! ContentLoaded || !_matches(before.content, slug)) {
+      return null;
+    }
     try {
       final json = await ref
           .read(apiClientProvider)
@@ -64,24 +80,57 @@ class ContentController extends Notifier<ContentState> {
           );
       final resp = ContentProgressUpdateResponse.fromJson(json);
       if (!ref.mounted) return resp;
-      final latest = state;
-      if (latest is ContentLoaded) {
-        state = ContentLoaded(
-          latest.content.copyWith(
-            progress: ContentProgress(
-              scrollPct: resp.scrollPct,
-              dwellSec: resp.dwellSec,
-              completed: resp.completed,
-              completedAt: resp.completedAt,
-            ),
-          ),
-        );
-      }
+      _applyProgress(slug, resp);
       return resp;
-    } on ApiException {
+    } on Object catch (error) {
+      if (ref.mounted) {
+        final latest = state;
+        if (latest is ContentLoaded && _matches(latest.content, slug)) {
+          state = ContentLoaded(
+            latest.content,
+            progressFailureMessage: _progressFailure(error),
+          );
+        }
+      }
       return null;
     }
   }
+
+  void _applyProgress(String slug, ContentProgressUpdateResponse response) {
+    final latest = state;
+    if (latest is! ContentLoaded || !_matches(latest.content, slug)) return;
+    final previous = latest.content.progress;
+    final completedNow = !previous.completed && response.completed;
+    state = ContentLoaded(
+      latest.content.copyWith(
+        progress: ContentProgress(
+          scrollPct: math.max(previous.scrollPct, response.scrollPct),
+          dwellSec: math.max(previous.dwellSec, response.dwellSec),
+          completed: previous.completed || response.completed,
+          completedAt: response.completedAt ?? previous.completedAt,
+        ),
+      ),
+    );
+    if (completedNow && ref.exists(todayControllerProvider)) {
+      unawaited(
+        ref.read(todayControllerProvider.notifier).invalidateAndRefetch(),
+      );
+    }
+  }
+
+  bool _matches(LearningContent content, String routeKey) =>
+      content.slug == routeKey || content.id.toString() == routeKey;
+
+  String _loadFailure(Object error) => switch (error) {
+    ApiException(:final message) => message,
+    FormatException() => '미션과 콘텐츠 연결을 확인하지 못했어요.',
+    _ => '콘텐츠 형식을 확인하지 못했어요.',
+  };
+
+  String _progressFailure(Object error) => switch (error) {
+    ApiException(:final message) => message,
+    _ => '진행률을 저장하지 못했어요.',
+  };
 }
 
 final contentControllerProvider =
