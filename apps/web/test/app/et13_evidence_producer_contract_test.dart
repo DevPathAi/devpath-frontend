@@ -45,7 +45,22 @@ void main() {
           'nodes rather than aria-label attributes',
     );
     expect(capture, isNot(contains('`[aria-label="\${label}"]`')));
-    expect(capture, contains("route.abort('blockedbyclient')"));
+    expect(
+      capture,
+      contains('if (!isAllowedLoopbackRequest(request)) {'),
+      reason:
+          'unexpected origins must remain fatal while loopback release assets '
+          'stay on Chromium\'s native network path',
+    );
+    expect(capture, contains('unexpected.push(request.url());'));
+    expect(
+      capture,
+      isNot(contains('page.route(')),
+      reason:
+          'Playwright routing enables Fetch interception for every page '
+          'request, including unmatched loopback assets',
+    );
+    expect(capture, isNot(contains('route.continue(')));
     expect(capture, contains("'wcag22aa'"));
     expect(capture, contains('page.screenshot'));
     expect(capture, contains('browser-smoke'));

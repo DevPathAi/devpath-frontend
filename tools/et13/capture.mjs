@@ -220,6 +220,19 @@ async function main() {
       const fontManifestCdpRequestIds = new Set();
       const fontManifestRequestIds = new Map();
       let nextFontManifestRequestId = 0;
+      // Playwright routing enables Chromium Fetch interception for the whole
+      // page, even when a matcher later continues an allowed request. Keep
+      // release assets on the native loopback path; the workflow's network
+      // namespace blocks egress, while this listener makes every other origin
+      // a fatal capture error.
+      const isAllowedLoopbackRequest = (request) => {
+        const url = new URL(request.url());
+        return (
+          url.protocol === 'http:' &&
+          url.hostname === '127.0.0.1' &&
+          url.port === String(ports[entry.distribution])
+        );
+      };
       const isFontManifestRequest = (request) =>
         new URL(request.url()).pathname === '/assets/FontManifest.json';
       cdp.on('Network.requestWillBeSent', (event) => {
@@ -260,6 +273,9 @@ async function main() {
         });
       });
       page.on('request', (request) => {
+        if (!isAllowedLoopbackRequest(request)) {
+          unexpected.push(request.url());
+        }
         if (!isFontManifestRequest(request)) return;
         const requestId = ++nextFontManifestRequestId;
         fontManifestRequestIds.set(request, requestId);
@@ -308,15 +324,6 @@ async function main() {
         if (response.status() >= 400) {
           pageErrors.push(`HTTP ${response.status()}: ${response.url()}`);
         }
-      });
-      await page.route('**/*', async (route) => {
-        const url = new URL(route.request().url());
-        if (url.protocol === 'http:' && url.hostname === '127.0.0.1') {
-          await route.continue();
-          return;
-        }
-        unexpected.push(route.request().url());
-        await route.abort('blockedbyclient');
       });
       const query = new URLSearchParams({
         fixture: entry.fixture_id,
