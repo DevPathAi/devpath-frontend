@@ -167,6 +167,27 @@ List<String> _workspaceLockErrors(String source) {
   return errors;
 }
 
+List<String> _workspaceMelosScriptErrors(String source) {
+  const analyze =
+      'run: dart run melos exec --flutter -- flutter analyze && '
+      'dart run melos exec --no-flutter -- dart analyze';
+  const test =
+      'run: dart run melos exec --flutter --dir-exists="test" -- '
+      'flutter test --exclude-tags golden && dart run melos exec '
+      '--no-flutter --dir-exists="test" -- dart test';
+  final errors = <String>[];
+  if (!source.contains(analyze)) {
+    errors.add('analyze must invoke the locked workspace Melos executable');
+  }
+  if (!source.contains(test)) {
+    errors.add('test must invoke the locked workspace Melos executable');
+  }
+  if (RegExp(r'^\s+run: melos exec ', multiLine: true).hasMatch(source)) {
+    errors.add('workspace scripts must not require a globally installed Melos');
+  }
+  return errors;
+}
+
 List<String> _workflowPinErrors(String source) {
   final errors = <String>[];
   final uses =
@@ -291,6 +312,7 @@ void main() {
   late String adminDockerfile;
   late String gradleWrapper;
   late String workspaceLock;
+  late String workspacePubspec;
 
   setUpAll(() {
     workflow = File(
@@ -303,6 +325,9 @@ void main() {
     ).readAsStringSync();
     workspaceLock = File(
       '../../pubspec.lock',
+    ).readAsStringSync().replaceAll('\r\n', '\n');
+    workspacePubspec = File(
+      '../../pubspec.yaml',
     ).readAsStringSync().replaceAll('\r\n', '\n');
   });
 
@@ -396,6 +421,22 @@ void main() {
     expect(hashDrift, isNot(workspaceLock));
     expect(_workspaceLockErrors(versionDrift), isNotEmpty);
     expect(_workspaceLockErrors(hashDrift), isNotEmpty);
+  });
+
+  test('workspace scripts invoke Melos from the locked local package', () {
+    expect(_workspaceMelosScriptErrors(workspacePubspec), isEmpty);
+
+    final globalAnalyze = workspacePubspec.replaceFirst(
+      'run: dart run melos exec --flutter -- flutter analyze',
+      'run: melos exec --flutter -- flutter analyze',
+    );
+    final globalTest = workspacePubspec.replaceFirst(
+      'run: dart run melos exec --flutter --dir-exists="test"',
+      'run: melos exec --flutter --dir-exists="test"',
+    );
+
+    expect(_workspaceMelosScriptErrors(globalAnalyze), isNotEmpty);
+    expect(_workspaceMelosScriptErrors(globalTest), isNotEmpty);
   });
 
   test('web and admin Dockerfiles lock production build inputs', () {
