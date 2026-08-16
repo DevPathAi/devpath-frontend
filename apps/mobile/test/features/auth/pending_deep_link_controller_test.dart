@@ -107,6 +107,28 @@ void main() {
       contains('/mission/302/content/77'),
     );
   });
+
+  test('scheduled consume CAS preserves a newer captured route', () async {
+    final store = InMemoryKeyValueStore();
+    final container = _container(store);
+    addTearDown(container.dispose);
+    final controller = container.read(pendingDeepLinkProvider.notifier);
+    await controller.capture('/path/301/today');
+    final scheduledGeneration = controller.generation;
+
+    await controller.capture('/mission/302/content/77');
+    controller.consumeIfMatches(
+      '/path/301/today',
+      expectedGeneration: scheduledGeneration,
+    );
+    await pumpEventQueue();
+
+    expect(container.read(pendingDeepLinkProvider), '/mission/302/content/77');
+    expect(
+      await store.read(PendingDeepLinkController.storageKey),
+      contains('/mission/302/content/77'),
+    );
+  });
 }
 
 class _DelayedDeleteStore implements KeyValueStore {
