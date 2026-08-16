@@ -1,6 +1,7 @@
 import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../shell/presentation/admin_shell.dart';
@@ -145,13 +146,13 @@ class _SupportDetailDialogState extends ConsumerState<_SupportDetailDialog> {
       title: Text(d == null ? '제보 #${widget.id} 상세' : '#${d.id} ${d.title}'),
       content: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 640),
-        child: SingleChildScrollView(
-          child: _loading
-              ? const DpLoading(label: '제보 상세를 불러오는 중입니다')
-              : _loadError != null
-              ? _detailError(context)
-              : _detailContent(context, d!),
-        ),
+        child: _loading
+            ? const SingleChildScrollView(
+                child: DpLoading(label: '제보 상세를 불러오는 중입니다'),
+              )
+            : _loadError != null
+            ? SingleChildScrollView(child: _detailError(context))
+            : _detailContent(context, d!),
       ),
       actions: [
         TextButton(
@@ -250,7 +251,7 @@ class _SupportDetailDialogState extends ConsumerState<_SupportDetailDialog> {
 
 /// Loaded support-detail production projection shared by the live dialog and
 /// the ET13 browser-distribution fixture.
-class AdminSupportDetailProjection extends StatelessWidget {
+class AdminSupportDetailProjection extends StatefulWidget {
   const AdminSupportDetailProjection({
     super.key,
     required this.detail,
@@ -265,39 +266,138 @@ class AdminSupportDetailProjection extends StatelessWidget {
   final String? error;
 
   @override
+  State<AdminSupportDetailProjection> createState() =>
+      _AdminSupportDetailProjectionState();
+}
+
+class _AdminSupportDetailProjectionState
+    extends State<AdminSupportDetailProjection> {
+  static const double _keyboardScrollStep = 50;
+
+  ScrollableState? _scrollableState;
+  late final FocusNode _scrollFocusNode = FocusNode(
+    debugLabel: 'Admin support detail scroll',
+  );
+  bool _hasVerticalOverflow = false;
+  bool _focused = false;
+  bool _metricsUpdateScheduled = false;
+
+  @override
+  void dispose() {
+    _scrollFocusNode.dispose();
+    _scrollableState = null;
+    super.dispose();
+  }
+
+  KeyEventResult _handleScrollKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    final direction = switch (event.logicalKey) {
+      LogicalKeyboardKey.arrowUp => -1,
+      LogicalKeyboardKey.arrowDown => 1,
+      _ => 0,
+    };
+    final scrollable = _scrollableState;
+    if (direction == 0 || scrollable == null || !scrollable.mounted) {
+      return KeyEventResult.ignored;
+    }
+    final position = scrollable.position;
+    if (!position.hasContentDimensions) return KeyEventResult.ignored;
+    final next = (position.pixels + direction * _keyboardScrollStep)
+        .clamp(position.minScrollExtent, position.maxScrollExtent)
+        .toDouble();
+    position.jumpTo(next);
+    return KeyEventResult.handled;
+  }
+
+  bool _handleScrollMetrics(ScrollMetricsNotification notification) {
+    if (notification.depth != 0) return false;
+    final scrollable = Scrollable.maybeOf(
+      notification.context,
+      axis: Axis.vertical,
+    );
+    if (scrollable == null) return false;
+    _scrollableState = scrollable;
+    if (_metricsUpdateScheduled) return false;
+    _metricsUpdateScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _metricsUpdateScheduled = false;
+      final latestScrollable = _scrollableState;
+      if (!mounted || latestScrollable == null || !latestScrollable.mounted) {
+        return;
+      }
+      final position = latestScrollable.position;
+      if (!position.hasContentDimensions) return;
+      final hasOverflow = position.maxScrollExtent > position.minScrollExtent;
+      if (hasOverflow == _hasVerticalOverflow) return;
+      if (!hasOverflow) _scrollFocusNode.unfocus();
+      setState(() {
+        _hasVerticalOverflow = hasOverflow;
+        if (!hasOverflow) _focused = false;
+      });
+    });
+    return false;
+  }
+
+  Widget _buildFocusTarget(Widget child) {
+    if (!_hasVerticalOverflow) return child;
+    return Focus(
+      key: const ValueKey('admin-support-detail-scroll-focus'),
+      focusNode: _scrollFocusNode,
+      onFocusChange: (focused) {
+        if (mounted && focused != _focused) {
+          setState(() => _focused = focused);
+        }
+      },
+      onKeyEvent: _handleScrollKey,
+      child: Semantics(
+        key: const ValueKey('admin-support-detail-scroll-focus-target'),
+        label: '제보 상세. 위아래 화살표로 스크롤',
+        child: child,
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final c = context.dpColors;
     final known = AdminStatusCatalog.isKnown(
       AdminStatusDomain.support,
-      detail.status,
+      widget.detail.status,
     );
-    return Column(
+    final content = Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        AdminStatusText(domain: AdminStatusDomain.support, wire: detail.status),
+        _buildFocusTarget(
+          AdminStatusText(
+            domain: AdminStatusDomain.support,
+            wire: widget.detail.status,
+          ),
+        ),
         const SizedBox(height: DpSpacing.md),
-        Text(detail.body),
+        Text(widget.detail.body),
         const SizedBox(height: DpSpacing.md),
-        _kv(context, '경로', detail.pagePath),
-        _kv(context, '빌드', detail.appVersion),
-        _kv(context, '화면', detail.viewport),
-        _kv(context, '브라우저', detail.userAgent),
-        _kv(context, '오류 코드', detail.errorCode),
-        _kv(context, 'trace', detail.traceId),
-        _kv(context, '발생 시각', detail.occurredAt),
-        _kv(context, '접수자', detail.reporterId?.toString()),
+        _kv(context, '경로', widget.detail.pagePath),
+        _kv(context, '빌드', widget.detail.appVersion),
+        _kv(context, '화면', widget.detail.viewport),
+        _kv(context, '브라우저', widget.detail.userAgent),
+        _kv(context, '오류 코드', widget.detail.errorCode),
+        _kv(context, 'trace', widget.detail.traceId),
+        _kv(context, '발생 시각', widget.detail.occurredAt),
+        _kv(context, '접수자', widget.detail.reporterId?.toString()),
         const SizedBox(height: DpSpacing.md),
         Text('최근 API 실패', style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: DpSpacing.xs),
-        if (detail.failures.isEmpty)
+        if (widget.detail.failures.isEmpty)
           Text(
             '기록 없음',
             style: Theme.of(
               context,
             ).textTheme.bodySmall?.copyWith(color: c.textSecondary),
           ),
-        for (final failure in detail.failures)
+        for (final failure in widget.detail.failures)
           Padding(
             padding: const EdgeInsets.only(bottom: DpSpacing.sm),
             child: DecoratedBox(
@@ -347,22 +447,22 @@ class AdminSupportDetailProjection extends StatelessWidget {
         const SizedBox(height: DpSpacing.md),
         TextField(
           key: const ValueKey('support-admin-note'),
-          controller: noteController,
-          enabled: known && !pending,
+          controller: widget.noteController,
+          enabled: known && !widget.pending,
           maxLines: 3,
           decoration: InputDecoration(
             labelText: known ? '내부 메모 (덮어쓰기)' : '알 수 없는 상태 · 읽기 전용',
             border: const OutlineInputBorder(),
           ),
         ),
-        if (error != null) ...[
+        if (widget.error != null) ...[
           const SizedBox(height: DpSpacing.sm),
           Semantics(
             liveRegion: true,
-            label: '상태 저장 실패: $error',
+            label: '상태 저장 실패: ${widget.error}',
             child: ExcludeSemantics(
               child: Text(
-                error!,
+                widget.error!,
                 style: Theme.of(
                   context,
                 ).textTheme.bodyMedium?.copyWith(color: c.danger),
@@ -371,6 +471,20 @@ class AdminSupportDetailProjection extends StatelessWidget {
           ),
         ],
       ],
+    );
+    return DecoratedBox(
+      key: const ValueKey('admin-support-detail-focus-ring'),
+      position: DecorationPosition.foreground,
+      decoration: _focused
+          ? BoxDecoration(border: Border.all(color: c.primaryText, width: 2))
+          : const BoxDecoration(),
+      child: NotificationListener<ScrollMetricsNotification>(
+        onNotification: _handleScrollMetrics,
+        child: SingleChildScrollView(
+          key: const ValueKey('admin-support-detail-scroll-view'),
+          child: content,
+        ),
+      ),
     );
   }
 

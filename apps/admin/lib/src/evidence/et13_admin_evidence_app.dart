@@ -111,11 +111,9 @@ class _Et13AdminSupportFixtureState extends State<_Et13AdminSupportFixture> {
       title: const Text('#77 $_longKorean'),
       content: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 640),
-        child: SingleChildScrollView(
-          child: AdminSupportDetailProjection(
-            detail: _detail,
-            noteController: _note,
-          ),
+        child: AdminSupportDetailProjection(
+          detail: _detail,
+          noteController: _note,
         ),
       ),
       actions: const [TextButton(onPressed: null, child: Text('닫기'))],
