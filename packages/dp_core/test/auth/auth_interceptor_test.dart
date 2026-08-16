@@ -402,6 +402,7 @@ void main() {
     final interceptor = AuthInterceptor(
       store: store,
       sessionEpoch: () async => epoch,
+      credentialMutation: coordinator.run,
       refresh: (_) async =>
           const TokenPair(access: 'A-refreshed', refresh: 'A-refresh-rotated'),
       retry: (request) async {

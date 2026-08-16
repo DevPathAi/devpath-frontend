@@ -2,6 +2,9 @@ import 'package:dio/dio.dart';
 
 import 'token_store.dart';
 
+typedef AuthCredentialMutationRunner =
+    Future<T> Function<T>(Future<T> Function() mutation);
+
 /// 401 시 큐잉 갱신(다중 동시요청을 한 번의 refresh로 직렬화). 참조 샘플 §7.
 ///
 /// QueuedInterceptor가 onError를 직렬화하므로, 첫 요청이 refresh하는 동안
@@ -13,6 +16,7 @@ class AuthInterceptor extends QueuedInterceptor {
     required this.refresh,
     required this.retry,
     this.sessionEpoch,
+    this.credentialMutation,
   });
 
   static const _sessionEpochExtra = 'dp_core.auth.session_epoch';
@@ -28,6 +32,11 @@ class AuthInterceptor extends QueuedInterceptor {
   /// old request from being replayed with a replacement account's token.
   /// Web clients may omit it and retain the token-only rotation guard.
   final Future<Object?> Function()? sessionEpoch;
+
+  /// Optional native credential boundary. When supplied, refresh saves,
+  /// retries, and failure clears share one serialized mutation tail with
+  /// account replacement/logout. Web clients may omit it.
+  final AuthCredentialMutationRunner? credentialMutation;
 
   @override
   Future<void> onRequest(
@@ -86,10 +95,19 @@ class AuthInterceptor extends QueuedInterceptor {
         return;
       }
       try {
-        final req = err.requestOptions
-          ..headers['Authorization'] = 'Bearer $currentAccess';
-        final res = await retry(req);
-        handler.resolve(res);
+        final res = await _mutateCredential<Response<dynamic>?>(() async {
+          if (!await _isSameSession(err.requestOptions)) return null;
+          final req = err.requestOptions
+            ..headers['Authorization'] = 'Bearer $currentAccess';
+          final response = await retry(req);
+          if (!await _isSameSession(err.requestOptions)) return null;
+          return response;
+        });
+        if (res == null) {
+          handler.next(err);
+        } else {
+          handler.resolve(res);
+        }
       } catch (_) {
         handler.next(err);
       }
@@ -111,30 +129,42 @@ class AuthInterceptor extends QueuedInterceptor {
       }
       if (pair == null) {
         // refresh 콜백이 null 반환 → 갱신 불가(쿠키 만료 등)
-        if (await _isSameSession(err.requestOptions)) {
-          await store.clear();
-        }
+        await _clearIfSameSession(err.requestOptions);
         handler.next(err);
         return;
       }
       // 쿠키 기반 시 pair.refresh==''(실 refresh 토큰은 HttpOnly 쿠키가 보유).
       // TokenStore.save는 refresh=''를 저장하지만 웹 구현체는 이를 무시한다
       // (readRefresh()는 항상 null을 반환해 쿠키 경로를 유지한다).
-      await store.save(access: pair.access, refresh: pair.refresh);
-      if (!await _isSameSession(err.requestOptions)) {
+      final res = await _mutateCredential<Response<dynamic>?>(() async {
+        if (!await _isSameSession(err.requestOptions)) return null;
+        await store.save(access: pair.access, refresh: pair.refresh);
+        if (!await _isSameSession(err.requestOptions)) return null;
+        final req = err.requestOptions
+          ..headers['Authorization'] = 'Bearer ${pair.access}';
+        final response = await retry(req);
+        if (!await _isSameSession(err.requestOptions)) return null;
+        return response;
+      });
+      if (res == null) {
         handler.next(err);
         return;
       }
-      final req = err.requestOptions
-        ..headers['Authorization'] = 'Bearer ${pair.access}';
-      final res = await retry(req);
       handler.resolve(res); // 재시도 성공 → 원 요청을 해당 응답으로 해결
     } catch (_) {
-      if (await _isSameSession(err.requestOptions)) {
-        await store.clear();
-      }
+      await _clearIfSameSession(err.requestOptions);
       handler.next(err); // 갱신 실패 → 원 에러 전파(상위에서 로그인 유도)
     }
+  }
+
+  Future<void> _clearIfSameSession(RequestOptions options) =>
+      _mutateCredential(() async {
+        if (await _isSameSession(options)) await store.clear();
+      });
+
+  Future<T> _mutateCredential<T>(Future<T> Function() mutation) {
+    final runner = credentialMutation;
+    return runner == null ? mutation() : runner(mutation);
   }
 
   Future<bool> _isSameSession(RequestOptions options) async {
