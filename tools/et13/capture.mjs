@@ -61,8 +61,35 @@ function mime(path) {
 async function serve(root, port) {
   const absoluteRoot = resolve(root);
   const rootPrefix = `${absoluteRoot}${sep}`;
+  const fontManifestRequests = [];
+  let nextFontManifestRequestId = 0;
   const server = createServer((request, response) => {
     const url = new URL(request.url, `http://127.0.0.1:${port}`);
+    const isFontManifest = url.pathname === '/assets/FontManifest.json';
+    const transport = isFontManifest
+      ? {
+          request_id: ++nextFontManifestRequestId,
+          started_at_ms: Date.now(),
+          request_connection: request.headers.connection ?? null,
+        }
+      : null;
+    if (transport !== null) {
+      fontManifestRequests.push(transport);
+      response.setHeader('X-ET13-Manifest-Request-Id', String(transport.request_id));
+      request.once('aborted', () => {
+        transport.request_aborted_at_ms = Date.now();
+      });
+      response.once('error', (error) => {
+        transport.response_error = String(error);
+      });
+      response.once('finish', () => {
+        transport.response_finished_at_ms = Date.now();
+      });
+      response.once('close', () => {
+        transport.response_closed_at_ms = Date.now();
+        transport.response_writable_finished = response.writableFinished;
+      });
+    }
     const relative = decodeURIComponent(url.pathname).replace(/^\/+/, '') || 'index.html';
     let target = resolve(absoluteRoot, relative);
     if (target !== absoluteRoot && !target.startsWith(rootPrefix)) {
@@ -83,6 +110,7 @@ async function serve(root, port) {
       return;
     }
     const bytes = readFileSync(target);
+    if (transport !== null) transport.response_bytes = bytes.length;
     response.setHeader('Cache-Control', 'no-store');
     response.setHeader('Content-Length', String(bytes.length));
     response.setHeader('Content-Type', mime(target));
@@ -92,7 +120,12 @@ async function serve(root, port) {
     server.once('error', reject);
     server.listen(port, '127.0.0.1', resolveListen);
   });
-  return server;
+  return {
+    server,
+    fontManifestRequestsSince(startedAt) {
+      return fontManifestRequests.filter((request) => request.started_at_ms >= startedAt);
+    },
+  };
 }
 
 function pngDiffPercent(candidatePath, baselinePath, diffPath) {
@@ -145,11 +178,11 @@ async function main() {
     }
   }
   const ports = { web: 4173, admin: 4174, mobile: 4175 };
-  const servers = [];
+  const servers = new Map();
   let browser;
   try {
     for (const distribution of Object.keys(roots)) {
-      servers.push(await serve(roots[distribution], ports[distribution]));
+      servers.set(distribution, await serve(roots[distribution], ports[distribution]));
     }
     browser = await chromium.launch({
       headless: true,
@@ -167,6 +200,7 @@ async function main() {
     const catalog = JSON.parse(await readFile(catalogPath, 'utf8'));
     const summaries = [];
     async function openValidatedPage(entry) {
+      const pageStartedAt = Date.now();
       const context = await browser.newContext({
         viewport: { width: entry.width, height: entry.height },
         deviceScaleFactor: entry.device_pixel_ratio,
@@ -177,18 +211,100 @@ async function main() {
         serviceWorkers: 'block',
       });
       const page = await context.newPage();
+      const cdp = await context.newCDPSession(page);
+      await cdp.send('Network.enable');
       const unexpected = [];
       const pageErrors = [];
+      const fontManifestBrowserTrace = [];
+      const fontManifestCdpTrace = [];
+      const fontManifestCdpRequestIds = new Set();
+      const fontManifestRequestIds = new Map();
+      let nextFontManifestRequestId = 0;
+      const isFontManifestRequest = (request) =>
+        new URL(request.url()).pathname === '/assets/FontManifest.json';
+      cdp.on('Network.requestWillBeSent', (event) => {
+        if (new URL(event.request.url).pathname !== '/assets/FontManifest.json') return;
+        fontManifestCdpRequestIds.add(event.requestId);
+        fontManifestCdpTrace.push({
+          event: 'requestWillBeSent',
+          request_id: event.requestId,
+          at_ms: Date.now(),
+        });
+      });
+      cdp.on('Network.responseReceived', (event) => {
+        if (!fontManifestCdpRequestIds.has(event.requestId)) return;
+        fontManifestCdpTrace.push({
+          event: 'responseReceived',
+          request_id: event.requestId,
+          at_ms: Date.now(),
+          status: event.response.status,
+        });
+      });
+      cdp.on('Network.loadingFinished', (event) => {
+        if (!fontManifestCdpRequestIds.has(event.requestId)) return;
+        fontManifestCdpTrace.push({
+          event: 'loadingFinished',
+          request_id: event.requestId,
+          at_ms: Date.now(),
+          encoded_data_length: event.encodedDataLength,
+        });
+      });
+      cdp.on('Network.loadingFailed', (event) => {
+        if (!fontManifestCdpRequestIds.has(event.requestId)) return;
+        fontManifestCdpTrace.push({
+          event: 'loadingFailed',
+          request_id: event.requestId,
+          at_ms: Date.now(),
+          error: event.errorText,
+          canceled: event.canceled,
+        });
+      });
+      page.on('request', (request) => {
+        if (!isFontManifestRequest(request)) return;
+        const requestId = ++nextFontManifestRequestId;
+        fontManifestRequestIds.set(request, requestId);
+        fontManifestBrowserTrace.push({
+          event: 'request',
+          request_id: requestId,
+          at_ms: Date.now(),
+        });
+      });
       page.on('pageerror', (error) => pageErrors.push(String(error)));
       page.on('console', (message) => {
         if (message.type() === 'error') pageErrors.push(message.text());
       });
       page.on('requestfailed', (request) => {
+        if (isFontManifestRequest(request)) {
+          fontManifestBrowserTrace.push({
+            event: 'requestfailed',
+            request_id: fontManifestRequestIds.get(request) ?? null,
+            at_ms: Date.now(),
+            error: request.failure()?.errorText ?? 'unknown',
+          });
+        }
         pageErrors.push(
           `request failed: ${request.url()} (${request.failure()?.errorText ?? 'unknown'})`,
         );
       });
+      page.on('requestfinished', (request) => {
+        if (!isFontManifestRequest(request)) return;
+        fontManifestBrowserTrace.push({
+          event: 'requestfinished',
+          request_id: fontManifestRequestIds.get(request) ?? null,
+          at_ms: Date.now(),
+        });
+      });
       page.on('response', (response) => {
+        if (isFontManifestRequest(response.request())) {
+          fontManifestBrowserTrace.push({
+            event: 'response',
+            request_id: fontManifestRequestIds.get(response.request()) ?? null,
+            at_ms: Date.now(),
+            status: response.status(),
+            server_request_id:
+              response.headers()['x-et13-manifest-request-id'] ?? null,
+          });
+        }
         if (response.status() >= 400) {
           pageErrors.push(`HTTP ${response.status()}: ${response.url()}`);
         }
@@ -237,7 +353,19 @@ async function main() {
       }
       const assertClean = () => {
         if (unexpected.length) fail(`${entry.case_id} attempted network: ${unexpected}`);
-        if (pageErrors.length) fail(`${entry.case_id} browser errors: ${pageErrors}`);
+        if (pageErrors.length) {
+          const serverTrace = servers
+            .get(entry.distribution)
+            .fontManifestRequestsSince(pageStartedAt);
+          fail(
+            `${entry.case_id} browser errors: ${pageErrors}; ` +
+              `font manifest transport trace: ${JSON.stringify({
+                browser: fontManifestBrowserTrace,
+                cdp: fontManifestCdpTrace,
+                server: serverTrace,
+              })}`,
+          );
+        }
       };
       assertClean();
       return { context, page, assertClean };
@@ -374,7 +502,11 @@ async function main() {
     process.stdout.write(`ET13 browser capture: ${summaries.length}/120 passed\n`);
   } finally {
     if (browser) await browser.close();
-    await Promise.all(servers.map((server) => new Promise((done) => server.close(done))));
+    await Promise.all(
+      [...servers.values()].map(
+        ({ server }) => new Promise((done) => server.close(done)),
+      ),
+    );
   }
 }
 

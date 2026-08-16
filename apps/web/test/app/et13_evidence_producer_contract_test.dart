@@ -66,6 +66,17 @@ void main() {
     );
     expect(capture, contains('response.end(bytes);'));
     expect(capture, isNot(contains('createReadStream(target)')));
+    expect(
+      capture,
+      contains("response.setHeader('X-ET13-Manifest-Request-Id'"),
+      reason:
+          'a failed FontManifest transport must correlate browser and server '
+          'lifecycles without weakening requestfailed',
+    );
+    expect(capture, contains('font manifest transport trace:'));
+    expect(capture, contains("page.on('requestfinished'"));
+    expect(capture, contains("cdp.on('Network.loadingFinished'"));
+    expect(capture, contains("cdp.on('Network.loadingFailed'"));
     expect(RegExp(r'assertClean\(\);').allMatches(capture), hasLength(3));
     expect(capture, isNot(contains('updateSnapshot')));
 
