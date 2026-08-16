@@ -250,6 +250,101 @@ void main() {
     });
 
     test(
+      'a new login flow retires a stalled callback from the previous verifier',
+      () async {
+        final store = InMemoryTokenStore();
+        final kv = InMemoryKeyValueStore();
+        await kv.write(_kVerifier, 'verifier-one');
+        final launcher = _FakeLauncher();
+        final oldExchangeStarted = Completer<void>();
+        final releaseOldExchange = Completer<void>();
+        final exchanges = <Map<String, dynamic>>[];
+        final client = _client(_userOk);
+        client.dio.interceptors.insert(
+          0,
+          InterceptorsWrapper(
+            onRequest: (options, handler) async {
+              if (options.path != '/auth/oauth/token') {
+                handler.next(options);
+                return;
+              }
+              final body = (options.data as Map).cast<String, dynamic>();
+              exchanges.add(body);
+              if (body['code'] == 'code-one') {
+                oldExchangeStarted.complete();
+                await releaseOldExchange.future;
+                handler.resolve(
+                  Response<Map<String, dynamic>>(
+                    requestOptions: options,
+                    statusCode: 200,
+                    data: const {
+                      'access_token': 'old-access',
+                      'refresh_token': 'old-refresh',
+                    },
+                  ),
+                );
+                return;
+              }
+              handler.resolve(
+                Response<Map<String, dynamic>>(
+                  requestOptions: options,
+                  statusCode: 200,
+                  data: const {
+                    'access_token': 'new-access',
+                    'refresh_token': 'new-refresh',
+                  },
+                ),
+              );
+            },
+          ),
+        );
+        final c = ProviderContainer(
+          overrides: [
+            tokenStoreProvider.overrideWithValue(store),
+            apiClientProvider.overrideWithValue(client),
+            oauthLauncherProvider.overrideWithValue(launcher),
+            keyValueStoreProvider.overrideWithValue(kv),
+            accountDataCleanerProvider.overrideWithValue(_NoopCleaner()),
+            ownerDataStoreProvider.overrideWithValue(InMemoryOwnerDataStore()),
+          ],
+        );
+        addTearDown(c.dispose);
+        final controller = c.read(authControllerProvider.notifier);
+        await pumpEventQueue();
+
+        final oldCompletion = controller.completeFromCode('code-one');
+        await oldExchangeStarted.future;
+        await controller.login();
+        final verifierTwo = await kv.read(_kVerifier);
+        expect(verifierTwo, isNotNull);
+        expect(verifierTwo, isNot('verifier-one'));
+        final newCompletion = controller.completeFromCode('code-two');
+        addTearDown(() async {
+          if (!releaseOldExchange.isCompleted) releaseOldExchange.complete();
+          await Future.wait([oldCompletion, newCompletion]);
+        });
+
+        await pumpEventQueue();
+        expect(exchanges, hasLength(2));
+        expect(exchanges[0], {
+          'code': 'code-one',
+          'code_verifier': 'verifier-one',
+        });
+        expect(exchanges[1], {
+          'code': 'code-two',
+          'code_verifier': verifierTwo,
+        });
+        await newCompletion;
+        releaseOldExchange.complete();
+        await oldCompletion;
+
+        expect(await store.readAccess(), 'new-access');
+        expect(await store.readRefresh(), 'new-refresh');
+        expect(c.read(authControllerProvider), isA<AuthAuthenticated>());
+      },
+    );
+
+    test(
       'completed OAuth callback replay preserves the authenticated session',
       () async {
         final store = InMemoryTokenStore();

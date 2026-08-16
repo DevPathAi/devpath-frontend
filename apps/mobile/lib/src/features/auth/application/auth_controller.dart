@@ -30,13 +30,16 @@ class AuthController extends Notifier<AuthState> {
   static const _kPkceVerifier = 'dp.auth.pkce_verifier';
   Future<void>? _bootstrapInFlight;
   Future<void>? _oauthCompletionInFlight;
+  var _oauthFlowGeneration = 0;
   var _epoch = 0;
 
   @override
   AuthState build() {
     ref.onDispose(() {
       _epoch += 1;
+      _oauthFlowGeneration += 1;
       _bootstrapInFlight = null;
+      _oauthCompletionInFlight = null;
     });
     Future.microtask(() {
       if (ref.mounted) bootstrapSession();
@@ -49,11 +52,21 @@ class AuthController extends Notifier<AuthState> {
   /// `client_type=mobile` + `code_challenge`(S256)로 모바일 PKCE 플로우임을 알린다 →
   /// 백엔드가 성공 후 `devpath://callback?code=`(일회용 code) 딥링크로 회신한다(웹은 쿠키).
   Future<void> login() async {
+    final flowGeneration = ++_oauthFlowGeneration;
+    final epoch = ++_epoch;
+    _bootstrapInFlight = null;
+    // The previous Future cannot be cancelled, but it is now epoch-stale and
+    // must not coalesce a callback belonging to this newly generated verifier.
+    _oauthCompletionInFlight = null;
     final pkce = PkcePair.generate();
-    await _mutateCredentials(
-      () =>
-          ref.read(keyValueStoreProvider).write(_kPkceVerifier, pkce.verifier),
-    );
+    final stored = await _mutateCredentials(() async {
+      if (!_isOAuthFlowCurrent(flowGeneration, epoch)) return false;
+      await ref
+          .read(keyValueStoreProvider)
+          .write(_kPkceVerifier, pkce.verifier);
+      return _isOAuthFlowCurrent(flowGeneration, epoch);
+    });
+    if (!stored || !_isOAuthFlowCurrent(flowGeneration, epoch)) return;
     final base = ref.read(appConfigProvider).baseUrl;
     await ref
         .read(oauthLauncherProvider)
@@ -218,10 +231,11 @@ class AuthController extends Notifier<AuthState> {
 
   Future<void> _completeFromCode(String code) async {
     final kv = ref.read(keyValueStoreProvider);
+    final flowGeneration = _oauthFlowGeneration;
     final observedEpoch = _epoch;
-    final verifier = await kv.read(_kPkceVerifier);
+    final verifier = await _mutateCredentials(() => kv.read(_kPkceVerifier));
+    if (!_isOAuthFlowCurrent(flowGeneration, observedEpoch)) return;
     if (verifier == null || verifier.isEmpty) {
-      if (_epoch != observedEpoch) return;
       // `app_links` can redeliver an already-consumed callback. Without a
       // verifier it is not a new login attempt and must never tear down an
       // authenticated (or currently restoring) verified session.
@@ -233,7 +247,6 @@ class AuthController extends Notifier<AuthState> {
       state = const AuthUnauthenticated(error: 'PKCE verifier 없음(로그인 재시도 필요)');
       return;
     }
-    if (_epoch != observedEpoch) return;
     final epoch = ++_epoch;
     _bootstrapInFlight = null;
     final previousUser = await ref.read(verifiedSessionStoreProvider).read();
@@ -446,6 +459,9 @@ class AuthController extends Notifier<AuthState> {
   }
 
   bool _isCurrent(int epoch) => ref.mounted && epoch == _epoch;
+
+  bool _isOAuthFlowCurrent(int generation, int epoch) =>
+      ref.mounted && generation == _oauthFlowGeneration && epoch == _epoch;
 
   void _invalidateCredentialBoundary() {
     ref.read(credentialMutationCoordinatorProvider).invalidate();
