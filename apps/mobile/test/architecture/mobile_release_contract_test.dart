@@ -85,6 +85,26 @@ void main() {
     );
   });
 
+  test('source guard rejects exact Xcode patch and build drift', () {
+    final workflow = _read('../../.github/workflows/mobile.yml');
+    expect(source_guard.mobileWorkflowToolchainViolation(workflow), isNull);
+
+    final versionDrift = workflow.replaceFirst(
+      "xcode-version: '26.4.1'",
+      "xcode-version: '26.4'",
+    );
+    expect(
+      source_guard.mobileWorkflowToolchainViolation(versionDrift),
+      contains('Xcode 26.4.1'),
+    );
+
+    final buildDrift = workflow.replaceFirst('17E202', '17E999');
+    expect(
+      source_guard.mobileWorkflowToolchainViolation(buildDrift),
+      contains('17E202'),
+    );
+  });
+
   test('release Android build cannot silently use the debug signing key', () {
     final gradle = _read('android/app/build.gradle.kts');
     final properties = _read('android/gradle.properties');
