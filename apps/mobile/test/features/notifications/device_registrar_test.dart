@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:devpath_mobile/src/data/owner_data_store.dart';
@@ -188,6 +190,38 @@ void main() {
     );
 
     test(
+      'logout during prior-token delete prevents stale registration POST',
+      () async {
+        final adapter = _DelayedPriorDeleteAdapter();
+        final client = ApiClient.create(
+          const ApiConfig(baseUrl: 'https://api.test'),
+        );
+        client.dio.httpClientAdapter = adapter;
+        final push = _LifecyclePush();
+        addTearDown(push.close);
+        final data = InMemoryOwnerDataStore();
+        await data.write(
+          'owner-a',
+          'push-registration-v1',
+          'ANDROID',
+          'old-token',
+        );
+        final registrar = DeviceRegistrar(client, push, 'ANDROID', data);
+        addTearDown(registrar.dispose);
+
+        final activating = registrar.activate('owner-a');
+        await adapter.firstDeleteStarted.future;
+        final loggingOut = registrar.unregister('owner-a');
+        adapter.releaseFirstDelete.complete();
+        await activating;
+        await loggingOut;
+
+        expect(adapter.postCalls, 0);
+        expect(await data.list('owner-a'), isEmpty);
+      },
+    );
+
+    test(
       'permission pending or denied cannot subscribe or apply token refresh',
       () async {
         final permission = Completer<bool>();
@@ -279,4 +313,51 @@ void main() {
       },
     );
   });
+}
+
+class _DelayedPriorDeleteAdapter implements HttpClientAdapter {
+  final firstDeleteStarted = Completer<void>();
+  final releaseFirstDelete = Completer<void>();
+  var deleteCalls = 0;
+  var postCalls = 0;
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    if (options.method == 'DELETE') {
+      deleteCalls += 1;
+      if (deleteCalls == 1) {
+        firstDeleteStarted.complete();
+        await releaseFirstDelete.future;
+      }
+      final status = deleteCalls == 2 ? 500 : 200;
+      return ResponseBody.fromString(
+        jsonEncode(
+          status == 200
+              ? <String, dynamic>{}
+              : {
+                  'error': {'code': 'UNKNOWN', 'message': 'forced failure'},
+                },
+        ),
+        status,
+        headers: {
+          Headers.contentTypeHeader: [Headers.jsonContentType],
+        },
+      );
+    }
+    if (options.method == 'POST') postCalls += 1;
+    return ResponseBody.fromString(
+      '{}',
+      200,
+      headers: {
+        Headers.contentTypeHeader: [Headers.jsonContentType],
+      },
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
 }
