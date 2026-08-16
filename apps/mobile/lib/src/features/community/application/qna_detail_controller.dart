@@ -43,6 +43,12 @@ class QnaDetailController extends Notifier<QnaDetailState> {
     }
   }
 
+  void reset() {
+    _id = null;
+    _generation += 1;
+    state = const QnaLoading();
+  }
+
   /// 인간 답변 작성 → 스레드에 추가(재조회).
   Future<void> submitAnswer(String bodyMd) =>
       _mutate(() => ref.read(answerCreateProvider)(_id!, bodyMd));

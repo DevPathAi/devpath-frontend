@@ -13,6 +13,8 @@ import '../features/auth/presentation/login_page.dart';
 import '../features/auth/presentation/session_unavailable_page.dart';
 import '../features/auth/state/auth_state.dart';
 import '../features/community/presentation/community_page.dart';
+import '../features/community/application/community_controller.dart';
+import '../features/community/application/qna_detail_controller.dart';
 import '../features/community/presentation/qna_detail_page.dart';
 import '../features/community/presentation/quick_capture_page.dart';
 import '../features/dashboard/application/dashboard_controller.dart';
@@ -78,6 +80,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       ref.invalidate(learnControllerProvider);
       ref.invalidate(dashboardControllerProvider);
       ref.invalidate(notificationControllerProvider);
+      ref.invalidate(communityControllerProvider);
+      ref.invalidate(qnaDetailControllerProvider);
     }
     notify();
   });
