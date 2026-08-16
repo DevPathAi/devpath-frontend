@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://leva.ai.kr/schemas/et13/catalog.v1.json",
+  "title": "Leva ET13 production evidence catalog v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "fixtures",
+    "visual_matrix",
+    "a11y_matrix",
+    "baseline_status"
+  ],
+  "properties": {
+    "schema_version": {"const": "leva.et13.catalog.v1"},
+    "fixtures": {
+      "type": "array",
+      "minItems": 12,
+      "maxItems": 12,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/fixture"}
+    },
+    "visual_matrix": {"$ref": "#/$defs/visualMatrix"},
+    "a11y_matrix": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {"$ref": "#/$defs/a11yCase"}
+    },
+    "baseline_status": {"const": "pending_external_review"}
+  },
+  "$defs": {
+    "fixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "owner",
+        "distribution",
+        "route",
+        "ready_semantics_label",
+        "surface_label"
+      ],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+        "owner": {"enum": ["web", "admin", "mobile", "dp_design"]},
+        "distribution": {"enum": ["web", "admin", "mobile"]},
+        "route": {"type": "string", "pattern": "^/\\?fixture=[a-z0-9-]+$"},
+        "ready_semantics_label": {"type": "string", "pattern": "^ET13_READY:[a-z0-9-]+$"},
+        "surface_label": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"}
+      }
+    },
+    "visualMatrix": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "widths",
+        "themes",
+        "height",
+        "device_pixel_ratio",
+        "text_scale_percent",
+        "locale",
+        "timezone",
+        "reduced_motion"
+      ],
+      "properties": {
+        "widths": {"const": [320, 600, 840, 1240]},
+        "themes": {"const": ["light", "dark"]},
+        "height": {"const": 900},
+        "device_pixel_ratio": {"const": 1},
+        "text_scale_percent": {"const": 100},
+        "locale": {"const": "ko-KR"},
+        "timezone": {"const": "UTC"},
+        "reduced_motion": {"const": true}
+      }
+    },
+    "a11yCase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "theme", "text_scale_percent"],
+      "properties": {
+        "width": {"enum": [320, 1240]},
+        "theme": {"enum": ["light", "dark"]},
+        "text_scale_percent": {"const": 200}
+      }
+    }
+  }
+}

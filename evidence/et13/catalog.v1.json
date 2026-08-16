@@ -1,0 +1,124 @@
+{
+  "schema_version": "leva.et13.catalog.v1",
+  "fixtures": [
+    {
+      "id": "web-today-available",
+      "owner": "web",
+      "distribution": "web",
+      "route": "/?fixture=web-today-available",
+      "ready_semantics_label": "ET13_READY:web-today-available",
+      "surface_label": "web-today-available"
+    },
+    {
+      "id": "web-path-current-week",
+      "owner": "web",
+      "distribution": "web",
+      "route": "/?fixture=web-path-current-week",
+      "ready_semantics_label": "ET13_READY:web-path-current-week",
+      "surface_label": "web-path-current-week"
+    },
+    {
+      "id": "web-content-reading",
+      "owner": "web",
+      "distribution": "web",
+      "route": "/?fixture=web-content-reading",
+      "ready_semantics_label": "ET13_READY:web-content-reading",
+      "surface_label": "web-content-reading"
+    },
+    {
+      "id": "web-workspace-idle",
+      "owner": "web",
+      "distribution": "web",
+      "route": "/?fixture=web-workspace-idle",
+      "ready_semantics_label": "ET13_READY:web-workspace-idle",
+      "surface_label": "web-workspace-idle"
+    },
+    {
+      "id": "web-review-loaded",
+      "owner": "web",
+      "distribution": "web",
+      "route": "/?fixture=web-review-loaded",
+      "ready_semantics_label": "ET13_READY:web-review-loaded",
+      "surface_label": "web-review-loaded"
+    },
+    {
+      "id": "web-mentor-context-preview",
+      "owner": "web",
+      "distribution": "web",
+      "route": "/?fixture=web-mentor-context-preview",
+      "ready_semantics_label": "ET13_READY:web-mentor-context-preview",
+      "surface_label": "web-mentor-context-preview"
+    },
+    {
+      "id": "admin-kpi-dashboard",
+      "owner": "admin",
+      "distribution": "admin",
+      "route": "/?fixture=admin-kpi-dashboard",
+      "ready_semantics_label": "ET13_READY:admin-kpi-dashboard",
+      "surface_label": "admin-kpi-dashboard"
+    },
+    {
+      "id": "admin-support-long-wire",
+      "owner": "admin",
+      "distribution": "admin",
+      "route": "/?fixture=admin-support-long-wire",
+      "ready_semantics_label": "ET13_READY:admin-support-long-wire",
+      "surface_label": "admin-support-long-wire"
+    },
+    {
+      "id": "mobile-today-available",
+      "owner": "mobile",
+      "distribution": "mobile",
+      "route": "/?fixture=mobile-today-available",
+      "ready_semantics_label": "ET13_READY:mobile-today-available",
+      "surface_label": "mobile-today-available"
+    },
+    {
+      "id": "mobile-content-reading",
+      "owner": "mobile",
+      "distribution": "mobile",
+      "route": "/?fixture=mobile-content-reading",
+      "ready_semantics_label": "ET13_READY:mobile-content-reading",
+      "surface_label": "mobile-content-reading"
+    },
+    {
+      "id": "dp-design-mission-ledger",
+      "owner": "dp_design",
+      "distribution": "web",
+      "route": "/?fixture=dp-design-mission-ledger",
+      "ready_semantics_label": "ET13_READY:dp-design-mission-ledger",
+      "surface_label": "dp-design-mission-ledger"
+    },
+    {
+      "id": "dp-design-context-payload-preview",
+      "owner": "dp_design",
+      "distribution": "web",
+      "route": "/?fixture=dp-design-context-payload-preview",
+      "ready_semantics_label": "ET13_READY:dp-design-context-payload-preview",
+      "surface_label": "dp-design-context-payload-preview"
+    }
+  ],
+  "visual_matrix": {
+    "widths": [320, 600, 840, 1240],
+    "themes": ["light", "dark"],
+    "height": 900,
+    "device_pixel_ratio": 1,
+    "text_scale_percent": 100,
+    "locale": "ko-KR",
+    "timezone": "UTC",
+    "reduced_motion": true
+  },
+  "a11y_matrix": [
+    {
+      "width": 320,
+      "theme": "light",
+      "text_scale_percent": 200
+    },
+    {
+      "width": 1240,
+      "theme": "dark",
+      "text_scale_percent": 200
+    }
+  ],
+  "baseline_status": "pending_external_review"
+}

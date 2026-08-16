@@ -7,3 +7,8 @@
 
 # 이 JSON은 JS/Dart가 raw SHA-256으로 동일성을 검증하므로 checkout에서도 LF를 유지한다.
 apps/web/lib/src/analytics/mission-spine.analytics.v1.json text eol=lf
+
+# Monaco is vendored byte-for-byte from the pinned npm archive. Treat upstream
+# minified assets/notices as binary so Git does not normalize or whitespace-check
+# their exact bytes.
+apps/web/web/vendor/monaco/** -text -diff

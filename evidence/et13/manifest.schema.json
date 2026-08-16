@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://leva.ai.kr/schemas/et13/manifest.v1.json",
+  "title": "Leva ET13 production evidence manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_sha",
+    "catalog_sha256",
+    "case_catalog_sha256",
+    "assets_lock_sha256",
+    "renderer_lock_sha256",
+    "renderer_image",
+    "renderer_image_digest",
+    "baseline_status",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {"enum": ["leva.et13.visual-manifest.v1", "leva.et13.a11y-manifest.v1"]},
+    "source_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "catalog_sha256": {"$ref": "#/$defs/sha256"},
+    "case_catalog_sha256": {"$ref": "#/$defs/sha256"},
+    "assets_lock_sha256": {"$ref": "#/$defs/sha256"},
+    "renderer_lock_sha256": {"$ref": "#/$defs/sha256"},
+    "renderer_image": {"type": "string", "pattern": "^mcr\\.microsoft\\.com/playwright:v1\\.55\\.0-noble@sha256:[0-9a-f]{64}$"},
+    "renderer_image_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "baseline_status": {"const": "pending_external_review"},
+    "cases": {"type": "array", "items": {"$ref": "#/$defs/case"}}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["case_id", "artifact_path", "sha256", "bytes"],
+      "properties": {
+        "case_id": {"type": "string", "pattern": "^[a-z0-9-]+--(?:visual|a11y)--w(?:320|600|840|1240)--(?:light|dark)(?:--text200)?$"},
+        "artifact_path": {"type": "string", "pattern": "^(?:visual|a11y)/(?:web|admin|mobile|dp_design)/[a-z0-9.-]+$"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "bytes": {"type": "integer", "minimum": 1},
+        "violations": {"type": "integer", "minimum": 0},
+        "passes": {"type": "integer", "minimum": 0},
+        "incomplete": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}
