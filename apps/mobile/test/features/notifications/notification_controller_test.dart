@@ -26,9 +26,10 @@ class _FakePush implements PushService {
 }
 
 class _FakeInteractivePush implements PushService, PushInteractionService {
-  _FakeInteractivePush({this.initial});
+  _FakeInteractivePush({this.initial, this.initialFuture});
 
   final PushMessage? initial;
+  final Future<PushMessage?>? initialFuture;
   final incomingController = StreamController<PushMessage>();
   final openedController = StreamController<PushMessage>();
 
@@ -39,7 +40,8 @@ class _FakeInteractivePush implements PushService, PushInteractionService {
   Stream<PushMessage> get incoming => incomingController.stream;
 
   @override
-  Future<PushMessage?> initialMessage() async => initial;
+  Future<PushMessage?> initialMessage() async =>
+      await (initialFuture ?? Future<PushMessage?>.value(initial));
 
   @override
   Stream<PushMessage> get opened => openedController.stream;
@@ -331,6 +333,7 @@ void main() {
         final container = ProviderContainer(
           overrides: [
             pushServiceProvider.overrideWithValue(_FakePush(push)),
+            keyValueStoreProvider.overrideWithValue(InMemoryKeyValueStore()),
             currentOwnerKeyProvider.overrideWith(
               (ref) => ref.watch(_ownerProvider),
             ),
@@ -375,6 +378,7 @@ void main() {
         final container = ProviderContainer(
           overrides: [
             pushServiceProvider.overrideWithValue(_FakePush(push)),
+            keyValueStoreProvider.overrideWithValue(InMemoryKeyValueStore()),
             currentOwnerKeyProvider.overrideWith(
               (ref) => ref.watch(_ownerProvider),
             ),
@@ -422,6 +426,7 @@ void main() {
         final container = ProviderContainer(
           overrides: [
             pushServiceProvider.overrideWithValue(_FakePush(push)),
+            keyValueStoreProvider.overrideWithValue(InMemoryKeyValueStore()),
             currentOwnerKeyProvider.overrideWithValue('owner-a'),
             notificationStoreProvider.overrideWithValue(store),
           ],
@@ -679,6 +684,112 @@ void main() {
         );
       },
     );
+
+    test(
+      'repeated buffered tap refreshes its latest-sixteen recency',
+      () async {
+        final push = _FakeInteractivePush();
+        addTearDown(push.close);
+        final store = NotificationStore(InMemoryOwnerDataStore());
+        final container = ProviderContainer(
+          overrides: [
+            pushServiceProvider.overrideWithValue(push),
+            keyValueStoreProvider.overrideWithValue(InMemoryKeyValueStore()),
+            authControllerProvider.overrideWith(
+              _NotificationAuthController.new,
+            ),
+            notificationStoreProvider.overrideWithValue(store),
+          ],
+        );
+        addTearDown(container.dispose);
+        final subscription = container.listen(
+          notificationControllerProvider,
+          (_, _) {},
+        );
+        addTearDown(subscription.close);
+
+        for (var index = 0; index < 16; index += 1) {
+          push.openedController.add(
+            PushMessage.ownerScoped(
+              id: 'buffered-$index',
+              title: 'Today',
+              body: 'first tap',
+              intendedOwnerKey: 'owner-a',
+              target: const PushTarget.today(pathId: 301),
+            ),
+          );
+        }
+        push.openedController.add(
+          const PushMessage.ownerScoped(
+            id: 'buffered-0',
+            title: 'Today',
+            body: 'latest repeated tap',
+            intendedOwnerKey: 'owner-a',
+            target: PushTarget.today(pathId: 301),
+          ),
+        );
+        push.openedController.add(
+          const PushMessage.ownerScoped(
+            id: 'buffered-16',
+            title: 'Today',
+            body: 'new tap',
+            intendedOwnerKey: 'owner-a',
+            target: PushTarget.today(pathId: 301),
+          ),
+        );
+        await pumpEventQueue(times: 3);
+        final auth =
+            container.read(authControllerProvider.notifier)
+                as _NotificationAuthController;
+        auth.authenticate('owner-a');
+        await pumpEventQueue(times: 24);
+
+        final ids = (await store.list(
+          'owner-a',
+        )).map((item) => item.message.id).toSet();
+        expect(ids, hasLength(16));
+        expect(ids, contains('buffered-0'));
+        expect(ids, isNot(contains('buffered-1')));
+        expect(ids, contains('buffered-16'));
+      },
+    );
+
+    test('late initial message after dispose is silently discarded', () async {
+      final initial = Completer<PushMessage?>();
+      final push = _FakeInteractivePush(initialFuture: initial.future);
+      addTearDown(push.close);
+      final store = NotificationStore(InMemoryOwnerDataStore());
+      final uncaught = <Object>[];
+
+      await runZonedGuarded<Future<void>>(() async {
+        final container = ProviderContainer(
+          overrides: [
+            pushServiceProvider.overrideWithValue(push),
+            keyValueStoreProvider.overrideWithValue(InMemoryKeyValueStore()),
+            authControllerProvider.overrideWith(
+              _NotificationAuthController.new,
+            ),
+            notificationStoreProvider.overrideWithValue(store),
+          ],
+        );
+        container.listen(notificationControllerProvider, (_, _) {});
+        await pumpEventQueue(times: 2);
+        container.dispose();
+        initial.complete(
+          const PushMessage.ownerScoped(
+            id: 'disposed-cold',
+            title: 'Today',
+            body: 'discard',
+            intendedOwnerKey: 'owner-a',
+            target: PushTarget.today(pathId: 301),
+          ),
+        );
+        await pumpEventQueue(times: 4);
+      }, (error, _) => uncaught.add(error));
+
+      expect(uncaught, isEmpty);
+      expect(await store.list('owner-a'), isEmpty);
+    });
 
     test('Loading push is discarded on unauthenticated terminal', () async {
       final push = _FakeInteractivePush();
