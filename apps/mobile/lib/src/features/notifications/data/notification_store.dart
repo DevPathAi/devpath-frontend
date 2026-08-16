@@ -80,17 +80,31 @@ class NotificationStore {
     return result;
   }
 
-  Future<void> markAllRead(String ownerKey) async {
-    for (final notification in await list(ownerKey)) {
+  Future<void> markAllRead(
+    String ownerKey, {
+    bool Function()? isCurrent,
+  }) async {
+    final notifications = await list(ownerKey);
+    if (isCurrent?.call() == false) return;
+    for (final notification in notifications) {
+      if (isCurrent?.call() == false) return;
       if (!notification.isRead) {
-        await _write(
-          ownerKey,
-          StoredNotification(
-            message: notification.message,
-            receivedAt: notification.receivedAt,
-            isRead: true,
-          ),
+        final marked = StoredNotification(
+          message: notification.message,
+          receivedAt: notification.receivedAt,
+          isRead: true,
         );
+        await _write(ownerKey, marked);
+        if (isCurrent?.call() == false) {
+          await _data.deleteIfMatches(
+            ownerKey,
+            bucket,
+            marked.message.id,
+            payload: _encode(marked),
+            updatedAt: marked.receivedAt,
+          );
+          return;
+        }
       }
     }
   }

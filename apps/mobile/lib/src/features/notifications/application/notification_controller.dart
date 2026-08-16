@@ -155,13 +155,34 @@ class NotificationController extends Notifier<NotificationState> {
     );
   }
 
-  void markAllRead() {
+  Future<void> markAllRead() async {
     if (state.unreadCount == 0) return;
-    state = NotificationState(messages: state.messages);
     final owner = _ownerKey;
-    if (owner != null) {
-      unawaited(ref.read(notificationStoreProvider).markAllRead(owner));
+    if (owner == null) return;
+    final boundary = _NotificationOwnerBoundary(
+      ownerKey: owner,
+      memoryEpoch: _ownerEpoch,
+    );
+    final capturedUnreadCount = state.unreadCount;
+    try {
+      await ref
+          .read(notificationStoreProvider)
+          .markAllRead(owner, isCurrent: () => _isCurrent(boundary));
+    } on Object {
+      // Reading notifications must remain usable if durable marking fails.
+      return;
     }
+    if (!_isCurrent(boundary)) return;
+    final latest = state;
+    final unreadCount = latest.unreadCount > capturedUnreadCount
+        ? latest.unreadCount - capturedUnreadCount
+        : 0;
+    state = NotificationState(
+      messages: latest.messages,
+      unreadCount: unreadCount,
+      navigationTarget: latest.navigationTarget,
+      isRestoring: latest.isRestoring,
+    );
   }
 }
 

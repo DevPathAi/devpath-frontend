@@ -255,7 +255,9 @@ void main() {
       await pumpEventQueue();
       expect(container.read(notificationControllerProvider).unreadCount, 1);
 
-      container.read(notificationControllerProvider.notifier).markAllRead();
+      await container
+          .read(notificationControllerProvider.notifier)
+          .markAllRead();
 
       final s = container.read(notificationControllerProvider);
       expect(s.unreadCount, 0);

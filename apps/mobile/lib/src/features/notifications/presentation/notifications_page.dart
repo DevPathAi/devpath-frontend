@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,9 +19,11 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => ref.read(notificationControllerProvider.notifier).markAllRead(),
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(
+        ref.read(notificationControllerProvider.notifier).markAllRead(),
+      );
+    });
   }
 
   @override
