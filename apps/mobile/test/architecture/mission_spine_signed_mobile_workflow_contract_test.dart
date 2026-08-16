@@ -25,19 +25,16 @@ void main() {
     expect(source, contains("java-version: '17.0.20+8'"));
     expect(source, contains("xcode-version: '26.4.1'"));
     expect(
-      RegExp(r'^\s*xcodebuild -version\s*\|', multiLine: true)
-          .hasMatch(source),
+      RegExp(r'^\s*xcodebuild -version\s*\|', multiLine: true).hasMatch(source),
       isFalse,
       reason: 'Xcode must not write into an early-closing grep under pipefail',
     );
-    expect(
-      source,
-      contains(r'apple_toolchain="$(xcodebuild -version)"'),
-    );
+    expect(source, contains(r'apple_toolchain="$(xcodebuild -version)"'));
     expect(
       source,
       contains(
-        r"""test "${apple_toolchain}" = $'Xcode 26.4.1\nBuild version 17E202'""",
+        'test "\${apple_toolchain}" = '
+        "\$'Xcode 26.4.1\\nBuild version 17E202'",
       ),
     );
     expect(source, contains('flutter build apk --release --no-pub'));
