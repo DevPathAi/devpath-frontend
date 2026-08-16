@@ -155,6 +155,44 @@ void main() {
       expect(saved?.cachedAt, newAt);
     },
   );
+
+  test(
+    'expired snapshot cleanup cannot delete a concurrent fresh write',
+    () async {
+      final data = _LatchedSnapshotStore();
+      final cache = ContentOfflineStore(data);
+      final oldAt = DateTime.utc(2026, 8, 15, 1);
+      final freshAt = DateTime.utc(2026, 8, 16, 2);
+      await cache.write('owner-a', '77', _content, cachedAt: oldAt);
+      data.latchNextRead = true;
+
+      final expiredRead = cache.read(
+        'owner-a',
+        '77',
+        now: oldAt.add(ContentOfflineStore.maxOfflineAge),
+      );
+      await data.snapshotCaptured.future;
+      const fresh = LearningContent(
+        id: 77,
+        slug: 'async-await',
+        title: 'Fresh content',
+        track: 'BACKEND',
+        markdown: '# Fresh body',
+        progress: ContentProgress(scrollPct: 0, dwellSec: 0),
+      );
+      await cache.write('owner-a', '77', fresh, cachedAt: freshAt);
+      data.releaseSnapshot.complete();
+
+      expect(await expiredRead, isNull);
+      final retained = await cache.read(
+        'owner-a',
+        '77',
+        now: freshAt.add(const Duration(minutes: 1)),
+      );
+      expect(retained?.content.title, fresh.title);
+      expect(retained?.cachedAt, freshAt);
+    },
+  );
 }
 
 class _LatchedSnapshotStore extends InMemoryOwnerDataStore {
