@@ -97,6 +97,27 @@ void main() {
     final workflow = _read('../../.github/workflows/mobile.yml');
     expect(source_guard.mobileWorkflowToolchainViolation(workflow), isNull);
 
+    expect(
+      RegExp(r'^\s*xcodebuild -version\s*\|', multiLine: true)
+          .hasMatch(workflow),
+      isFalse,
+      reason:
+          'xcodebuild must not feed grep -q under pipefail because grep can '
+          'close the pipe before xcodebuild writes its second line',
+    );
+    expect(
+      RegExp(r'^\s*apple_toolchain="\$\(xcodebuild -version\)"$', multiLine: true)
+          .allMatches(workflow),
+      hasLength(1),
+      reason: 'capture the exact two-line Xcode identity once',
+    );
+    expect(
+      workflow,
+      contains(
+        r"""test "${apple_toolchain}" = $'Xcode 26.4.1\nBuild version 17E202'""",
+      ),
+    );
+
     final versionDrift = workflow.replaceFirst(
       "xcode-version: '26.4.1'",
       "xcode-version: '26.4'",

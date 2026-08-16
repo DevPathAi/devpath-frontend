@@ -244,15 +244,15 @@ jobs:
           test "${GITHUB_REF}" = refs/heads/main
           test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
           test -z "$(git status --porcelain=v1 --untracked-files=all)"
-          flutter --version --machine \
-            | grep -Fq '"frameworkVersion": "3.44.1"'
-          flutter --version --machine \
-            | grep -Fq '"frameworkRevision": "924134a44c189315be2148659913dda1671cbe99"'
-          flutter --version --machine \
-            | grep -Fq '"dartSdkVersion": "3.12.1"'
-          xcodebuild -version | grep -Fqx 'Xcode 26.4.1'
-          xcodebuild -version | grep -Fqx 'Build version 17E202'
-          xcrun --sdk iphoneos --show-sdk-version | grep -Fqx '26.4'
+          flutter_toolchain="$(flutter --version --machine)"
+          grep -Fq '"frameworkVersion": "3.44.1"' <<< "${flutter_toolchain}"
+          grep -Fq '"frameworkRevision": "924134a44c189315be2148659913dda1671cbe99"' \
+            <<< "${flutter_toolchain}"
+          grep -Fq '"dartSdkVersion": "3.12.1"' <<< "${flutter_toolchain}"
+          apple_toolchain="$(xcodebuild -version)"
+          test "${apple_toolchain}" = $'Xcode 26.4.1\nBuild version 17E202'
+          iphoneos_sdk="$(xcrun --sdk iphoneos --show-sdk-version)"
+          test "${iphoneos_sdk}" = '26.4'
           printf '%s  %s\n' \
             '${{ steps.approval.outputs.workflow_sha256 }}' \
             .github/workflows/mission-spine-signed-mobile-build.yml \

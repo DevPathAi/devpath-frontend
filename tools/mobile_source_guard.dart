@@ -268,9 +268,10 @@ String? mobileWorkflowToolchainViolation(String workflowSource) {
   }
   const exactAppleToolchain = [
     "xcode-version: '26.4.1'",
-    "xcodebuild -version | grep -q '^Xcode 26.4.1\$'",
-    "xcodebuild -version | grep -q '^Build version 17E202\$'",
-    "xcrun --sdk iphoneos --show-sdk-version | grep -q '^26.4\$'",
+    'apple_toolchain="\$(xcodebuild -version)"',
+    "test \"\${apple_toolchain}\" = \$'Xcode 26.4.1\\nBuild version 17E202'",
+    'iphoneos_sdk="\$(xcrun --sdk iphoneos --show-sdk-version)"',
+    "test \"\${iphoneos_sdk}\" = '26.4'",
   ];
   for (final marker in exactAppleToolchain) {
     if (!workflowSource.contains(marker)) {
