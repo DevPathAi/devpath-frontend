@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:devpath_mobile/src/data/owner_data_store.dart';
 import 'package:devpath_mobile/src/features/learning/data/content_offline_store.dart';
 import 'package:dp_core/dp_core.dart';
@@ -104,4 +106,74 @@ void main() {
       expect(pending?.requestCompletion, isTrue);
     },
   );
+
+  test(
+    'progress merge cannot overwrite a concurrent authoritative content write',
+    () async {
+      final data = _LatchedSnapshotStore();
+      final cache = ContentOfflineStore(data);
+      final oldAt = DateTime.utc(2026, 8, 16, 1);
+      final newAt = DateTime.utc(2026, 8, 16, 2);
+      await cache.write('owner-a', '77', _content, cachedAt: oldAt);
+      data.latchNextRead = true;
+
+      final applying = cache.applyServerProgress(
+        'owner-a',
+        '77',
+        const ContentProgressUpdateResponse(
+          scrollPct: 0.8,
+          dwellSec: 80,
+          completed: false,
+        ),
+      );
+      await data.snapshotCaptured.future;
+      const authoritative = LearningContent(
+        id: 77,
+        slug: 'async-await',
+        title: 'Authoritative title',
+        track: 'BACKEND',
+        markdown: '# Fresh server body',
+        progress: ContentProgress(scrollPct: 0.4, dwellSec: 40),
+      );
+      final writing = cache.write(
+        'owner-a',
+        '77',
+        authoritative,
+        cachedAt: newAt,
+      );
+      await pumpEventQueue();
+      data.releaseSnapshot.complete();
+      await Future.wait([applying, writing]);
+
+      final saved = await cache.read(
+        'owner-a',
+        '77',
+        now: newAt.add(const Duration(minutes: 1)),
+      );
+      expect(saved?.content.title, authoritative.title);
+      expect(saved?.content.markdown, authoritative.markdown);
+      expect(saved?.cachedAt, newAt);
+    },
+  );
+}
+
+class _LatchedSnapshotStore extends InMemoryOwnerDataStore {
+  var latchNextRead = false;
+  final snapshotCaptured = Completer<void>();
+  final releaseSnapshot = Completer<void>();
+
+  @override
+  Future<OwnerDataRecord?> read(
+    String ownerKey,
+    String bucket,
+    String recordKey,
+  ) async {
+    final snapshot = await super.read(ownerKey, bucket, recordKey);
+    if (latchNextRead) {
+      latchNextRead = false;
+      snapshotCaptured.complete();
+      await releaseSnapshot.future;
+    }
+    return snapshot;
+  }
 }

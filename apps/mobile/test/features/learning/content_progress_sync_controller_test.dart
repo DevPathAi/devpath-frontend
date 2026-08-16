@@ -130,6 +130,62 @@ void main() {
   );
 
   test(
+    'permanent failure discards only the sent row, not a concurrent newer row',
+    () async {
+      final adapter = _LatchedResponseAdapter(
+        status: 404,
+        body: {
+          'error': {'code': 'RESOURCE_NOT_FOUND', 'message': 'not found'},
+        },
+      );
+      final client = ApiClient.create(
+        const ApiConfig(baseUrl: 'https://api.example.test'),
+      );
+      client.dio.httpClientAdapter = adapter;
+      final data = InMemoryOwnerDataStore();
+      final queue = ContentProgressQueue(data);
+      final container = ProviderContainer(
+        overrides: [
+          apiClientProvider.overrideWithValue(client),
+          currentOwnerKeyProvider.overrideWithValue('owner-a'),
+          contentProgressQueueProvider.overrideWithValue(queue),
+          contentOfflineStoreProvider.overrideWithValue(
+            ContentOfflineStore(data),
+          ),
+          connectivityProvider.overrideWith((_) => const Stream.empty()),
+        ],
+      );
+      addTearDown(container.dispose);
+      final subscription = container.listen(
+        contentProgressSyncControllerProvider,
+        (_, _) {},
+      );
+      addTearDown(subscription.close);
+      final controller = container.read(
+        contentProgressSyncControllerProvider.notifier,
+      );
+
+      final sent = controller.enqueueAndSync(_progress);
+      await adapter.requestStarted.future;
+      const newer = QueuedContentProgress(
+        ownerKey: 'owner-a',
+        routeKey: '77',
+        scrollPct: 0.95,
+        dwellSec: 120,
+        requestCompletion: true,
+      );
+      await queue.enqueue(newer);
+      adapter.releaseResponse.complete();
+      await sent;
+
+      final retained = await queue.read('owner-a', '77');
+      expect(retained?.scrollPct, newer.scrollPct);
+      expect(retained?.dwellSec, newer.dwellSec);
+      expect(retained?.requestCompletion, newer.requestCompletion);
+    },
+  );
+
+  test(
     'progress 401 invalidates auth and clears the exact owner outbox',
     () async {
       final tokens = InMemoryTokenStore();
@@ -291,6 +347,35 @@ class _CountingStatusAdapter implements HttpClientAdapter {
       jsonEncode({
         'error': {'code': 'RESOURCE_NOT_FOUND', 'message': 'not found'},
       }),
+      status,
+      headers: {
+        Headers.contentTypeHeader: [Headers.jsonContentType],
+      },
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
+class _LatchedResponseAdapter implements HttpClientAdapter {
+  _LatchedResponseAdapter({required this.status, required this.body});
+
+  final int status;
+  final Map<String, dynamic> body;
+  final requestStarted = Completer<void>();
+  final releaseResponse = Completer<void>();
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    if (!requestStarted.isCompleted) requestStarted.complete();
+    await releaseResponse.future;
+    return ResponseBody.fromString(
+      jsonEncode(body),
       status,
       headers: {
         Headers.contentTypeHeader: [Headers.jsonContentType],
