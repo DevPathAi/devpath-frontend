@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:devpath_mobile/src/features/today/data/current_mission_cache.dart';
 import 'package:devpath_mobile/src/data/local/app_database.dart';
 import 'package:dp_core/dp_core.dart';
@@ -150,5 +152,53 @@ void main() {
       );
       expect(await db.select(db.currentMissionCacheRows).get(), isEmpty);
     });
+
+    test(
+      'expired read cleanup cannot delete a concurrent fresh DB row',
+      () async {
+        final latched = _LatchedDriftCurrentMissionCache(db);
+        final staleAt = DateTime.utc(2026, 8, 15, 1);
+        final freshAt = DateTime.utc(2026, 8, 16, 2);
+        await latched.write('owner-a', _mission(1), cachedAt: staleAt);
+
+        final reading = latched.read(
+          'owner-a',
+          now: staleAt.add(CurrentMissionCache.maxOfflineAge),
+        );
+        await latched.cleanupStarted.future;
+        await latched.write('owner-a', _mission(2), cachedAt: freshAt);
+        latched.releaseCleanup.complete();
+
+        expect(await reading, isNull);
+        expect(
+          (await latched.read(
+            'owner-a',
+            now: freshAt,
+          ))?.mission.nextTask?.taskId,
+          2,
+        );
+      },
+    );
   });
+}
+
+class _LatchedDriftCurrentMissionCache extends DriftCurrentMissionCache {
+  _LatchedDriftCurrentMissionCache(super.db);
+
+  final cleanupStarted = Completer<void>();
+  final releaseCleanup = Completer<void>();
+  var _latched = false;
+
+  Future<void> _waitForRelease() async {
+    if (_latched) return;
+    _latched = true;
+    cleanupStarted.complete();
+    await releaseCleanup.future;
+  }
+
+  @override
+  Future<void> clearOwner(String ownerKey) async {
+    await _waitForRelease();
+    await super.clearOwner(ownerKey);
+  }
 }
