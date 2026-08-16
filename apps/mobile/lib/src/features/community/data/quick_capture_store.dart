@@ -64,11 +64,15 @@ class QuickCaptureStore {
     }
   }
 
-  Future<void> write(String ownerKey, QuickCaptureDraft draft) {
-    if (draft.isEmpty) return clear(ownerKey);
-    return _serialize(
-      ownerKey,
-      () => _data.write(
+  Future<void> write(
+    String ownerKey,
+    QuickCaptureDraft draft, {
+    bool Function()? isCurrent,
+  }) {
+    if (draft.isEmpty) return clear(ownerKey, isCurrent: isCurrent);
+    return _serialize(ownerKey, () async {
+      if (isCurrent?.call() == false) return;
+      await _data.write(
         ownerKey,
         bucket,
         key,
@@ -77,12 +81,15 @@ class QuickCaptureStore {
           'body': draft.body,
           'tags': draft.tags,
         }),
-      ),
-    );
+      );
+    });
   }
 
-  Future<void> clear(String ownerKey) =>
-      _serialize(ownerKey, () => _data.delete(ownerKey, bucket, key));
+  Future<void> clear(String ownerKey, {bool Function()? isCurrent}) =>
+      _serialize(ownerKey, () async {
+        if (isCurrent?.call() == false) return;
+        await _data.delete(ownerKey, bucket, key);
+      });
 
   Future<T> _serialize<T>(String ownerKey, Future<T> Function() mutation) {
     final previous = _mutationTails[ownerKey] ?? Future<void>.value();

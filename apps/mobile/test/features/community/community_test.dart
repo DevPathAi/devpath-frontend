@@ -50,7 +50,10 @@ final Map<String, MockFixture> _createFx = {
 
 ProviderContainer _container(Map<String, MockFixture> fx) {
   final c = ProviderContainer(
-    overrides: [apiClientProvider.overrideWithValue(mockApiClient(fx))],
+    overrides: [
+      apiClientProvider.overrideWithValue(mockApiClient(fx)),
+      currentOwnerKeyProvider.overrideWithValue('owner-test'),
+    ],
   );
   addTearDown(c.dispose);
   return c;
@@ -76,6 +79,7 @@ void main() {
       'A load completion cannot paint after mounted controller moves to B',
       () async {
         final aResponse = Completer<List<CommunityPostSummary>>();
+        final bResponse = Completer<List<CommunityPostSummary>>();
         var calls = 0;
         final c = ProviderContainer(
           overrides: [
@@ -85,9 +89,7 @@ void main() {
             communityListProvider.overrideWithValue(() {
               calls += 1;
               if (calls == 1) return aResponse.future;
-              return Future.value([
-                const CommunityPostSummary(id: 2, title: 'B post'),
-              ]);
+              return bResponse.future;
             }),
           ],
         );
@@ -107,9 +109,13 @@ void main() {
         await aLoad;
         expect(c.read(communityControllerProvider), isA<CommunityLoading>());
 
-        await c.read(communityControllerProvider.notifier).load();
+        bResponse.complete([
+          const CommunityPostSummary(id: 2, title: 'B post'),
+        ]);
+        await pumpEventQueue();
         final b = c.read(communityControllerProvider) as CommunityLoaded;
         expect(b.posts.single.title, 'B post');
+        expect(calls, 2);
       },
     );
   });

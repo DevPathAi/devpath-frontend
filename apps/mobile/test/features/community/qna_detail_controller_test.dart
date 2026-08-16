@@ -36,6 +36,7 @@ void main() {
   test('load: QnaLoaded(detail)', () async {
     final c = ProviderContainer(
       overrides: [
+        currentOwnerKeyProvider.overrideWithValue('owner-test'),
         qnaDetailFetchProvider.overrideWithValue(
           (id) async => _detail(answers: [_ans(11)]),
         ),
@@ -53,6 +54,7 @@ void main() {
     int? acceptedId;
     final c = ProviderContainer(
       overrides: [
+        currentOwnerKeyProvider.overrideWithValue('owner-test'),
         qnaDetailFetchProvider.overrideWithValue((id) async {
           fetchCalls++;
           return fetchCalls == 1
@@ -79,6 +81,7 @@ void main() {
   test('accept 403(비작성자): 상세 유지 + actionError 표면화', () async {
     final c = ProviderContainer(
       overrides: [
+        currentOwnerKeyProvider.overrideWithValue('owner-test'),
         qnaDetailFetchProvider.overrideWithValue(
           (id) async => _detail(answers: [_ans(11)]),
         ),
@@ -108,6 +111,7 @@ void main() {
     int? seenId, seenValue;
     final c = ProviderContainer(
       overrides: [
+        currentOwnerKeyProvider.overrideWithValue('owner-test'),
         qnaDetailFetchProvider.overrideWithValue((id) async {
           fetchCalls++;
           return _detail(answers: [_ans(11)]);
@@ -140,6 +144,7 @@ void main() {
     String? seenBody;
     final c = ProviderContainer(
       overrides: [
+        currentOwnerKeyProvider.overrideWithValue('owner-test'),
         qnaDetailFetchProvider.overrideWithValue((id) async {
           fetchCalls++;
           return fetchCalls == 1
@@ -166,6 +171,7 @@ void main() {
   test('load 실패 → QnaFailed', () async {
     final c = ProviderContainer(
       overrides: [
+        currentOwnerKeyProvider.overrideWithValue('owner-test'),
         qnaDetailFetchProvider.overrideWithValue(
           (id) async => throw const ApiException(
             code: ApiErrorCode.forbidden,
@@ -183,6 +189,7 @@ void main() {
     'late A detail cannot paint after mounted controller moves to B',
     () async {
       final aResponse = Completer<CommunityQuestionDetail>();
+      final bResponse = Completer<CommunityQuestionDetail>();
       var calls = 0;
       final c = ProviderContainer(
         overrides: [
@@ -191,9 +198,7 @@ void main() {
           ),
           qnaDetailFetchProvider.overrideWithValue((id) {
             calls += 1;
-            return calls == 1
-                ? aResponse.future
-                : Future.value(_detail(title: 'B detail'));
+            return calls == 1 ? aResponse.future : bResponse.future;
           }),
         ],
       );
@@ -211,16 +216,19 @@ void main() {
 
       expect(resetBeforeCompletion, isA<QnaLoading>());
       expect(c.read(qnaDetailControllerProvider), isA<QnaLoading>());
-      await c.read(qnaDetailControllerProvider.notifier).load(1);
+      bResponse.complete(_detail(title: 'B detail'));
+      await pumpEventQueue();
       expect(
         (c.read(qnaDetailControllerProvider) as QnaLoaded).detail.title,
         'B detail',
       );
+      expect(calls, 2);
     },
   );
 
   test('late A mutation refresh cannot paint after owner switch', () async {
     final fresh = Completer<CommunityQuestionDetail>();
+    final bResponse = Completer<CommunityQuestionDetail>();
     final freshStarted = Completer<void>();
     var fetchCalls = 0;
     final c = ProviderContainer(
@@ -231,8 +239,11 @@ void main() {
         qnaDetailFetchProvider.overrideWithValue((id) {
           fetchCalls += 1;
           if (fetchCalls == 1) return Future.value(_detail(title: 'A base'));
-          freshStarted.complete();
-          return fresh.future;
+          if (fetchCalls == 2) {
+            freshStarted.complete();
+            return fresh.future;
+          }
+          return bResponse.future;
         }),
         answerAcceptProvider.overrideWithValue((id) async {}),
       ],
@@ -253,18 +264,29 @@ void main() {
 
     expect(resetBeforeCompletion, isA<QnaLoading>());
     expect(c.read(qnaDetailControllerProvider), isA<QnaLoading>());
+    bResponse.complete(_detail(title: 'B detail'));
+    await pumpEventQueue();
+    expect(
+      (c.read(qnaDetailControllerProvider) as QnaLoaded).detail.title,
+      'B detail',
+    );
   });
 
   test('late A mutation error cannot restore A action state for B', () async {
     final action = Completer<void>();
+    final bResponse = Completer<CommunityQuestionDetail>();
+    var fetchCalls = 0;
     final c = ProviderContainer(
       overrides: [
         currentOwnerKeyProvider.overrideWith(
           (ref) => ref.watch(_ownerProvider),
         ),
-        qnaDetailFetchProvider.overrideWithValue(
-          (id) async => _detail(title: 'A base'),
-        ),
+        qnaDetailFetchProvider.overrideWithValue((id) {
+          fetchCalls += 1;
+          return fetchCalls == 1
+              ? Future.value(_detail(title: 'A base'))
+              : bResponse.future;
+        }),
         answerAcceptProvider.overrideWithValue((id) => action.future),
       ],
     );
@@ -289,6 +311,12 @@ void main() {
 
     expect(resetBeforeCompletion, isA<QnaLoading>());
     expect(c.read(qnaDetailControllerProvider), isA<QnaLoading>());
+    bResponse.complete(_detail(title: 'B detail'));
+    await pumpEventQueue();
+    expect(
+      (c.read(qnaDetailControllerProvider) as QnaLoaded).detail.title,
+      'B detail',
+    );
   });
 }
 

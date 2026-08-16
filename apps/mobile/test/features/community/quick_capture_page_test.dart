@@ -173,7 +173,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(_text(tester, 0), 'B title');
     expect(_text(tester, 1), 'B body');
-    expect(store.writes['owner-b'], isEmpty);
+    expect(store.writes['owner-b'] ?? const <QuickCaptureDraft>[], isEmpty);
   });
 
   testWidgets('late A submit cannot clear B draft or pop B page', (
@@ -267,7 +267,12 @@ class _ControlledQuickCaptureStore extends QuickCaptureStore {
   }
 
   @override
-  Future<void> write(String ownerKey, QuickCaptureDraft draft) async {
+  Future<void> write(
+    String ownerKey,
+    QuickCaptureDraft draft, {
+    bool Function()? isCurrent,
+  }) async {
+    if (isCurrent?.call() == false) return;
     writes.putIfAbsent(ownerKey, () => []).add(draft);
     if (draft.isEmpty) {
       drafts.remove(ownerKey);
@@ -277,7 +282,8 @@ class _ControlledQuickCaptureStore extends QuickCaptureStore {
   }
 
   @override
-  Future<void> clear(String ownerKey) async {
+  Future<void> clear(String ownerKey, {bool Function()? isCurrent}) async {
+    if (isCurrent?.call() == false) return;
     clears.add(ownerKey);
     drafts.remove(ownerKey);
   }

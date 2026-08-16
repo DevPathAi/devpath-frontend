@@ -1,6 +1,7 @@
 import 'package:dp_core/dp_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../auth/application/auth_controller.dart';
 import '../data/community_source.dart';
 import '../state/qna_detail_state.dart';
 
@@ -8,17 +9,36 @@ import '../state/qna_detail_state.dart';
 /// 최신 답변 스레드·카운트·solved를 반영한다(web QnaDetailController와 동일 정책).
 class QnaDetailController extends Notifier<QnaDetailState> {
   int? _id;
+  String? _ownerKey;
+  var _generation = 0;
 
   @override
-  QnaDetailState build() => const QnaLoading();
+  QnaDetailState build() {
+    _ownerKey = ref.read(currentOwnerKeyProvider);
+    ref.listen(currentOwnerKeyProvider, (_, owner) {
+      if (owner == _ownerKey) return;
+      _ownerKey = owner;
+      _generation += 1;
+      state = const QnaLoading();
+      final id = _id;
+      if (owner != null && id != null) {
+        Future<void>.microtask(() => load(id));
+      }
+    });
+    return const QnaLoading();
+  }
 
   Future<void> load(int id) async {
     _id = id;
+    final owner = _ownerKey;
+    final generation = ++_generation;
     state = const QnaLoading();
     try {
       final detail = await ref.read(qnaDetailFetchProvider)(id);
+      if (!_isCurrent(owner, id, generation)) return;
       state = QnaLoaded(detail);
     } on ApiException catch (e) {
+      if (!_isCurrent(owner, id, generation)) return;
       state = QnaFailed(e.message);
     }
   }
@@ -43,16 +63,28 @@ class QnaDetailController extends Notifier<QnaDetailState> {
 
   Future<void> _mutate(Future<void> Function() action) async {
     final cur = state;
-    if (cur is! QnaLoaded || _id == null) return;
+    final id = _id;
+    if (cur is! QnaLoaded || id == null) return;
+    final owner = _ownerKey;
+    final generation = ++_generation;
     state = cur.copyWith(submitting: true);
     try {
       await action();
-      final fresh = await ref.read(qnaDetailFetchProvider)(_id!);
+      if (!_isCurrent(owner, id, generation)) return;
+      final fresh = await ref.read(qnaDetailFetchProvider)(id);
+      if (!_isCurrent(owner, id, generation)) return;
       state = QnaLoaded(fresh);
     } on ApiException catch (e) {
+      if (!_isCurrent(owner, id, generation)) return;
       state = cur.copyWith(submitting: false, actionError: e.message);
     }
   }
+
+  bool _isCurrent(String? owner, int id, int generation) =>
+      ref.mounted &&
+      owner == _ownerKey &&
+      id == _id &&
+      generation == _generation;
 }
 
 final qnaDetailControllerProvider =
