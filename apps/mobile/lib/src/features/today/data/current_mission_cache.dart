@@ -42,8 +42,11 @@ class InMemoryCurrentMissionCache implements CurrentMissionCache {
     required DateTime now,
   }) async {
     final entry = _entries[ownerKey];
-    if (entry == null || !_isFresh(entry.cachedAt, now)) {
-      _entries.remove(ownerKey);
+    if (entry == null) return null;
+    if (!_isFresh(entry.cachedAt, now)) {
+      if (identical(_entries[ownerKey], entry)) {
+        _entries.remove(ownerKey);
+      }
       return null;
     }
     return entry;
@@ -92,7 +95,11 @@ class DriftCurrentMissionCache implements CurrentMissionCache {
     )..where((table) => table.ownerKey.equals(ownerKey))).getSingleOrNull();
     if (row == null) return null;
     if (!_isFresh(row.cachedAt, now)) {
-      await clearOwner(ownerKey);
+      await clearPayloadIfMatches(
+        ownerKey,
+        row.payload,
+        cachedAt: row.cachedAt,
+      );
       return null;
     }
     try {
@@ -101,7 +108,11 @@ class DriftCurrentMissionCache implements CurrentMissionCache {
         cachedAt: row.cachedAt,
       );
     } on Object {
-      await clearOwner(ownerKey);
+      await clearPayloadIfMatches(
+        ownerKey,
+        row.payload,
+        cachedAt: row.cachedAt,
+      );
       return null;
     }
   }
@@ -129,10 +140,26 @@ class DriftCurrentMissionCache implements CurrentMissionCache {
     CurrentMission mission, {
     required DateTime cachedAt,
   }) async {
+    await clearPayloadIfMatches(
+      ownerKey,
+      CurrentMissionCacheCodec.encode(mission),
+      cachedAt: cachedAt,
+    );
+  }
+
+  /// Deletes only the exact serialized row previously observed by a reader.
+  ///
+  /// Keeping this operation public also lets concurrency tests latch the
+  /// cleanup boundary without weakening the cache interface.
+  Future<void> clearPayloadIfMatches(
+    String ownerKey,
+    String payload, {
+    required DateTime cachedAt,
+  }) async {
     await (_db.delete(_db.currentMissionCacheRows)..where(
           (table) =>
               table.ownerKey.equals(ownerKey) &
-              table.payload.equals(CurrentMissionCacheCodec.encode(mission)) &
+              table.payload.equals(payload) &
               table.cachedAt.equals(cachedAt),
         ))
         .go();

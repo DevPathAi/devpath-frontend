@@ -17,8 +17,24 @@ class MobileAccountDataCleaner implements AccountDataCleaner {
 
   @override
   Future<void> clearOwner(String ownerKey) async {
-    await _missionCache.clearOwner(ownerKey);
-    await _ownerData.clearOwner(ownerKey);
+    Object? firstError;
+    StackTrace? firstStackTrace;
+
+    Future<void> attempt(Future<void> Function() cleanup) async {
+      try {
+        await cleanup();
+      } on Object catch (error, stackTrace) {
+        firstError ??= error;
+        firstStackTrace ??= stackTrace;
+      }
+    }
+
+    await attempt(() => _missionCache.clearOwner(ownerKey));
+    await attempt(() => _ownerData.clearOwner(ownerKey));
+
+    if (firstError case final error?) {
+      Error.throwWithStackTrace(error, firstStackTrace!);
+    }
   }
 }
 

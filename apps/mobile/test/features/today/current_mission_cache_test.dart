@@ -197,8 +197,12 @@ class _LatchedDriftCurrentMissionCache extends DriftCurrentMissionCache {
   }
 
   @override
-  Future<void> clearOwner(String ownerKey) async {
+  Future<void> clearPayloadIfMatches(
+    String ownerKey,
+    String payload, {
+    required DateTime cachedAt,
+  }) async {
     await _waitForRelease();
-    await super.clearOwner(ownerKey);
+    await super.clearPayloadIfMatches(ownerKey, payload, cachedAt: cachedAt);
   }
 }
