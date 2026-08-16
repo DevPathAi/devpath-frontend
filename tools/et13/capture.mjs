@@ -217,8 +217,9 @@ async function main() {
         `;width=${entry.width};height=${entry.height}` +
         `;dpr=${entry.device_pixel_ratio};brightness=${entry.theme}` +
         `;textScalePercent=${entry.text_scale_percent}`;
-      for (const label of [ready, source, surface, runtime]) {
-        await page.locator(`[aria-label="${label}"]`).waitFor({ state: 'attached' });
+      await page.getByLabel(surface, { exact: true }).waitFor({ state: 'attached' });
+      for (const label of [ready, source, runtime]) {
+        await page.getByText(label, { exact: true }).waitFor({ state: 'attached' });
       }
       await page.evaluate(() => document.fonts.ready);
       const fontResources = await page.evaluate(() =>

@@ -32,6 +32,19 @@ void main() {
     expect(capture, contains('ET13_READY:'));
     expect(capture, contains('ET13_SOURCE_SHA:'));
     expect(capture, contains('ET13_CAPTURE_SURFACE:'));
+    expect(
+      capture,
+      contains("page.getByLabel(surface, { exact: true })"),
+      reason: 'the rendered capture-surface container exposes an aria label',
+    );
+    expect(
+      capture,
+      contains("page.getByText(label, { exact: true })"),
+      reason:
+          'CanvasKit exposes leaf runtime Semantics markers as exact text '
+          'nodes rather than aria-label attributes',
+    );
+    expect(capture, isNot(contains('`[aria-label="\${label}"]`')));
     expect(capture, contains("route.abort('blockedbyclient')"));
     expect(capture, contains("'wcag22aa'"));
     expect(capture, contains('page.screenshot'));
