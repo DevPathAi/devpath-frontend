@@ -109,14 +109,17 @@ class ContentProgressSyncController extends Notifier<int> {
           return latestResponse;
         }
         latestResponse = response;
-        await ref
-            .read(contentOfflineStoreProvider)
-            .applyServerProgress(ownerKey, routeKey, response);
-        if (!_isCurrentBoundary(ownerKey, ownerGeneration)) {
-          return latestResponse;
-        }
-        await ref.read(contentProgressQueueProvider).acknowledge(pending);
-        if (!_isCurrentBoundary(ownerKey, ownerGeneration)) {
+        final committed = await _mutateIfCurrent(
+          ownerKey,
+          ownerGeneration,
+          () async {
+            await ref
+                .read(contentOfflineStoreProvider)
+                .applyServerProgress(ownerKey, routeKey, response);
+            await ref.read(contentProgressQueueProvider).acknowledge(pending);
+          },
+        );
+        if (!committed) {
           return latestResponse;
         }
         state += 1;
@@ -134,20 +137,30 @@ class ContentProgressSyncController extends Notifier<int> {
           return latestResponse;
         }
         if (_isUnauthorized(error)) {
-          await ref
-              .read(contentProgressQueueProvider)
-              .remove(ownerKey, routeKey);
-          if (!_isCurrentBoundary(ownerKey, ownerGeneration)) {
+          final removed = await _mutateIfCurrent(
+            ownerKey,
+            ownerGeneration,
+            () => ref
+                .read(contentProgressQueueProvider)
+                .remove(ownerKey, routeKey),
+          );
+          if (!removed) {
             return latestResponse;
           }
           await ref
               .read(authControllerProvider.notifier)
               .invalidateUnauthorized(error.message);
         } else if (_isPermanentClientError(error)) {
-          await ref
-              .read(contentProgressQueueProvider)
-              .discardIfMatches(pending);
-          if (_isCurrentBoundary(ownerKey, ownerGeneration)) state += 1;
+          final discarded = await _mutateIfCurrent(
+            ownerKey,
+            ownerGeneration,
+            () async {
+              await ref
+                  .read(contentProgressQueueProvider)
+                  .discardIfMatches(pending);
+            },
+          );
+          if (discarded) state += 1;
         }
         // Transport, throttling and 5xx retain the durable row for reconnect.
         return latestResponse;
@@ -171,6 +184,20 @@ class ContentProgressSyncController extends Notifier<int> {
       ref.read(currentOwnerKeyProvider) == ownerKey &&
       ref.read(credentialMutationCoordinatorProvider).generation ==
           ownerGeneration;
+
+  /// Serializes durable post-response mutations with logout/account
+  /// replacement. The boundary is rechecked after entering the shared tail;
+  /// if it changes while a local mutation is awaiting I/O, the queued account
+  /// cleanup runs immediately afterward and remains the final write.
+  Future<bool> _mutateIfCurrent(
+    String ownerKey,
+    int ownerGeneration,
+    Future<void> Function() mutation,
+  ) => ref.read(credentialMutationCoordinatorProvider).run(() async {
+    if (!_isCurrentBoundary(ownerKey, ownerGeneration)) return false;
+    await mutation();
+    return _isCurrentBoundary(ownerKey, ownerGeneration);
+  });
 
   bool _isUnauthorized(ApiException error) =>
       error.status == 401 || error.code == ApiErrorCode.unauthorized;
