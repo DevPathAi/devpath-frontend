@@ -54,7 +54,12 @@ void main() {
       expect(contractJob, contains('"app_version":"%s"'));
       expect(contractJob, contains('"mission_spine_enabled":%s'));
       expect(contractJob, contains('"analytics_contract_version":"%s"'));
-      expect(contractJob, contains('actions/upload-artifact@v4'));
+      expect(
+        contractJob,
+        contains(
+          'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02',
+        ),
+      );
       expect(
         contractJob,
         contains(

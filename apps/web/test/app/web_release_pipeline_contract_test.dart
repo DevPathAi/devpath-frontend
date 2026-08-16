@@ -499,7 +499,12 @@ exit "${status}"
     expect(publishJob, contains('"source_sha": \$source_sha'));
     expect(publishJob, contains('"image_digest": \$image_digest'));
     expect(publishJob, contains('"compiled_config":'));
-    expect(publishJob, contains('actions/upload-artifact@v4'));
+    expect(
+      publishJob,
+      contains(
+        'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02',
+      ),
+    );
     expect(
       publishJob,
       contains(
@@ -513,7 +518,12 @@ exit "${status}"
     expect(publishJob, isNot(contains('"token"')));
     expect(publishJob, isNot(contains('"actor"')));
 
-    expect(verifyJob, contains('actions/download-artifact@v5'));
+    expect(
+      verifyJob,
+      contains(
+        'actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53',
+      ),
+    );
     expect(verifyJob, contains('merge-multiple: true'));
     expect(verifyJob, contains('continue-on-error: true'));
     expect(verifyJob, contains('!cancelled()'));
