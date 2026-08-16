@@ -587,6 +587,7 @@ void main() {
       'renderer_image_digest': renderer['manifest_digest'],
       'build_marker_sha256':
           'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      'baseline_authentication': null,
     };
     final document = <String, Object?>{
       ...unsigned,
@@ -606,6 +607,24 @@ void main() {
       returnsNormally,
     );
 
+    unsigned['baseline_authentication'] = <String, Object?>{};
+    document['baseline_authentication'] = unsigned['baseline_authentication'];
+    document['input_provenance_sha256'] = _canonicalSha(unsigned);
+    _writeManifest(file, document);
+    expect(
+      () => et13.validateInputProvenanceDocument(
+        kind: 'a11y',
+        provenancePath: file.path,
+        catalogPath: catalogPath,
+        generatedCatalogPath: casePath,
+        assetsLockPath: assetsPath,
+        rendererLockPath: rendererPath,
+      ),
+      throwsA(isA<FormatException>()),
+    );
+
+    unsigned['baseline_authentication'] = null;
+    document['baseline_authentication'] = null;
     document['input_provenance_sha256'] =
         'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc';
     _writeManifest(file, document);

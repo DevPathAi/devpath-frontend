@@ -137,6 +137,24 @@ const _a11yResultCaseKeys = <String>[
   'passes',
   'incomplete',
 ];
+const _baselineAuthenticationKeys = <String>[
+  'release_id',
+  'repository',
+  'workflow_path',
+  'workflow_sha256',
+  'run_id',
+  'run_attempt',
+  'head_sha',
+  'artifact_id',
+  'artifact_name',
+  'artifact_archive_sha256',
+  'approval_document_sha256',
+  'approval_environment',
+  'approval_environment_id',
+  'approved_by_id',
+  'approved_by',
+  'approval_effective_at',
+];
 const _expectedAssets = <Map<String, Object?>>[
   {
     'id': 'pretendard-400',
@@ -292,6 +310,27 @@ String _sha256String(Object? value, String path) {
   final result = _string(value, path);
   if (!RegExp(r'^[0-9a-f]{64}$').hasMatch(result)) {
     _fail('$path must be 64 lowercase hexadecimal characters');
+  }
+  return result;
+}
+
+String _githubLogin(Object? value, String path) {
+  final result = _string(value, path);
+  if (!RegExp(
+    r'^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$',
+  ).hasMatch(result)) {
+    _fail('$path must be an exact GitHub user login');
+  }
+  return result;
+}
+
+String _utcTimestamp(Object? value, String path) {
+  final result = _string(value, path);
+  if (!RegExp(
+        r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$',
+      ).hasMatch(result) ||
+      DateTime.tryParse(result)?.isUtc != true) {
+    _fail('$path must be an ISO-8601 UTC Z timestamp');
   }
   return result;
 }
@@ -1129,11 +1168,109 @@ Map<String, Object?> writeBuildMarker({
   return marker;
 }
 
+Map<String, Object?>? _validateBaselineAuthentication(
+  Object? value, {
+  required String sourceSha,
+}) {
+  if (value == null) return null;
+  final authentication = _object(value, 'baselineAuthentication');
+  _exactKeys(
+    authentication,
+    _baselineAuthenticationKeys,
+    r'$baselineAuthentication',
+  );
+  final releaseId = _string(
+    authentication['release_id'],
+    'baselineAuthentication.release_id',
+  );
+  if (!RegExp(r'^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$').hasMatch(releaseId)) {
+    _fail('baseline authentication release ID is invalid');
+  }
+  _exactValue(
+    authentication['repository'],
+    'DevPathAi/devpath-frontend',
+    'baselineAuthentication.repository',
+  );
+  _exactValue(
+    authentication['workflow_path'],
+    '.github/workflows/et13-baseline-approval.yml',
+    'baselineAuthentication.workflow_path',
+  );
+  for (final key in [
+    'workflow_sha256',
+    'artifact_archive_sha256',
+    'approval_document_sha256',
+  ]) {
+    _sha256String(authentication[key], 'baselineAuthentication.$key');
+  }
+  for (final key in [
+    'run_id',
+    'run_attempt',
+    'artifact_id',
+    'approval_environment_id',
+    'approved_by_id',
+  ]) {
+    if (_integer(authentication[key], 'baselineAuthentication.$key') < 1) {
+      _fail('baselineAuthentication.$key must be positive');
+    }
+  }
+  _exactValue(
+    authentication['head_sha'],
+    sourceSha,
+    'baselineAuthentication.head_sha',
+  );
+  final runId = _integer(
+    authentication['run_id'],
+    'baselineAuthentication.run_id',
+  );
+  final runAttempt = _integer(
+    authentication['run_attempt'],
+    'baselineAuthentication.run_attempt',
+  );
+  _exactValue(
+    authentication['artifact_name'],
+    '$releaseId-frontend-visual-approved-baseline-run-$runId-attempt-'
+        '$runAttempt',
+    'baselineAuthentication.artifact_name',
+  );
+  _exactValue(
+    authentication['approval_environment'],
+    'et13-baseline-approval',
+    'baselineAuthentication.approval_environment',
+  );
+  _githubLogin(
+    authentication['approved_by'],
+    'baselineAuthentication.approved_by',
+  );
+  _utcTimestamp(
+    authentication['approval_effective_at'],
+    'baselineAuthentication.approval_effective_at',
+  );
+  return authentication;
+}
+
+Map<String, Object?>? _validateProvenanceMode(
+  Map<String, Object?> provenance,
+  String mode,
+) {
+  final authentication = provenance['baseline_authentication'];
+  if (mode == _releaseReady && authentication == null) {
+    _fail('release-ready provenance requires baseline authentication');
+  }
+  if (mode == _diagnostic && authentication != null) {
+    _fail('diagnostic provenance must not carry baseline authentication');
+  }
+  return authentication == null
+      ? null
+      : _object(authentication, 'provenance.baseline_authentication');
+}
+
 Map<String, Object?> inputProvenance(
   String kind,
   String sourceSha,
-  String buildMarkerPath,
-) {
+  String buildMarkerPath, {
+  Map<String, Object?>? baselineAuthentication,
+}) {
   validateSourceIdentity(sourceSha, buildMarkerPath);
   validateGeneratedCatalogs();
   validateAssets();
@@ -1155,6 +1292,10 @@ Map<String, Object?> inputProvenance(
     'renderer_lock_sha256': _rawSha('evidence/et13/renderer.lock.json'),
     'renderer_image_digest': renderer['manifest_digest'],
     'build_marker_sha256': _rawSha(buildMarkerPath),
+    'baseline_authentication': _validateBaselineAuthentication(
+      baselineAuthentication,
+      sourceSha: sourceSha,
+    ),
   };
   return <String, Object?>{
     ...inputs,
@@ -1167,8 +1308,14 @@ Map<String, Object?> writeInputProvenance({
   required String sourceSha,
   required String buildMarkerPath,
   required String outputPath,
+  Map<String, Object?>? baselineAuthentication,
 }) {
-  final provenance = inputProvenance(kind, sourceSha, buildMarkerPath);
+  final provenance = inputProvenance(
+    kind,
+    sourceSha,
+    buildMarkerPath,
+    baselineAuthentication: baselineAuthentication,
+  );
   _writePretty(outputPath, provenance);
   return provenance;
 }
@@ -1276,8 +1423,22 @@ Map<String, Object?> validateInputProvenanceFile({
   required String buildMarkerPath,
   required String provenancePath,
 }) {
-  final expected = inputProvenance(kind, sourceSha, buildMarkerPath);
   final file = File(provenancePath);
+  if (!file.existsSync()) {
+    _fail('input provenance must exist');
+  }
+  final actual = _readObject(provenancePath);
+  final expected = inputProvenance(
+    kind,
+    sourceSha,
+    buildMarkerPath,
+    baselineAuthentication: actual['baseline_authentication'] == null
+        ? null
+        : _object(
+            actual['baseline_authentication'],
+            'provenance.baseline_authentication',
+          ),
+  );
   if (!file.existsSync() || file.readAsStringSync() != _pretty(expected)) {
     _fail('input provenance must be the exact canonical producer output');
   }
@@ -1309,6 +1470,7 @@ Map<String, Object?> validateInputProvenanceDocument({
     'renderer_lock_sha256',
     'renderer_image_digest',
     'build_marker_sha256',
+    'baseline_authentication',
     'input_provenance_sha256',
   ], r'$provenance');
   final casePath =
@@ -1335,6 +1497,10 @@ Map<String, Object?> validateInputProvenanceDocument({
   _sha256String(
     provenance['build_marker_sha256'],
     'provenance.build_marker_sha256',
+  );
+  _validateBaselineAuthentication(
+    provenance['baseline_authentication'],
+    sourceSha: sourceSha,
   );
   final unsigned = <String, Object?>{
     for (final entry in provenance.entries)
@@ -1393,6 +1559,8 @@ Map<String, Object?> validateBaselineApproval({
   bool requireExactBundle = false,
   String catalogPath = 'evidence/et13/catalog.v1.json',
   String generatedCatalogPath = 'evidence/et13/generated/visual-cases.v1.json',
+  String approvalWorkflowPath = '.github/workflows/et13-baseline-approval.yml',
+  String rawReviewWorkflowPath = '.github/workflows/et13-evidence.yml',
 }) {
   final approval = _readObject(approvalPath);
   _exactKeys(approval, const [
@@ -1405,8 +1573,24 @@ Map<String, Object?> validateBaselineApproval({
     'fixture_ids',
     'case_count',
     'candidate_set_sha256',
+    'approval_repository',
+    'approval_workflow_path',
+    'approval_workflow_sha256',
+    'approval_run_id',
+    'approval_run_attempt',
+    'approval_head_sha',
+    'approval_environment',
+    'approval_environment_id',
+    'approved_by_id',
     'approved_by',
-    'approved_at',
+    'approval_effective_at',
+    'raw_review_workflow_sha256',
+    'raw_review_run_id',
+    'raw_review_run_attempt',
+    'raw_review_head_sha',
+    'raw_review_artifact_id',
+    'raw_review_artifact_name',
+    'raw_review_artifact_digest',
   ], r'$baselineApproval');
   _exactValue(
     approval['schema_version'],
@@ -1513,19 +1697,79 @@ Map<String, Object?> validateBaselineApproval({
     _fail('baseline approval fixture order drifted');
   }
   _exactValue(approval['case_count'], 96, 'baselineApproval.case_count');
-  if (_string(
-    approval['approved_by'],
-    'baselineApproval.approved_by',
-  ).trim().isEmpty) {
-    _fail('baseline approval reviewer identity must not be empty');
-  }
-  final approvedAt = _string(
-    approval['approved_at'],
-    'baselineApproval.approved_at',
+  _exactValue(
+    approval['approval_repository'],
+    'DevPathAi/devpath-frontend',
+    'baselineApproval.approval_repository',
   );
-  if (!approvedAt.endsWith('Z') ||
-      DateTime.tryParse(approvedAt)?.isUtc != true) {
-    _fail('baseline approval timestamp must be an ISO-8601 UTC Z value');
+  _exactValue(
+    approval['approval_workflow_path'],
+    '.github/workflows/et13-baseline-approval.yml',
+    'baselineApproval.approval_workflow_path',
+  );
+  _exactValue(
+    approval['approval_workflow_sha256'],
+    _rawSha(approvalWorkflowPath),
+    'baselineApproval.approval_workflow_sha256',
+  );
+  _exactValue(
+    approval['raw_review_workflow_sha256'],
+    _rawSha(rawReviewWorkflowPath),
+    'baselineApproval.raw_review_workflow_sha256',
+  );
+  for (final key in [
+    'approval_run_id',
+    'approval_run_attempt',
+    'approval_environment_id',
+    'approved_by_id',
+    'raw_review_run_id',
+    'raw_review_run_attempt',
+    'raw_review_artifact_id',
+  ]) {
+    if (_integer(approval[key], 'baselineApproval.$key') < 1) {
+      _fail('baselineApproval.$key must be positive');
+    }
+  }
+  _exactValue(
+    approval['approval_head_sha'],
+    sourceSha,
+    'baselineApproval.approval_head_sha',
+  );
+  _exactValue(
+    approval['raw_review_head_sha'],
+    sourceSha,
+    'baselineApproval.raw_review_head_sha',
+  );
+  _exactValue(
+    approval['approval_environment'],
+    'et13-baseline-approval',
+    'baselineApproval.approval_environment',
+  );
+  _githubLogin(approval['approved_by'], 'baselineApproval.approved_by');
+  _utcTimestamp(
+    approval['approval_effective_at'],
+    'baselineApproval.approval_effective_at',
+  );
+  final rawReviewRunId = _integer(
+    approval['raw_review_run_id'],
+    'baselineApproval.raw_review_run_id',
+  );
+  final rawReviewRunAttempt = _integer(
+    approval['raw_review_run_attempt'],
+    'baselineApproval.raw_review_run_attempt',
+  );
+  _exactValue(
+    approval['raw_review_artifact_name'],
+    'et13-unsealed-raw-review-run-$rawReviewRunId-attempt-'
+        '$rawReviewRunAttempt',
+    'baselineApproval.raw_review_artifact_name',
+  );
+  final rawReviewDigest = _string(
+    approval['raw_review_artifact_digest'],
+    'baselineApproval.raw_review_artifact_digest',
+  );
+  if (!RegExp(r'^sha256:[0-9a-f]{64}$').hasMatch(rawReviewDigest)) {
+    _fail('baseline approval raw review artifact digest is invalid');
   }
   _exactValue(
     approval['candidate_set_sha256'],
@@ -1544,6 +1788,89 @@ Map<String, Object?> validateBaselineApproval({
     );
   }
   return approval;
+}
+
+Map<String, Object?> buildBaselineAuthentication({
+  required String releaseId,
+  required String sourceSha,
+  required String baselineRoot,
+  required String approvalPath,
+  required int runId,
+  required int runAttempt,
+  required int artifactId,
+  required String artifactName,
+  required String artifactArchiveSha256,
+  required String workflowSha256,
+  String catalogPath = 'evidence/et13/catalog.v1.json',
+  String generatedCatalogPath = 'evidence/et13/generated/visual-cases.v1.json',
+  String approvalWorkflowPath = '.github/workflows/et13-baseline-approval.yml',
+  String rawReviewWorkflowPath = '.github/workflows/et13-evidence.yml',
+}) {
+  final approval = validateBaselineApproval(
+    approvalPath: approvalPath,
+    baselineRoot: baselineRoot,
+    reviewCandidatePath: File.fromUri(
+      Directory(baselineRoot).absolute.uri.resolve('review-candidate.v1.json'),
+    ).path,
+    requireExactBundle: true,
+    catalogPath: catalogPath,
+    generatedCatalogPath: generatedCatalogPath,
+    approvalWorkflowPath: approvalWorkflowPath,
+    rawReviewWorkflowPath: rawReviewWorkflowPath,
+  );
+  if (!RegExp(r'^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$').hasMatch(releaseId)) {
+    _fail('baseline authentication release ID is invalid');
+  }
+  for (final entry in <String, Object?>{
+    'source_sha': sourceSha,
+    'approval_repository': 'DevPathAi/devpath-frontend',
+    'approval_workflow_path': '.github/workflows/et13-baseline-approval.yml',
+    'approval_workflow_sha256': workflowSha256,
+    'approval_run_id': runId,
+    'approval_run_attempt': runAttempt,
+    'approval_head_sha': sourceSha,
+  }.entries) {
+    _exactValue(
+      approval[entry.key],
+      entry.value,
+      'baselineApproval.${entry.key}',
+    );
+  }
+  if (runId < 1 || runAttempt < 1 || artifactId < 1) {
+    _fail('baseline authentication coordinates must be positive');
+  }
+  _sha256String(workflowSha256, 'baselineAuthentication.workflow_sha256');
+  _sha256String(
+    artifactArchiveSha256,
+    'baselineAuthentication.artifact_archive_sha256',
+  );
+  final expectedName =
+      '$releaseId-frontend-visual-approved-baseline-run-$runId-attempt-'
+      '$runAttempt';
+  _exactValue(
+    artifactName,
+    expectedName,
+    'baselineAuthentication.artifact_name',
+  );
+  final authentication = <String, Object?>{
+    'release_id': releaseId,
+    'repository': 'DevPathAi/devpath-frontend',
+    'workflow_path': '.github/workflows/et13-baseline-approval.yml',
+    'workflow_sha256': workflowSha256,
+    'run_id': runId,
+    'run_attempt': runAttempt,
+    'head_sha': sourceSha,
+    'artifact_id': artifactId,
+    'artifact_name': artifactName,
+    'artifact_archive_sha256': artifactArchiveSha256,
+    'approval_document_sha256': _rawSha(approvalPath),
+    'approval_environment': approval['approval_environment'],
+    'approval_environment_id': approval['approval_environment_id'],
+    'approved_by_id': approval['approved_by_id'],
+    'approved_by': approval['approved_by'],
+    'approval_effective_at': approval['approval_effective_at'],
+  };
+  return _validateBaselineAuthentication(authentication, sourceSha: sourceSha)!;
 }
 
 void _validateExactApprovedBaselineBundle({
@@ -1922,6 +2249,7 @@ void validateResultManifest({
   required String manifestPath,
   required String artifactRoot,
   required String buildMarkerPath,
+  required String provenancePath,
   String? baselineRoot,
   String? baselineApprovalPath,
 }) {
@@ -1994,7 +2322,13 @@ void validateResultManifest({
     'manifest.renderer_lock_sha256',
   );
   final sourceSha = _string(manifest['source_sha'], 'manifest.source_sha');
-  final provenance = inputProvenance(kind, sourceSha, buildMarkerPath);
+  final provenance = validateInputProvenanceFile(
+    kind: kind,
+    sourceSha: sourceSha,
+    buildMarkerPath: buildMarkerPath,
+    provenancePath: provenancePath,
+  );
+  final baselineAuthentication = _validateProvenanceMode(provenance, mode);
   _exactValue(
     manifest['input_provenance_sha256'],
     provenance['input_provenance_sha256'],
@@ -2019,6 +2353,13 @@ void validateResultManifest({
     baselineRoot: baselineRoot,
     approvalPath: baselineApprovalPath,
   );
+  if (visual && mode == _releaseReady) {
+    _exactValue(
+      baselineAuthentication!['approval_document_sha256'],
+      baseline.approvalSha,
+      'provenance.baseline_authentication.approval_document_sha256',
+    );
+  }
   if (visual) {
     _exactValue(
       manifest['baseline_status'],
@@ -2161,6 +2502,7 @@ Map<String, Object?> writeCandidateSpec({
     buildMarkerPath: buildMarkerPath,
     provenancePath: provenancePath,
   );
+  final baselineAuthentication = _validateProvenanceMode(provenance, mode);
   final baseline = _baselineDigests(
     visual: visual,
     mode: mode,
@@ -2168,6 +2510,13 @@ Map<String, Object?> writeCandidateSpec({
     baselineRoot: baselineRoot,
     approvalPath: baselineApprovalPath,
   );
+  if (visual && mode == _releaseReady) {
+    _exactValue(
+      baselineAuthentication!['approval_document_sha256'],
+      baseline.approvalSha,
+      'provenance.baseline_authentication.approval_document_sha256',
+    );
+  }
   final casePath =
       'evidence/et13/generated/${visual ? 'visual' : 'a11y'}-cases.v1.json';
   final generated = _readObject(casePath);
@@ -2290,6 +2639,10 @@ Map<String, Object?> _validateCandidateSpec({
     kind: kind,
     provenancePath: provenancePath,
   );
+  final baselineAuthentication = _validateProvenanceMode(
+    provenance,
+    _string(candidate['evidence_mode'], 'candidate.evidence_mode'),
+  );
   validateCandidateProvenanceIdentity(
     candidate: candidate,
     provenance: provenance,
@@ -2307,6 +2660,13 @@ Map<String, Object?> _validateCandidateSpec({
       } else {
         _exactValue(candidate[key], null, 'candidate.$key');
       }
+    }
+    if (mode == _releaseReady) {
+      _exactValue(
+        baselineAuthentication!['approval_document_sha256'],
+        candidate['baseline_approval_sha256'],
+        'candidate.baseline_approval_sha256',
+      );
     }
   }
   return candidate;
@@ -2532,6 +2892,33 @@ void validateCanonicalReleaseInputs({
     visualBinding: bindings['visual']!,
     a11yBinding: bindings['a11y']!,
   );
+  final visualProvenance = validateInputProvenanceDocument(
+    kind: 'visual',
+    provenancePath: visualProvenancePath,
+  );
+  final a11yProvenance = validateInputProvenanceDocument(
+    kind: 'a11y',
+    provenancePath: a11yProvenancePath,
+  );
+  final baselineAuthentication = _object(
+    visualProvenance['baseline_authentication'],
+    'visualProvenance.baseline_authentication',
+  );
+  _exactValue(
+    a11yProvenance['baseline_authentication'],
+    baselineAuthentication,
+    'atomicLaneIdentity.baseline_authentication',
+  );
+  _exactValue(
+    baselineAuthentication['release_id'],
+    releaseId,
+    'baselineAuthentication.release_id',
+  );
+  _exactValue(
+    baselineAuthentication['approval_document_sha256'],
+    bindings['visual']!['baseline_approval_sha256'],
+    'baselineAuthentication.approval_document_sha256',
+  );
   for (final entry in bindings.entries) {
     _exactValue(
       entry.value['evidence_mode'],
@@ -2575,6 +2962,7 @@ Map<String, Object?> writeResultManifest({
     buildMarkerPath: buildMarkerPath,
     provenancePath: provenancePath,
   );
+  final baselineAuthentication = _validateProvenanceMode(provenance, mode);
   _validateCaptureSummary(
     path: captureSummaryPath,
     sourceSha: sourceSha,
@@ -2587,6 +2975,13 @@ Map<String, Object?> writeResultManifest({
     baselineRoot: baselineRoot,
     approvalPath: baselineApprovalPath,
   );
+  if (visual && mode == _releaseReady) {
+    _exactValue(
+      baselineAuthentication!['approval_document_sha256'],
+      baseline.approvalSha,
+      'provenance.baseline_authentication.approval_document_sha256',
+    );
+  }
   final casePath =
       'evidence/et13/generated/${visual ? 'visual' : 'a11y'}-cases.v1.json';
   final generated = _readObject(casePath);
@@ -2660,6 +3055,7 @@ Map<String, Object?> writeResultManifest({
     manifestPath: outputPath,
     artifactRoot: artifactRoot,
     buildMarkerPath: buildMarkerPath,
+    provenancePath: provenancePath,
     baselineRoot: baselineRoot,
     baselineApprovalPath: baselineApprovalPath,
   );
@@ -2683,6 +3079,21 @@ Map<String, Object?> writeSanitizedEvidence({
     candidatePath: candidatePath,
     provenancePath: provenancePath,
   );
+  if (candidate['evidence_mode'] == _releaseReady) {
+    final provenance = validateInputProvenanceDocument(
+      kind: kind,
+      provenancePath: provenancePath,
+    );
+    final authentication = _object(
+      provenance['baseline_authentication'],
+      'provenance.baseline_authentication',
+    );
+    _exactValue(
+      authentication['release_id'],
+      releaseId,
+      'baselineAuthentication.release_id',
+    );
+  }
   final manifest = validateResultManifestDocument(
     kind: kind,
     manifestPath: manifestPath,
@@ -2812,6 +3223,21 @@ void validateSanitizedEvidence({
     candidatePath: candidatePath,
     provenancePath: provenancePath,
   );
+  if (candidate['evidence_mode'] == _releaseReady) {
+    final provenance = validateInputProvenanceDocument(
+      kind: kind,
+      provenancePath: provenancePath,
+    );
+    final authentication = _object(
+      provenance['baseline_authentication'],
+      'provenance.baseline_authentication',
+    );
+    _exactValue(
+      authentication['release_id'],
+      releaseId,
+      'baselineAuthentication.release_id',
+    );
+  }
   final manifest = validateResultManifestDocument(
     kind: kind,
     manifestPath: manifestPath,
@@ -3038,11 +3464,59 @@ void main(List<String> arguments) {
         stdout.writeln('ET13 catalog/assets/renderer: OK');
       case 'provenance':
         final options = _options(arguments.skip(1));
+        final mode = _requiredOption(options, 'mode');
+        _mode(mode, 'provenance.evidence_mode');
+        Map<String, Object?>? baselineAuthentication;
+        if (mode == _releaseReady) {
+          baselineAuthentication = buildBaselineAuthentication(
+            releaseId: _requiredOption(options, 'release-id'),
+            sourceSha: _requiredOption(options, 'source-sha'),
+            baselineRoot: _requiredOption(options, 'baseline-root'),
+            approvalPath: _requiredOption(options, 'baseline-approval'),
+            runId: _positiveInteger(
+              _requiredOption(options, 'baseline-run-id'),
+              'baseline-run-id',
+            ),
+            runAttempt: _positiveInteger(
+              _requiredOption(options, 'baseline-run-attempt'),
+              'baseline-run-attempt',
+            ),
+            artifactId: _positiveInteger(
+              _requiredOption(options, 'baseline-artifact-id'),
+              'baseline-artifact-id',
+            ),
+            artifactName: _requiredOption(options, 'baseline-artifact-name'),
+            artifactArchiveSha256: _requiredOption(
+              options,
+              'baseline-artifact-archive-sha256',
+            ),
+            workflowSha256: _requiredOption(
+              options,
+              'baseline-workflow-sha256',
+            ),
+          );
+        } else {
+          const releaseOnly = <String>{
+            'release-id',
+            'baseline-root',
+            'baseline-approval',
+            'baseline-run-id',
+            'baseline-run-attempt',
+            'baseline-artifact-id',
+            'baseline-artifact-name',
+            'baseline-artifact-archive-sha256',
+            'baseline-workflow-sha256',
+          };
+          if (options.keys.any(releaseOnly.contains)) {
+            _fail('diagnostic provenance must not consume baseline inputs');
+          }
+        }
         final provenance = writeInputProvenance(
           kind: _requiredOption(options, 'kind'),
           sourceSha: _requiredOption(options, 'source-sha'),
           buildMarkerPath: _requiredOption(options, 'build-marker'),
           outputPath: _requiredOption(options, 'output'),
+          baselineAuthentication: baselineAuthentication,
         );
         stdout.writeln(
           'ET13 ${options['kind']} input provenance: '
@@ -3127,6 +3601,7 @@ void main(List<String> arguments) {
           manifestPath: _requiredOption(options, 'manifest'),
           artifactRoot: _requiredOption(options, 'artifact-root'),
           buildMarkerPath: _requiredOption(options, 'build-marker'),
+          provenancePath: _requiredOption(options, 'provenance'),
           baselineRoot: options['baseline-root'],
           baselineApprovalPath: options['baseline-approval'],
         );

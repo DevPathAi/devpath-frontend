@@ -52,6 +52,33 @@ void main() {
     expect(verifier, contains("exact(workflow.encoding, 'base64'"));
   });
 
+  test('all release renderers resolve CanvasKit default font offline', () {
+    for (final path in [
+      '../../apps/web/web/flutter_bootstrap.js',
+      '../../apps/admin/web/flutter_bootstrap.js',
+      '../../apps/mobile/web/flutter_bootstrap.js',
+    ]) {
+      final bootstrap = File(path).readAsStringSync();
+      expect(
+        bootstrap,
+        contains("new URLSearchParams(window.location.search).has('fixture')"),
+        reason: '$path must scope the offline fallback to evidence routes',
+      );
+      expect(
+        bootstrap,
+        contains('fontFallbackBaseUrl:'),
+        reason: '$path must configure the engine fallback base',
+      );
+      expect(
+        bootstrap,
+        contains('assets/packages/dp_design/fonts/Pretendard-Regular.otf?'),
+        reason:
+            '$path must resolve CanvasKit fallback requests from the already '
+            'hash-pinned local Pretendard bytes',
+      );
+    }
+  });
+
   test('release producer has strict evidence and baseline schemas', () {
     for (final path in [
       '../../evidence/et13/evidence.schema.json',
@@ -95,11 +122,25 @@ void main() {
     expect(approvalSchema['required'], contains('review_candidate_sha256'));
     expect(
       approvalSchema['required'],
+      containsAll([
+        'approval_workflow_sha256',
+        'approval_environment_id',
+        'approved_by_id',
+        'approval_effective_at',
+        'raw_review_head_sha',
+        'raw_review_artifact_digest',
+      ]),
+    );
+    expect(
+      approvalSchema['required'],
       isNot(contains('candidate_spec_sha256')),
     );
     final approvalProperties = approvalSchema['properties'] as Map;
     expect(approvalProperties['fixture_ids'], {r'$ref': r'#/$defs/fixtureIds'});
-    expect((approvalProperties['approved_at'] as Map)['pattern'], r'Z$');
+    expect(
+      (approvalProperties['approval_effective_at'] as Map)['pattern'],
+      r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$',
+    );
 
     final bundle =
         jsonDecode(
@@ -332,8 +373,34 @@ void main() {
         root.path,
         generatedCatalogPath: generatedPath,
       ),
+      'approval_repository': 'DevPathAi/devpath-frontend',
+      'approval_workflow_path': '.github/workflows/et13-baseline-approval.yml',
+      'approval_workflow_sha256': sha256
+          .convert(
+            File(
+              '../../.github/workflows/et13-baseline-approval.yml',
+            ).readAsBytesSync(),
+          )
+          .toString(),
+      'approval_run_id': 12,
+      'approval_run_attempt': 1,
+      'approval_head_sha': sourceSha,
+      'approval_environment': 'et13-baseline-approval',
+      'approval_environment_id': 34,
+      'approved_by_id': 56,
       'approved_by': 'external-reviewer',
-      'approved_at': '2099-01-01T00:00:00Z',
+      'approval_effective_at': '2099-01-01T00:00:00Z',
+      'raw_review_workflow_sha256': sha256
+          .convert(
+            File('../../.github/workflows/et13-evidence.yml').readAsBytesSync(),
+          )
+          .toString(),
+      'raw_review_run_id': 7,
+      'raw_review_run_attempt': 2,
+      'raw_review_head_sha': sourceSha,
+      'raw_review_artifact_id': 89,
+      'raw_review_artifact_name': 'et13-unsealed-raw-review-run-7-attempt-2',
+      'raw_review_artifact_digest': 'sha256:$digest',
     };
     final approvalFile = File.fromUri(
       root.uri.resolve('baseline-approval.v1.json'),
@@ -346,9 +413,51 @@ void main() {
         requireExactBundle: true,
         catalogPath: catalogPath,
         generatedCatalogPath: generatedPath,
+        approvalWorkflowPath:
+            '../../.github/workflows/et13-baseline-approval.yml',
+        rawReviewWorkflowPath: '../../.github/workflows/et13-evidence.yml',
       ),
       returnsNormally,
     );
+    final authentication = et13.buildBaselineAuthentication(
+      releaseId: 'ms-20260816-et13',
+      sourceSha: sourceSha,
+      baselineRoot: root.path,
+      approvalPath: approvalFile.path,
+      runId: 12,
+      runAttempt: 1,
+      artifactId: 90,
+      artifactName:
+          'ms-20260816-et13-frontend-visual-approved-baseline-run-12-attempt-1',
+      artifactArchiveSha256: digest,
+      workflowSha256: approval['approval_workflow_sha256']! as String,
+      catalogPath: catalogPath,
+      generatedCatalogPath: generatedPath,
+      approvalWorkflowPath:
+          '../../.github/workflows/et13-baseline-approval.yml',
+      rawReviewWorkflowPath: '../../.github/workflows/et13-evidence.yml',
+    );
+    expect(authentication, {
+      'release_id': 'ms-20260816-et13',
+      'repository': 'DevPathAi/devpath-frontend',
+      'workflow_path': '.github/workflows/et13-baseline-approval.yml',
+      'workflow_sha256': approval['approval_workflow_sha256'],
+      'run_id': 12,
+      'run_attempt': 1,
+      'head_sha': sourceSha,
+      'artifact_id': 90,
+      'artifact_name':
+          'ms-20260816-et13-frontend-visual-approved-baseline-run-12-attempt-1',
+      'artifact_archive_sha256': digest,
+      'approval_document_sha256': sha256
+          .convert(approvalFile.readAsBytesSync())
+          .toString(),
+      'approval_environment': 'et13-baseline-approval',
+      'approval_environment_id': 34,
+      'approved_by_id': 56,
+      'approved_by': 'external-reviewer',
+      'approval_effective_at': '2099-01-01T00:00:00Z',
+    });
 
     review['repository'] = 'UntrustedFork/devpath-frontend';
     reviewFile.writeAsStringSync(jsonEncode(review));
@@ -364,6 +473,9 @@ void main() {
         requireExactBundle: true,
         catalogPath: catalogPath,
         generatedCatalogPath: generatedPath,
+        approvalWorkflowPath:
+            '../../.github/workflows/et13-baseline-approval.yml',
+        rawReviewWorkflowPath: '../../.github/workflows/et13-evidence.yml',
       ),
       throwsA(isA<FormatException>()),
     );
@@ -374,7 +486,7 @@ void main() {
         .toString();
     approvalFile.writeAsStringSync(jsonEncode(approval));
 
-    approval['approved_at'] = '2099-01-01T09:00:00+09:00';
+    approval['approval_effective_at'] = '2099-01-01T09:00:00+09:00';
     approvalFile.writeAsStringSync(jsonEncode(approval));
     expect(
       () => et13.validateBaselineApproval(
@@ -384,10 +496,49 @@ void main() {
         requireExactBundle: true,
         catalogPath: catalogPath,
         generatedCatalogPath: generatedPath,
+        approvalWorkflowPath:
+            '../../.github/workflows/et13-baseline-approval.yml',
+        rawReviewWorkflowPath: '../../.github/workflows/et13-evidence.yml',
       ),
       throwsA(isA<FormatException>()),
     );
-    approval['approved_at'] = '2099-01-01T00:00:00Z';
+    approval['approval_effective_at'] = '2099-01-01T00:00:00Z';
+    approvalFile.writeAsStringSync(jsonEncode(approval));
+
+    approval['approved_by'] = 'not a github login';
+    approvalFile.writeAsStringSync(jsonEncode(approval));
+    expect(
+      () => et13.validateBaselineApproval(
+        approvalPath: approvalFile.path,
+        baselineRoot: root.path,
+        reviewCandidatePath: reviewFile.path,
+        requireExactBundle: true,
+        catalogPath: catalogPath,
+        generatedCatalogPath: generatedPath,
+        approvalWorkflowPath:
+            '../../.github/workflows/et13-baseline-approval.yml',
+        rawReviewWorkflowPath: '../../.github/workflows/et13-evidence.yml',
+      ),
+      throwsA(isA<FormatException>()),
+    );
+    approval['approved_by'] = 'external-reviewer';
+    approval['approval_environment'] = 'unprotected-environment';
+    approvalFile.writeAsStringSync(jsonEncode(approval));
+    expect(
+      () => et13.validateBaselineApproval(
+        approvalPath: approvalFile.path,
+        baselineRoot: root.path,
+        reviewCandidatePath: reviewFile.path,
+        requireExactBundle: true,
+        catalogPath: catalogPath,
+        generatedCatalogPath: generatedPath,
+        approvalWorkflowPath:
+            '../../.github/workflows/et13-baseline-approval.yml',
+        rawReviewWorkflowPath: '../../.github/workflows/et13-evidence.yml',
+      ),
+      throwsA(isA<FormatException>()),
+    );
+    approval['approval_environment'] = 'et13-baseline-approval';
     approvalFile.writeAsStringSync(jsonEncode(approval));
 
     File.fromUri(root.uri.resolve('extra.json')).writeAsStringSync('{}');
@@ -399,6 +550,9 @@ void main() {
         requireExactBundle: true,
         catalogPath: catalogPath,
         generatedCatalogPath: generatedPath,
+        approvalWorkflowPath:
+            '../../.github/workflows/et13-baseline-approval.yml',
+        rawReviewWorkflowPath: '../../.github/workflows/et13-evidence.yml',
       ),
       throwsA(isA<FormatException>()),
     );
@@ -599,6 +753,28 @@ void main() {
     expect(workflow, contains('--canonical-candidate='));
     expect(workflow, contains('review-candidate.v1.json'));
     expect(workflow, contains('release-binding.v1.json'));
+    expect(workflow, contains('Hard-verify exact external artifact archives'));
+    expect(workflow, contains('candidate_artifact_archive_sha256'));
+    expect(workflow, contains('baseline_artifact_archive_sha256'));
+    expect(workflow, contains('sha256sum --check --strict'));
+    expect(workflow, contains('with zipfile.ZipFile(archive)'));
+    expect(workflow, contains('duplicate external archive entry'));
+    expect(workflow, contains('diff --recursive --brief'));
+    for (final option in [
+      '--mode="\${EVIDENCE_MODE}"',
+      '--baseline-run-id="\${BASELINE_RUN_ID}"',
+      '--baseline-run-attempt="\${BASELINE_RUN_ATTEMPT}"',
+      '--baseline-artifact-id="\${BASELINE_ARTIFACT_ID}"',
+      '--baseline-artifact-name="\${BASELINE_ARTIFACT_NAME}"',
+      '--baseline-artifact-archive-sha256="\${BASELINE_ARTIFACT_ARCHIVE_SHA256}"',
+      '--baseline-workflow-sha256="\${BASELINE_WORKFLOW_SHA256}"',
+    ]) {
+      expect(workflow, contains(option), reason: option);
+    }
+    expect(
+      File('../../tools/et13_evidence.dart').readAsStringSync(),
+      contains("'baseline_authentication'"),
+    );
     expect(
       workflow,
       contains(r'[[ "${CANDIDATE_SPEC_SHA256}" =~ ^[0-9a-f]{64}$ ]]'),
