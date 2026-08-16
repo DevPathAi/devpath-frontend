@@ -7,6 +7,7 @@ import 'package:devpath_mobile/src/data/owner_data_store.dart';
 import 'package:devpath_mobile/src/features/auth/application/auth_controller.dart';
 import 'package:devpath_mobile/src/features/auth/application/account_epoch_store.dart';
 import 'package:devpath_mobile/src/features/auth/application/credential_mutation_coordinator.dart';
+import 'package:devpath_mobile/src/features/auth/application/pending_deep_link_controller.dart';
 import 'package:devpath_mobile/src/features/auth/application/verified_session_store.dart';
 import 'package:devpath_mobile/src/features/auth/state/auth_state.dart';
 import 'package:devpath_mobile/src/features/notifications/application/device_registrar.dart';
@@ -257,6 +258,39 @@ void main() {
       expect(events, ['revoke:owner-a', 'clear:owner-a']);
       expect(container.read(authControllerProvider).ownerKey, 'owner-b');
       expect((await VerifiedSessionStore(kv).read())?.id, 'owner-b');
+    },
+  );
+
+  test(
+    'verified A to server B clears live and durable A pending route',
+    () async {
+      final tokens = InMemoryTokenStore();
+      final kv = InMemoryKeyValueStore();
+      await tokens.save(access: 'b-access', refresh: 'b-refresh');
+      await VerifiedSessionStore(kv).write(_user('owner-a'));
+      final container = ProviderContainer(
+        overrides: [
+          tokenStoreProvider.overrideWithValue(tokens),
+          keyValueStoreProvider.overrideWithValue(kv),
+          accountDataCleanerProvider.overrideWithValue(_Cleaner()),
+          ownerDataStoreProvider.overrideWithValue(InMemoryOwnerDataStore()),
+          deviceRegistrarProvider.overrideWithValue(_SwitchRegistrar([])),
+          apiClientProvider.overrideWithValue(
+            _client({'GET /users/me': (200, _userJson('owner-b'))}),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      final pending = container.read(pendingDeepLinkProvider.notifier);
+      expect(await pending.capture('/path/101/today'), isTrue);
+      expect(container.read(pendingDeepLinkProvider), '/path/101/today');
+      expect(await kv.read(PendingDeepLinkController.storageKey), isNotNull);
+
+      await container.read(authControllerProvider.notifier).bootstrapSession();
+
+      expect(container.read(authControllerProvider).ownerKey, 'owner-b');
+      expect(container.read(pendingDeepLinkProvider), isNull);
+      expect(await kv.read(PendingDeepLinkController.storageKey), isNull);
     },
   );
 
