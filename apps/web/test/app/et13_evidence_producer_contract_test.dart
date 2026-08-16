@@ -766,6 +766,91 @@ void main() {
     );
   });
 
+  test('packaged build marker validates without producer build trees', () {
+    final root = Directory.systemTemp.createTempSync('et13-review-marker-');
+    addTearDown(() => root.deleteSync(recursive: true));
+    final assets =
+        (jsonDecode(
+                  File(
+                    '../../evidence/et13/assets.lock.json',
+                  ).readAsStringSync(),
+                )
+                as Map<String, dynamic>)['assets']
+            as List<dynamic>;
+    const builtFontPaths = <String, String>{
+      'pretendard-400':
+          'assets/packages/dp_design/fonts/Pretendard-Regular.otf',
+      'pretendard-500': 'assets/packages/dp_design/fonts/Pretendard-Medium.otf',
+      'pretendard-600':
+          'assets/packages/dp_design/fonts/Pretendard-SemiBold.otf',
+      'pretendard-700': 'assets/packages/dp_design/fonts/Pretendard-Bold.otf',
+      'd2coding': 'assets/packages/dp_design/fonts/D2Coding.ttf',
+      'material-symbols-rounded':
+          'assets/packages/material_symbols_icons/lib/fonts/'
+          'MaterialSymbolsRounded.ttf',
+      'material-icons': 'assets/fonts/MaterialIcons-Regular.otf',
+    };
+    final fontAssets = <Map<String, Object?>>[
+      for (final entry in builtFontPaths.entries)
+        () {
+          final locked = assets.cast<Map<String, dynamic>>().singleWhere(
+            (asset) => asset['id'] == entry.key,
+          );
+          return <String, Object?>{
+            'id': entry.key,
+            'artifact_path': entry.value,
+            'sha256': locked['sha256'],
+            'bytes': locked['bytes'],
+          };
+        }(),
+    ];
+    const sourceSha = '1234567890abcdef1234567890abcdef12345678';
+    const entrypoints = <String, String>{
+      'web': 'apps/web/lib/et13_evidence_main.dart',
+      'admin': 'apps/admin/lib/et13_evidence_main.dart',
+      'mobile': 'apps/mobile/lib/et13_evidence_main.dart',
+    };
+    final marker = <String, Object?>{
+      'schema_version': 'leva.et13.build-marker.v1',
+      'source_sha': sourceSha,
+      'capture_surface': 'flutter_web_release_projection',
+      'device_evidence': false,
+      'distributions': [
+        for (final entry in entrypoints.entries)
+          <String, Object?>{
+            'id': entry.key,
+            'entrypoint': entry.value,
+            'artifact_root': 'unavailable/build/${entry.key}',
+            'main_dart_js_sha256': 'a' * 64,
+            'font_assets': fontAssets,
+          },
+      ],
+    };
+    final markerFile = File.fromUri(root.uri.resolve('build-marker.v1.json'))
+      ..writeAsStringSync(jsonEncode(marker));
+    expect(
+      Directory.fromUri(root.uri.resolve('unavailable/')).existsSync(),
+      isFalse,
+    );
+    expect(
+      et13.validateBuildMarkerDocument(
+        sourceSha: sourceSha,
+        buildMarkerPath: markerFile.path,
+      )['source_sha'],
+      sourceSha,
+    );
+
+    fontAssets.first['bytes'] = 1;
+    markerFile.writeAsStringSync(jsonEncode(marker));
+    expect(
+      () => et13.validateBuildMarkerDocument(
+        sourceSha: sourceSha,
+        buildMarkerPath: markerFile.path,
+      ),
+      throwsA(isA<FormatException>()),
+    );
+  });
+
   test('single atomic workflow separates sealable lanes and raw review bytes', () {
     final workflow = File(
       '../../.github/workflows/et13-evidence.yml',

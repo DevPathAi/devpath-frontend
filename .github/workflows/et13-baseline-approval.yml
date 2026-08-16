@@ -581,10 +581,22 @@ jobs:
                .repository == "DevPathAi/devpath-frontend" and
                .producer_run_id == $run_id and
                .producer_run_attempt == $run_attempt and
-               .evidence_mode == "diagnostic" and
-               .baseline_status == "pending_external_review"' \
+               .evidence_mode == "diagnostic"' \
               "${candidate}" > /dev/null
-            dart run tools/et13_evidence.dart validate-manifest \
+            if [[ "${lane}" == visual ]]; then
+              jq -e '
+                .baseline_status == "pending_external_review" and
+                .baseline_set_sha256 == null and
+                .baseline_approval_sha256 == null
+              ' "${candidate}" > /dev/null
+            else
+              jq -e '
+                (has("baseline_status") | not) and
+                (has("baseline_set_sha256") | not) and
+                (has("baseline_approval_sha256") | not)
+              ' "${candidate}" > /dev/null
+            fi
+            dart run tools/et13_evidence.dart validate-review-manifest \
               --kind="${lane}" \
               --manifest="${raw_root}/producer/${lane}/${lane}-manifest.v1.json" \
               --artifact-root="${raw_root}/capture" \

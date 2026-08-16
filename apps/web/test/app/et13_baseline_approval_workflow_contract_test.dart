@@ -153,6 +153,36 @@ void main() {
     expect(workflow, contains('924134a44c189315be2148659913dda1671cbe99'));
   });
 
+  test(
+    'fresh approval validates packaged review evidence without build trees',
+    () {
+      expect(workflow, contains('validate-review-manifest'));
+      expect(
+        workflow,
+        isNot(contains('et13_evidence.dart validate-manifest \\')),
+        reason:
+            'approval runners receive the strict raw-review bundle, not the '
+            'producer build trees required by validate-manifest',
+      );
+      expect(workflow, contains(r'if [[ "${lane}" == visual ]]; then'));
+      expect(
+        workflow,
+        contains('.baseline_status == "pending_external_review"'),
+      );
+      for (final field in [
+        'baseline_status',
+        'baseline_set_sha256',
+        'baseline_approval_sha256',
+      ]) {
+        expect(
+          workflow,
+          contains('has("$field") | not'),
+          reason: 'a11y review candidates must omit $field',
+        );
+      }
+    },
+  );
+
   test('all third-party actions are pinned to full commit identities', () {
     final uses = RegExp(
       r'^\s*-?\s*uses:\s*([^\s#]+)',

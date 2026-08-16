@@ -1025,23 +1025,13 @@ void _validateCleanHead(String sourceSha, {String? workingDirectory}) {
 void validateSourceTreeClean(String sourceSha, {String? workingDirectory}) =>
     _validateCleanHead(sourceSha, workingDirectory: workingDirectory);
 
-List<Map<String, Object?>> _builtFontMarker(String artifactRoot) {
-  final root = Directory(artifactRoot);
+List<Map<String, Object?>> _lockedBuiltFontMarker() {
   return <Map<String, Object?>>[
     for (final path in _builtFontPaths.entries)
       () {
         final expected = _expectedAssets.singleWhere(
           (asset) => asset['id'] == path.key,
         );
-        final file = File.fromUri(root.uri.resolve(path.value));
-        if (!file.existsSync() ||
-            file.lengthSync() != expected['bytes'] ||
-            _rawSha(file.path) != expected['sha256']) {
-          _fail(
-            '$artifactRoot/${path.value} is absent, tree-shaken, or differs '
-            'from the exact ET13 font lock',
-          );
-        }
         return <String, Object?>{
           'id': path.key,
           'artifact_path': path.value,
@@ -1052,9 +1042,31 @@ List<Map<String, Object?>> _builtFontMarker(String artifactRoot) {
   ];
 }
 
-void validateSourceIdentity(String sourceSha, String buildMarkerPath) {
-  _validateCleanHead(sourceSha);
+List<Map<String, Object?>> _builtFontMarker(String artifactRoot) {
+  final root = Directory(artifactRoot);
+  final locked = _lockedBuiltFontMarker();
+  for (final font in locked) {
+    final relative = _string(font['artifact_path'], 'font.artifact_path');
+    final file = File.fromUri(root.uri.resolve(relative));
+    if (!file.existsSync() ||
+        file.lengthSync() != font['bytes'] ||
+        _rawSha(file.path) != font['sha256']) {
+      _fail(
+        '$artifactRoot/$relative is absent, tree-shaken, or differs '
+        'from the exact ET13 font lock',
+      );
+    }
+  }
+  return locked;
+}
 
+/// Validates the immutable build-marker document without reopening producer
+/// build trees. Approval jobs use this boundary because their authenticated
+/// raw-review artifact intentionally contains only review evidence bytes.
+Map<String, Object?> validateBuildMarkerDocument({
+  required String sourceSha,
+  required String buildMarkerPath,
+}) {
   final marker = _readObject(buildMarkerPath);
   _exactKeys(marker, const [
     'schema_version',
@@ -1108,6 +1120,37 @@ void validateSourceIdentity(String sourceSha, String buildMarkerPath) {
       distribution['artifact_root'],
       '$id.artifact_root',
     );
+    if (artifactRoot.isEmpty || artifactRoot.contains('\\')) {
+      _fail('$id build marker artifact root must be a canonical path');
+    }
+    _sha256String(
+      distribution['main_dart_js_sha256'],
+      '$id.main_dart_js_sha256',
+    );
+    if (jsonEncode(distribution['font_assets']) !=
+        jsonEncode(_lockedBuiltFontMarker())) {
+      _fail('$id build marker font assets drifted from the exact lock');
+    }
+  }
+  return marker;
+}
+
+void validateSourceIdentity(String sourceSha, String buildMarkerPath) {
+  _validateCleanHead(sourceSha);
+  final marker = validateBuildMarkerDocument(
+    sourceSha: sourceSha,
+    buildMarkerPath: buildMarkerPath,
+  );
+  for (final raw in _array(
+    marker['distributions'],
+    'buildMarker.distributions',
+  )) {
+    final distribution = _object(raw, 'buildMarker.distribution');
+    final id = _string(distribution['id'], 'distribution.id');
+    final artifactRoot = _string(
+      distribution['artifact_root'],
+      '$id.artifact_root',
+    );
     final main = File.fromUri(
       Directory(artifactRoot).uri.resolve('main.dart.js'),
     );
@@ -1118,10 +1161,7 @@ void validateSourceIdentity(String sourceSha, String buildMarkerPath) {
     if (!main.existsSync() || _rawSha(main.path) != expectedMainSha) {
       _fail('$id build marker does not match its main.dart.js bytes');
     }
-    final expectedFonts = _builtFontMarker(artifactRoot);
-    if (jsonEncode(distribution['font_assets']) != jsonEncode(expectedFonts)) {
-      _fail('$id build marker font assets drifted from exact packaged bytes');
-    }
+    _builtFontMarker(artifactRoot);
   }
 }
 
@@ -2386,6 +2426,58 @@ void validateResultManifest({
   );
 }
 
+/// Re-opens an authenticated diagnostic review bundle on a fresh approval
+/// runner. This validates the packaged marker, provenance, manifest, and
+/// capture bytes without requiring the producer-only Flutter build trees.
+/// [validateResultManifest] remains the producer boundary that additionally
+/// re-opens every release build and the clean source checkout.
+void validateReviewManifest({
+  required String kind,
+  required String manifestPath,
+  required String artifactRoot,
+  required String buildMarkerPath,
+  required String provenancePath,
+}) {
+  final manifest = validateResultManifestDocument(
+    kind: kind,
+    manifestPath: manifestPath,
+  );
+  final mode = _mode(manifest['evidence_mode'], 'manifest.evidence_mode');
+  _exactValue(mode, _diagnostic, 'manifest.evidence_mode');
+  final sourceSha = _string(manifest['source_sha'], 'manifest.source_sha');
+  validateBuildMarkerDocument(
+    sourceSha: sourceSha,
+    buildMarkerPath: buildMarkerPath,
+  );
+  final provenance = validateInputProvenanceDocument(
+    kind: kind,
+    provenancePath: provenancePath,
+  );
+  _validateProvenanceMode(provenance, mode);
+  _exactValue(
+    provenance['build_marker_sha256'],
+    _rawSha(buildMarkerPath),
+    'provenance.build_marker_sha256',
+  );
+  for (final key in [
+    'source_sha',
+    'catalog_sha256',
+    'case_catalog_sha256',
+    'projection_contract_sha256',
+    'assets_lock_sha256',
+    'renderer_lock_sha256',
+    'renderer_image_digest',
+    'input_provenance_sha256',
+  ]) {
+    _exactValue(manifest[key], provenance[key], 'manifest.$key');
+  }
+  validateResultArtifacts(
+    kind: kind,
+    manifestPath: manifestPath,
+    artifactRoot: artifactRoot,
+  );
+}
+
 int _positiveInteger(String value, String path) {
   final parsed = int.tryParse(value);
   if (parsed == null || parsed < 1) _fail('$path must be a positive integer');
@@ -3423,7 +3515,8 @@ void _usage() {
   stderr.writeln(
     'Usage: dart run tools/et13_evidence.dart '
     '<generate|validate|build-marker|provenance|candidate|manifest|evidence|'
-    'validate-release-inputs|validate-manifest|validate-package> '
+    'validate-release-inputs|validate-manifest|validate-review-manifest|'
+    'validate-package> '
     '[--name=value ...]',
   );
 }
@@ -3606,6 +3699,16 @@ void main(List<String> arguments) {
           baselineApprovalPath: options['baseline-approval'],
         );
         stdout.writeln('ET13 ${options['kind']} manifest: OK');
+      case 'validate-review-manifest':
+        final options = _options(arguments.skip(1));
+        validateReviewManifest(
+          kind: _requiredOption(options, 'kind'),
+          manifestPath: _requiredOption(options, 'manifest'),
+          artifactRoot: _requiredOption(options, 'artifact-root'),
+          buildMarkerPath: _requiredOption(options, 'build-marker'),
+          provenancePath: _requiredOption(options, 'provenance'),
+        );
+        stdout.writeln('ET13 ${options['kind']} review manifest: OK');
       case 'validate-package':
         final options = _options(arguments.skip(1));
         validateReleasePackage(
