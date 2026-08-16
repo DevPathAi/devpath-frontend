@@ -84,6 +84,7 @@ class AuthController extends Notifier<AuthState> {
   /// 목 모드 로그인 — 코드 교환을 생략하고 가짜 토큰을 저장해 동일 경로로 세션 구성.
   Future<void> mockLogin() async {
     final epoch = ++_epoch;
+    _retireOAuthFlow();
     _bootstrapInFlight = null;
     _invalidateCredentialBoundary();
     final saved = await _mutateCredentials(() async {
@@ -253,9 +254,7 @@ class AuthController extends Notifier<AuthState> {
       // `app_links` can redeliver an already-consumed callback. Without a
       // verifier it is not a new login attempt and must never tear down an
       // authenticated (or currently restoring) verified session.
-      if (state is AuthAuthenticated ||
-          state is AuthOfflineAuthenticated ||
-          state is AuthLoading) {
+      if (_preservesSessionOnOAuthCandidateFailure) {
         return;
       }
       state = const AuthUnauthenticated(error: 'PKCE verifier 없음(로그인 재시도 필요)');
@@ -349,9 +348,7 @@ class AuthController extends Notifier<AuthState> {
     required int requestEpoch,
   }) {
     if (!_isOAuthFlowCurrent(flowGeneration, requestEpoch)) return;
-    if (state is AuthAuthenticated ||
-        state is AuthOfflineAuthenticated ||
-        state is AuthLoading) {
+    if (_preservesSessionOnOAuthCandidateFailure) {
       return;
     }
     state = AuthUnauthenticated(error: message);
@@ -362,20 +359,46 @@ class AuthController extends Notifier<AuthState> {
     _oauthCompletions.clear();
   }
 
+  void _retireOAuthFlow() {
+    _oauthFlowGeneration += 1;
+    _resetOAuthCallbackQueue();
+  }
+
+  bool get _preservesSessionOnOAuthCandidateFailure =>
+      state is AuthAuthenticated ||
+      state is AuthOfflineAuthenticated ||
+      state is AuthSessionUnavailable ||
+      state is AuthLoading;
+
   Future<void> logout() async {
+    final epoch = ++_epoch;
+    _retireOAuthFlow();
+    _bootstrapInFlight = null;
     final liveOwnerKey = state.ownerKey;
     final ownerKey =
         liveOwnerKey ??
         (await ref.read(verifiedSessionStoreProvider).read())?.id;
+    if (!_isCurrent(epoch)) return;
     final credentialOwnerConfirmed =
         liveOwnerKey != null && liveOwnerKey == ownerKey;
-    final epoch = ++_epoch;
-    _bootstrapInFlight = null;
     _invalidateCredentialBoundary();
     // Drop the in-memory owner boundary before slow server/disk work so no
     // push or deep-link event can attach to the account being removed.
     state = const AuthUnauthenticated();
     ref.read(pendingDeepLinkProvider.notifier).consume();
+    // Retire the durable PKCE capability before slow network revocation. A
+    // storage failure is retried by the full credential cleanup below.
+    try {
+      await _mutateCredentials(() async {
+        if (_isCurrent(epoch)) {
+          await ref.read(keyValueStoreProvider).delete(_kPkceVerifier);
+        }
+      });
+    } on Object {
+      // Continue fail-closed owner/token cleanup even when this early delete
+      // cannot be persisted; the final cleanup attempts the exact delete again.
+    }
+    if (!_isCurrent(epoch)) return;
     try {
       await _revokePush(
         ownerKey,
@@ -418,6 +441,7 @@ class AuthController extends Notifier<AuthState> {
     String? message,
   ) async {
     final epoch = ++_epoch;
+    _retireOAuthFlow();
     _bootstrapInFlight = null;
     _invalidateCredentialBoundary();
     final terminal = AuthUnauthenticated(

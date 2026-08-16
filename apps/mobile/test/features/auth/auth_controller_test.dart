@@ -7,7 +7,9 @@ import 'package:devpath_mobile/src/features/auth/application/auth_controller.dar
 import 'package:devpath_mobile/src/features/auth/application/oauth_launcher.dart';
 import 'package:devpath_mobile/src/features/auth/application/pkce.dart';
 import 'package:devpath_mobile/src/features/auth/state/auth_state.dart';
+import 'package:devpath_mobile/src/features/notifications/application/device_registrar.dart';
 import 'package:devpath_mobile/src/providers/api_providers.dart';
+import 'package:devpath_mobile/src/services/push_service.dart';
 import 'package:dp_core/dp_core.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -22,6 +24,28 @@ class _FakeLauncher implements OAuthLauncher {
 class _NoopCleaner implements AccountDataCleaner {
   @override
   Future<void> clearOwner(String ownerKey) async {}
+}
+
+class _BlockingRegistrar extends DeviceRegistrar {
+  _BlockingRegistrar()
+    : super(
+        _client(const {}),
+        StubPushService(),
+        'ANDROID',
+        InMemoryOwnerDataStore(),
+      );
+
+  final started = Completer<void>();
+  final release = Completer<void>();
+
+  @override
+  Future<void> unregister(
+    String ownerKey, {
+    bool? credentialOwnerConfirmed,
+  }) async {
+    if (!started.isCompleted) started.complete();
+    await release.future;
+  }
 }
 
 ApiClient _client(Map<String, MockFixture> fx) {
@@ -732,6 +756,83 @@ void main() {
       expect(await store.readAccess(), isNull);
     });
 
+    test(
+      'logout retires queued OAuth callbacks before slow push revoke',
+      () async {
+        final store = InMemoryTokenStore();
+        final kv = InMemoryKeyValueStore();
+        final registrar = _BlockingRegistrar();
+        final firstStarted = Completer<void>();
+        final releaseFirst = Completer<void>();
+        final exchangeCodes = <String>[];
+        final authFlow = _client(const {});
+        authFlow.dio.interceptors.insert(
+          0,
+          InterceptorsWrapper(
+            onRequest: (options, handler) async {
+              final code = (options.data as Map)['code'] as String;
+              exchangeCodes.add(code);
+              if (code == 'first-code') {
+                firstStarted.complete();
+                await releaseFirst.future;
+              }
+              handler.reject(
+                DioException(
+                  requestOptions: options,
+                  response: Response<Map<String, dynamic>>(
+                    requestOptions: options,
+                    statusCode: 401,
+                    data: const {
+                      'error': {
+                        'code': 'UNAUTHORIZED',
+                        'message': 'PKCE mismatch',
+                      },
+                    },
+                  ),
+                  type: DioExceptionType.badResponse,
+                ),
+              );
+            },
+          ),
+        );
+        final c = ProviderContainer(
+          overrides: [
+            tokenStoreProvider.overrideWithValue(store),
+            apiClientProvider.overrideWithValue(_client(_userOk)),
+            authFlowClientProvider.overrideWithValue(authFlow),
+            keyValueStoreProvider.overrideWithValue(kv),
+            accountDataCleanerProvider.overrideWithValue(_NoopCleaner()),
+            ownerDataStoreProvider.overrideWithValue(InMemoryOwnerDataStore()),
+            deviceRegistrarProvider.overrideWithValue(registrar),
+          ],
+        );
+        addTearDown(() {
+          if (!releaseFirst.isCompleted) releaseFirst.complete();
+          if (!registrar.release.isCompleted) registrar.release.complete();
+          c.dispose();
+        });
+        final controller = c.read(authControllerProvider.notifier);
+        await pumpEventQueue();
+        await controller.mockLogin();
+        await kv.write(_kVerifier, 'current-verifier');
+
+        final first = controller.completeFromCode('first-code');
+        await firstStarted.future;
+        final queued = controller.completeFromCode('queued-code');
+        final loggingOut = controller.logout();
+        await registrar.started.future;
+        releaseFirst.complete();
+        await Future.wait([first, queued]);
+
+        expect(exchangeCodes, ['first-code']);
+        registrar.release.complete();
+        await loggingOut;
+        expect(c.read(authControllerProvider), isA<AuthUnauthenticated>());
+        expect(await store.readAccess(), isNull);
+        expect(await kv.read(_kVerifier), isNull);
+      },
+    );
+
     test('login() → PKCE challenge 포함 인가 URL + verifier 보관', () async {
       final launcher = _FakeLauncher();
       final kv = InMemoryKeyValueStore();
@@ -766,6 +867,51 @@ void main() {
       expect(c.read(authControllerProvider), isA<AuthSessionUnavailable>());
       expect(await store.readAccess(), 'x');
     });
+
+    test('missing OAuth verifier preserves retryable session state', () async {
+      final store = InMemoryTokenStore();
+      await store.save(access: 'x', refresh: 'y');
+      final c = _container(store: store, fixtures: const {});
+      final controller = c.read(authControllerProvider.notifier);
+      await controller.bootstrapSession();
+      expect(c.read(authControllerProvider), isA<AuthSessionUnavailable>());
+
+      await controller.completeFromCode('missing-verifier-code');
+
+      expect(c.read(authControllerProvider), isA<AuthSessionUnavailable>());
+      expect(await store.readAccess(), 'x');
+    });
+
+    test(
+      'rejected OAuth candidate preserves retryable session state',
+      () async {
+        final store = InMemoryTokenStore();
+        final kv = InMemoryKeyValueStore();
+        await store.save(access: 'x', refresh: 'y');
+        await kv.write(_kVerifier, 'current-verifier');
+        final c = _container(
+          store: store,
+          kv: kv,
+          fixtures: {
+            'POST /auth/oauth/token': (
+              401,
+              {
+                'error': {'code': 'UNAUTHORIZED', 'message': 'PKCE mismatch'},
+              },
+            ),
+          },
+        );
+        final controller = c.read(authControllerProvider.notifier);
+        await controller.bootstrapSession();
+        expect(c.read(authControllerProvider), isA<AuthSessionUnavailable>());
+
+        await controller.completeFromCode('stale-candidate');
+
+        expect(c.read(authControllerProvider), isA<AuthSessionUnavailable>());
+        expect(await store.readAccess(), 'x');
+        expect(await kv.read(_kVerifier), 'current-verifier');
+      },
+    );
 
     test(
       'malformed /users/me is terminal and never leaves AuthLoading',
