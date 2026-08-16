@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../../tools/mobile_source_guard.dart' as source_guard;
+
 String _read(String path) => File(path).readAsStringSync();
 
 void main() {
@@ -58,6 +60,29 @@ void main() {
         reason: '${use.group(1)} must retain a human-readable version comment',
       );
     }
+  });
+
+  test('source guard rejects reviewed action SHA and count drift', () {
+    final workflow = _read('../../.github/workflows/mobile.yml');
+    expect(source_guard.mobileWorkflowActionViolation(workflow), isNull);
+
+    final shaDrift = workflow.replaceFirst(
+      'd23441a48e516b6c34aea4fa41551a30e30af803',
+      '0000000000000000000000000000000000000000',
+    );
+    expect(
+      source_guard.mobileWorkflowActionViolation(shaDrift),
+      contains('actions/checkout must use reviewed pin'),
+    );
+
+    final countDrift =
+        '$workflow\n'
+        '      - uses: actions/setup-java@'
+        'cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1\n';
+    expect(
+      source_guard.mobileWorkflowActionViolation(countDrift),
+      contains('actions/setup-java must occur exactly 1 time(s)'),
+    );
   });
 
   test('release Android build cannot silently use the debug signing key', () {
