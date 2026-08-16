@@ -191,9 +191,9 @@ void main(List<String> args) {
     'runs-on: ubuntu-24.04',
     'runs-on: macos-26',
     '"dartSdkVersion": "3.12.1"',
-    "java-version: '17.0.19+10'",
-    'OpenJDK Runtime Environment Temurin-17.0.19+10 '
-        '(build 17.0.19+10)',
+    "java-version: '17.0.20+8'",
+    'OpenJDK Runtime Environment Temurin-17.0.20+8 '
+        '(build 17.0.20+8)',
     'platforms/android-36/android.jar',
     'xcodebuild -version',
     '--dart-define=USE_MOCK=true',
@@ -256,13 +256,13 @@ void main(List<String> args) {
 
 String? mobileWorkflowToolchainViolation(String workflowSource) {
   const exactJavaToolchain = [
-    "java-version: '17.0.19+10'",
-    'OpenJDK Runtime Environment Temurin-17.0.19+10 '
-        '(build 17.0.19+10)',
+    "java-version: '17.0.20+8'",
+    'OpenJDK Runtime Environment Temurin-17.0.20+8 '
+        '(build 17.0.20+8)',
   ];
   for (final marker in exactJavaToolchain) {
     if (!workflowSource.contains(marker)) {
-      return 'mobile CI must pin Temurin 17.0.19+10 runtime and build: '
+      return 'mobile CI must pin Temurin 17.0.20+8 runtime and build: '
           'missing $marker';
     }
   }

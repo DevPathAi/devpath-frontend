@@ -41,7 +41,7 @@ jobs:
       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
         with:
           distribution: temurin
-          java-version: '17.0.19+10'
+          java-version: '17.0.20+8'
       - name: Verify exact checkout and toolchain
         shell: bash
         run: |
@@ -49,7 +49,7 @@ jobs:
           test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
           flutter --version --machine | grep -q '"frameworkVersion": "3.44.1"'
           flutter --version --machine | grep -q '"dartSdkVersion": "3.12.1"'
-          java -version 2>&1 | grep -Fqx 'OpenJDK Runtime Environment Temurin-17.0.19+10 (build 17.0.19+10)'
+          java -version 2>&1 | grep -Fqx 'OpenJDK Runtime Environment Temurin-17.0.20+8 (build 17.0.20+8)'
           test -n "${ANDROID_HOME}"
           test -f "${ANDROID_HOME}/platforms/android-36/android.jar"
       - name: Resolve locked workspace

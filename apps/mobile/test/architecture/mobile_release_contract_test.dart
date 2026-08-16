@@ -20,12 +20,12 @@ void main() {
       expect(workflow, contains('pubspec.lock'));
       expect(workflow, contains('runs-on: ubuntu-24.04'));
       expect(workflow, contains('runs-on: macos-26'));
-      expect(workflow, contains("java-version: '17.0.19+10'"));
+      expect(workflow, contains("java-version: '17.0.20+8'"));
       expect(
         workflow,
         contains(
-          'OpenJDK Runtime Environment Temurin-17.0.19+10 '
-          '(build 17.0.19+10)',
+          'OpenJDK Runtime Environment Temurin-17.0.20+8 '
+          '(build 17.0.20+8)',
         ),
       );
       expect(workflow, isNot(contains('secrets.')));
@@ -118,21 +118,21 @@ void main() {
     expect(source_guard.mobileWorkflowToolchainViolation(workflow), isNull);
 
     final versionDrift = workflow.replaceFirst(
-      "java-version: '17.0.19+10'",
+      "java-version: '17.0.20+8'",
       "java-version: '17'",
     );
     expect(
       source_guard.mobileWorkflowToolchainViolation(versionDrift),
-      contains('Temurin 17.0.19+10'),
+      contains('Temurin 17.0.20+8'),
     );
 
     final runtimeDrift = workflow.replaceFirst(
+      'OpenJDK Runtime Environment Temurin-17.0.20+8 (build 17.0.20+8)',
       'OpenJDK Runtime Environment Temurin-17.0.19+10 (build 17.0.19+10)',
-      'OpenJDK Runtime Environment Temurin-17.0.18+8 (build 17.0.18+8)',
     );
     expect(
       source_guard.mobileWorkflowToolchainViolation(runtimeDrift),
-      contains('Temurin 17.0.19+10'),
+      contains('Temurin 17.0.20+8'),
     );
   });
 
