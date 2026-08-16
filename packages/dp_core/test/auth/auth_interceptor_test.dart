@@ -5,6 +5,8 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:dp_core/src/auth/auth_interceptor.dart';
 import 'package:dp_core/src/auth/token_store.dart';
+import 'package:dp_core/src/error/api_error_code.dart';
+import 'package:dp_core/src/error/api_exception.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:test/test.dart';
 
@@ -216,6 +218,38 @@ void main() {
     );
     expect(await store.readAccess(), isNull);
   });
+
+  for (final status in [401, 403]) {
+    test('refresh HTTP $status clears tokens', () async {
+      final store = InMemoryTokenStore()..save(access: 'old', refresh: 'RRR');
+      final interceptor = AuthInterceptor(
+        store: store,
+        refresh: (_) async => throw ApiException(
+          code: status == 401
+              ? ApiErrorCode.unauthorized
+              : ApiErrorCode.forbidden,
+          message: 'refresh rejected',
+          status: status,
+        ),
+        retry: (_) async => Response(requestOptions: RequestOptions(path: '/')),
+      );
+      final request = RequestOptions(path: '/resource')
+        ..headers['Authorization'] = 'Bearer old';
+      final error = DioException(
+        requestOptions: request,
+        response: Response(requestOptions: request, statusCode: 401),
+        type: DioExceptionType.badResponse,
+      );
+      final handler = _InspectableErrorHandler();
+      final consumed = handler.consume();
+
+      await interceptor.onError(error, handler);
+      await consumed;
+
+      expect(await store.readAccess(), isNull);
+      expect(await store.readRefresh(), isNull);
+    });
+  }
 
   test('refresh transport failure retains the existing credential', () async {
     final store = InMemoryTokenStore()..save(access: 'old', refresh: 'RRR');

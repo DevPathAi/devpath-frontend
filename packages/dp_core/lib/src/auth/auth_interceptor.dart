@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 
+import '../error/api_error_code.dart';
+import '../error/api_exception.dart';
 import 'token_store.dart';
 
 typedef AuthCredentialMutationRunner =
@@ -95,19 +97,18 @@ class AuthInterceptor extends QueuedInterceptor {
         return;
       }
       try {
-        final res = await _mutateCredential<Response<dynamic>?>(() async {
-          if (!await _isSameSession(err.requestOptions)) return null;
-          final req = err.requestOptions
-            ..headers['Authorization'] = 'Bearer $currentAccess';
-          final response = await retry(req);
-          if (!await _isSameSession(err.requestOptions)) return null;
-          return response;
-        });
-        if (res == null) {
+        if (!await _isSameSession(err.requestOptions)) {
           handler.next(err);
-        } else {
-          handler.resolve(res);
+          return;
         }
+        final req = err.requestOptions
+          ..headers['Authorization'] = 'Bearer $currentAccess';
+        final res = await retry(req);
+        if (!await _isSameSession(err.requestOptions)) {
+          handler.next(err);
+          return;
+        }
+        handler.resolve(res);
       } catch (_) {
         handler.next(err);
       }
@@ -121,39 +122,66 @@ class AuthInterceptor extends QueuedInterceptor {
       handler.next(err);
       return;
     }
+    late final TokenPair? pair;
     try {
-      final pair = await refresh(refreshToken); // 쿠키 기반이면 인자 무시
-      if (!await _isSameSession(err.requestOptions)) {
-        handler.next(err);
-        return;
-      }
-      if (pair == null) {
-        // refresh 콜백이 null 반환 → 갱신 불가(쿠키 만료 등)
+      pair = await refresh(refreshToken); // 쿠키 기반이면 인자 무시
+    } catch (error) {
+      if (_isAuthoritativeRefreshRejection(error)) {
         await _clearIfSameSession(err.requestOptions);
-        handler.next(err);
-        return;
       }
-      // 쿠키 기반 시 pair.refresh==''(실 refresh 토큰은 HttpOnly 쿠키가 보유).
-      // TokenStore.save는 refresh=''를 저장하지만 웹 구현체는 이를 무시한다
-      // (readRefresh()는 항상 null을 반환해 쿠키 경로를 유지한다).
-      final res = await _mutateCredential<Response<dynamic>?>(() async {
-        if (!await _isSameSession(err.requestOptions)) return null;
-        await store.save(access: pair.access, refresh: pair.refresh);
-        if (!await _isSameSession(err.requestOptions)) return null;
-        final req = err.requestOptions
-          ..headers['Authorization'] = 'Bearer ${pair.access}';
-        final response = await retry(req);
-        if (!await _isSameSession(err.requestOptions)) return null;
-        return response;
+      // A transport/5xx failure does not prove that the credential is invalid;
+      // explicit 401/403 is authoritative and clears through the shared tail.
+      handler.next(err);
+      return;
+    }
+    if (!await _isSameSession(err.requestOptions)) {
+      handler.next(err);
+      return;
+    }
+    if (pair == null) {
+      // null is the explicit authoritative rejection contract.
+      await _clearIfSameSession(err.requestOptions);
+      handler.next(err);
+      return;
+    }
+    final refreshedPair = pair;
+    // 쿠키 기반 시 pair.refresh==''(실 refresh 토큰은 HttpOnly 쿠키가 보유).
+    // TokenStore.save는 refresh=''를 저장하지만 웹 구현체는 이를 무시한다
+    // (readRefresh()는 항상 null을 반환해 쿠키 경로를 유지한다).
+    late final bool persisted;
+    try {
+      persisted = await _mutateCredential(() async {
+        if (!await _isSameSession(err.requestOptions)) return false;
+        await store.save(
+          access: refreshedPair.access,
+          refresh: refreshedPair.refresh,
+        );
+        return _isSameSession(err.requestOptions);
       });
-      if (res == null) {
+    } catch (_) {
+      // A local persistence failure can leave a partial token pair. Clear it
+      // only while the request still belongs to the current account.
+      await _clearIfSameSession(err.requestOptions);
+      handler.next(err);
+      return;
+    }
+    if (!persisted || !await _isSameSession(err.requestOptions)) {
+      handler.next(err);
+      return;
+    }
+    final req = err.requestOptions
+      ..headers['Authorization'] = 'Bearer ${refreshedPair.access}';
+    try {
+      final res = await retry(req);
+      if (!await _isSameSession(err.requestOptions)) {
         handler.next(err);
         return;
       }
       handler.resolve(res); // 재시도 성공 → 원 요청을 해당 응답으로 해결
     } catch (_) {
-      await _clearIfSameSession(err.requestOptions);
-      handler.next(err); // 갱신 실패 → 원 에러 전파(상위에서 로그인 유도)
+      // The refreshed credential remains valid when only the resource retry
+      // fails due to transport/5xx.
+      handler.next(err);
     }
   }
 
@@ -165,6 +193,18 @@ class AuthInterceptor extends QueuedInterceptor {
   Future<T> _mutateCredential<T>(Future<T> Function() mutation) {
     final runner = credentialMutation;
     return runner == null ? mutation() : runner(mutation);
+  }
+
+  bool _isAuthoritativeRefreshRejection(Object error) {
+    if (error is ApiException) {
+      return error.status == 401 ||
+          error.status == 403 ||
+          error.code == ApiErrorCode.unauthorized ||
+          error.code == ApiErrorCode.forbidden;
+    }
+    return error is DioException &&
+        (error.response?.statusCode == 401 ||
+            error.response?.statusCode == 403);
   }
 
   Future<bool> _isSameSession(RequestOptions options) async {
