@@ -1,7 +1,10 @@
 import 'package:devpath_mobile/src/features/learning/application/content_controller.dart';
 import 'package:devpath_mobile/src/features/auth/application/auth_controller.dart';
+import 'package:devpath_mobile/src/data/owner_data_store.dart';
+import 'package:devpath_mobile/src/features/learning/data/content_offline_store.dart';
 import 'package:devpath_mobile/src/features/learning/state/content_state.dart';
 import 'package:devpath_mobile/src/providers/api_providers.dart';
+import 'package:devpath_mobile/src/services/connectivity_service.dart';
 import 'package:dp_core/dp_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -173,6 +176,55 @@ void main() {
         expect((retained as ContentLoaded).isStale, isTrue);
         expect(retained.loadFailureMessage, isNotEmpty);
         expect(c.read(second), isA<ContentFailed>());
+      },
+    );
+
+    test(
+      'offline cache restore merges durable queued progress without local completion',
+      () async {
+        final data = InMemoryOwnerDataStore();
+        final offline = ContentOfflineStore(data);
+        final queue = ContentProgressQueue(data);
+        final cachedAt = DateTime.now().toUtc();
+        await offline.write(
+          'owner-a',
+          'future-async-await',
+          LearningContent.fromJson(_content(completed: false)),
+          cachedAt: cachedAt,
+        );
+        await queue.enqueue(
+          const QueuedContentProgress(
+            ownerKey: 'owner-a',
+            routeKey: 'future-async-await',
+            scrollPct: 0.9,
+            dwellSec: 80,
+            requestCompletion: true,
+          ),
+        );
+        final c = ProviderContainer(
+          overrides: [
+            apiClientProvider.overrideWithValue(mockApiClient(const {})),
+            currentOwnerKeyProvider.overrideWithValue('owner-a'),
+            ownerDataStoreProvider.overrideWithValue(data),
+            contentOfflineStoreProvider.overrideWithValue(offline),
+            contentProgressQueueProvider.overrideWithValue(queue),
+            connectivityProvider.overrideWith((_) => const Stream.empty()),
+          ],
+        );
+        addTearDown(c.dispose);
+        final provider = contentControllerProvider('future-async-await');
+
+        await c.read(provider.notifier).load();
+
+        final state = c.read(provider) as ContentLoaded;
+        expect(state.fromOfflineCache, isTrue);
+        expect(state.content.progress.scrollPct, 0.9);
+        expect(state.content.progress.dwellSec, 80);
+        expect(
+          state.content.progress.completed,
+          isFalse,
+          reason: 'queued completion intent is not server confirmation',
+        );
       },
     );
   });

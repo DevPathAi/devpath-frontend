@@ -36,24 +36,49 @@ void main() {
 
     expect(android, contains('android:autoVerify="true"'));
     expect(android, contains('android:host="app.leva.ai.kr"'));
-    expect(android, contains('android:pathPattern="/path/.*/today"'));
-    expect(android, contains('android:pathPattern="/mission/.*/content/.*"'));
+    expect(
+      android,
+      contains('android:pathAdvancedPattern="/path/[1-9][0-9]*/today"'),
+    );
+    expect(
+      android,
+      contains(
+        'android:pathAdvancedPattern="/mission/[1-9][0-9]*/content/[1-9][0-9]*"',
+      ),
+    );
     expect(android, isNot(contains('android:pathPrefix="/mission/"')));
     expect(iosDebug, contains('applinks:app.leva.ai.kr'));
     expect(iosDebug, contains('<string>development</string>'));
     expect(iosRelease, contains('applinks:app.leva.ai.kr'));
     expect(iosRelease, contains('<string>production</string>'));
-    expect(
-      'CODE_SIGN_ENTITLEMENTS = Runner/RunnerDebug.entitlements;'.allMatches(
-        xcodeProject,
-      ),
-      hasLength(1),
-    );
-    expect(
-      'CODE_SIGN_ENTITLEMENTS = Runner/RunnerRelease.entitlements;'.allMatches(
-        xcodeProject,
-      ),
-      hasLength(2),
-    );
+    expect(_runnerEntitlements(xcodeProject), {
+      'Debug': 'Runner/RunnerDebug.entitlements',
+      'Release': 'Runner/RunnerRelease.entitlements',
+      'Profile': 'Runner/RunnerRelease.entitlements',
+    });
   });
+}
+
+Map<String, String> _runnerEntitlements(String project) {
+  final section = project
+      .split('/* Begin XCBuildConfiguration section */')[1]
+      .split('/* End XCBuildConfiguration section */')[0];
+  final result = <String, String>{};
+  final blocks = RegExp(
+    r'/\* (Debug|Release|Profile) \*/ = \{(.*?)\n\s*\};',
+    dotAll: true,
+  ).allMatches(section);
+  for (final block in blocks) {
+    final body = block.group(2)!;
+    if (!body.contains(
+      'PRODUCT_BUNDLE_IDENTIFIER = ai.devpath.devpathMobile;',
+    )) {
+      continue;
+    }
+    final entitlement = RegExp(
+      r'CODE_SIGN_ENTITLEMENTS = ([^;]+);',
+    ).firstMatch(body);
+    result[block.group(1)!] = entitlement?.group(1) ?? '';
+  }
+  return result;
 }

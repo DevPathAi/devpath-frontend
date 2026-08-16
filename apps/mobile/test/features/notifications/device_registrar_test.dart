@@ -1,3 +1,4 @@
+import 'package:devpath_mobile/src/data/owner_data_store.dart';
 import 'package:devpath_mobile/src/features/notifications/application/device_registrar.dart';
 import 'package:devpath_mobile/src/services/push_service.dart';
 import 'package:dp_core/dp_core.dart';
@@ -10,6 +11,18 @@ class _FakePush implements PushService {
   Future<String?> getToken() async => _token;
   @override
   Stream<PushMessage> get incoming => const Stream.empty();
+}
+
+class _LifecyclePush implements PushService {
+  var deleteCalls = 0;
+
+  @override
+  Future<String?> getToken() async => 'fcm-tok';
+
+  @override
+  Stream<PushMessage> get incoming => const Stream.empty();
+
+  Future<void> deleteToken() async => deleteCalls += 1;
 }
 
 ApiClient _client(Map<String, MockFixture> fx) {
@@ -35,5 +48,24 @@ void main() {
       final r = DeviceRegistrar(c, _FakePush(null), 'ANDROID');
       await r.register();
     });
+
+    test(
+      'logout unregister calls server and invalidates local FCM token once',
+      () async {
+        final c = _client({
+          'POST /notifications/devices': (200, <String, dynamic>{}),
+          'DELETE /notifications/devices': (200, <String, dynamic>{}),
+        });
+        final push = _LifecyclePush();
+        final data = InMemoryOwnerDataStore();
+        final dynamic registrar = DeviceRegistrar(c, push, 'ANDROID', data);
+        await registrar.register('owner-a');
+
+        await registrar.unregister('owner-a');
+
+        expect(push.deleteCalls, 1);
+        expect(await data.list('owner-a'), isEmpty);
+      },
+    );
   });
 }

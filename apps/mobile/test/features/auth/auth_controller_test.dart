@@ -200,6 +200,55 @@ void main() {
       expect(await store.readAccess(), 'x');
     });
 
+    test(
+      'malformed /users/me is terminal and never leaves AuthLoading',
+      () async {
+        final store = InMemoryTokenStore();
+        await store.save(access: 'x', refresh: 'y');
+        final c = _container(
+          store: store,
+          fixtures: {
+            'GET /users/me': (200, <String, dynamic>{'id': 42}),
+          },
+        );
+        final controller = c.read(authControllerProvider.notifier);
+
+        await expectLater(controller.bootstrapSession(), completes);
+
+        expect(c.read(authControllerProvider), isA<AuthUnauthenticated>());
+        expect(await store.readAccess(), isNull);
+        expect(await store.readRefresh(), isNull);
+      },
+    );
+
+    test(
+      'malformed OAuth token payload is terminal and stores no credential',
+      () async {
+        final store = InMemoryTokenStore();
+        final kv = InMemoryKeyValueStore();
+        await kv.write(_kVerifier, 'the-verifier');
+        final c = _container(
+          store: store,
+          kv: kv,
+          fixtures: {
+            'POST /auth/oauth/token': (
+              200,
+              <String, dynamic>{'access_token': 7, 'refresh_token': null},
+            ),
+          },
+        );
+        final controller = c.read(authControllerProvider.notifier);
+        await pumpEventQueue();
+
+        await expectLater(controller.completeFromCode('the-code'), completes);
+
+        expect(c.read(authControllerProvider), isA<AuthUnauthenticated>());
+        expect(await store.readAccess(), isNull);
+        expect(await store.readRefresh(), isNull);
+        expect(await kv.read(_kVerifier), isNull);
+      },
+    );
+
     test('logout 뒤 늦은 OAuth 교환 응답은 토큰을 되살리지 않는다', () async {
       final store = InMemoryTokenStore();
       final kv = InMemoryKeyValueStore();

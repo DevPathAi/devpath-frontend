@@ -53,6 +53,30 @@ class _OwnerController extends Notifier<String?> {
   void setOwner(String? owner) => state = owner;
 }
 
+class _DelayedNotificationData extends InMemoryOwnerDataStore {
+  final writeStarted = Completer<void>();
+  final releaseWrite = Completer<void>();
+
+  @override
+  Future<void> write(
+    String ownerKey,
+    String bucket,
+    String recordKey,
+    String payload, {
+    DateTime? updatedAt,
+  }) async {
+    if (!writeStarted.isCompleted) writeStarted.complete();
+    await releaseWrite.future;
+    await super.write(
+      ownerKey,
+      bucket,
+      recordKey,
+      payload,
+      updatedAt: updatedAt,
+    );
+  }
+}
+
 final _ownerProvider = NotifierProvider<_OwnerController, String?>(
   _OwnerController.new,
 );
@@ -218,5 +242,84 @@ void main() {
         expect(state.unreadCount, 0);
       },
     );
+
+    test('owner-null 상태에서 누른 A 알림은 다음 B owner에게 승계되지 않는다', () async {
+      final push = _FakeInteractivePush();
+      addTearDown(push.close);
+      final data = InMemoryOwnerDataStore();
+      final container = ProviderContainer(
+        overrides: [
+          pushServiceProvider.overrideWithValue(push),
+          currentOwnerKeyProvider.overrideWith(
+            (ref) => ref.watch(_ownerProvider),
+          ),
+          notificationStoreProvider.overrideWithValue(NotificationStore(data)),
+        ],
+      );
+      addTearDown(container.dispose);
+      final subscription = container.listen(
+        notificationControllerProvider,
+        (_, _) {},
+      );
+      addTearDown(subscription.close);
+
+      container.read(_ownerProvider.notifier).setOwner(null);
+      push.openedController.add(
+        const PushMessage(
+          id: 'owner-a-after-logout',
+          title: 'A 전용',
+          body: 'B에게 보이면 안 됨',
+          target: PushTarget.today(pathId: 301),
+        ),
+      );
+      await pumpEventQueue();
+      container.read(_ownerProvider.notifier).setOwner('owner-b');
+      await pumpEventQueue();
+
+      final state = container.read(notificationControllerProvider);
+      expect(state.messages, isEmpty);
+      expect(state.unreadCount, 0);
+      expect(state.navigationTarget, isNull);
+      expect(await NotificationStore(data).list('owner-b'), isEmpty);
+    });
+
+    test('A tap persist가 지연된 사이 B로 바뀌면 A target을 열지 않는다', () async {
+      final push = _FakeInteractivePush();
+      addTearDown(push.close);
+      final data = _DelayedNotificationData();
+      final container = ProviderContainer(
+        overrides: [
+          pushServiceProvider.overrideWithValue(push),
+          currentOwnerKeyProvider.overrideWith(
+            (ref) => ref.watch(_ownerProvider),
+          ),
+          notificationStoreProvider.overrideWithValue(NotificationStore(data)),
+        ],
+      );
+      addTearDown(container.dispose);
+      final subscription = container.listen(
+        notificationControllerProvider,
+        (_, _) {},
+      );
+      addTearDown(subscription.close);
+
+      push.openedController.add(
+        const PushMessage(
+          id: 'late-owner-a',
+          title: 'A 전용',
+          body: '지연',
+          target: PushTarget.content(taskId: 302, contentId: 77),
+        ),
+      );
+      await data.writeStarted.future;
+      container.read(_ownerProvider.notifier).setOwner('owner-b');
+      data.releaseWrite.complete();
+      await pumpEventQueue();
+
+      final state = container.read(notificationControllerProvider);
+      expect(state.messages, isEmpty);
+      expect(state.navigationTarget, isNull);
+      expect(await NotificationStore(data).list('owner-b'), isEmpty);
+    });
   });
 }
