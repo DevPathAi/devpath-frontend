@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:devpath_mobile/src/data/account_data_cleaner.dart';
 import 'package:devpath_mobile/src/data/key_value_store.dart';
 import 'package:devpath_mobile/src/data/owner_data_store.dart';
@@ -206,64 +207,124 @@ void main() {
     expect(container.read(authControllerProvider), isA<AuthUnauthenticated>());
   });
 
-  test('verified A to server B revokes A before clearing and exposing B', () async {
-    final events = <String>[];
-    final tokens = InMemoryTokenStore();
-    final kv = InMemoryKeyValueStore();
-    final cleaner = _Cleaner(events);
-    await tokens.save(access: 'b-access', refresh: 'b-refresh');
-    await VerifiedSessionStore(kv).write(_user('owner-a'));
-    final container = ProviderContainer(
-      overrides: [
-        tokenStoreProvider.overrideWithValue(tokens),
-        keyValueStoreProvider.overrideWithValue(kv),
-        accountDataCleanerProvider.overrideWithValue(cleaner),
-        ownerDataStoreProvider.overrideWithValue(InMemoryOwnerDataStore()),
-        deviceRegistrarProvider.overrideWithValue(_SwitchRegistrar(events)),
-        apiClientProvider.overrideWithValue(
-          _client({'GET /users/me': (200, _userJson('owner-b'))}),
-        ),
-      ],
-    );
-    addTearDown(container.dispose);
+  test(
+    'verified A to server B revokes A before clearing and exposing B',
+    () async {
+      final events = <String>[];
+      final tokens = InMemoryTokenStore();
+      final kv = InMemoryKeyValueStore();
+      final cleaner = _Cleaner(events);
+      await tokens.save(access: 'b-access', refresh: 'b-refresh');
+      await VerifiedSessionStore(kv).write(_user('owner-a'));
+      final container = ProviderContainer(
+        overrides: [
+          tokenStoreProvider.overrideWithValue(tokens),
+          keyValueStoreProvider.overrideWithValue(kv),
+          accountDataCleanerProvider.overrideWithValue(cleaner),
+          ownerDataStoreProvider.overrideWithValue(InMemoryOwnerDataStore()),
+          deviceRegistrarProvider.overrideWithValue(_SwitchRegistrar(events)),
+          apiClientProvider.overrideWithValue(
+            _client({'GET /users/me': (200, _userJson('owner-b'))}),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
 
-    await container.read(authControllerProvider.notifier).bootstrapSession();
+      await container.read(authControllerProvider.notifier).bootstrapSession();
 
-    expect(events, ['revoke:owner-a', 'clear:owner-a']);
-    expect(container.read(authControllerProvider).ownerKey, 'owner-b');
-    expect((await VerifiedSessionStore(kv).read())?.id, 'owner-b');
-  });
+      expect(events, ['revoke:owner-a', 'clear:owner-a']);
+      expect(container.read(authControllerProvider).ownerKey, 'owner-b');
+      expect((await VerifiedSessionStore(kv).read())?.id, 'owner-b');
+    },
+  );
 
-  test('A revoke failure still clears A and never exposes or activates B', () async {
-    final events = <String>[];
-    final tokens = InMemoryTokenStore();
-    final kv = InMemoryKeyValueStore();
-    final cleaner = _Cleaner(events);
-    await tokens.save(access: 'b-access', refresh: 'b-refresh');
-    await VerifiedSessionStore(kv).write(_user('owner-a'));
-    final container = ProviderContainer(
-      overrides: [
-        tokenStoreProvider.overrideWithValue(tokens),
-        keyValueStoreProvider.overrideWithValue(kv),
-        accountDataCleanerProvider.overrideWithValue(cleaner),
-        ownerDataStoreProvider.overrideWithValue(InMemoryOwnerDataStore()),
-        deviceRegistrarProvider.overrideWithValue(
-          _SwitchRegistrar(events, fail: true),
-        ),
-        apiClientProvider.overrideWithValue(
-          _client({'GET /users/me': (200, _userJson('owner-b'))}),
-        ),
-      ],
-    );
-    addTearDown(container.dispose);
+  test(
+    'A revoke failure still clears A and never exposes or activates B',
+    () async {
+      final events = <String>[];
+      final tokens = InMemoryTokenStore();
+      final kv = InMemoryKeyValueStore();
+      final cleaner = _Cleaner(events);
+      await tokens.save(access: 'b-access', refresh: 'b-refresh');
+      await VerifiedSessionStore(kv).write(_user('owner-a'));
+      final container = ProviderContainer(
+        overrides: [
+          tokenStoreProvider.overrideWithValue(tokens),
+          keyValueStoreProvider.overrideWithValue(kv),
+          accountDataCleanerProvider.overrideWithValue(cleaner),
+          ownerDataStoreProvider.overrideWithValue(InMemoryOwnerDataStore()),
+          deviceRegistrarProvider.overrideWithValue(
+            _SwitchRegistrar(events, fail: true),
+          ),
+          apiClientProvider.overrideWithValue(
+            _client({'GET /users/me': (200, _userJson('owner-b'))}),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
 
-    await container.read(authControllerProvider.notifier).bootstrapSession();
+      await container.read(authControllerProvider.notifier).bootstrapSession();
 
-    expect(events, ['revoke:owner-a', 'clear:owner-a']);
-    expect(container.read(authControllerProvider), isA<AuthUnauthenticated>());
-    expect(await tokens.readAccess(), isNull);
-    expect(await VerifiedSessionStore(kv).read(), isNull);
-  });
+      expect(events, ['revoke:owner-a', 'clear:owner-a']);
+      expect(
+        container.read(authControllerProvider),
+        isA<AuthUnauthenticated>(),
+      );
+      expect(await tokens.readAccess(), isNull);
+      expect(await VerifiedSessionStore(kv).read(), isNull);
+    },
+  );
+
+  test(
+    'OAuth replacement advances A epoch before saving B and cannot restore A offline',
+    () async {
+      final events = <String>[];
+      final tokens = _RecordingTokenStore(events);
+      final kv = InMemoryKeyValueStore();
+      final cleaner = _Cleaner(events);
+      await tokens.save(access: 'a-access', refresh: 'a-refresh');
+      await VerifiedSessionStore(kv).write(_user('owner-a'));
+      await kv.write('dp.auth.pkce_verifier', 'verifier');
+      final api = _OAuthReplacementApi();
+      final container = ProviderContainer(
+        overrides: [
+          tokenStoreProvider.overrideWithValue(tokens),
+          keyValueStoreProvider.overrideWithValue(kv),
+          accountDataCleanerProvider.overrideWithValue(cleaner),
+          ownerDataStoreProvider.overrideWithValue(InMemoryOwnerDataStore()),
+          deviceRegistrarProvider.overrideWithValue(_SwitchRegistrar(events)),
+          apiClientProvider.overrideWithValue(api),
+        ],
+      );
+      addTearDown(container.dispose);
+      final controller = container.read(authControllerProvider.notifier);
+      await controller.bootstrapSession();
+      expect(container.read(authControllerProvider).ownerKey, 'owner-a');
+      events.clear();
+
+      await controller.completeFromCode('code-for-b');
+
+      expect(
+        events,
+        containsAllInOrder([
+          'revoke:owner-a',
+          'clear:owner-a',
+          'token:clear',
+          'token:save:b-access',
+        ]),
+      );
+      expect(await AccountEpochStore(kv).current(), 1);
+      expect(await VerifiedSessionStore(kv).read(), isNull);
+      expect(
+        container.read(authControllerProvider),
+        isA<AuthSessionUnavailable>(),
+      );
+      expect(
+        container.read(authControllerProvider),
+        isNot(isA<AuthOfflineAuthenticated>()),
+      );
+    },
+  );
 }
 
 User _user(String id) => User(
@@ -283,3 +344,50 @@ Map<String, dynamic> _userJson(String id) => {
   'onboardingStatus': 'DONE',
   'consentStatus': 'DONE',
 };
+
+final class _RecordingTokenStore extends InMemoryTokenStore {
+  _RecordingTokenStore(this.events);
+
+  final List<String> events;
+
+  @override
+  Future<void> save({required String access, required String refresh}) async {
+    events.add('token:save:$access');
+    await super.save(access: access, refresh: refresh);
+  }
+
+  @override
+  Future<void> clear() async {
+    events.add('token:clear');
+    await super.clear();
+  }
+}
+
+final class _OAuthReplacementApi extends ApiClient {
+  _OAuthReplacementApi() : super(Dio());
+
+  var userCalls = 0;
+
+  @override
+  Future<T> get<T>(String path, {Map<String, dynamic>? query}) async {
+    userCalls += 1;
+    if (userCalls == 1) return _userJson('owner-a') as T;
+    throw const ApiException(
+      code: ApiErrorCode.unknown,
+      message: 'B session lookup unavailable',
+      status: 503,
+    );
+  }
+
+  @override
+  Future<T> post<T>(
+    String path, {
+    Object? body,
+    Map<String, dynamic>? query,
+  }) async =>
+      <String, dynamic>{
+            'access_token': 'b-access',
+            'refresh_token': 'b-refresh',
+          }
+          as T;
+}
