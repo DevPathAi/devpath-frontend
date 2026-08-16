@@ -6,6 +6,7 @@ import 'package:devpath_mobile/src/data/account_data_cleaner.dart';
 import 'package:devpath_mobile/src/data/key_value_store.dart';
 import 'package:devpath_mobile/src/data/owner_data_store.dart';
 import 'package:devpath_mobile/src/features/auth/application/auth_controller.dart';
+import 'package:devpath_mobile/src/features/auth/application/credential_mutation_coordinator.dart';
 import 'package:devpath_mobile/src/features/auth/state/auth_state.dart';
 import 'package:devpath_mobile/src/features/learning/application/content_progress_sync_controller.dart';
 import 'package:devpath_mobile/src/features/learning/data/content_offline_store.dart';
@@ -320,6 +321,124 @@ void main() {
   );
 
   test(
+    'late A progress 401 cannot invalidate authenticated B or B owner data',
+    () async {
+      final adapter = _LatchedResponseAdapter(
+        status: 401,
+        body: {
+          'error': {'code': 'UNAUTHORIZED', 'message': 'expired A request'},
+        },
+      );
+      final client = ApiClient.create(
+        const ApiConfig(baseUrl: 'https://api.example.test'),
+      );
+      client.dio.httpClientAdapter = adapter;
+      final tokens = InMemoryTokenStore();
+      final data = InMemoryOwnerDataStore();
+      final queue = ContentProgressQueue(data);
+      await tokens.save(access: 'token-a', refresh: 'refresh-a');
+      await data.write('owner-b', 'test', 'safe', 'B data');
+      final container = ProviderContainer(
+        overrides: [
+          authControllerProvider.overrideWith(_TrackingAuthController.new),
+          tokenStoreProvider.overrideWithValue(tokens),
+          ownerDataStoreProvider.overrideWithValue(data),
+          apiClientProvider.overrideWithValue(client),
+          contentProgressQueueProvider.overrideWithValue(queue),
+          contentOfflineStoreProvider.overrideWithValue(
+            ContentOfflineStore(data),
+          ),
+          connectivityProvider.overrideWith((_) => const Stream.empty()),
+        ],
+      );
+      addTearDown(container.dispose);
+      final auth =
+          container.read(authControllerProvider.notifier)
+              as _TrackingAuthController;
+      final subscription = container.listen(
+        contentProgressSyncControllerProvider,
+        (_, _) {},
+      );
+      addTearDown(subscription.close);
+
+      final syncing = container
+          .read(contentProgressSyncControllerProvider.notifier)
+          .enqueueAndSync(_progress);
+      await adapter.requestStarted.future;
+      container.read(credentialMutationCoordinatorProvider).invalidate();
+      auth.switchTo(_user('owner-b'));
+      await tokens.save(access: 'token-b', refresh: 'refresh-b');
+      adapter.releaseResponse.complete();
+      await syncing;
+
+      expect(container.read(currentOwnerKeyProvider), 'owner-b');
+      expect(container.read(authControllerProvider), isA<AuthAuthenticated>());
+      expect(auth.invalidations, 0);
+      expect(await tokens.readAccess(), 'token-b');
+      expect(await data.read('owner-b', 'test', 'safe'), isNotNull);
+      expect(await queue.read('owner-a', '77'), isNotNull);
+    },
+  );
+
+  test(
+    'late progress 401 from an earlier generation cannot invalidate relogin',
+    () async {
+      final adapter = _LatchedResponseAdapter(
+        status: 401,
+        body: {
+          'error': {'code': 'UNAUTHORIZED', 'message': 'expired old session'},
+        },
+      );
+      final client = ApiClient.create(
+        const ApiConfig(baseUrl: 'https://api.example.test'),
+      );
+      client.dio.httpClientAdapter = adapter;
+      final tokens = InMemoryTokenStore();
+      final data = InMemoryOwnerDataStore();
+      final queue = ContentProgressQueue(data);
+      await tokens.save(access: 'old-token', refresh: 'old-refresh');
+      final container = ProviderContainer(
+        overrides: [
+          authControllerProvider.overrideWith(_TrackingAuthController.new),
+          tokenStoreProvider.overrideWithValue(tokens),
+          ownerDataStoreProvider.overrideWithValue(data),
+          apiClientProvider.overrideWithValue(client),
+          contentProgressQueueProvider.overrideWithValue(queue),
+          contentOfflineStoreProvider.overrideWithValue(
+            ContentOfflineStore(data),
+          ),
+          connectivityProvider.overrideWith((_) => const Stream.empty()),
+        ],
+      );
+      addTearDown(container.dispose);
+      final auth =
+          container.read(authControllerProvider.notifier)
+              as _TrackingAuthController;
+      final subscription = container.listen(
+        contentProgressSyncControllerProvider,
+        (_, _) {},
+      );
+      addTearDown(subscription.close);
+
+      final syncing = container
+          .read(contentProgressSyncControllerProvider.notifier)
+          .enqueueAndSync(_progress);
+      await adapter.requestStarted.future;
+      container.read(credentialMutationCoordinatorProvider).invalidate();
+      auth.switchTo(_user('owner-a', nickname: 'new A session'));
+      await tokens.save(access: 'new-token', refresh: 'new-refresh');
+      adapter.releaseResponse.complete();
+      await syncing;
+
+      expect(container.read(currentOwnerKeyProvider), 'owner-a');
+      expect(container.read(authControllerProvider), isA<AuthAuthenticated>());
+      expect(auth.invalidations, 0);
+      expect(await tokens.readAccess(), 'new-token');
+      expect(await queue.read('owner-a', '77'), isNotNull);
+    },
+  );
+
+  test(
     'enqueue at empty-read flight tail drains without external reconnect',
     () async {
       final client = ApiClient.create(
@@ -392,6 +511,35 @@ class _StoreCleaner implements AccountDataCleaner {
     await data.clearOwner(ownerKey);
   }
 }
+
+final class _TrackingAuthController extends AuthController {
+  var invalidations = 0;
+
+  @override
+  AuthState build() => AuthAuthenticated(_user('owner-a'));
+
+  void switchTo(User user) => state = AuthAuthenticated(user);
+
+  @override
+  Future<void> invalidateUnauthorized([String? message]) async {
+    invalidations += 1;
+    final ownerKey = state.ownerKey;
+    await ref.read(tokenStoreProvider).clear();
+    if (ownerKey != null) {
+      await ref.read(ownerDataStoreProvider).clearOwner(ownerKey);
+    }
+    state = AuthUnauthenticated(error: message);
+  }
+}
+
+User _user(String id, {String? nickname}) => User(
+  id: id,
+  email: '$id@example.com',
+  nickname: nickname ?? id,
+  role: UserRole.learner,
+  onboardingStatus: OnboardingStatus.done,
+  consentStatus: ConsentStatus.done,
+);
 
 class _CountingStatusAdapter implements HttpClientAdapter {
   _CountingStatusAdapter(this.status);
