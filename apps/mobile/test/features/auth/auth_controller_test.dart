@@ -52,10 +52,12 @@ ProviderContainer _container({
   OAuthLauncher? launcher,
   KeyValueStore? kv,
 }) {
+  final client = _client(fixtures ?? _userOk);
   final c = ProviderContainer(
     overrides: [
       tokenStoreProvider.overrideWithValue(store ?? InMemoryTokenStore()),
-      apiClientProvider.overrideWithValue(_client(fixtures ?? _userOk)),
+      apiClientProvider.overrideWithValue(client),
+      authFlowClientProvider.overrideWithValue(client),
       oauthLauncherProvider.overrideWithValue(launcher ?? _FakeLauncher()),
       keyValueStoreProvider.overrideWithValue(kv ?? InMemoryKeyValueStore()),
       accountDataCleanerProvider.overrideWithValue(_NoopCleaner()),
@@ -114,6 +116,79 @@ void main() {
       expect(await kv.read(_kVerifier), isNull, reason: '교환 후 verifier 삭제');
     });
 
+    test(
+      'OAuth code exchange uses the un-intercepted auth-flow client',
+      () async {
+        final store = InMemoryTokenStore();
+        final kv = InMemoryKeyValueStore();
+        await kv.write(_kVerifier, 'the-verifier');
+        var interceptedExchangeCalls = 0;
+        var authFlowExchangeCalls = 0;
+        final intercepted = _client(_userOk);
+        intercepted.dio.interceptors.insert(
+          0,
+          InterceptorsWrapper(
+            onRequest: (options, handler) {
+              if (options.path == '/auth/oauth/token') {
+                interceptedExchangeCalls += 1;
+                handler.reject(
+                  DioException(
+                    requestOptions: options,
+                    response: Response<void>(
+                      requestOptions: options,
+                      statusCode: 401,
+                    ),
+                    type: DioExceptionType.badResponse,
+                  ),
+                );
+                return;
+              }
+              handler.next(options);
+            },
+          ),
+        );
+        final authFlow = _client(const {});
+        authFlow.dio.interceptors.insert(
+          0,
+          InterceptorsWrapper(
+            onRequest: (options, handler) {
+              authFlowExchangeCalls += 1;
+              handler.resolve(
+                Response<Map<String, dynamic>>(
+                  requestOptions: options,
+                  statusCode: 200,
+                  data: const {
+                    'access_token': 'deep-a',
+                    'refresh_token': 'deep-r',
+                  },
+                ),
+              );
+            },
+          ),
+        );
+        final c = ProviderContainer(
+          overrides: [
+            tokenStoreProvider.overrideWithValue(store),
+            apiClientProvider.overrideWithValue(intercepted),
+            authFlowClientProvider.overrideWithValue(authFlow),
+            keyValueStoreProvider.overrideWithValue(kv),
+            accountDataCleanerProvider.overrideWithValue(_NoopCleaner()),
+            ownerDataStoreProvider.overrideWithValue(InMemoryOwnerDataStore()),
+          ],
+        );
+        addTearDown(c.dispose);
+        final controller = c.read(authControllerProvider.notifier);
+        await pumpEventQueue();
+
+        await controller.completeFromCode('the-code');
+
+        expect(interceptedExchangeCalls, 0);
+        expect(authFlowExchangeCalls, 1);
+        expect(c.read(authControllerProvider), isA<AuthAuthenticated>());
+        expect(await store.readAccess(), 'deep-a');
+      },
+    );
+
     test('동일 OAuth code의 concurrent callback은 정확히 한 번 교환한다', () async {
       final store = InMemoryTokenStore();
       final kv = InMemoryKeyValueStore();
@@ -169,6 +244,7 @@ void main() {
         overrides: [
           tokenStoreProvider.overrideWithValue(store),
           apiClientProvider.overrideWithValue(client),
+          authFlowClientProvider.overrideWithValue(client),
           keyValueStoreProvider.overrideWithValue(kv),
           accountDataCleanerProvider.overrideWithValue(_NoopCleaner()),
           ownerDataStoreProvider.overrideWithValue(InMemoryOwnerDataStore()),
@@ -249,6 +325,7 @@ void main() {
           overrides: [
             tokenStoreProvider.overrideWithValue(store),
             apiClientProvider.overrideWithValue(client),
+            authFlowClientProvider.overrideWithValue(client),
             oauthLauncherProvider.overrideWithValue(launcher),
             keyValueStoreProvider.overrideWithValue(kv),
             accountDataCleanerProvider.overrideWithValue(_NoopCleaner()),
@@ -314,6 +391,7 @@ void main() {
           overrides: [
             tokenStoreProvider.overrideWithValue(store),
             apiClientProvider.overrideWithValue(client),
+            authFlowClientProvider.overrideWithValue(client),
             oauthLauncherProvider.overrideWithValue(launcher),
             keyValueStoreProvider.overrideWithValue(kv),
             accountDataCleanerProvider.overrideWithValue(_NoopCleaner()),
@@ -374,6 +452,7 @@ void main() {
       final c = ProviderContainer(
         overrides: [
           apiClientProvider.overrideWithValue(client),
+          authFlowClientProvider.overrideWithValue(client),
           keyValueStoreProvider.overrideWithValue(kv),
           accountDataCleanerProvider.overrideWithValue(_NoopCleaner()),
           ownerDataStoreProvider.overrideWithValue(InMemoryOwnerDataStore()),
@@ -432,6 +511,7 @@ void main() {
           overrides: [
             tokenStoreProvider.overrideWithValue(store),
             apiClientProvider.overrideWithValue(client),
+            authFlowClientProvider.overrideWithValue(client),
             oauthLauncherProvider.overrideWithValue(launcher),
             keyValueStoreProvider.overrideWithValue(kv),
             accountDataCleanerProvider.overrideWithValue(_NoopCleaner()),
@@ -509,6 +589,7 @@ void main() {
           overrides: [
             tokenStoreProvider.overrideWithValue(store),
             apiClientProvider.overrideWithValue(client),
+            authFlowClientProvider.overrideWithValue(client),
             oauthLauncherProvider.overrideWithValue(launcher),
             keyValueStoreProvider.overrideWithValue(kv),
             accountDataCleanerProvider.overrideWithValue(_NoopCleaner()),
@@ -578,6 +659,7 @@ void main() {
           overrides: [
             tokenStoreProvider.overrideWithValue(store),
             apiClientProvider.overrideWithValue(client),
+            authFlowClientProvider.overrideWithValue(client),
             keyValueStoreProvider.overrideWithValue(kv),
             accountDataCleanerProvider.overrideWithValue(_NoopCleaner()),
             ownerDataStoreProvider.overrideWithValue(InMemoryOwnerDataStore()),
@@ -772,6 +854,7 @@ void main() {
         overrides: [
           tokenStoreProvider.overrideWithValue(store),
           apiClientProvider.overrideWithValue(client),
+          authFlowClientProvider.overrideWithValue(client),
           keyValueStoreProvider.overrideWithValue(kv),
           accountDataCleanerProvider.overrideWithValue(_NoopCleaner()),
           ownerDataStoreProvider.overrideWithValue(InMemoryOwnerDataStore()),

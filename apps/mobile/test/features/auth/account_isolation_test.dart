@@ -374,6 +374,7 @@ void main() {
           ownerDataStoreProvider.overrideWithValue(InMemoryOwnerDataStore()),
           deviceRegistrarProvider.overrideWithValue(_SwitchRegistrar(events)),
           apiClientProvider.overrideWithValue(api),
+          authFlowClientProvider.overrideWithValue(api),
         ],
       );
       addTearDown(container.dispose);
@@ -467,6 +468,7 @@ void main() {
           _SwitchRegistrar(events, fail: true),
         ),
         apiClientProvider.overrideWithValue(api),
+        authFlowClientProvider.overrideWithValue(api),
       ],
     );
     addTearDown(container.dispose);

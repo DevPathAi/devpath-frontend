@@ -24,6 +24,7 @@ import 'verified_session_store.dart';
 /// 목 모드는 [mockLogin]이 가짜 토큰을 저장하고 /users/me 목 픽스처로 세션을 구성한다.
 class AuthController extends Notifier<AuthState> {
   ApiClient get _client => ref.read(apiClientProvider);
+  ApiClient get _authFlowClient => ref.read(authFlowClientProvider);
   TokenStore get _store => ref.read(tokenStoreProvider);
 
   /// PKCE verifier 임시 보관 키(콜백이 새 프로세스로 와도 복원되도록 영속 저장).
@@ -262,7 +263,10 @@ class AuthController extends Notifier<AuthState> {
     }
     var acceptedExchange = false;
     try {
-      final data = await _client.post<Map<String, dynamic>>(
+      // A rejected PKCE candidate is not an authenticated-resource 401. Keep
+      // this exchange off [AuthInterceptor] so it cannot refresh or invalidate
+      // an otherwise valid session while the current callback remains queued.
+      final data = await _authFlowClient.post<Map<String, dynamic>>(
         '/auth/oauth/token',
         body: {'code': code, 'code_verifier': verifier},
       );
