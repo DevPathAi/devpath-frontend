@@ -2,11 +2,13 @@ import 'dart:async';
 
 import 'package:devpath_mobile/src/features/notifications/application/notification_controller.dart';
 import 'package:devpath_mobile/src/features/auth/application/auth_controller.dart';
+import 'package:devpath_mobile/src/features/auth/state/auth_state.dart';
 import 'package:devpath_mobile/src/data/key_value_store.dart';
 import 'package:devpath_mobile/src/providers/api_providers.dart';
 import 'package:devpath_mobile/src/features/notifications/data/notification_store.dart';
 import 'package:devpath_mobile/src/data/owner_data_store.dart';
 import 'package:devpath_mobile/src/services/push_service.dart';
+import 'package:dp_core/dp_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -53,6 +55,24 @@ class _OwnerController extends Notifier<String?> {
   String? build() => 'owner-a';
 
   void setOwner(String? owner) => state = owner;
+}
+
+class _NotificationAuthController extends AuthController {
+  @override
+  AuthState build() => const AuthLoading();
+
+  void authenticate(String ownerKey) => state = AuthAuthenticated(
+    User(
+      id: ownerKey,
+      email: '$ownerKey@example.com',
+      nickname: ownerKey,
+      role: UserRole.learner,
+      onboardingStatus: OnboardingStatus.done,
+      consentStatus: ConsentStatus.done,
+    ),
+  );
+
+  void unauthenticate() => state = const AuthUnauthenticated();
 }
 
 class _DelayedNotificationData extends InMemoryOwnerDataStore {
@@ -520,14 +540,13 @@ void main() {
           overrides: [
             pushServiceProvider.overrideWithValue(push),
             keyValueStoreProvider.overrideWithValue(InMemoryKeyValueStore()),
-            currentOwnerKeyProvider.overrideWith(
-              (ref) => ref.watch(_ownerProvider),
+            authControllerProvider.overrideWith(
+              _NotificationAuthController.new,
             ),
             notificationStoreProvider.overrideWithValue(store),
           ],
         );
         addTearDown(container.dispose);
-        container.read(_ownerProvider.notifier).setOwner(null);
         final subscription = container.listen(
           notificationControllerProvider,
           (_, _) {},
@@ -539,7 +558,10 @@ void main() {
           isEmpty,
         );
 
-        container.read(_ownerProvider.notifier).setOwner('owner-a');
+        final auth =
+            container.read(authControllerProvider.notifier)
+                as _NotificationAuthController;
+        auth.authenticate('owner-a');
         await pumpEventQueue(times: 4);
 
         final state = container.read(notificationControllerProvider);
@@ -549,6 +571,148 @@ void main() {
         expect(state.unreadCount, 1);
         expect(state.navigationTarget?.location, '/path/301/today');
         expect(await store.list('owner-a'), hasLength(1));
+      },
+    );
+
+    test(
+      'warm opened message waits through retry Loading for matching owner',
+      () async {
+        final push = _FakeInteractivePush();
+        addTearDown(push.close);
+        final data = InMemoryOwnerDataStore();
+        final store = NotificationStore(data);
+        final container = ProviderContainer(
+          overrides: [
+            pushServiceProvider.overrideWithValue(push),
+            keyValueStoreProvider.overrideWithValue(InMemoryKeyValueStore()),
+            authControllerProvider.overrideWith(
+              _NotificationAuthController.new,
+            ),
+            notificationStoreProvider.overrideWithValue(store),
+          ],
+        );
+        addTearDown(container.dispose);
+        final subscription = container.listen(
+          notificationControllerProvider,
+          (_, _) {},
+        );
+        addTearDown(subscription.close);
+        push.openedController.add(
+          const PushMessage.ownerScoped(
+            id: 'warm-auth-loading',
+            title: 'Content',
+            body: '인증 재시도 뒤 이어하기',
+            intendedOwnerKey: 'owner-a',
+            target: PushTarget.content(taskId: 302, contentId: 77),
+          ),
+        );
+        await pumpEventQueue();
+        expect(
+          container.read(notificationControllerProvider).messages,
+          isEmpty,
+        );
+
+        final auth =
+            container.read(authControllerProvider.notifier)
+                as _NotificationAuthController;
+        auth.authenticate('owner-a');
+        await pumpEventQueue(times: 4);
+
+        final state = container.read(notificationControllerProvider);
+        expect(state.messages.map((message) => message.id), [
+          'warm-auth-loading',
+        ]);
+        expect(state.navigationTarget?.location, '/mission/302/content/77');
+        expect(await store.list('owner-a'), hasLength(1));
+      },
+    );
+
+    test('Loading push is discarded on unauthenticated terminal', () async {
+      final push = _FakeInteractivePush();
+      addTearDown(push.close);
+      final data = InMemoryOwnerDataStore();
+      final store = NotificationStore(data);
+      final container = ProviderContainer(
+        overrides: [
+          pushServiceProvider.overrideWithValue(push),
+          keyValueStoreProvider.overrideWithValue(InMemoryKeyValueStore()),
+          authControllerProvider.overrideWith(_NotificationAuthController.new),
+          notificationStoreProvider.overrideWithValue(store),
+        ],
+      );
+      addTearDown(container.dispose);
+      final subscription = container.listen(
+        notificationControllerProvider,
+        (_, _) {},
+      );
+      addTearDown(subscription.close);
+      push.openedController.add(
+        const PushMessage.ownerScoped(
+          id: 'loading-to-logout',
+          title: 'Today',
+          body: 'discard',
+          intendedOwnerKey: 'owner-a',
+          target: PushTarget.today(pathId: 301),
+        ),
+      );
+      await pumpEventQueue();
+      final auth =
+          container.read(authControllerProvider.notifier)
+              as _NotificationAuthController;
+      auth.unauthenticate();
+      await pumpEventQueue();
+      auth.authenticate('owner-a');
+      await pumpEventQueue(times: 3);
+
+      expect(container.read(notificationControllerProvider).messages, isEmpty);
+      expect(await store.list('owner-a'), isEmpty);
+    });
+
+    test(
+      'Loading owner-A push is discarded when verified owner is B',
+      () async {
+        final push = _FakeInteractivePush();
+        addTearDown(push.close);
+        final data = InMemoryOwnerDataStore();
+        final store = NotificationStore(data);
+        final container = ProviderContainer(
+          overrides: [
+            pushServiceProvider.overrideWithValue(push),
+            keyValueStoreProvider.overrideWithValue(InMemoryKeyValueStore()),
+            authControllerProvider.overrideWith(
+              _NotificationAuthController.new,
+            ),
+            notificationStoreProvider.overrideWithValue(store),
+          ],
+        );
+        addTearDown(container.dispose);
+        final subscription = container.listen(
+          notificationControllerProvider,
+          (_, _) {},
+        );
+        addTearDown(subscription.close);
+        push.openedController.add(
+          const PushMessage.ownerScoped(
+            id: 'loading-a-to-b',
+            title: 'Today',
+            body: 'discard',
+            intendedOwnerKey: 'owner-a',
+            target: PushTarget.today(pathId: 301),
+          ),
+        );
+        await pumpEventQueue();
+        final auth =
+            container.read(authControllerProvider.notifier)
+                as _NotificationAuthController;
+        auth.authenticate('owner-b');
+        await pumpEventQueue(times: 4);
+
+        expect(
+          container.read(notificationControllerProvider).messages,
+          isEmpty,
+        );
+        expect(await store.list('owner-a'), isEmpty);
+        expect(await store.list('owner-b'), isEmpty);
       },
     );
 
