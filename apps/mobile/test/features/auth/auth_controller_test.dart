@@ -114,6 +114,83 @@ void main() {
       expect(await kv.read(_kVerifier), isNull, reason: '교환 후 verifier 삭제');
     });
 
+    test('동일 OAuth code의 concurrent callback은 정확히 한 번 교환한다', () async {
+      final store = InMemoryTokenStore();
+      final kv = InMemoryKeyValueStore();
+      await kv.write(_kVerifier, 'the-verifier');
+      final exchangeStarted = Completer<void>();
+      final releaseExchange = Completer<void>();
+      var exchangeCalls = 0;
+      final client = _client(_userOk);
+      client.dio.interceptors.insert(
+        0,
+        InterceptorsWrapper(
+          onRequest: (options, handler) async {
+            if (options.path != '/auth/oauth/token') {
+              handler.next(options);
+              return;
+            }
+            exchangeCalls += 1;
+            if (exchangeCalls == 1) {
+              exchangeStarted.complete();
+              await releaseExchange.future;
+              handler.resolve(
+                Response<Map<String, dynamic>>(
+                  requestOptions: options,
+                  statusCode: 200,
+                  data: const {
+                    'access_token': 'deep-a',
+                    'refresh_token': 'deep-r',
+                  },
+                ),
+              );
+              return;
+            }
+            handler.reject(
+              DioException(
+                requestOptions: options,
+                response: Response<Map<String, dynamic>>(
+                  requestOptions: options,
+                  statusCode: 401,
+                  data: const {
+                    'error': {
+                      'code': 'UNAUTHORIZED',
+                      'message': 'code already consumed',
+                    },
+                  },
+                ),
+                type: DioExceptionType.badResponse,
+              ),
+            );
+          },
+        ),
+      );
+      final c = ProviderContainer(
+        overrides: [
+          tokenStoreProvider.overrideWithValue(store),
+          apiClientProvider.overrideWithValue(client),
+          keyValueStoreProvider.overrideWithValue(kv),
+          accountDataCleanerProvider.overrideWithValue(_NoopCleaner()),
+          ownerDataStoreProvider.overrideWithValue(InMemoryOwnerDataStore()),
+        ],
+      );
+      addTearDown(c.dispose);
+      final controller = c.read(authControllerProvider.notifier);
+      await pumpEventQueue();
+
+      final first = controller.completeFromCode('one-use-code');
+      await exchangeStarted.future;
+      final duplicate = controller.completeFromCode('one-use-code');
+      await pumpEventQueue();
+      releaseExchange.complete();
+      await Future.wait([first, duplicate]);
+
+      expect(exchangeCalls, 1);
+      expect(c.read(authControllerProvider), isA<AuthAuthenticated>());
+      expect(await store.readAccess(), 'deep-a');
+      expect(await kv.read(_kVerifier), isNull);
+    });
+
     test('completeFromCode: 교환 실패해도 verifier 폐기(1회용)', () async {
       // code는 교환을 시도한 순간 서버에서 소비되므로, 실패해도 verifier는 더 이상
       // 유효하지 않다. 잔존 시 secure_storage에 만료된 1회용 비밀이 남는다 → 폐기 보장.
