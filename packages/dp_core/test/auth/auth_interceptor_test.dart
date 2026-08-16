@@ -34,6 +34,51 @@ class _CookieOnlyTokenStore implements TokenStore {
   Future<void> clear() async => _access = null;
 }
 
+class _LatchSaveTokenStore implements TokenStore {
+  _LatchSaveTokenStore({required String access, required String refresh})
+    : _access = access,
+      _refresh = refresh;
+
+  String? _access;
+  String? _refresh;
+  final refreshSaveStarted = Completer<void>();
+  final _releaseRefreshSave = Completer<void>();
+
+  @override
+  Future<String?> readAccess() async => _access;
+
+  @override
+  Future<String?> readRefresh() async => _refresh;
+
+  @override
+  Future<void> save({required String access, required String refresh}) async {
+    if (access == 'A-refreshed') {
+      if (!refreshSaveStarted.isCompleted) refreshSaveStarted.complete();
+      await _releaseRefreshSave.future;
+    }
+    _access = access;
+    _refresh = refresh;
+  }
+
+  void releaseRefreshSave() => _releaseRefreshSave.complete();
+
+  @override
+  Future<void> clear() async {
+    _access = null;
+    _refresh = null;
+  }
+}
+
+class _CredentialMutationCoordinator {
+  Future<void> _tail = Future<void>.value();
+
+  Future<T> run<T>(Future<T> Function() mutation) {
+    final operation = _tail.then((_) => mutation());
+    _tail = operation.then<void>((_) {}, onError: (Object _, StackTrace _) {});
+    return operation;
+  }
+}
+
 /// access=='Bearer NEW'면 200, 아니면 401 반환하는 최소 어댑터.
 class _AuthFlowAdapter implements HttpClientAdapter {
   @override
@@ -345,6 +390,54 @@ void main() {
       expect(await store.readAccess(), 'B-access');
     },
   );
+
+  test('late refresh save cannot overwrite a replacement credential', () async {
+    var epoch = 1;
+    var retryCalls = 0;
+    final store = _LatchSaveTokenStore(
+      access: 'A-access',
+      refresh: 'A-refresh',
+    );
+    final coordinator = _CredentialMutationCoordinator();
+    final interceptor = AuthInterceptor(
+      store: store,
+      sessionEpoch: () async => epoch,
+      refresh: (_) async =>
+          const TokenPair(access: 'A-refreshed', refresh: 'A-refresh-rotated'),
+      retry: (request) async {
+        retryCalls += 1;
+        return Response(requestOptions: request, statusCode: 200);
+      },
+    );
+    final request = RequestOptions(
+      path: '/contents/1/progress',
+      method: 'POST',
+    );
+    await interceptor.onRequest(request, RequestInterceptorHandler());
+    final error = DioException(
+      requestOptions: request,
+      response: Response(requestOptions: request, statusCode: 401),
+      type: DioExceptionType.badResponse,
+    );
+    final errorDone = runZonedGuarded<Future<void>>(
+      () => interceptor.onError(error, ErrorInterceptorHandler()),
+      (_, _) {},
+    );
+
+    await store.refreshSaveStarted.future;
+    epoch = 2;
+    final replacement = coordinator.run(
+      () => store.save(access: 'B-access', refresh: 'B-refresh'),
+    );
+    await Future<void>.delayed(Duration.zero);
+    store.releaseRefreshSave();
+    await errorDone;
+    await replacement;
+
+    expect(await store.readAccess(), 'B-access');
+    expect(await store.readRefresh(), 'B-refresh');
+    expect(retryCalls, 0);
+  });
 
   test('same account token rotation still retries exactly once', () async {
     var epoch = 7;
