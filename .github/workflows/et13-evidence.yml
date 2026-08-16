@@ -405,6 +405,7 @@ jobs:
             packages/dp_design/test/theme/dp_typography_test.dart \
             apps/web/lib/src/evidence \
             apps/web/test/evidence \
+            apps/web/test/app/et13_baseline_approval_workflow_contract_test.dart \
             apps/web/test/app/et13_evidence_catalog_contract_test.dart \
             apps/web/test/app/et13_evidence_producer_contract_test.dart \
             apps/admin/lib/src/evidence \
@@ -430,6 +431,7 @@ jobs:
             test/evidence/et13_evidence_fixtures_test.dart \
             test/theme/dp_typography_test.dart)
           (cd apps/web && flutter test --no-pub \
+            test/app/et13_baseline_approval_workflow_contract_test.dart \
             test/app/et13_evidence_catalog_contract_test.dart \
             test/app/et13_evidence_producer_contract_test.dart \
             test/evidence/et13_web_evidence_app_test.dart)

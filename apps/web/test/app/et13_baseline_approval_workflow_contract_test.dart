@@ -11,37 +11,55 @@ void main() {
     workflow = file.readAsStringSync();
   });
 
-  test('approval job is a read-only, first-attempt protected environment gate', () {
-    expect(workflow, contains("'on':\n  workflow_dispatch:"));
-    expect(workflow, contains('actions: read'));
-    expect(workflow, contains('contents: read'));
-    expect(workflow, isNot(contains(RegExp(r'\b(?:actions|contents): write\b'))));
-    expect(workflow, contains('name: et13-baseline-approval'));
-    expect(workflow, contains("requiredRule.prevent_self_review !== true"));
-    expect(workflow, contains('requiredRules.length !== 1'));
-    expect(workflow, contains('requiredRule.reviewers.length < 1'));
-    expect(
-      workflow,
-      contains(r'/environments/${encodeURIComponent(environmentName)}'),
-    );
-    expect(workflow, contains(r'/actions/runs/${currentRunId}/approvals'));
-    expect(workflow, contains("review.state === 'approved'"));
-    expect(
-      workflow,
-      contains('const protectedReviewVisible = Array.isArray(approvals)'),
-    );
-    expect(workflow, contains('approvals.length !== 1'));
-    expect(workflow, contains('review.environments.length === 1'));
-    expect(workflow, contains('review.environments[0]?.id === environment.id'));
-    expect(workflow, contains('review.environments[0]?.name === environmentName'));
-    expect(workflow, contains('approvedBy === currentRun.actor?.login'));
-    expect(workflow, contains('approvedBy === currentRun.triggering_actor?.login'));
-    expect(workflow, contains('review.user.id === currentRun.actor?.id'));
-    expect(workflow, contains('review.user.id === currentRun.triggering_actor?.id'));
-    expect(workflow, contains("currentRun.run_attempt, 1"));
-    expect(workflow, isNot(contains('/pending_deployments')));
-    expect(workflow, isNot(contains("method: 'POST'")));
-  });
+  test(
+    'approval job is a read-only, first-attempt protected environment gate',
+    () {
+      expect(workflow, contains("'on':\n  workflow_dispatch:"));
+      expect(workflow, contains('actions: read'));
+      expect(workflow, contains('contents: read'));
+      expect(
+        workflow,
+        isNot(contains(RegExp(r'\b(?:actions|contents): write\b'))),
+      );
+      expect(workflow, contains('name: et13-baseline-approval'));
+      expect(workflow, contains("requiredRule.prevent_self_review !== true"));
+      expect(workflow, contains('requiredRules.length !== 1'));
+      expect(workflow, contains('requiredRule.reviewers.length < 1'));
+      expect(
+        workflow,
+        contains(r'/environments/${encodeURIComponent(environmentName)}'),
+      );
+      expect(workflow, contains(r'/actions/runs/${currentRunId}/approvals'));
+      expect(workflow, contains("review.state === 'approved'"));
+      expect(
+        workflow,
+        contains('const protectedReviewVisible = Array.isArray(approvals)'),
+      );
+      expect(workflow, contains('approvals.length !== 1'));
+      expect(workflow, contains('review.environments.length === 1'));
+      expect(
+        workflow,
+        contains('review.environments[0]?.id === environment.id'),
+      );
+      expect(
+        workflow,
+        contains('review.environments[0]?.name === environmentName'),
+      );
+      expect(workflow, contains('approvedBy === currentRun.actor?.login'));
+      expect(
+        workflow,
+        contains('approvedBy === currentRun.triggering_actor?.login'),
+      );
+      expect(workflow, contains('review.user.id === currentRun.actor?.id'));
+      expect(
+        workflow,
+        contains('review.user.id === currentRun.triggering_actor?.id'),
+      );
+      expect(workflow, contains("currentRun.run_attempt, 1"));
+      expect(workflow, isNot(contains('/pending_deployments')));
+      expect(workflow, isNot(contains("method: 'POST'")));
+    },
+  );
 
   test('raw review input is bound to immutable same-source coordinates', () {
     for (final input in [
@@ -120,7 +138,10 @@ void main() {
     );
     expect(workflow, contains(r'"${RUNNER_TEMP}/expected-directories.txt"'));
     expect(workflow, contains(r'"${RUNNER_TEMP}/actual-directories.txt"'));
-    expect(workflow, contains('test "\$(wc -l < "\${RUNNER_TEMP}/actual-files.txt")" -eq 98'));
+    expect(
+      workflow,
+      contains('test "\$(wc -l < "\${RUNNER_TEMP}/actual-files.txt")" -eq 98'),
+    );
     expect(workflow, contains('sha256sum --check --strict'));
     expect(
       workflow,
@@ -133,17 +154,13 @@ void main() {
   });
 
   test('all third-party actions are pinned to full commit identities', () {
-    final uses = RegExp(r'^\s*-?\s*uses:\s*([^\s#]+)', multiLine: true)
-        .allMatches(workflow)
-        .map((match) => match.group(1)!)
-        .toList();
+    final uses = RegExp(
+      r'^\s*-?\s*uses:\s*([^\s#]+)',
+      multiLine: true,
+    ).allMatches(workflow).map((match) => match.group(1)!).toList();
     expect(uses, isNotEmpty);
     for (final action in uses) {
-      expect(
-        action,
-        matches(RegExp(r'^[^@]+@[0-9a-f]{40}$')),
-        reason: action,
-      );
+      expect(action, matches(RegExp(r'^[^@]+@[0-9a-f]{40}$')), reason: action);
     }
   });
 }
