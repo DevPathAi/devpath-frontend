@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:devpath_mobile/src/data/account_data_cleaner.dart';
 import 'package:devpath_mobile/src/data/key_value_store.dart';
@@ -302,7 +304,50 @@ void main() {
       expect(container.read(authControllerProvider).ownerKey, 'owner-a');
       events.clear();
 
-      await controller.completeFromCode('code-for-b');
+      var refreshCalls = 0;
+      var retryCalls = 0;
+      final interceptor = AuthInterceptor(
+        store: tokens,
+        sessionEpoch: AccountEpochStore(kv).current,
+        refresh: (_) async {
+          refreshCalls += 1;
+          return const TokenPair(access: 'unexpected', refresh: 'unexpected');
+        },
+        retry: (options) async {
+          retryCalls += 1;
+          return Response<dynamic>(requestOptions: options, statusCode: 200);
+        },
+      );
+      final oldARequest = RequestOptions(
+        path: '/community/questions',
+        method: 'POST',
+      );
+      await interceptor.onRequest(oldARequest, RequestInterceptorHandler());
+      expect(oldARequest.headers['Authorization'], 'Bearer a-access');
+
+      final replacing = controller.completeFromCode('code-for-b');
+      await tokens.bSaved.future;
+      await api.bLookupStarted.future;
+      expect(await AccountEpochStore(kv).current(), 1);
+
+      final lateAError = DioException(
+        requestOptions: oldARequest,
+        response: Response<dynamic>(
+          requestOptions: oldARequest,
+          statusCode: 401,
+        ),
+        type: DioExceptionType.badResponse,
+      );
+      await runZonedGuarded(
+        () => interceptor.onError(lateAError, ErrorInterceptorHandler()),
+        (_, _) {},
+      );
+      expect(refreshCalls, 0);
+      expect(retryCalls, 0);
+      expect(await tokens.readAccess(), 'b-access');
+
+      api.releaseBLookup.complete();
+      await replacing;
 
       expect(
         events,
@@ -325,6 +370,41 @@ void main() {
       );
     },
   );
+
+  test('OAuth replacement revoke failure clears A and never saves B', () async {
+    final events = <String>[];
+    final tokens = _RecordingTokenStore(events);
+    final kv = InMemoryKeyValueStore();
+    await tokens.save(access: 'a-access', refresh: 'a-refresh');
+    await VerifiedSessionStore(kv).write(_user('owner-a'));
+    await kv.write('dp.auth.pkce_verifier', 'verifier');
+    final api = _OAuthReplacementApi();
+    final container = ProviderContainer(
+      overrides: [
+        tokenStoreProvider.overrideWithValue(tokens),
+        keyValueStoreProvider.overrideWithValue(kv),
+        accountDataCleanerProvider.overrideWithValue(_Cleaner(events)),
+        ownerDataStoreProvider.overrideWithValue(InMemoryOwnerDataStore()),
+        deviceRegistrarProvider.overrideWithValue(
+          _SwitchRegistrar(events, fail: true),
+        ),
+        apiClientProvider.overrideWithValue(api),
+      ],
+    );
+    addTearDown(container.dispose);
+    final controller = container.read(authControllerProvider.notifier);
+    await controller.bootstrapSession();
+    events.clear();
+
+    await controller.completeFromCode('code-for-b');
+
+    expect(events, containsAllInOrder(['revoke:owner-a', 'clear:owner-a']));
+    expect(events, isNot(contains('token:save:b-access')));
+    expect(await tokens.readAccess(), isNull);
+    expect(await AccountEpochStore(kv).current(), 1);
+    expect(await VerifiedSessionStore(kv).read(), isNull);
+    expect(container.read(authControllerProvider), isA<AuthUnauthenticated>());
+  });
 }
 
 User _user(String id) => User(
@@ -349,11 +429,13 @@ final class _RecordingTokenStore extends InMemoryTokenStore {
   _RecordingTokenStore(this.events);
 
   final List<String> events;
+  final bSaved = Completer<void>();
 
   @override
   Future<void> save({required String access, required String refresh}) async {
     events.add('token:save:$access');
     await super.save(access: access, refresh: refresh);
+    if (access == 'b-access' && !bSaved.isCompleted) bSaved.complete();
   }
 
   @override
@@ -367,11 +449,15 @@ final class _OAuthReplacementApi extends ApiClient {
   _OAuthReplacementApi() : super(Dio());
 
   var userCalls = 0;
+  final bLookupStarted = Completer<void>();
+  final releaseBLookup = Completer<void>();
 
   @override
   Future<T> get<T>(String path, {Map<String, dynamic>? query}) async {
     userCalls += 1;
     if (userCalls == 1) return _userJson('owner-a') as T;
+    bLookupStarted.complete();
+    await releaseBLookup.future;
     throw const ApiException(
       code: ApiErrorCode.unknown,
       message: 'B session lookup unavailable',

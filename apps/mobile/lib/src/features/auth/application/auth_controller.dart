@@ -190,6 +190,8 @@ class AuthController extends Notifier<AuthState> {
       state = const AuthUnauthenticated(error: 'PKCE verifier 없음(로그인 재시도 필요)');
       return;
     }
+    final previousUser = await ref.read(verifiedSessionStoreProvider).read();
+    if (!_isCurrent(epoch)) return;
     try {
       final data = await _client.post<Map<String, dynamic>>(
         '/auth/oauth/token',
@@ -204,12 +206,32 @@ class AuthController extends Notifier<AuthState> {
           refresh.isEmpty) {
         throw const FormatException('malformed OAuth token payload');
       }
+      if (previousUser != null) {
+        // Stop exposing A before any slow replacement cleanup or B activation.
+        state = const AuthUnauthenticated();
+      }
+      var replacementRejected = false;
       final saved = await _mutateCredentials(() async {
         if (!_isCurrent(epoch)) return false;
+        if (previousUser != null) {
+          final prepared = await _prepareCredentialReplacement(previousUser.id);
+          if (!_isCurrent(epoch)) return false;
+          if (!prepared) {
+            replacementRejected = true;
+            return true;
+          }
+        }
         await _store.save(access: access, refresh: refresh);
         return _isCurrent(epoch);
       });
       if (!saved) return;
+      if (replacementRejected) {
+        ref.read(pendingDeepLinkProvider.notifier).consume();
+        state = const AuthUnauthenticated(
+          error: '이전 계정의 알림 연결을 해제하지 못했어요. 다시 로그인해 주세요.',
+        );
+        return;
+      }
       await bootstrapSession();
     } on ApiException catch (e) {
       if (!_isCurrent(epoch)) return;
@@ -314,6 +336,25 @@ class AuthController extends Notifier<AuthState> {
       // Credential and owner cleanup must remain fail-closed locally.
       return false;
     }
+  }
+
+  /// Clears an established account before a replacement credential can be
+  /// stored. The durable epoch advances first so in-flight A requests cannot
+  /// pass the interceptor rotation guard with B's token.
+  Future<bool> _prepareCredentialReplacement(String ownerKey) async {
+    final revoked = await _revokePush(ownerKey);
+    try {
+      await ref.read(accountEpochStoreProvider).advance();
+      await ref.read(accountDataCleanerProvider).clearOwner(ownerKey);
+    } finally {
+      await _store.clear();
+      await ref.read(verifiedSessionStoreProvider).clear();
+      await ref
+          .read(keyValueStoreProvider)
+          .delete(PendingDeepLinkController.storageKey);
+    }
+    ref.read(pendingDeepLinkProvider.notifier).consume();
+    return revoked;
   }
 
   bool _isCurrent(int epoch) => ref.mounted && epoch == _epoch;
