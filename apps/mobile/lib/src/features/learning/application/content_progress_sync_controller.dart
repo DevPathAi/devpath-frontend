@@ -129,17 +129,17 @@ class ContentProgressSyncController extends Notifier<int> {
         } else if (_isPermanentClientError(error)) {
           await ref
               .read(contentProgressQueueProvider)
-              .remove(ownerKey, routeKey);
+              .discardIfMatches(pending);
           if (ref.mounted) state += 1;
         }
         // Transport, throttling and 5xx retain the durable row for reconnect.
         return latestResponse;
       } on FormatException {
-        await ref.read(contentProgressQueueProvider).remove(ownerKey, routeKey);
+        await ref.read(contentProgressQueueProvider).discardIfMatches(pending);
         if (ref.mounted) state += 1;
         return latestResponse;
       } on TypeError {
-        await ref.read(contentProgressQueueProvider).remove(ownerKey, routeKey);
+        await ref.read(contentProgressQueueProvider).discardIfMatches(pending);
         if (ref.mounted) state += 1;
         return latestResponse;
       } on Object {

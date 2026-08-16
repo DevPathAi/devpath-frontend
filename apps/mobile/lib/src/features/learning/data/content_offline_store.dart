@@ -20,6 +20,7 @@ class ContentOfflineStore {
   static const bucket = 'content-cache-v1';
   static const maxOfflineAge = Duration(hours: 24);
   final OwnerDataStore _data;
+  final _mutationTails = <String, Future<void>>{};
 
   Future<CachedLearningContent?> read(
     String ownerKey,
@@ -52,19 +53,17 @@ class ContentOfflineStore {
     String routeKey,
     LearningContent content, {
     required DateTime cachedAt,
-  }) => _data.write(
+  }) => _serialize(
     ownerKey,
-    bucket,
     routeKey,
-    jsonEncode(content.toJson()),
-    updatedAt: cachedAt,
+    () => _write(ownerKey, routeKey, content, cachedAt: cachedAt),
   );
 
   Future<void> applyServerProgress(
     String ownerKey,
     String routeKey,
     ContentProgressUpdateResponse response,
-  ) async {
+  ) => _serialize(ownerKey, routeKey, () async {
     final row = await _data.read(ownerKey, bucket, routeKey);
     if (row == null) return;
     try {
@@ -80,10 +79,46 @@ class ContentOfflineStore {
           completedAt: response.completedAt ?? previous.completedAt,
         ),
       );
-      await write(ownerKey, routeKey, updated, cachedAt: row.updatedAt);
+      await _write(ownerKey, routeKey, updated, cachedAt: row.updatedAt);
     } on Object {
       await _data.delete(ownerKey, bucket, routeKey);
     }
+  });
+
+  Future<void> _write(
+    String ownerKey,
+    String routeKey,
+    LearningContent content, {
+    required DateTime cachedAt,
+  }) => _data.write(
+    ownerKey,
+    bucket,
+    routeKey,
+    jsonEncode(content.toJson()),
+    updatedAt: cachedAt,
+  );
+
+  Future<T> _serialize<T>(
+    String ownerKey,
+    String routeKey,
+    Future<T> Function() mutation,
+  ) {
+    final key = '$ownerKey\u0000$routeKey';
+    final previous = _mutationTails[key] ?? Future<void>.value();
+    final result = previous.then((_) => mutation());
+    final tail = result.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
+    _mutationTails[key] = tail;
+    unawaited(
+      tail.then((_) {
+        if (identical(_mutationTails[key], tail)) {
+          _mutationTails.remove(key);
+        }
+      }),
+    );
+    return result;
   }
 }
 
@@ -190,6 +225,16 @@ class ContentProgressQueue {
       _data.delete(ownerKey, bucket, routeKey);
 
   Future<bool> acknowledge(QueuedContentProgress sent) {
+    return _removeIfMatches(sent);
+  }
+
+  /// Discards a permanent failure only if the queued row is still exactly the
+  /// request that failed. A newer monotonic enqueue remains durable.
+  Future<bool> discardIfMatches(QueuedContentProgress sent) {
+    return _removeIfMatches(sent);
+  }
+
+  Future<bool> _removeIfMatches(QueuedContentProgress sent) {
     return _serialize(sent.ownerKey, sent.routeKey, () async {
       final latest = await read(sent.ownerKey, sent.routeKey);
       if (latest == null) return true;
