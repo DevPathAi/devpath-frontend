@@ -148,6 +148,7 @@ class _DpEt13EvidenceFrameState extends State<DpEt13EvidenceFrame> {
   @override
   Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false,
+    title: 'Leva ET13 Evidence',
     locale: const Locale('ko', 'KR'),
     theme: widget.brightness == Brightness.light
         ? DpTheme.light()

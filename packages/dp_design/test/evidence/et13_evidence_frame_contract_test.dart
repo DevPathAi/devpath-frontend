@@ -61,6 +61,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
+      tester.widget<MaterialApp>(find.byType(MaterialApp)).title,
+      'Leva ET13 Evidence',
+      reason: 'the release renderer must not clear the browser document title',
+    );
+    expect(
       find.bySemanticsLabel(
         'ET13_RUNTIME_PROFILE:fixture=fixture-a;width=320;height=900;dpr=1;brightness=dark;textScalePercent=200',
       ),

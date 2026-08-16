@@ -74,12 +74,10 @@ void main() {
   });
 
   test('all release renderers resolve CanvasKit default font offline', () {
-    for (final path in [
-      '../../apps/web/web/flutter_bootstrap.js',
-      '../../apps/admin/web/flutter_bootstrap.js',
-      '../../apps/mobile/web/flutter_bootstrap.js',
-    ]) {
+    for (final app in ['web', 'admin', 'mobile']) {
+      final path = '../../apps/$app/web/flutter_bootstrap.js';
       final bootstrap = File(path).readAsStringSync();
+      final index = File('../../apps/$app/web/index.html').readAsStringSync();
       expect(
         bootstrap,
         contains("new URLSearchParams(window.location.search).has('fixture')"),
@@ -97,6 +95,22 @@ void main() {
             '$path must resolve CanvasKit fallback requests from the already '
             'hash-pinned local Pretendard bytes',
       );
+      expect(
+        index,
+        contains(
+          '<meta name="viewport" '
+          'content="width=device-width, initial-scale=1.0">',
+        ),
+        reason: '$app evidence must preserve browser zoom and text scaling',
+      );
+      expect(
+        index,
+        contains('<html lang="ko">'),
+        reason: '$app custom-host evidence must retain a document language',
+      );
+      expect(bootstrap, contains("document.createElement('div')"));
+      expect(bootstrap, contains('hostElement: et13HostElement'));
+      expect(bootstrap, contains("et13HostElement.style.position = 'fixed'"));
     }
   });
 
