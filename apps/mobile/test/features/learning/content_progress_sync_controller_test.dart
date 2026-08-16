@@ -336,7 +336,7 @@ class _FlightTailQueue extends ContentProgressQueue {
 
   @override
   Future<List<QueuedContentProgress>> list(String ownerKey) async => [
-    if (_pending case final pending?) pending,
+    ?_pending,
   ];
 
   @override

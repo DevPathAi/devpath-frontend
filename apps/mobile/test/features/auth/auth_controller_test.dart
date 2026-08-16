@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:devpath_mobile/src/data/key_value_store.dart';
 import 'package:devpath_mobile/src/data/account_data_cleaner.dart';
+import 'package:devpath_mobile/src/data/owner_data_store.dart';
 import 'package:devpath_mobile/src/features/auth/application/auth_controller.dart';
 import 'package:devpath_mobile/src/features/auth/application/oauth_launcher.dart';
 import 'package:devpath_mobile/src/features/auth/application/pkce.dart';
@@ -58,6 +59,7 @@ ProviderContainer _container({
       oauthLauncherProvider.overrideWithValue(launcher ?? _FakeLauncher()),
       keyValueStoreProvider.overrideWithValue(kv ?? InMemoryKeyValueStore()),
       accountDataCleanerProvider.overrideWithValue(_NoopCleaner()),
+      ownerDataStoreProvider.overrideWithValue(InMemoryOwnerDataStore()),
     ],
   );
   addTearDown(c.dispose);
@@ -285,6 +287,7 @@ void main() {
           apiClientProvider.overrideWithValue(client),
           keyValueStoreProvider.overrideWithValue(kv),
           accountDataCleanerProvider.overrideWithValue(_NoopCleaner()),
+          ownerDataStoreProvider.overrideWithValue(InMemoryOwnerDataStore()),
         ],
       );
       addTearDown(c.dispose);

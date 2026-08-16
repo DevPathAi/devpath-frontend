@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../providers/api_providers.dart';
 import '../../../data/account_data_cleaner.dart';
+import '../../notifications/application/device_registrar.dart';
 import '../state/auth_state.dart';
 import 'oauth_launcher.dart';
 import 'account_epoch_store.dart';
@@ -135,6 +136,17 @@ class AuthController extends Notifier<AuthState> {
       } else {
         state = AuthSessionUnavailable(e.message);
       }
+    } on Object {
+      if (!_isCurrent(epoch)) return;
+      final cleared = await _mutateCredentials(() async {
+        if (!_isCurrent(epoch)) return false;
+        await _clearVerifiedBoundary(previousUser?.id);
+        return _isCurrent(epoch);
+      });
+      if (!cleared) return;
+      state = const AuthUnauthenticated(
+        error: '세션 응답 형식을 확인하지 못했어요. 다시 로그인해 주세요.',
+      );
     }
   }
 
@@ -163,8 +175,14 @@ class AuthController extends Notifier<AuthState> {
         body: {'code': code, 'code_verifier': verifier},
       );
       if (!_isCurrent(epoch)) return;
-      final access = data['access_token'] as String;
-      final refresh = data['refresh_token'] as String;
+      final access = data['access_token'];
+      final refresh = data['refresh_token'];
+      if (access is! String ||
+          access.isEmpty ||
+          refresh is! String ||
+          refresh.isEmpty) {
+        throw const FormatException('malformed OAuth token payload');
+      }
       final saved = await _mutateCredentials(() async {
         if (!_isCurrent(epoch)) return false;
         await _store.save(access: access, refresh: refresh);
@@ -175,6 +193,11 @@ class AuthController extends Notifier<AuthState> {
     } on ApiException catch (e) {
       if (!_isCurrent(epoch)) return;
       state = AuthUnauthenticated(error: e.message);
+    } on Object {
+      if (!_isCurrent(epoch)) return;
+      state = const AuthUnauthenticated(
+        error: '로그인 응답 형식을 확인하지 못했어요. 다시 시도해 주세요.',
+      );
     } finally {
       // 1회용 PKCE verifier: code는 교환을 시도한 순간 서버에서 소비되므로
       // 성공/실패와 무관하게 폐기한다(secure_storage에 만료된 비밀 잔존 방지).
@@ -192,9 +215,14 @@ class AuthController extends Notifier<AuthState> {
         (await ref.read(verifiedSessionStoreProvider).read())?.id;
     final epoch = ++_epoch;
     _bootstrapInFlight = null;
+    // Drop the in-memory owner boundary before slow server/disk work so no
+    // push or deep-link event can attach to the account being removed.
+    state = const AuthUnauthenticated();
+    ref.read(pendingDeepLinkProvider.notifier).consume();
     try {
       await _mutateCredentials(() async {
         try {
+          await _revokePush(ownerKey);
           await ref.read(accountEpochStoreProvider).advance();
           if (ownerKey != null) {
             await ref.read(accountDataCleanerProvider).clearOwner(ownerKey);
@@ -216,10 +244,33 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
+  /// Runtime APIs use the same exact 401 boundary as cold-start `/users/me`.
+  Future<void> invalidateUnauthorized([String? message]) async {
+    final ownerKey =
+        state.ownerKey ??
+        (await ref.read(verifiedSessionStoreProvider).read())?.id;
+    final epoch = ++_epoch;
+    _bootstrapInFlight = null;
+    final terminal = AuthUnauthenticated(
+      error: message ?? '세션이 만료되었어요. 다시 로그인해 주세요.',
+    );
+    state = terminal;
+    ref.read(pendingDeepLinkProvider.notifier).consume();
+    final cleared = await _mutateCredentials(() async {
+      if (!_isCurrent(epoch)) return false;
+      await _clearVerifiedBoundary(ownerKey);
+      return _isCurrent(epoch);
+    });
+    if (cleared) {
+      state = terminal;
+    }
+  }
+
   Future<void> _clearVerifiedBoundary([String? knownOwner]) async {
     final sessionStore = ref.read(verifiedSessionStoreProvider);
     final ownerKey = knownOwner ?? (await sessionStore.read())?.id;
     try {
+      await _revokePush(ownerKey);
       await ref.read(accountEpochStoreProvider).advance();
       if (ownerKey != null) {
         await ref.read(accountDataCleanerProvider).clearOwner(ownerKey);
@@ -230,6 +281,15 @@ class AuthController extends Notifier<AuthState> {
       await ref
           .read(keyValueStoreProvider)
           .delete(PendingDeepLinkController.storageKey);
+    }
+  }
+
+  Future<void> _revokePush(String? ownerKey) async {
+    if (ownerKey == null) return;
+    try {
+      await ref.read(deviceRegistrarProvider).unregister(ownerKey);
+    } on Object {
+      // Credential and owner cleanup must remain fail-closed locally.
     }
   }
 

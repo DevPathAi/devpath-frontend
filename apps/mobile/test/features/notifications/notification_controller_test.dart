@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:devpath_mobile/src/features/notifications/application/notification_controller.dart';
 import 'package:devpath_mobile/src/features/auth/application/auth_controller.dart';
+import 'package:devpath_mobile/src/data/key_value_store.dart';
+import 'package:devpath_mobile/src/providers/api_providers.dart';
 import 'package:devpath_mobile/src/features/notifications/data/notification_store.dart';
 import 'package:devpath_mobile/src/data/owner_data_store.dart';
 import 'package:devpath_mobile/src/services/push_service.dart';
@@ -56,6 +58,7 @@ class _OwnerController extends Notifier<String?> {
 class _DelayedNotificationData extends InMemoryOwnerDataStore {
   final writeStarted = Completer<void>();
   final releaseWrite = Completer<void>();
+  final staleDiscarded = Completer<void>();
 
   @override
   Future<void> write(
@@ -75,6 +78,24 @@ class _DelayedNotificationData extends InMemoryOwnerDataStore {
       updatedAt: updatedAt,
     );
   }
+
+  @override
+  Future<void> deleteIfMatches(
+    String ownerKey,
+    String bucket,
+    String recordKey, {
+    required String payload,
+    required DateTime updatedAt,
+  }) async {
+    await super.deleteIfMatches(
+      ownerKey,
+      bucket,
+      recordKey,
+      payload: payload,
+      updatedAt: updatedAt,
+    );
+    if (!staleDiscarded.isCompleted) staleDiscarded.complete();
+  }
 }
 
 final _ownerProvider = NotifierProvider<_OwnerController, String?>(
@@ -87,6 +108,7 @@ final _ownerProvider = NotifierProvider<_OwnerController, String?>(
   final c = ProviderContainer(
     overrides: [
       pushServiceProvider.overrideWithValue(_FakePush(ctrl)),
+      keyValueStoreProvider.overrideWithValue(InMemoryKeyValueStore()),
       currentOwnerKeyProvider.overrideWithValue('owner-a'),
       notificationStoreProvider.overrideWithValue(
         NotificationStore(InMemoryOwnerDataStore()),
@@ -135,6 +157,24 @@ void main() {
       expect(s.unreadCount, 2);
     });
 
+    test('다른 owner로 지정된 메시지는 현재 계정에 저장하지 않는다', () async {
+      final (:container, :push) = _setup();
+      final sub = container.listen(notificationControllerProvider, (_, _) {});
+      addTearDown(sub.close);
+
+      push.add(
+        const PushMessage(
+          id: 'owner-b-only',
+          title: 'B 전용',
+          body: 'A에게 보이면 안 됨',
+          intendedOwnerKey: 'owner-b',
+        ),
+      );
+      await pumpEventQueue();
+
+      expect(container.read(notificationControllerProvider).messages, isEmpty);
+    });
+
     test('markAllRead는 미읽음을 0으로 만들고 목록은 유지한다', () async {
       final (:container, :push) = _setup();
       final sub = container.listen(notificationControllerProvider, (_, _) {});
@@ -166,6 +206,7 @@ void main() {
         final container = ProviderContainer(
           overrides: [
             pushServiceProvider.overrideWithValue(push),
+            keyValueStoreProvider.overrideWithValue(InMemoryKeyValueStore()),
             currentOwnerKeyProvider.overrideWithValue('owner-a'),
             notificationStoreProvider.overrideWithValue(
               NotificationStore(InMemoryOwnerDataStore()),
@@ -217,6 +258,7 @@ void main() {
         final container = ProviderContainer(
           overrides: [
             pushServiceProvider.overrideWithValue(_FakePush(pushController)),
+            keyValueStoreProvider.overrideWithValue(InMemoryKeyValueStore()),
             currentOwnerKeyProvider.overrideWith(
               (ref) => ref.watch(_ownerProvider),
             ),
@@ -250,6 +292,7 @@ void main() {
       final container = ProviderContainer(
         overrides: [
           pushServiceProvider.overrideWithValue(push),
+          keyValueStoreProvider.overrideWithValue(InMemoryKeyValueStore()),
           currentOwnerKeyProvider.overrideWith(
             (ref) => ref.watch(_ownerProvider),
           ),
@@ -290,6 +333,7 @@ void main() {
       final container = ProviderContainer(
         overrides: [
           pushServiceProvider.overrideWithValue(push),
+          keyValueStoreProvider.overrideWithValue(InMemoryKeyValueStore()),
           currentOwnerKeyProvider.overrideWith(
             (ref) => ref.watch(_ownerProvider),
           ),
@@ -314,11 +358,12 @@ void main() {
       await data.writeStarted.future;
       container.read(_ownerProvider.notifier).setOwner('owner-b');
       data.releaseWrite.complete();
-      await pumpEventQueue();
+      await data.staleDiscarded.future;
 
       final state = container.read(notificationControllerProvider);
       expect(state.messages, isEmpty);
       expect(state.navigationTarget, isNull);
+      expect(await NotificationStore(data).list('owner-a'), isEmpty);
       expect(await NotificationStore(data).list('owner-b'), isEmpty);
     });
   });

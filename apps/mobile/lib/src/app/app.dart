@@ -80,11 +80,16 @@ class _DevPathMobileAppState extends ConsumerState<DevPathMobileApp>
   Widget build(BuildContext context) {
     // 인증 진입(전이) 시 1회 FCM 디바이스 토큰 등록(트랙 C). 부가 기능이라 실패는 무시.
     ref.listen(authControllerProvider, (prev, next) {
-      if (next is AuthAuthenticated && prev?.ownerKey != next.user.id) {
+      final wasConsented =
+          prev is AuthAuthenticated &&
+          prev.user.consentStatus == ConsentStatus.done;
+      if (next is AuthAuthenticated &&
+          next.user.consentStatus == ConsentStatus.done &&
+          (!wasConsented || prev.ownerKey != next.user.id)) {
         unawaited(
           ref
               .read(deviceRegistrarProvider)
-              .register(next.user.id)
+              .activate(next.user.id)
               .catchError((_) {}),
         );
       }

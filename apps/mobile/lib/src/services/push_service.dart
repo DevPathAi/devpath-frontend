@@ -12,6 +12,7 @@ class PushMessage {
     required this.title,
     required this.body,
     this.target,
+    this.intendedOwnerKey,
   });
 
   /// 메시지 식별자(FCM `messageId`). 목록 키·중복 제거에 사용.
@@ -19,6 +20,7 @@ class PushMessage {
   final String title;
   final String body;
   final PushTarget? target;
+  final String? intendedOwnerKey;
 }
 
 enum PushTargetKind { today, content }
@@ -85,6 +87,17 @@ abstract interface class PushService {
   Stream<PushMessage> get incoming;
 }
 
+/// Token and OS-permission lifecycle implemented by production FCM and the
+/// deterministic stub. Kept separate so read-only notification fakes remain
+/// lightweight.
+abstract interface class PushTokenLifecycleService {
+  Future<bool> requestPermission();
+
+  Stream<String> get tokenRefresh;
+
+  Future<void> deleteToken();
+}
+
 /// Optional OS-notification interaction channel for cold and warm taps.
 abstract interface class PushInteractionService {
   Future<PushMessage?> initialMessage();
@@ -93,7 +106,8 @@ abstract interface class PushInteractionService {
 }
 
 /// Firebase 없이 동작하는 스텁. 토큰은 고정값, 수신은 빈 스트림.
-class StubPushService implements PushService, PushInteractionService {
+class StubPushService
+    implements PushService, PushInteractionService, PushTokenLifecycleService {
   @override
   Future<String?> getToken() async => 'stub-fcm-token';
 
@@ -105,6 +119,15 @@ class StubPushService implements PushService, PushInteractionService {
 
   @override
   Stream<PushMessage> get opened => const Stream.empty();
+
+  @override
+  Future<bool> requestPermission() async => true;
+
+  @override
+  Stream<String> get tokenRefresh => const Stream.empty();
+
+  @override
+  Future<void> deleteToken() async {}
 }
 
 /// FCM `RemoteMessage` → [PushMessage] 매핑(순수 함수). 단위 테스트 대상.
@@ -113,7 +136,14 @@ PushMessage pushMessageFromRemote(RemoteMessage m) => PushMessage(
   title: m.notification?.title ?? '',
   body: m.notification?.body ?? '',
   target: PushTarget.fromData(m.data),
+  intendedOwnerKey: _pushOwnerKey(m.data),
 );
+
+String? _pushOwnerKey(Map<String, dynamic> data) {
+  final raw = data['ownerKey'] ?? data['userId'];
+  final value = raw?.toString().trim();
+  return value == null || value.isEmpty ? null : value;
+}
 
 /// 백그라운드/종료 상태 수신 진입점. **반드시 top-level**(앱이 비활성일 때 별
 /// isolate에서 호출됨)이며 `@pragma('vm:entry-point')`로 release tree-shaking을
@@ -137,7 +167,8 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 ///
 /// `FirebaseMessaging.instance`는 **lazy** 참조 — 생성자에서 Firebase를 건드리지
 /// 않으므로 미초기화 환경에서도 인스턴스화는 가능(실제 토큰·수신 호출 시점에만 초기화 필요).
-class FcmPushService implements PushService, PushInteractionService {
+class FcmPushService
+    implements PushService, PushInteractionService, PushTokenLifecycleService {
   /// [messaging]은 테스트 주입용(미지정 시 `FirebaseMessaging.instance`를 lazy 사용).
   FcmPushService([this._messaging]);
 
@@ -161,6 +192,25 @@ class FcmPushService implements PushService, PushInteractionService {
   @override
   Stream<PushMessage> get opened =>
       FirebaseMessaging.onMessageOpenedApp.map(pushMessageFromRemote);
+
+  @override
+  Future<bool> requestPermission() async {
+    final settings = await _fm.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+    return switch (settings.authorizationStatus) {
+      AuthorizationStatus.authorized || AuthorizationStatus.provisional => true,
+      _ => false,
+    };
+  }
+
+  @override
+  Stream<String> get tokenRefresh => _fm.onTokenRefresh;
+
+  @override
+  Future<void> deleteToken() => _fm.deleteToken();
 }
 
 /// 푸시 서비스 주입점(교체 경계). 목 모드=스텁, 실 모드=FCM.

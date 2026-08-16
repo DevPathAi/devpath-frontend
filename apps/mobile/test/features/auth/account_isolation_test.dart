@@ -1,5 +1,6 @@
 import 'package:devpath_mobile/src/data/account_data_cleaner.dart';
 import 'package:devpath_mobile/src/data/key_value_store.dart';
+import 'package:devpath_mobile/src/data/owner_data_store.dart';
 import 'package:devpath_mobile/src/features/auth/application/auth_controller.dart';
 import 'package:devpath_mobile/src/features/auth/application/account_epoch_store.dart';
 import 'package:devpath_mobile/src/features/auth/application/verified_session_store.dart';
@@ -112,6 +113,7 @@ void main() {
           tokenStoreProvider.overrideWithValue(tokens),
           keyValueStoreProvider.overrideWithValue(kv),
           accountDataCleanerProvider.overrideWithValue(cleaner),
+          ownerDataStoreProvider.overrideWithValue(InMemoryOwnerDataStore()),
           apiClientProvider.overrideWithValue(
             _client({
               'GET /users/me': (
@@ -162,6 +164,7 @@ void main() {
           }),
         ),
         accountDataCleanerProvider.overrideWithValue(cleaner),
+        ownerDataStoreProvider.overrideWithValue(InMemoryOwnerDataStore()),
       ],
     );
     addTearDown(container.dispose);

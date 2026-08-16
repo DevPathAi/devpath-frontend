@@ -16,7 +16,6 @@ class NotificationController extends Notifier<NotificationState> {
   StreamSubscription<PushMessage>? _sub;
   StreamSubscription<PushMessage>? _openedSub;
   String? _ownerKey;
-  PushMessage? _deferredOpened;
   var _ownerEpoch = 0;
 
   @override
@@ -41,9 +40,6 @@ class NotificationController extends Notifier<NotificationState> {
       state = NotificationState(isRestoring: owner != null);
       if (owner != null) {
         unawaited(_restore(owner, _ownerEpoch));
-        final deferred = _deferredOpened;
-        _deferredOpened = null;
-        if (deferred != null) unawaited(_onOpened(deferred));
       }
     });
     ref.onDispose(() {
@@ -60,21 +56,37 @@ class NotificationController extends Notifier<NotificationState> {
 
   void _onMessage(PushMessage message) => unawaited(_persist(message));
 
-  Future<void> _persist(PushMessage message) async {
-    final owner = _ownerKey;
-    final epoch = _ownerEpoch;
-    if (owner == null || message.id.isEmpty) return;
-    final added = await ref
-        .read(notificationStoreProvider)
-        .add(owner, message, receivedAt: DateTime.now().toUtc());
-    if (!ref.mounted || owner != _ownerKey || epoch != _ownerEpoch || !added) {
-      return;
-    }
-    state = NotificationState(
-      messages: [message, ...state.messages],
-      unreadCount: state.unreadCount + 1,
-      navigationTarget: state.navigationTarget,
+  Future<bool> _persist(
+    PushMessage message, {
+    _NotificationOwnerBoundary? boundary,
+  }) async {
+    final captured = boundary ?? await _captureBoundary(message);
+    if (captured == null || message.id.isEmpty) return false;
+    final store = ref.read(notificationStoreProvider);
+    final receivedAt = DateTime.now().toUtc();
+    final added = await store.add(
+      captured.ownerKey,
+      message,
+      receivedAt: receivedAt,
     );
+    if (!_isCurrent(captured)) {
+      if (added) {
+        await store.discardIfMatches(
+          captured.ownerKey,
+          message,
+          receivedAt: receivedAt,
+        );
+      }
+      return false;
+    }
+    if (added) {
+      state = NotificationState(
+        messages: [message, ...state.messages],
+        unreadCount: state.unreadCount + 1,
+        navigationTarget: state.navigationTarget,
+      );
+    }
+    return true;
   }
 
   Future<void> _restore(String owner, int epoch) async {
@@ -88,17 +100,40 @@ class NotificationController extends Notifier<NotificationState> {
   }
 
   Future<void> _onOpened(PushMessage message) async {
-    if (_ownerKey == null) {
-      _deferredOpened = message;
+    final boundary = await _captureBoundary(message);
+    if (boundary == null || !await _persist(message, boundary: boundary)) {
       return;
     }
-    await _persist(message);
-    if (!ref.mounted || message.target == null || _ownerKey == null) return;
+    if (message.target == null || !_isCurrent(boundary)) return;
     state = NotificationState(
       messages: state.messages,
       unreadCount: state.unreadCount,
       navigationTarget: message.target,
     );
+  }
+
+  Future<_NotificationOwnerBoundary?> _captureBoundary(
+    PushMessage message,
+  ) async {
+    final owner = _ownerKey;
+    final memoryEpoch = _ownerEpoch;
+    if (owner == null || !_matchesIntendedOwner(message, owner)) return null;
+    final boundary = _NotificationOwnerBoundary(
+      ownerKey: owner,
+      memoryEpoch: memoryEpoch,
+    );
+    return _isCurrent(boundary) ? boundary : null;
+  }
+
+  bool _isCurrent(_NotificationOwnerBoundary boundary) =>
+      ref.mounted &&
+      boundary.ownerKey == _ownerKey &&
+      boundary.memoryEpoch == _ownerEpoch &&
+      ref.read(currentOwnerKeyProvider) == boundary.ownerKey;
+
+  bool _matchesIntendedOwner(PushMessage message, String ownerKey) {
+    final intended = message.intendedOwnerKey;
+    return intended == null || intended == ownerKey;
   }
 
   void open(PushMessage message) {
@@ -133,3 +168,13 @@ final notificationControllerProvider =
     NotifierProvider<NotificationController, NotificationState>(
       NotificationController.new,
     );
+
+final class _NotificationOwnerBoundary {
+  const _NotificationOwnerBoundary({
+    required this.ownerKey,
+    required this.memoryEpoch,
+  });
+
+  final String ownerKey;
+  final int memoryEpoch;
+}

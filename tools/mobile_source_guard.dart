@@ -5,7 +5,20 @@ Never _fail(String message) {
   exit(1);
 }
 
-void main() {
+void main(List<String> args) {
+  String? sourceOnly;
+  for (final argument in args) {
+    if (argument.startsWith('--source-only=')) {
+      sourceOnly = argument.substring('--source-only='.length);
+      break;
+    }
+  }
+  if (sourceOnly != null) {
+    _guardDartSource(Directory(sourceOnly));
+    stdout.writeln('mobile source guard: OK');
+    return;
+  }
+
   final root = Directory.current;
   final lock = File('${root.path}/pubspec.lock');
   final workflow = File('${root.path}/.github/workflows/mobile.yml');
@@ -16,23 +29,38 @@ void main() {
   final iosProject = File(
     '${root.path}/apps/mobile/ios/Runner.xcodeproj/project.pbxproj',
   );
-  final mobileLib = Directory('${root.path}/apps/mobile/lib/src');
+  final iosFirebaseExample = File(
+    '${root.path}/apps/mobile/ios/Runner/GoogleService-Info.plist.example',
+  );
+  final fcmDocs = File('${root.path}/apps/mobile/docs/FCM_SETUP.md');
+  final androidLinkDefault = File(
+    '${root.path}/apps/mobile/android/app/src/main/res/values/bools.xml',
+  );
+  final androidLinkV31 = File(
+    '${root.path}/apps/mobile/android/app/src/main/res/values-v31/bools.xml',
+  );
+  final mobileLib = Directory('${root.path}/apps/mobile/lib');
 
-  for (final required in [lock, workflow, gradle, manifest, iosProject]) {
+  for (final required in [
+    lock,
+    workflow,
+    gradle,
+    manifest,
+    iosProject,
+    iosFirebaseExample,
+    fcmDocs,
+    androidLinkDefault,
+    androidLinkV31,
+  ]) {
     if (!required.existsSync()) _fail('missing ${required.path}');
   }
   for (final forbidden in ['sandbox', 'review', 'mentor']) {
-    if (Directory('${mobileLib.path}/features/$forbidden').existsSync()) {
+    if (Directory('${mobileLib.path}/src/features/$forbidden').existsSync()) {
       _fail('native $forbidden feature is outside the companion boundary');
     }
   }
 
-  final source = mobileLib
-      .listSync(recursive: true)
-      .whereType<File>()
-      .where((file) => file.path.endsWith('.dart'))
-      .map((file) => file.readAsStringSync())
-      .join('\n');
+  final source = _guardDartSource(mobileLib);
   if (source.contains("'/onboarding'") || source.contains('"/onboarding"')) {
     _fail('obsolete native onboarding route/API is present');
   }
@@ -60,14 +88,28 @@ void main() {
 
   final manifestSource = manifest.readAsStringSync();
   if (!manifestSource.contains('android:host="app.leva.ai.kr"') ||
-      !manifestSource.contains('android:pathPattern="/path/.*/today"') ||
       !manifestSource.contains(
-        'android:pathPattern="/mission/.*/content/.*"',
+        'android:enabled="@bool/enable_exact_app_links"',
       ) ||
+      !manifestSource.contains(
+        'android:pathAdvancedPattern="/path/[1-9][0-9]*/today"',
+      ) ||
+      !manifestSource.contains(
+        'android:pathAdvancedPattern="/mission/[1-9][0-9]*/content/[1-9][0-9]*"',
+      ) ||
+      manifestSource.contains('android:pathPattern=') ||
       manifestSource.contains('android:pathPrefix="/mission/"')) {
     _fail(
       'Android verified links are not exact canonical Today/Content filters',
     );
+  }
+  if (!androidLinkDefault.readAsStringSync().contains(
+        '<bool name="enable_exact_app_links">false</bool>',
+      ) ||
+      !androidLinkV31.readAsStringSync().contains(
+        '<bool name="enable_exact_app_links">true</bool>',
+      )) {
+    _fail('Android exact-link alias does not fail closed before API 31');
   }
 
   final workflowSource = workflow.readAsStringSync();
@@ -99,9 +141,25 @@ void main() {
     _fail('release Android build is wired to a debug signing key');
   }
   final xcodeSource = iosProject.readAsStringSync();
-  if ('Runner/RunnerDebug.entitlements'.allMatches(xcodeSource).length != 1 ||
-      'Runner/RunnerRelease.entitlements'.allMatches(xcodeSource).length != 2) {
+  final entitlements = _runnerEntitlements(xcodeSource);
+  const expectedEntitlements = {
+    'Debug': 'Runner/RunnerDebug.entitlements',
+    'Release': 'Runner/RunnerRelease.entitlements',
+    'Profile': 'Runner/RunnerRelease.entitlements',
+  };
+  if (entitlements.length != expectedEntitlements.length ||
+      expectedEntitlements.entries.any(
+        (entry) => entitlements[entry.key] != entry.value,
+      )) {
     _fail('iOS APNs entitlements are not split by build configuration');
+  }
+  for (final source in [
+    iosFirebaseExample.readAsStringSync(),
+    fcmDocs.readAsStringSync(),
+  ]) {
+    if (!source.contains('ai.devpath.devpathMobile')) {
+      _fail('FCM setup does not match the actual iOS bundle identifier');
+    }
   }
 
   final expectedSha = Platform.environment['GITHUB_SHA'];
@@ -114,4 +172,52 @@ void main() {
   }
 
   stdout.writeln('mobile source guard: OK');
+}
+
+String _guardDartSource(Directory directory) {
+  if (!directory.existsSync()) _fail('missing ${directory.path}');
+  final source = directory
+      .listSync(recursive: true)
+      .whereType<File>()
+      .where((file) => file.path.endsWith('.dart'))
+      .map((file) => file.readAsStringSync())
+      .join('\n');
+  for (final forbidden in [
+    'dart:html',
+    'dart:js_interop',
+    'dart:js',
+    'localStorage',
+    'sessionStorage',
+  ]) {
+    if (source.contains(forbidden)) {
+      _fail('browser-only API leaked into mobile: $forbidden');
+    }
+  }
+  return source;
+}
+
+Map<String, String> _runnerEntitlements(String project) {
+  final sections = project.split('/* Begin XCBuildConfiguration section */');
+  if (sections.length < 2) return const {};
+  final section = sections[1].split(
+    '/* End XCBuildConfiguration section */',
+  )[0];
+  final result = <String, String>{};
+  final blocks = RegExp(
+    r'/\* (Debug|Release|Profile) \*/ = \{(.*?)\n\s*\};',
+    dotAll: true,
+  ).allMatches(section);
+  for (final block in blocks) {
+    final body = block.group(2)!;
+    if (!body.contains(
+      'PRODUCT_BUNDLE_IDENTIFIER = ai.devpath.devpathMobile;',
+    )) {
+      continue;
+    }
+    final entitlement = RegExp(
+      r'CODE_SIGN_ENTITLEMENTS = ([^;]+);',
+    ).firstMatch(body);
+    result[block.group(1)!] = entitlement?.group(1) ?? '';
+  }
+  return result;
 }

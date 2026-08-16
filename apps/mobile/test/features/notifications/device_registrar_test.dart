@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:devpath_mobile/src/data/owner_data_store.dart';
 import 'package:devpath_mobile/src/features/notifications/application/device_registrar.dart';
 import 'package:devpath_mobile/src/services/push_service.dart';
@@ -13,8 +15,10 @@ class _FakePush implements PushService {
   Stream<PushMessage> get incoming => const Stream.empty();
 }
 
-class _LifecyclePush implements PushService {
+class _LifecyclePush implements PushService, PushTokenLifecycleService {
   var deleteCalls = 0;
+  var permissionCalls = 0;
+  final refreshes = StreamController<String>.broadcast();
 
   @override
   Future<String?> getToken() async => 'fcm-tok';
@@ -22,7 +26,19 @@ class _LifecyclePush implements PushService {
   @override
   Stream<PushMessage> get incoming => const Stream.empty();
 
+  @override
   Future<void> deleteToken() async => deleteCalls += 1;
+
+  @override
+  Future<bool> requestPermission() async {
+    permissionCalls += 1;
+    return true;
+  }
+
+  @override
+  Stream<String> get tokenRefresh => refreshes.stream;
+
+  Future<void> close() => refreshes.close();
 }
 
 ApiClient _client(Map<String, MockFixture> fx) {
@@ -57,6 +73,7 @@ void main() {
           'DELETE /notifications/devices': (200, <String, dynamic>{}),
         });
         final push = _LifecyclePush();
+        addTearDown(push.close);
         final data = InMemoryOwnerDataStore();
         final dynamic registrar = DeviceRegistrar(c, push, 'ANDROID', data);
         await registrar.register('owner-a');
@@ -65,6 +82,31 @@ void main() {
 
         expect(push.deleteCalls, 1);
         expect(await data.list('owner-a'), isEmpty);
+      },
+    );
+
+    test(
+      'consented activation requests permission and token refresh updates owner',
+      () async {
+        final c = _client({
+          'POST /notifications/devices': (200, <String, dynamic>{}),
+          'DELETE /notifications/devices': (200, <String, dynamic>{}),
+        });
+        final push = _LifecyclePush();
+        addTearDown(push.close);
+        final data = InMemoryOwnerDataStore();
+        final registrar = DeviceRegistrar(c, push, 'ANDROID', data);
+        addTearDown(registrar.dispose);
+
+        await registrar.activate('owner-a');
+        expect(push.permissionCalls, 1);
+        expect((await data.list('owner-a')).single.payload, 'fcm-tok');
+
+        push.refreshes.add('rotated-token');
+        await pumpEventQueue();
+
+        expect((await data.list('owner-a')).single.payload, 'rotated-token');
+        expect(await data.list('owner-b'), isEmpty);
       },
     );
   });

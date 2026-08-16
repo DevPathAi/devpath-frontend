@@ -20,6 +20,10 @@ void main() {
     expect(manifest, contains('android:host="app.leva.ai.kr"'));
     expect(
       manifest,
+      contains('android:enabled="@bool/enable_exact_app_links"'),
+    );
+    expect(
+      manifest,
       contains('android:pathAdvancedPattern="/path/[1-9][0-9]*/today"'),
     );
     expect(
@@ -116,7 +120,8 @@ void main() {
       ]) {
         expect(push, contains(marker), reason: marker);
       }
-      expect(registrar, contains("delete<dynamic>('/notifications/devices'"));
+      expect(registrar, contains('delete<dynamic>'));
+      expect(registrar, contains("'/notifications/devices'"));
       expect(registrar, contains('requestPermission'));
       expect(registrar, contains('tokenRefresh'));
       expect(app, contains('ConsentStatus.done'));

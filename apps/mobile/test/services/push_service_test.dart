@@ -20,6 +20,15 @@ void main() {
         ),
       );
       expect(content.target?.location, '/mission/302/content/77');
+      expect(content.intendedOwnerKey, isNull);
+
+      final owned = pushMessageFromRemote(
+        const RemoteMessage(
+          messageId: 'm-owned',
+          data: {'ownerKey': 'owner-a', 'targetType': 'TODAY', 'pathId': '301'},
+        ),
+      );
+      expect(owned.intendedOwnerKey, 'owner-a');
 
       final rejected = pushMessageFromRemote(
         const RemoteMessage(

@@ -71,13 +71,15 @@ class ContentController extends Notifier<ContentState> {
       final json = await ref
           .read(apiClientProvider)
           .get<Map<String, dynamic>>('/contents/$routeKey');
-      final content = LearningContent.fromJson(json);
+      var content = LearningContent.fromJson(json);
       if (!_matches(content)) {
         throw const FormatException('content identity mismatch');
       }
       if (!ref.mounted || generation != _loadGeneration) return;
       final now = DateTime.now().toUtc();
       if (owner != null && ref.read(currentOwnerKeyProvider) == owner) {
+        content = await _mergeQueuedProgress(owner, content);
+        if (!ref.mounted || generation != _loadGeneration) return;
         try {
           await ref
               .read(contentOfflineStoreProvider)
@@ -113,14 +115,18 @@ class ContentController extends Notifier<ContentState> {
         }
       }
       if (!ref.mounted || generation != _loadGeneration) return;
-      state = cached == null
+      final restored = cached == null || owner == null
+          ? cached?.content
+          : await _mergeQueuedProgress(owner, cached.content);
+      if (!ref.mounted || generation != _loadGeneration) return;
+      state = restored == null
           ? ContentFailed(message)
           : ContentLoaded(
-              cached.content,
+              restored,
               loadFailureMessage: message,
               isStale: true,
               fromOfflineCache: true,
-              cachedAt: cached.cachedAt,
+              cachedAt: cached?.cachedAt,
             );
     }
   }
@@ -252,6 +258,25 @@ class ContentController extends Notifier<ContentState> {
 
   bool _matches(LearningContent content) =>
       content.slug == routeKey || content.id.toString() == routeKey;
+
+  Future<LearningContent> _mergeQueuedProgress(
+    String ownerKey,
+    LearningContent content,
+  ) async {
+    final pending = await ref
+        .read(contentProgressQueueProvider)
+        .read(ownerKey, routeKey);
+    if (pending == null) return content;
+    final progress = content.progress;
+    return content.copyWith(
+      progress: ContentProgress(
+        scrollPct: math.max(progress.scrollPct, pending.scrollPct),
+        dwellSec: math.max(progress.dwellSec, pending.dwellSec),
+        completed: progress.completed,
+        completedAt: progress.completedAt,
+      ),
+    );
+  }
 
   String _loadFailure(Object error) => switch (error) {
     ApiException(:final message) => message,

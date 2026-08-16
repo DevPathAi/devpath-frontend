@@ -56,7 +56,19 @@ class ContentProgressSyncController extends Notifier<int> {
   ) {
     final key = '$ownerKey\u0000$routeKey';
     final active = _flights[key];
-    if (active != null) return active;
+    if (active != null) {
+      return active.then((response) async {
+        if (!ref.mounted || ref.read(currentOwnerKeyProvider) != ownerKey) {
+          return response;
+        }
+        final pending = await ref
+            .read(contentProgressQueueProvider)
+            .read(ownerKey, routeKey);
+        if (pending == null) return response;
+        final tail = await syncRoute(ownerKey, routeKey);
+        return tail ?? response;
+      });
+    }
     late final Future<ContentProgressUpdateResponse?> tracked;
     tracked = _drainRoute(ownerKey, routeKey).whenComplete(() {
       if (identical(_flights[key], tracked)) _flights.remove(key);
@@ -104,12 +116,52 @@ class ContentProgressSyncController extends Notifier<int> {
             ref.invalidate(todayControllerProvider);
           }
         }
+      } on ApiException catch (error) {
+        if (_isUnauthorized(error)) {
+          await ref
+              .read(contentProgressQueueProvider)
+              .remove(ownerKey, routeKey);
+          if (ref.mounted) {
+            await ref
+                .read(authControllerProvider.notifier)
+                .invalidateUnauthorized(error.message);
+          }
+        } else if (_isPermanentClientError(error)) {
+          await ref
+              .read(contentProgressQueueProvider)
+              .remove(ownerKey, routeKey);
+          if (ref.mounted) state += 1;
+        }
+        // Transport, throttling and 5xx retain the durable row for reconnect.
+        return latestResponse;
+      } on FormatException {
+        await ref.read(contentProgressQueueProvider).remove(ownerKey, routeKey);
+        if (ref.mounted) state += 1;
+        return latestResponse;
+      } on TypeError {
+        await ref.read(contentProgressQueueProvider).remove(ownerKey, routeKey);
+        if (ref.mounted) state += 1;
+        return latestResponse;
       } on Object {
-        // Transport/malformed responses retain the durable row for reconnect.
+        // Non-HTTP transport/platform failures remain retryable.
         return latestResponse;
       }
     }
     return latestResponse;
+  }
+
+  bool _isUnauthorized(ApiException error) =>
+      error.status == 401 || error.code == ApiErrorCode.unauthorized;
+
+  bool _isPermanentClientError(ApiException error) {
+    final status = error.status;
+    return status != null &&
+        status >= 400 &&
+        status < 500 &&
+        status != 401 &&
+        status != 408 &&
+        status != 425 &&
+        status != 429;
   }
 }
 

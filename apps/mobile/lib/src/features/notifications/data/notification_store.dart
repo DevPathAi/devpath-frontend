@@ -87,24 +87,50 @@ class NotificationStore {
     }
   }
 
+  /// Removes only the exact unread write created by a now-stale account
+  /// boundary. A later write with the same message id is left untouched.
+  Future<void> discardIfMatches(
+    String ownerKey,
+    PushMessage message, {
+    required DateTime receivedAt,
+  }) {
+    final notification = StoredNotification(
+      message: message,
+      receivedAt: receivedAt,
+      isRead: false,
+    );
+    return _data.deleteIfMatches(
+      ownerKey,
+      bucket,
+      message.id,
+      payload: _encode(notification),
+      updatedAt: receivedAt,
+    );
+  }
+
   Future<void> _write(String ownerKey, StoredNotification notification) {
-    final target = notification.message.target;
     return _data.write(
       ownerKey,
       bucket,
       notification.message.id,
-      jsonEncode({
-        'id': notification.message.id,
-        'title': notification.message.title,
-        'body': notification.message.body,
-        'targetType': target?.kind.name,
-        'primaryId': target?.primaryId,
-        'secondaryId': target?.secondaryId,
-        'receivedAt': notification.receivedAt.toUtc().toIso8601String(),
-        'isRead': notification.isRead,
-      }),
+      _encode(notification),
       updatedAt: notification.receivedAt,
     );
+  }
+
+  String _encode(StoredNotification notification) {
+    final target = notification.message.target;
+    return jsonEncode({
+      'id': notification.message.id,
+      'title': notification.message.title,
+      'body': notification.message.body,
+      'intendedOwnerKey': notification.message.intendedOwnerKey,
+      'targetType': target?.kind.name,
+      'primaryId': target?.primaryId,
+      'secondaryId': target?.secondaryId,
+      'receivedAt': notification.receivedAt.toUtc().toIso8601String(),
+      'isRead': notification.isRead,
+    });
   }
 
   StoredNotification _decode(String payload) {
@@ -123,6 +149,7 @@ class NotificationStore {
         title: json['title'] as String? ?? '',
         body: json['body'] as String? ?? '',
         target: target,
+        intendedOwnerKey: json['intendedOwnerKey'] as String?,
       ),
       receivedAt: DateTime.parse(json['receivedAt'] as String).toUtc(),
       isRead: json['isRead'] as bool? ?? false,
