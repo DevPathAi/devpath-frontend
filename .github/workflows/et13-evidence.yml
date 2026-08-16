@@ -1,6 +1,55 @@
+---
+# Immutable action and image digests intentionally exceed 80 columns.
+# yamllint disable rule:line-length
 name: ET13 Frontend Evidence
 
-on:
+'on':
+  workflow_dispatch:
+    inputs:
+      release_id:
+        description: Release identifier bound by the external candidate spec
+        required: true
+        type: string
+      candidate_run_id:
+        description: Successful GitOps candidate producer run ID
+        required: true
+        type: string
+      candidate_run_attempt:
+        description: Exact successful GitOps candidate producer attempt
+        required: true
+        type: string
+      candidate_artifact_id:
+        description: Immutable canonical candidate artifact ID
+        required: true
+        type: string
+      candidate_gitops_head_sha:
+        description: Exact GitOps head that produced the candidate
+        required: true
+        type: string
+      candidate_workflow_blob_sha:
+        description: SHA-256 of the exact candidate workflow bytes
+        required: true
+        type: string
+      candidate_spec_sha256:
+        description: SHA-256 of the exact raw canonical candidate-spec bytes
+        required: true
+        type: string
+      baseline_run_id:
+        description: Successful protected baseline approval run ID
+        required: true
+        type: string
+      baseline_run_attempt:
+        description: Exact successful protected baseline approval attempt
+        required: true
+        type: string
+      baseline_artifact_id:
+        description: Immutable approved baseline artifact ID
+        required: true
+        type: string
+      baseline_workflow_blob_sha:
+        description: SHA-256 of the exact baseline workflow bytes
+        required: true
+        type: string
   pull_request:
     paths:
       - 'apps/web/**'
@@ -9,7 +58,9 @@ on:
       - 'packages/dp_core/**'
       - 'packages/dp_design/**'
       - 'evidence/et13/**'
+      - 'tools/et13/**'
       - 'tools/et13_evidence.dart'
+      - 'tools/et13_baseline_updater.dart'
       - 'pubspec.yaml'
       - 'pubspec.lock'
       - '.gitattributes'
@@ -23,7 +74,9 @@ on:
       - 'packages/dp_core/**'
       - 'packages/dp_design/**'
       - 'evidence/et13/**'
+      - 'tools/et13/**'
       - 'tools/et13_evidence.dart'
+      - 'tools/et13_baseline_updater.dart'
       - 'pubspec.yaml'
       - 'pubspec.lock'
       - '.gitattributes'
@@ -31,21 +84,147 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
-  group: et13-evidence-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: et13-evidence-${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && inputs.release_id || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
+
+env:
+  RENDERER_IMAGE: mcr.microsoft.com/playwright:v1.55.0-noble@sha256:ffc33305f7b4b04057ae4a0caa70aad4fde87454fb403a1a22e7f931707dfcf9
+  ET13_ROOT: build/et13
+  EVIDENCE_MODE: ${{ github.event_name == 'workflow_dispatch' && 'release_ready' || 'diagnostic' }}
 
 jobs:
-  contracts:
+  produce-atomic-pair:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 120
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
-      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6.1.0
+
+      - name: Mint read-only GitOps candidate token
+        if: github.event_name == 'workflow_dispatch'
+        id: gitops-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3.2.0
+        with:
+          app-id: ${{ secrets.GITOPS_APP_ID }}
+          private-key: ${{ secrets.GITOPS_APP_PRIVATE_KEY }}
+          owner: DevPathAi
+          repositories: devpath-gitops
+          permission-actions: read
+          permission-contents: read
+
+      - name: Authenticate exact external release artifact metadata
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          GITOPS_TOKEN: ${{ steps.gitops-token.outputs.token }}
+          FRONTEND_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ inputs.release_id }}
+          CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+          CANDIDATE_RUN_ATTEMPT: ${{ inputs.candidate_run_attempt }}
+          CANDIDATE_ARTIFACT_ID: ${{ inputs.candidate_artifact_id }}
+          CANDIDATE_GITOPS_HEAD_SHA: ${{ inputs.candidate_gitops_head_sha }}
+          CANDIDATE_WORKFLOW_BLOB_SHA: ${{ inputs.candidate_workflow_blob_sha }}
+          BASELINE_RUN_ID: ${{ inputs.baseline_run_id }}
+          BASELINE_RUN_ATTEMPT: ${{ inputs.baseline_run_attempt }}
+          BASELINE_ARTIFACT_ID: ${{ inputs.baseline_artifact_id }}
+          BASELINE_WORKFLOW_BLOB_SHA: ${{ inputs.baseline_workflow_blob_sha }}
+        run: |
+          set -euo pipefail
+          test -n "${GITOPS_TOKEN}"
+          test -n "${FRONTEND_TOKEN}"
+          GITHUB_TOKEN="${GITOPS_TOKEN}" node tools/et13/verify_external_artifact.mjs \
+            --kind=candidate \
+            --release-id="${RELEASE_ID}" \
+            --run-id="${CANDIDATE_RUN_ID}" \
+            --run-attempt="${CANDIDATE_RUN_ATTEMPT}" \
+            --artifact-id="${CANDIDATE_ARTIFACT_ID}" \
+            --gitops-head-sha="${CANDIDATE_GITOPS_HEAD_SHA}" \
+            --workflow-blob-sha="${CANDIDATE_WORKFLOW_BLOB_SHA}" \
+            --frontend-sha="${GITHUB_SHA}"
+          GITHUB_TOKEN="${FRONTEND_TOKEN}" node tools/et13/verify_external_artifact.mjs \
+            --kind=baseline \
+            --release-id="${RELEASE_ID}" \
+            --run-id="${BASELINE_RUN_ID}" \
+            --run-attempt="${BASELINE_RUN_ATTEMPT}" \
+            --artifact-id="${BASELINE_ARTIFACT_ID}" \
+            --workflow-blob-sha="${BASELINE_WORKFLOW_BLOB_SHA}" \
+            --frontend-sha="${GITHUB_SHA}"
+
+      - name: Download exact canonical candidate
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53  # v6.0.0
+        with:
+          artifact-ids: ${{ inputs.candidate_artifact_id }}
+          repository: DevPathAi/devpath-gitops
+          run-id: ${{ inputs.candidate_run_id }}
+          github-token: ${{ steps.gitops-token.outputs.token }}
+          merge-multiple: true
+          path: build/et13/external/candidate
+
+      - name: Download exact approved visual baseline
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53  # v6.0.0
+        with:
+          artifact-ids: ${{ inputs.baseline_artifact_id }}
+          repository: DevPathAi/devpath-frontend
+          run-id: ${{ inputs.baseline_run_id }}
+          github-token: ${{ github.token }}
+          merge-multiple: true
+          path: build/et13/external/baseline
+
+      - name: Reject external artifact links, extras, and raw-byte drift
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          CANDIDATE_SPEC_SHA256: ${{ inputs.candidate_spec_sha256 }}
+        run: |
+          set -euo pipefail
+          [[ "${CANDIDATE_SPEC_SHA256}" =~ ^[0-9a-f]{64}$ ]]
+          candidate_root="${ET13_ROOT}/external/candidate"
+          baseline_root="${ET13_ROOT}/external/baseline"
+          test -z "$(find "${candidate_root}" "${baseline_root}" -type l -print -quit)"
+          mapfile -t candidate_files < <(
+            find "${candidate_root}" -type f -printf '%P\n' | LC_ALL=C sort
+          )
+          test "${#candidate_files[@]}" -eq 1
+          test "${candidate_files[0]}" = candidate-spec.json
+          test -z "$(find "${candidate_root}" -mindepth 1 -type d -print -quit)"
+          printf '%s  %s\n' \
+            "${CANDIDATE_SPEC_SHA256}" \
+            "${candidate_root}/candidate-spec.json" | sha256sum --check --strict
+          {
+            printf '%s\n' baseline-approval.v1.json review-candidate.v1.json
+            jq -er '.cases[].artifact_path' \
+              evidence/et13/generated/visual-cases.v1.json
+          } | LC_ALL=C sort > "${RUNNER_TEMP}/expected-baseline-files.txt"
+          find "${baseline_root}" -type f -printf '%P\n' | LC_ALL=C sort \
+            > "${RUNNER_TEMP}/actual-baseline-files.txt"
+          diff -u \
+            "${RUNNER_TEMP}/expected-baseline-files.txt" \
+            "${RUNNER_TEMP}/actual-baseline-files.txt"
+          while IFS= read -r path; do
+            directory="$(dirname "${path}")"
+            while [[ "${directory}" != . ]]; do
+              printf '%s\n' "${directory}"
+              directory="$(dirname "${directory}")"
+            done
+          done < "${RUNNER_TEMP}/expected-baseline-files.txt" \
+            | LC_ALL=C sort -u \
+            > "${RUNNER_TEMP}/expected-baseline-directories.txt"
+          find "${baseline_root}" -mindepth 1 -type d -printf '%P\n' \
+            | LC_ALL=C sort \
+            > "${RUNNER_TEMP}/actual-baseline-directories.txt"
+          diff -u \
+            "${RUNNER_TEMP}/expected-baseline-directories.txt" \
+            "${RUNNER_TEMP}/actual-baseline-directories.txt"
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2  # v2.23.0
         with:
           flutter-version: '3.44.1'
           cache: true
+
       - name: Verify exact checkout and toolchain
         shell: bash
         run: |
@@ -53,13 +232,304 @@ jobs:
           test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
           flutter --version --machine | grep -q '"frameworkVersion": "3.44.1"'
           flutter --version --machine | grep -q '"dartSdkVersion": "3.12.1"'
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
       - name: Resolve locked workspace
         run: flutter pub get --enforce-lockfile
-      - name: Validate immutable ET13 inputs
-        run: dart run tools/et13_evidence.dart validate
-      - name: Run ET13 negative contract tests
-        working-directory: apps/web
-        run: flutter test --no-pub test/app/et13_evidence_catalog_contract_test.dart
 
-  # Capture jobs are added only with the complete release renderers. CI never
-  # updates snapshots or marks pending_external_review baselines as approved.
+      - name: Validate immutable producer inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          dart run tools/et13_evidence.dart validate
+          dart run tools/mobile_source_guard.dart
+          dart analyze \
+            tools/et13_evidence.dart \
+            tools/et13_baseline_updater.dart
+          node --check tools/et13/capture.mjs
+          node --check tools/et13/verify_external_artifact.mjs
+          dart format --output=none --set-exit-if-changed \
+            tools/et13_evidence.dart \
+            tools/et13_baseline_updater.dart \
+            packages/dp_design/lib/dp_design.dart \
+            packages/dp_design/lib/src/evidence \
+            packages/dp_design/lib/src/theme/dp_typography.dart \
+            packages/dp_design/test/evidence \
+            packages/dp_design/test/theme/dp_typography_test.dart \
+            apps/web/lib/src/evidence \
+            apps/web/test/evidence \
+            apps/web/test/app/et13_evidence_catalog_contract_test.dart \
+            apps/web/test/app/et13_evidence_producer_contract_test.dart \
+            apps/admin/lib/src/evidence \
+            apps/admin/test/evidence \
+            apps/mobile/lib/src/evidence \
+            apps/mobile/test/evidence
+
+      - name: Analyze all production evidence distributions
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd packages/dp_design && flutter analyze --no-pub)
+          (cd apps/web && flutter analyze --no-pub)
+          (cd apps/admin && flutter analyze --no-pub)
+          (cd apps/mobile && flutter analyze --no-pub)
+
+      - name: Run production evidence contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd packages/dp_design && flutter test --no-pub \
+            test/evidence/et13_evidence_frame_contract_test.dart \
+            test/evidence/et13_evidence_fixtures_test.dart \
+            test/theme/dp_typography_test.dart)
+          (cd apps/web && flutter test --no-pub \
+            test/app/et13_evidence_catalog_contract_test.dart \
+            test/app/et13_evidence_producer_contract_test.dart \
+            test/evidence/et13_web_evidence_app_test.dart)
+          (cd apps/admin && flutter test --no-pub \
+            test/evidence/et13_admin_evidence_app_test.dart)
+          (cd apps/mobile && flutter test --no-pub \
+            test/evidence/et13_mobile_evidence_app_test.dart \
+            test/features/evidence/mobile_evidence_projection_test.dart)
+
+      - name: Build web evidence distribution
+        working-directory: apps/web
+        run: >-
+          flutter build web --release --no-pub
+          --no-web-resources-cdn --no-tree-shake-icons
+          --target lib/et13_evidence_main.dart
+          --dart-define=ET13_SOURCE_SHA=${{ github.sha }}
+          --output ${{ github.workspace }}/build/et13/build/web
+
+      - name: Build admin evidence distribution
+        working-directory: apps/admin
+        run: >-
+          flutter build web --release --no-pub
+          --no-web-resources-cdn --no-tree-shake-icons
+          --target lib/et13_evidence_main.dart
+          --dart-define=ET13_SOURCE_SHA=${{ github.sha }}
+          --output ${{ github.workspace }}/build/et13/build/admin
+
+      - name: Build mobile evidence distribution
+        working-directory: apps/mobile
+        run: >-
+          flutter build web --release --no-pub
+          --no-web-resources-cdn --no-tree-shake-icons
+          --target lib/et13_evidence_main.dart
+          --dart-define=ET13_SOURCE_SHA=${{ github.sha }}
+          --output ${{ github.workspace }}/build/et13/build/mobile
+
+      - name: Bind release builds and lane input provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${ET13_ROOT}/producer/visual" "${ET13_ROOT}/producer/a11y"
+          dart run tools/et13_evidence.dart build-marker \
+            --source-sha="${GITHUB_SHA}" \
+            --output="${ET13_ROOT}/build-marker.v1.json" \
+            --web-root="${ET13_ROOT}/build/web" \
+            --admin-root="${ET13_ROOT}/build/admin" \
+            --mobile-root="${ET13_ROOT}/build/mobile"
+          for lane in visual a11y; do
+            dart run tools/et13_evidence.dart provenance \
+              --kind="${lane}" \
+              --source-sha="${GITHUB_SHA}" \
+              --build-marker="${ET13_ROOT}/build-marker.v1.json" \
+              --output="${ET13_ROOT}/producer/${lane}/provenance.v1.json"
+          done
+
+      - name: Write diagnostic review candidates
+        if: github.event_name != 'workflow_dispatch'
+        shell: bash
+        run: |
+          set -euo pipefail
+          for lane in visual a11y; do
+            dart run tools/et13_evidence.dart candidate \
+              --kind="${lane}" \
+              --source-sha="${GITHUB_SHA}" \
+              --build-marker="${ET13_ROOT}/build-marker.v1.json" \
+              --provenance="${ET13_ROOT}/producer/${lane}/provenance.v1.json" \
+              --mode=diagnostic \
+              --producer-run-id="${GITHUB_RUN_ID}" \
+              --producer-run-attempt="${GITHUB_RUN_ATTEMPT}" \
+              --repository="${GITHUB_REPOSITORY}" \
+              --output="${ET13_ROOT}/producer/${lane}/review-candidate.v1.json"
+          done
+
+      - name: Bind release lanes to canonical candidate and approved baseline
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          RELEASE_ID: ${{ inputs.release_id }}
+          CANDIDATE_SPEC_SHA256: ${{ inputs.candidate_spec_sha256 }}
+        run: |
+          set -euo pipefail
+          baseline_root="${ET13_ROOT}/external/baseline"
+          dart run tools/et13_evidence.dart candidate \
+            --kind=visual \
+            --source-sha="${GITHUB_SHA}" \
+            --build-marker="${ET13_ROOT}/build-marker.v1.json" \
+            --provenance="${ET13_ROOT}/producer/visual/provenance.v1.json" \
+            --mode=release_ready \
+            --producer-run-id="${GITHUB_RUN_ID}" \
+            --producer-run-attempt="${GITHUB_RUN_ATTEMPT}" \
+            --repository="${GITHUB_REPOSITORY}" \
+            --baseline-root="${baseline_root}" \
+            --baseline-approval="${baseline_root}/baseline-approval.v1.json" \
+            --output="${ET13_ROOT}/producer/visual/release-binding.v1.json"
+          dart run tools/et13_evidence.dart candidate \
+            --kind=a11y \
+            --source-sha="${GITHUB_SHA}" \
+            --build-marker="${ET13_ROOT}/build-marker.v1.json" \
+            --provenance="${ET13_ROOT}/producer/a11y/provenance.v1.json" \
+            --mode=release_ready \
+            --producer-run-id="${GITHUB_RUN_ID}" \
+            --producer-run-attempt="${GITHUB_RUN_ATTEMPT}" \
+            --repository="${GITHUB_REPOSITORY}" \
+            --output="${ET13_ROOT}/producer/a11y/release-binding.v1.json"
+          dart run tools/et13_evidence.dart validate-release-inputs \
+            --canonical-candidate="${ET13_ROOT}/external/candidate/candidate-spec.json" \
+            --canonical-candidate-sha256="${CANDIDATE_SPEC_SHA256}" \
+            --release-id="${RELEASE_ID}" \
+            --visual-candidate="${ET13_ROOT}/producer/visual/release-binding.v1.json" \
+            --visual-provenance="${ET13_ROOT}/producer/visual/provenance.v1.json" \
+            --a11y-candidate="${ET13_ROOT}/producer/a11y/release-binding.v1.json" \
+            --a11y-provenance="${ET13_ROOT}/producer/a11y/provenance.v1.json"
+
+      - name: Install pinned capture dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull --platform linux/amd64 "${RENDERER_IMAGE}"
+          docker run --rm --platform linux/amd64 \
+            -v "${GITHUB_WORKSPACE}:/work" \
+            -w /work/tools/et13 \
+            "${RENDERER_IMAGE}" \
+            npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Capture production distributions without network
+        shell: bash
+        run: |
+          set -euo pipefail
+          baseline=()
+          if [[ "${EVIDENCE_MODE}" == release_ready ]]; then
+            baseline+=(--baseline-root="${ET13_ROOT}/external/baseline")
+          fi
+          docker run --rm --platform linux/amd64 --network none --ipc=host \
+            -v "${GITHUB_WORKSPACE}:/work" \
+            -w /work \
+            "${RENDERER_IMAGE}" \
+            node tools/et13/capture.mjs \
+              --source-sha="${GITHUB_SHA}" \
+              --catalog=evidence/et13/catalog.v1.json \
+              --build-marker="${ET13_ROOT}/build-marker.v1.json" \
+              --output-root="${ET13_ROOT}/capture" \
+              --mode="${EVIDENCE_MODE}" \
+              --web-root="${ET13_ROOT}/build/web" \
+              --admin-root="${ET13_ROOT}/build/admin" \
+              --mobile-root="${ET13_ROOT}/build/mobile" \
+              "${baseline[@]}"
+
+      - name: Assemble and jointly validate both lanes
+        shell: bash
+        env:
+          RELEASE_ID: ${{ inputs.release_id }}
+          CANDIDATE_SPEC_SHA256: ${{ inputs.candidate_spec_sha256 }}
+        run: |
+          set -euo pipefail
+          baseline=()
+          if [[ "${EVIDENCE_MODE}" == release_ready ]]; then
+            baseline+=(
+              --baseline-root="${ET13_ROOT}/external/baseline"
+              --baseline-approval="${ET13_ROOT}/external/baseline/baseline-approval.v1.json"
+            )
+          fi
+          for lane in visual a11y; do
+            lane_baseline=()
+            if [[ "${lane}" == visual ]]; then lane_baseline=("${baseline[@]}"); fi
+            binding="${ET13_ROOT}/producer/${lane}/review-candidate.v1.json"
+            canonical=()
+            if [[ "${EVIDENCE_MODE}" == release_ready ]]; then
+              binding="${ET13_ROOT}/producer/${lane}/release-binding.v1.json"
+              canonical+=(
+                --canonical-candidate="${ET13_ROOT}/external/candidate/candidate-spec.json"
+                --canonical-candidate-sha256="${CANDIDATE_SPEC_SHA256}"
+                --release-id="${RELEASE_ID}"
+              )
+            fi
+            dart run tools/et13_evidence.dart manifest \
+              --kind="${lane}" \
+              --source-sha="${GITHUB_SHA}" \
+              --build-marker="${ET13_ROOT}/build-marker.v1.json" \
+              --provenance="${ET13_ROOT}/producer/${lane}/provenance.v1.json" \
+              --artifact-root="${ET13_ROOT}/capture" \
+              --capture-summary="${ET13_ROOT}/capture/artifacts/et13/capture-summary.v1.json" \
+              --mode="${EVIDENCE_MODE}" \
+              --output="${ET13_ROOT}/producer/${lane}/${lane}-manifest.v1.json" \
+              "${lane_baseline[@]}"
+            dart run tools/et13_evidence.dart evidence \
+              --kind="${lane}" \
+              --candidate="${binding}" \
+              --provenance="${ET13_ROOT}/producer/${lane}/provenance.v1.json" \
+              --manifest="${ET13_ROOT}/producer/${lane}/${lane}-manifest.v1.json" \
+              --output="${ET13_ROOT}/producer/${lane}/evidence.json" \
+              "${canonical[@]}"
+            install -D -m 0644 \
+              "${ET13_ROOT}/producer/${lane}/evidence.json" \
+              "${ET13_ROOT}/stage/${lane}/evidence.json"
+            install -D -m 0644 \
+              "evidence/et13/generated/${lane}-cases.v1.json" \
+              "${ET13_ROOT}/stage/${lane}/evidence/et13/generated/${lane}-cases.v1.json"
+            install -D -m 0644 \
+              "${ET13_ROOT}/producer/${lane}/provenance.v1.json" \
+              "${ET13_ROOT}/stage/${lane}/artifacts/et13/provenance.v1.json"
+            install -D -m 0644 \
+              "${ET13_ROOT}/producer/${lane}/${lane}-manifest.v1.json" \
+              "${ET13_ROOT}/stage/${lane}/artifacts/et13/${lane}-manifest.v1.json"
+          done
+          for lane in visual a11y; do
+            binding="${ET13_ROOT}/producer/${lane}/review-candidate.v1.json"
+            canonical=()
+            if [[ "${EVIDENCE_MODE}" == release_ready ]]; then
+              binding="${ET13_ROOT}/producer/${lane}/release-binding.v1.json"
+              canonical+=(
+                --canonical-candidate="${ET13_ROOT}/external/candidate/candidate-spec.json"
+                --canonical-candidate-sha256="${CANDIDATE_SPEC_SHA256}"
+                --release-id="${RELEASE_ID}"
+              )
+            fi
+            dart run tools/et13_evidence.dart validate-package \
+              --kind="${lane}" \
+              --package-root="${ET13_ROOT}/stage/${lane}" \
+              --candidate="${binding}" \
+              "${canonical[@]}"
+          done
+
+      - name: Upload unsealable raw review evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: et13-unsealed-raw-review-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            build/et13/build-marker.v1.json
+            build/et13/capture
+            build/et13/producer
+
+      - name: Upload sealable visual lane
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: ${{ inputs.release_id }}-frontend-visual-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          if-no-files-found: error
+          retention-days: 30
+          path: build/et13/stage/visual/
+
+      - name: Upload sealable automated accessibility lane
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: ${{ inputs.release_id }}-frontend-automated-a11y-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          if-no-files-found: error
+          retention-days: 30
+          path: build/et13/stage/a11y/

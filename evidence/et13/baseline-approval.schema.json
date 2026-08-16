@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://leva.ai.kr/schemas/et13/baseline-approval.v1.json",
+  "title": "Leva ET13 externally reviewed visual baseline approval",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "source_sha",
+    "catalog_sha256",
+    "case_catalog_sha256",
+    "review_candidate_sha256",
+    "fixture_ids",
+    "case_count",
+    "candidate_set_sha256",
+    "approved_by",
+    "approved_at"
+  ],
+  "properties": {
+    "schema_version": {"const": "leva.et13.baseline-approval.v1"},
+    "status": {"const": "approved"},
+    "source_sha": {
+      "type": "string",
+      "pattern": "^(?!0{40}$)[0-9a-f]{40}$"
+    },
+    "catalog_sha256": {"$ref": "#/$defs/sha256"},
+    "case_catalog_sha256": {"$ref": "#/$defs/sha256"},
+    "review_candidate_sha256": {"$ref": "#/$defs/sha256"},
+    "fixture_ids": {"$ref": "#/$defs/fixtureIds"},
+    "case_count": {"const": 96},
+    "candidate_set_sha256": {"$ref": "#/$defs/sha256"},
+    "approved_by": {"type": "string", "minLength": 1},
+    "approved_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "fixtureIds": {
+      "type": "array",
+      "minItems": 12,
+      "maxItems": 12,
+      "prefixItems": [
+        {"const": "web-today-available"},
+        {"const": "web-path-current-week"},
+        {"const": "web-content-reading"},
+        {"const": "web-workspace-idle"},
+        {"const": "web-review-loaded"},
+        {"const": "web-mentor-context-preview"},
+        {"const": "admin-kpi-dashboard"},
+        {"const": "admin-support-long-wire"},
+        {"const": "mobile-today-available"},
+        {"const": "mobile-content-reading"},
+        {"const": "dp-design-mission-ledger"},
+        {"const": "dp-design-context-payload-preview"}
+      ],
+      "items": false
+    }
+  }
+}

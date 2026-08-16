@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 /// DESIGN.md §2 타입 스케일. 본문 Pretendard(한글 행간 1.6), 코드 D2Coding.
 abstract final class DpTypography {
-  static const String family = 'Pretendard';
-  static const String codeFamily = 'D2Coding';
+  static const String family = 'packages/dp_design/Pretendard';
+  static const String codeFamily = 'packages/dp_design/D2Coding';
 
   /// 코드/고정폭 텍스트 기본 스타일.
   static const TextStyle code = TextStyle(

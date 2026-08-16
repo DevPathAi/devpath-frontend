@@ -47,3 +47,4 @@ export 'src/mission/dp_context_capsule.dart';
 export 'src/mission/dp_next_action_band.dart';
 export 'src/evidence/et13_evidence_fixtures.dart';
 export 'src/evidence/et13_evidence_frame.dart';
+export 'src/evidence/et13_font_asset_ready.dart';

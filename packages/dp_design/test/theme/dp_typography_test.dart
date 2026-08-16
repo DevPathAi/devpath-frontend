@@ -3,18 +3,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  const pretendard = 'packages/dp_design/Pretendard';
+  const d2Coding = 'packages/dp_design/D2Coding';
+
   test('본문 폰트는 Pretendard, 한글 행간 1.6', () {
     final t = DpTypography.textTheme(Brightness.light);
-    expect(t.bodyLarge!.fontFamily, 'Pretendard');
+    expect(t.bodyLarge!.fontFamily, pretendard);
     expect(t.bodyLarge!.fontSize, 16);
     expect(t.bodyLarge!.height, closeTo(1.6, 0.001));
-    expect(t.bodyMedium!.fontFamily, 'Pretendard');
+    expect(t.bodyMedium!.fontFamily, pretendard);
     expect(t.bodyMedium!.height, closeTo(1.6, 0.001));
     expect(t.titleMedium!.fontWeight, FontWeight.w600);
   });
 
   test('코드용 폰트 헬퍼는 D2Coding', () {
-    expect(DpTypography.code.fontFamily, 'D2Coding');
+    expect(DpTypography.code.fontFamily, d2Coding);
   });
 
   group('타입 스케일 추가 3종', () {
@@ -51,7 +54,7 @@ void main() {
         t.labelMedium,
         t.labelSmall,
       ]) {
-        expect(s!.fontFamily, 'Pretendard');
+        expect(s!.fontFamily, pretendard);
       }
     });
   });

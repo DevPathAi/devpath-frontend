@@ -6,9 +6,16 @@ import 'package:crypto/crypto.dart';
 const _catalogVersion = 'leva.et13.catalog.v1';
 const _visualVersion = 'leva.et13.visual-cases.v1';
 const _a11yVersion = 'leva.et13.a11y-cases.v1';
+const _projectionContractVersion = 'leva.et13.projection-contract.v1';
+const _projectionContractSha256 =
+    'c66d08b6425628a06b27d07e08d648cfb3568d9db7c8d8aca2371172ccf4bde3';
 const _pendingReview = 'pending_external_review';
+const _approved = 'approved';
+const _diagnostic = 'diagnostic';
+const _releaseReady = 'release_ready';
 const _captureSurface = 'flutter_web_release_projection';
 const _externalAccessibilityStatus = 'not_satisfied';
+const _a11yStandard = 'WCAG 2.2 AA';
 const _workspaceLockSha =
     '0314570cb0955aab626fa61191b419c06b6f2cb06736827b48a1e88f252a34e4';
 const _rendererImage =
@@ -42,6 +49,94 @@ const _a11ySurfaceCounts = <String, int>{
   'mobile': 4,
   'dp_design': 4,
 };
+const _commonEvidenceKeys = <String>[
+  'candidate_spec_sha256',
+  'status',
+  'producer_run_id',
+  'producer_run_attempt',
+  'repository',
+  'source_sha',
+  'case_catalog_sha256',
+  'case_catalog_version',
+  'case_catalog_schema_version',
+  'projection_contract_sha256',
+  'fixture_ids',
+  'case_count',
+  'passed_case_count',
+  'failed_case_count',
+  'surface_case_counts',
+  'capture_surface',
+  'device_evidence',
+  'input_provenance_sha256',
+  'input_provenance_file_sha256',
+  'result_manifest_sha256',
+  'evidence_mode',
+];
+const _visualEvidenceKeys = <String>[
+  ..._commonEvidenceKeys,
+  'baseline_status',
+  'baseline_set_sha256',
+  'baseline_approval_sha256',
+  'pixel_diff_percent',
+];
+const _a11yEvidenceKeys = <String>[
+  ..._commonEvidenceKeys,
+  'standard',
+  'critical_violations',
+  'serious_violations',
+];
+const _commonManifestKeys = <String>[
+  'schema_version',
+  'evidence_mode',
+  'case_catalog_version',
+  'case_catalog_schema_version',
+  'fixture_ids',
+  'source_sha',
+  'catalog_sha256',
+  'case_catalog_sha256',
+  'projection_contract_sha256',
+  'assets_lock_sha256',
+  'renderer_lock_sha256',
+  'input_provenance_sha256',
+  'renderer_image',
+  'renderer_image_digest',
+  'capture_network',
+  'unexpected_request_policy',
+  'capture_surface',
+  'device_evidence',
+  'external_accessibility_status',
+];
+const _visualManifestKeys = <String>[
+  ..._commonManifestKeys,
+  'baseline_status',
+  'baseline_set_sha256',
+  'baseline_approval_sha256',
+  'case_count',
+  'surface_case_counts',
+  'cases',
+];
+const _a11yManifestKeys = <String>[
+  ..._commonManifestKeys,
+  'case_count',
+  'surface_case_counts',
+  'cases',
+];
+const _visualResultCaseKeys = <String>[
+  'case_id',
+  'status',
+  'artifact_path',
+  'sha256',
+  'bytes',
+];
+const _a11yResultCaseKeys = <String>[
+  ..._visualResultCaseKeys,
+  'standard',
+  'critical_violations',
+  'serious_violations',
+  'other_violations',
+  'passes',
+  'incomplete',
+];
 const _expectedAssets = <Map<String, Object?>>[
   {
     'id': 'pretendard-400',
@@ -145,6 +240,17 @@ const _expectedAssets = <Map<String, Object?>>[
   },
 ];
 
+const _builtFontPaths = <String, String>{
+  'pretendard-400': 'assets/packages/dp_design/fonts/Pretendard-Regular.otf',
+  'pretendard-500': 'assets/packages/dp_design/fonts/Pretendard-Medium.otf',
+  'pretendard-600': 'assets/packages/dp_design/fonts/Pretendard-SemiBold.otf',
+  'pretendard-700': 'assets/packages/dp_design/fonts/Pretendard-Bold.otf',
+  'd2coding': 'assets/packages/dp_design/fonts/D2Coding.ttf',
+  'material-symbols-rounded':
+      'assets/packages/material_symbols_icons/lib/fonts/MaterialSymbolsRounded.ttf',
+  'material-icons': 'assets/fonts/MaterialIcons-Regular.otf',
+};
+
 Never _fail(String message) => throw FormatException(message);
 
 void _exactKeys(Map<String, Object?> value, List<String> keys, String path) {
@@ -191,7 +297,11 @@ String _sha256String(Object? value, String path) {
 }
 
 void _exactValue(Object? actual, Object? expected, String path) {
-  if (actual != expected) _fail('$path must be $expected; found $actual');
+  final equal =
+      actual is List || actual is Map || expected is List || expected is Map
+      ? jsonEncode(actual) == jsonEncode(expected)
+      : actual == expected;
+  if (!equal) _fail('$path must be $expected; found $actual');
 }
 
 Map<String, Object?> _readObject(String path) {
@@ -205,6 +315,12 @@ String _rawSha(String path) =>
 
 String _pretty(Object value) =>
     '${const JsonEncoder.withIndent('  ').convert(value)}\n';
+
+void _writePretty(String path, Object value) {
+  final file = File(path);
+  file.parent.createSync(recursive: true);
+  file.writeAsStringSync(_pretty(value));
+}
 
 Object? _canonical(Object? value) {
   if (value is Map) {
@@ -220,12 +336,16 @@ Object? _canonical(Object? value) {
 String _canonicalSha(Object value) =>
     sha256.convert(utf8.encode(jsonEncode(_canonical(value)))).toString();
 
-Map<String, Object?> validateCatalog() {
-  const path = 'evidence/et13/catalog.v1.json';
+Map<String, Object?> validateCatalog({
+  String path = 'evidence/et13/catalog.v1.json',
+}) {
   final catalog = _readObject(path);
   _exactKeys(catalog, const [
     'schema_version',
     'fixtures',
+    'projection_contract_version',
+    'projection_matrix',
+    'projection_contract_sha256',
     'visual_matrix',
     'a11y_matrix',
     'baseline_status',
@@ -233,6 +353,11 @@ Map<String, Object?> validateCatalog() {
   if (catalog['schema_version'] != _catalogVersion) {
     _fail('catalog schema_version must be $_catalogVersion');
   }
+  _exactValue(
+    catalog['projection_contract_version'],
+    _projectionContractVersion,
+    r'$catalog.projection_contract_version',
+  );
   if (catalog['baseline_status'] != _pendingReview) {
     _fail('baseline status must remain $_pendingReview');
   }
@@ -251,6 +376,9 @@ Map<String, Object?> validateCatalog() {
       'route',
       'ready_semantics_label',
       'surface_label',
+      'capture_scope',
+      'source_widget',
+      'substitutions',
     ], r'$catalog.fixtures[$index]');
     final id = _string(fixture['id'], 'fixture[$index].id');
     final owner = _string(fixture['owner'], 'fixture[$index].owner');
@@ -265,6 +393,26 @@ Map<String, Object?> validateCatalog() {
         fixture['ready_semantics_label'] != 'ET13_READY:$id' ||
         fixture['surface_label'] != id) {
       _fail('fixture $id route/readiness/surface identity drifted');
+    }
+    final captureScope = _string(
+      fixture['capture_scope'],
+      'fixture[$index].capture_scope',
+    );
+    if (!const {
+      'full_route',
+      'body_projection',
+      'component_projection',
+    }.contains(captureScope)) {
+      _fail('fixture $id capture scope is invalid');
+    }
+    _string(fixture['source_widget'], 'fixture[$index].source_widget');
+    final substitutions = _array(
+      fixture['substitutions'],
+      'fixture[$index].substitutions',
+    );
+    if (substitutions.isEmpty ||
+        substitutions.any((value) => value is! String || value.isEmpty)) {
+      _fail('fixture $id must declare explicit substitutions');
     }
     if (owner == 'dp_design' && distribution != 'web') {
       _fail('dp_design fixtures must use the web production distribution');
@@ -291,6 +439,34 @@ Map<String, Object?> validateCatalog() {
       !_mapEquals(distributions, expectedDistributions)) {
     _fail('fixture owner/distribution counts drifted');
   }
+
+  final expectedProjectionMatrix = <Map<String, Object?>>[
+    for (final raw in fixtures)
+      {
+        'fixture_id': _object(raw, 'fixture')['id'],
+        'capture_scope': _object(raw, 'fixture')['capture_scope'],
+        'source_widget': _object(raw, 'fixture')['source_widget'],
+        'substitutions': _object(raw, 'fixture')['substitutions'],
+      },
+  ];
+  final projectionMatrix = _array(
+    catalog['projection_matrix'],
+    r'$catalog.projection_matrix',
+  );
+  if (jsonEncode(projectionMatrix) != jsonEncode(expectedProjectionMatrix)) {
+    _fail('projection matrix must exactly mirror the ordered fixture contract');
+  }
+  final projectionSha = _canonicalSha(projectionMatrix);
+  _exactValue(
+    catalog['projection_contract_sha256'],
+    _projectionContractSha256,
+    r'$catalog.projection_contract_sha256',
+  );
+  _exactValue(
+    projectionSha,
+    _projectionContractSha256,
+    r'$catalog.canonicalProjectionMatrixSha256',
+  );
 
   final visual = _object(catalog['visual_matrix'], r'$catalog.visual_matrix');
   _exactKeys(visual, const [
@@ -372,6 +548,9 @@ Map<String, Object?> _case({
     'route': fixture['route'],
     'ready_semantics_label': fixture['ready_semantics_label'],
     'surface_label': fixture['surface_label'],
+    'capture_scope': fixture['capture_scope'],
+    'source_widget': fixture['source_widget'],
+    'substitutions': fixture['substitutions'],
     'width': width,
     'height': 900,
     'device_pixel_ratio': 1,
@@ -428,6 +607,8 @@ Map<String, Object?> _case({
     'schema_version': _visualVersion,
     'case_catalog_version': _catalogVersion,
     'catalog_sha256': catalogSha,
+    'projection_contract_sha256': catalog['projection_contract_sha256'],
+    'projection_matrix': catalog['projection_matrix'],
     'fixture_ids': _fixtureIds,
     'case_count': 96,
     'surface_case_counts': _visualSurfaceCounts,
@@ -437,6 +618,8 @@ Map<String, Object?> _case({
     'schema_version': _a11yVersion,
     'case_catalog_version': _catalogVersion,
     'catalog_sha256': catalogSha,
+    'projection_contract_sha256': catalog['projection_contract_sha256'],
+    'projection_matrix': catalog['projection_matrix'],
     'fixture_ids': _fixtureIds,
     'case_count': 24,
     'surface_case_counts': _a11ySurfaceCounts,
@@ -484,6 +667,7 @@ void validateCanonicalLineEndings() {
     if (bytes.contains(13)) {
       _fail('$path must use canonical LF bytes (CR found)');
     }
+    jsonDecode(utf8.decode(bytes));
   }
   final lockBytes = File('pubspec.lock').readAsBytesSync();
   final normalizedLock = <int>[];
@@ -502,6 +686,94 @@ void validateCanonicalLineEndings() {
   final attribute = _gitOutput(['check-attr', 'eol', '--', 'pubspec.lock']);
   if (attribute != 'pubspec.lock: eol: lf') {
     _fail('pubspec.lock must be pinned as text eol=lf in .gitattributes');
+  }
+}
+
+void validateContractDocuments() {
+  const schemas = <String, String>{
+    'evidence/et13/catalog.schema.json':
+        'https://leva.ai.kr/schemas/et13/catalog.v1.json',
+    'evidence/et13/generated-cases.schema.json':
+        'https://leva.ai.kr/schemas/et13/generated-cases.v1.json',
+    'evidence/et13/manifest.schema.json':
+        'https://leva.ai.kr/schemas/et13/manifest.v1.json',
+    'evidence/et13/evidence.schema.json':
+        'https://leva.ai.kr/schemas/et13/evidence.v1.json',
+    'evidence/et13/baseline-approval.schema.json':
+        'https://leva.ai.kr/schemas/et13/baseline-approval.v1.json',
+  };
+  for (final entry in schemas.entries) {
+    final schema = _readObject(entry.key);
+    _exactValue(
+      schema[r'$schema'],
+      'https://json-schema.org/draft/2020-12/schema',
+      '${entry.key}.\$schema',
+    );
+    _exactValue(schema[r'$id'], entry.value, '${entry.key}.\$id');
+    _exactValue(schema['type'], 'object', '${entry.key}.type');
+    _exactValue(
+      schema['additionalProperties'],
+      false,
+      '${entry.key}.additionalProperties',
+    );
+  }
+
+  final bundle = _readObject('evidence/et13/release-bundle.v1.json');
+  _exactKeys(bundle, const [
+    'schema_version',
+    'workflow_path',
+    'capture_surface',
+    'device_evidence',
+    'lanes',
+  ], r'$releaseBundle');
+  for (final entry in const <String, Object?>{
+    'schema_version': 'leva.et13.release-bundle.v1',
+    'workflow_path': '.github/workflows/et13-evidence.yml',
+    'capture_surface': _captureSurface,
+    'device_evidence': false,
+  }.entries) {
+    _exactValue(bundle[entry.key], entry.value, 'releaseBundle.${entry.key}');
+  }
+  final lanes = _array(bundle['lanes'], 'releaseBundle.lanes');
+  if (lanes.length != 2) _fail('release bundle must declare two ordered lanes');
+  for (var index = 0; index < lanes.length; index++) {
+    final visual = index == 0;
+    final kind = visual ? 'visual' : 'a11y';
+    final lane = _object(lanes[index], 'releaseBundle.lanes[$index]');
+    _exactKeys(lane, const [
+      'kind',
+      'artifact_name_template',
+      'files',
+      'generated_schema_version',
+      'provenance_schema_version',
+      'manifest_schema_version',
+      'evidence_keys',
+      'manifest_keys',
+      'result_case_keys',
+    ], 'releaseBundle.lanes[$index]');
+    final label = visual ? 'visual' : 'automated-a11y';
+    final manifest = visual ? 'visual' : 'a11y';
+    for (final entry in <String, Object?>{
+      'kind': kind,
+      'artifact_name_template':
+          '<release_id>-frontend-$label-run-<run_id>-attempt-<run_attempt>',
+      'files': [
+        'evidence.json',
+        'evidence/et13/generated/$kind-cases.v1.json',
+        'artifacts/et13/provenance.v1.json',
+        'artifacts/et13/$manifest-manifest.v1.json',
+      ],
+      'generated_schema_version': visual ? _visualVersion : _a11yVersion,
+      'provenance_schema_version': 'leva.et13.input-provenance.v1',
+      'manifest_schema_version': visual
+          ? 'leva.et13.visual-manifest.v1'
+          : 'leva.et13.a11y-manifest.v1',
+      'evidence_keys': visual ? _visualEvidenceKeys : _a11yEvidenceKeys,
+      'manifest_keys': visual ? _visualManifestKeys : _a11yManifestKeys,
+      'result_case_keys': visual ? _visualResultCaseKeys : _a11yResultCaseKeys,
+    }.entries) {
+      _exactValue(lane[entry.key], entry.value, '$kind.${entry.key}');
+    }
   }
 }
 
@@ -675,31 +947,74 @@ void validateAssets() {
   }
 }
 
-String _gitOutput(List<String> arguments) {
-  final result = Process.runSync('git', arguments, runInShell: false);
+String _gitOutput(List<String> arguments, {String? workingDirectory}) {
+  final result = Process.runSync(
+    'git',
+    arguments,
+    runInShell: false,
+    workingDirectory: workingDirectory,
+  );
   if (result.exitCode != 0) {
     _fail('git ${arguments.join(' ')} failed: ${result.stderr}');
   }
   return (result.stdout as String).trim();
 }
 
-void validateSourceIdentity(String sourceSha, String buildMarkerPath) {
+void _validateCleanHead(String sourceSha, {String? workingDirectory}) {
   if (!RegExp(r'^[0-9a-f]{40}$').hasMatch(sourceSha) ||
       sourceSha == '0000000000000000000000000000000000000000') {
     _fail('source SHA must be a non-zero 40-character lowercase git SHA');
   }
-  final head = _gitOutput(['rev-parse', '--verify', 'HEAD']);
+  final head = _gitOutput([
+    'rev-parse',
+    '--verify',
+    'HEAD',
+  ], workingDirectory: workingDirectory);
   if (sourceSha != head) {
     _fail('source SHA $sourceSha does not match clean git HEAD $head');
   }
   final trackedStatus = _gitOutput([
     'status',
     '--porcelain=v1',
-    '--untracked-files=no',
-  ]);
+    '--untracked-files=all',
+  ], workingDirectory: workingDirectory);
   if (trackedStatus.isNotEmpty) {
-    _fail('tracked source must be clean before provenance is computed');
+    _fail('source tree must be clean before provenance is computed');
   }
+}
+
+void validateSourceTreeClean(String sourceSha, {String? workingDirectory}) =>
+    _validateCleanHead(sourceSha, workingDirectory: workingDirectory);
+
+List<Map<String, Object?>> _builtFontMarker(String artifactRoot) {
+  final root = Directory(artifactRoot);
+  return <Map<String, Object?>>[
+    for (final path in _builtFontPaths.entries)
+      () {
+        final expected = _expectedAssets.singleWhere(
+          (asset) => asset['id'] == path.key,
+        );
+        final file = File.fromUri(root.uri.resolve(path.value));
+        if (!file.existsSync() ||
+            file.lengthSync() != expected['bytes'] ||
+            _rawSha(file.path) != expected['sha256']) {
+          _fail(
+            '$artifactRoot/${path.value} is absent, tree-shaken, or differs '
+            'from the exact ET13 font lock',
+          );
+        }
+        return <String, Object?>{
+          'id': path.key,
+          'artifact_path': path.value,
+          'sha256': expected['sha256'],
+          'bytes': expected['bytes'],
+        };
+      }(),
+  ];
+}
+
+void validateSourceIdentity(String sourceSha, String buildMarkerPath) {
+  _validateCleanHead(sourceSha);
 
   final marker = _readObject(buildMarkerPath);
   _exactKeys(marker, const [
@@ -743,6 +1058,7 @@ void validateSourceIdentity(String sourceSha, String buildMarkerPath) {
       'entrypoint',
       'artifact_root',
       'main_dart_js_sha256',
+      'font_assets',
     ], 'buildMarker.distributions[$index]');
     final id = _string(distribution['id'], 'distribution.id');
     if (id != expected.keys.elementAt(index) ||
@@ -763,7 +1079,54 @@ void validateSourceIdentity(String sourceSha, String buildMarkerPath) {
     if (!main.existsSync() || _rawSha(main.path) != expectedMainSha) {
       _fail('$id build marker does not match its main.dart.js bytes');
     }
+    final expectedFonts = _builtFontMarker(artifactRoot);
+    if (jsonEncode(distribution['font_assets']) != jsonEncode(expectedFonts)) {
+      _fail('$id build marker font assets drifted from exact packaged bytes');
+    }
   }
+}
+
+Map<String, Object?> writeBuildMarker({
+  required String sourceSha,
+  required String outputPath,
+  required String webRoot,
+  required String adminRoot,
+  required String mobileRoot,
+}) {
+  _validateCleanHead(sourceSha);
+  final roots = <String, String>{
+    'web': webRoot,
+    'admin': adminRoot,
+    'mobile': mobileRoot,
+  };
+  const entrypoints = <String, String>{
+    'web': 'apps/web/lib/et13_evidence_main.dart',
+    'admin': 'apps/admin/lib/et13_evidence_main.dart',
+    'mobile': 'apps/mobile/lib/et13_evidence_main.dart',
+  };
+  final distributions = <Map<String, Object?>>[];
+  for (final id in entrypoints.keys) {
+    final root = roots[id]!;
+    final main = File.fromUri(Directory(root).uri.resolve('main.dart.js'));
+    if (!main.existsSync()) _fail('$id release build is missing main.dart.js');
+    distributions.add({
+      'id': id,
+      'entrypoint': entrypoints[id],
+      'artifact_root': root.replaceAll('\\', '/'),
+      'main_dart_js_sha256': _rawSha(main.path),
+      'font_assets': _builtFontMarker(root),
+    });
+  }
+  final marker = <String, Object?>{
+    'schema_version': 'leva.et13.build-marker.v1',
+    'source_sha': sourceSha,
+    'capture_surface': _captureSurface,
+    'device_evidence': false,
+    'distributions': distributions,
+  };
+  _writePretty(outputPath, marker);
+  validateSourceIdentity(sourceSha, outputPath);
+  return marker;
 }
 
 Map<String, Object?> inputProvenance(
@@ -786,6 +1149,8 @@ Map<String, Object?> inputProvenance(
     'source_sha': sourceSha,
     'catalog_sha256': _rawSha('evidence/et13/catalog.v1.json'),
     'case_catalog_sha256': _rawSha(casePath),
+    'projection_contract_sha256':
+        validateCatalog()['projection_contract_sha256'],
     'assets_lock_sha256': _rawSha('evidence/et13/assets.lock.json'),
     'renderer_lock_sha256': _rawSha('evidence/et13/renderer.lock.json'),
     'renderer_image_digest': renderer['manifest_digest'],
@@ -793,8 +1158,19 @@ Map<String, Object?> inputProvenance(
   };
   return <String, Object?>{
     ...inputs,
-    'provenance_sha256': _canonicalSha(inputs),
+    'input_provenance_sha256': _canonicalSha(inputs),
   };
+}
+
+Map<String, Object?> writeInputProvenance({
+  required String kind,
+  required String sourceSha,
+  required String buildMarkerPath,
+  required String outputPath,
+}) {
+  final provenance = inputProvenance(kind, sourceSha, buildMarkerPath);
+  _writePretty(outputPath, provenance);
+  return provenance;
 }
 
 void _validateA11yResult(
@@ -886,62 +1262,410 @@ void _validateA11yResult(
   }
 }
 
-void validateResultManifest({
+String _mode(Object? value, String path) {
+  final mode = _string(value, path);
+  if (mode != _diagnostic && mode != _releaseReady) {
+    _fail('$path must be $_diagnostic or $_releaseReady');
+  }
+  return mode;
+}
+
+Map<String, Object?> validateInputProvenanceFile({
+  required String kind,
+  required String sourceSha,
+  required String buildMarkerPath,
+  required String provenancePath,
+}) {
+  final expected = inputProvenance(kind, sourceSha, buildMarkerPath);
+  final file = File(provenancePath);
+  if (!file.existsSync() || file.readAsStringSync() != _pretty(expected)) {
+    _fail('input provenance must be the exact canonical producer output');
+  }
+  return expected;
+}
+
+/// Validates packaged provenance without needing the producer's build tree.
+/// The self-digest excludes only [input_provenance_sha256], matching the
+/// canonical producer calculation.
+Map<String, Object?> validateInputProvenanceDocument({
+  required String kind,
+  required String provenancePath,
+  String catalogPath = 'evidence/et13/catalog.v1.json',
+  String? generatedCatalogPath,
+  String assetsLockPath = 'evidence/et13/assets.lock.json',
+  String rendererLockPath = 'evidence/et13/renderer.lock.json',
+}) {
+  final visual = kind == 'visual';
+  if (!visual && kind != 'a11y') _fail('kind must be visual or a11y');
+  final provenance = _readObject(provenancePath);
+  _exactKeys(provenance, const [
+    'schema_version',
+    'kind',
+    'source_sha',
+    'catalog_sha256',
+    'case_catalog_sha256',
+    'projection_contract_sha256',
+    'assets_lock_sha256',
+    'renderer_lock_sha256',
+    'renderer_image_digest',
+    'build_marker_sha256',
+    'input_provenance_sha256',
+  ], r'$provenance');
+  final casePath =
+      generatedCatalogPath ??
+      'evidence/et13/generated/${visual ? 'visual' : 'a11y'}-cases.v1.json';
+  final catalog = validateCatalog(path: catalogPath);
+  final renderer = validateRendererLock(rendererLockPath);
+  final sourceSha = _string(provenance['source_sha'], 'provenance.source_sha');
+  if (!RegExp(r'^(?!0{40}$)[0-9a-f]{40}$').hasMatch(sourceSha)) {
+    _fail('provenance source SHA must be a non-zero lowercase git SHA');
+  }
+  for (final entry in <String, Object?>{
+    'schema_version': 'leva.et13.input-provenance.v1',
+    'kind': kind,
+    'catalog_sha256': _rawSha(catalogPath),
+    'case_catalog_sha256': _rawSha(casePath),
+    'projection_contract_sha256': catalog['projection_contract_sha256'],
+    'assets_lock_sha256': _rawSha(assetsLockPath),
+    'renderer_lock_sha256': _rawSha(rendererLockPath),
+    'renderer_image_digest': renderer['manifest_digest'],
+  }.entries) {
+    _exactValue(provenance[entry.key], entry.value, 'provenance.${entry.key}');
+  }
+  _sha256String(
+    provenance['build_marker_sha256'],
+    'provenance.build_marker_sha256',
+  );
+  final unsigned = <String, Object?>{
+    for (final entry in provenance.entries)
+      if (entry.key != 'input_provenance_sha256') entry.key: entry.value,
+  };
+  _exactValue(
+    provenance['input_provenance_sha256'],
+    _canonicalSha(unsigned),
+    'provenance.input_provenance_sha256',
+  );
+  return provenance;
+}
+
+String visualArtifactSetSha(
+  String artifactRoot, {
+  String generatedCatalogPath = 'evidence/et13/generated/visual-cases.v1.json',
+}) {
+  final generated = _readObject(generatedCatalogPath);
+  final cases = _array(generated['cases'], 'visualCases.cases');
+  final root = Directory(artifactRoot).absolute;
+  final rootPrefix = '${root.path}${Platform.pathSeparator}';
+  final expectedPaths = <String>{};
+  final lines = <String>[];
+  for (var index = 0; index < cases.length; index++) {
+    final entry = _object(cases[index], 'visualCases[$index]');
+    final relative = _string(entry['artifact_path'], 'visualCases.path');
+    final file = File.fromUri(root.uri.resolve(relative)).absolute;
+    if (!file.path.startsWith(rootPrefix) || !file.existsSync()) {
+      _fail('visual baseline is missing $relative or escapes its root');
+    }
+    expectedPaths.add(relative);
+    lines.add('$relative ${_rawSha(file.path)}');
+  }
+  final visualRoot = Directory.fromUri(root.uri.resolve('visual/'));
+  final actualPaths = visualRoot.existsSync()
+      ? visualRoot
+            .listSync(recursive: true, followLinks: false)
+            .whereType<File>()
+            .map(
+              (file) => file.absolute.path
+                  .substring(rootPrefix.length)
+                  .replaceAll('\\', '/'),
+            )
+            .toSet()
+      : <String>{};
+  if (!_setEquals(expectedPaths, actualPaths)) {
+    _fail('visual baseline set has missing or unexpected files');
+  }
+  return sha256.convert(utf8.encode('${lines.join('\n')}\n')).toString();
+}
+
+Map<String, Object?> validateBaselineApproval({
+  required String approvalPath,
+  required String baselineRoot,
+  required String reviewCandidatePath,
+  bool requireExactBundle = false,
+  String catalogPath = 'evidence/et13/catalog.v1.json',
+  String generatedCatalogPath = 'evidence/et13/generated/visual-cases.v1.json',
+}) {
+  final approval = _readObject(approvalPath);
+  _exactKeys(approval, const [
+    'schema_version',
+    'status',
+    'source_sha',
+    'catalog_sha256',
+    'case_catalog_sha256',
+    'review_candidate_sha256',
+    'fixture_ids',
+    'case_count',
+    'candidate_set_sha256',
+    'approved_by',
+    'approved_at',
+  ], r'$baselineApproval');
+  _exactValue(
+    approval['schema_version'],
+    'leva.et13.baseline-approval.v1',
+    'baselineApproval.schema_version',
+  );
+  _exactValue(approval['status'], _approved, 'baselineApproval.status');
+  final sourceSha = _string(
+    approval['source_sha'],
+    'baselineApproval.source_sha',
+  );
+  if (!RegExp(r'^(?!0{40}$)[0-9a-f]{40}$').hasMatch(sourceSha)) {
+    _fail('baseline approval source SHA is invalid');
+  }
+  _exactValue(
+    approval['catalog_sha256'],
+    _rawSha(catalogPath),
+    'baselineApproval.catalog_sha256',
+  );
+  _exactValue(
+    approval['case_catalog_sha256'],
+    _rawSha(generatedCatalogPath),
+    'baselineApproval.case_catalog_sha256',
+  );
+  _exactValue(
+    approval['review_candidate_sha256'],
+    _rawSha(reviewCandidatePath),
+    'baselineApproval.review_candidate_sha256',
+  );
+  final reviewCandidate = _readObject(reviewCandidatePath);
+  _exactKeys(reviewCandidate, const [
+    'schema_version',
+    'kind',
+    'evidence_mode',
+    'producer_run_id',
+    'producer_run_attempt',
+    'repository',
+    'source_sha',
+    'case_catalog_sha256',
+    'case_catalog_version',
+    'case_catalog_schema_version',
+    'projection_contract_sha256',
+    'fixture_ids',
+    'case_count',
+    'surface_case_counts',
+    'capture_surface',
+    'device_evidence',
+    'input_provenance_sha256',
+    'input_provenance_file_sha256',
+    'baseline_status',
+    'baseline_set_sha256',
+    'baseline_approval_sha256',
+  ], r'$reviewCandidate');
+  final visualGenerated = _readObject(generatedCatalogPath);
+  for (final entry in <String, Object?>{
+    'schema_version': 'leva.et13.candidate-spec.v1',
+    'kind': 'visual',
+    'evidence_mode': _diagnostic,
+    'source_sha': sourceSha,
+    'case_catalog_sha256': _rawSha(generatedCatalogPath),
+    'case_catalog_version': _catalogVersion,
+    'case_catalog_schema_version': _visualVersion,
+    'projection_contract_sha256': validateCatalog(
+      path: catalogPath,
+    )['projection_contract_sha256'],
+    'fixture_ids': _fixtureIds,
+    'case_count': 96,
+    'surface_case_counts': visualGenerated['surface_case_counts'],
+    'capture_surface': _captureSurface,
+    'device_evidence': false,
+    'baseline_status': _pendingReview,
+    'baseline_set_sha256': null,
+    'baseline_approval_sha256': null,
+  }.entries) {
+    _exactValue(
+      reviewCandidate[entry.key],
+      entry.value,
+      'reviewCandidate.${entry.key}',
+    );
+  }
+  _repository(
+    _string(reviewCandidate['repository'], 'reviewCandidate.repository'),
+  );
+  _exactValue(
+    reviewCandidate['repository'],
+    'DevPathAi/devpath-frontend',
+    'reviewCandidate.repository',
+  );
+  for (final key in ['producer_run_id', 'producer_run_attempt']) {
+    if (_integer(reviewCandidate[key], 'reviewCandidate.$key') < 1) {
+      _fail('reviewCandidate.$key must be positive');
+    }
+  }
+  for (final key in [
+    'input_provenance_sha256',
+    'input_provenance_file_sha256',
+  ]) {
+    _sha256String(reviewCandidate[key], 'reviewCandidate.$key');
+  }
+  if (!_listEquals(
+    _array(approval['fixture_ids'], 'baselineApproval.fixture_ids'),
+    _fixtureIds,
+  )) {
+    _fail('baseline approval fixture order drifted');
+  }
+  _exactValue(approval['case_count'], 96, 'baselineApproval.case_count');
+  if (_string(
+    approval['approved_by'],
+    'baselineApproval.approved_by',
+  ).trim().isEmpty) {
+    _fail('baseline approval reviewer identity must not be empty');
+  }
+  final approvedAt = _string(
+    approval['approved_at'],
+    'baselineApproval.approved_at',
+  );
+  if (!approvedAt.endsWith('Z') ||
+      DateTime.tryParse(approvedAt)?.isUtc != true) {
+    _fail('baseline approval timestamp must be an ISO-8601 UTC Z value');
+  }
+  _exactValue(
+    approval['candidate_set_sha256'],
+    visualArtifactSetSha(
+      baselineRoot,
+      generatedCatalogPath: generatedCatalogPath,
+    ),
+    'baselineApproval.candidate_set_sha256',
+  );
+  if (requireExactBundle) {
+    _validateExactApprovedBaselineBundle(
+      baselineRoot: baselineRoot,
+      approvalPath: approvalPath,
+      reviewCandidatePath: reviewCandidatePath,
+      generatedCatalogPath: generatedCatalogPath,
+    );
+  }
+  return approval;
+}
+
+void _validateExactApprovedBaselineBundle({
+  required String baselineRoot,
+  required String approvalPath,
+  required String reviewCandidatePath,
+  required String generatedCatalogPath,
+}) {
+  final root = Directory(baselineRoot).absolute;
+  final approval = File(approvalPath).absolute;
+  final reviewCandidate = File(reviewCandidatePath).absolute;
+  final expectedApproval = File.fromUri(
+    root.uri.resolve('baseline-approval.v1.json'),
+  ).absolute;
+  final expectedReview = File.fromUri(
+    root.uri.resolve('review-candidate.v1.json'),
+  ).absolute;
+  if (approval.path != expectedApproval.path ||
+      reviewCandidate.path != expectedReview.path) {
+    _fail('approved baseline metadata must use the two canonical root paths');
+  }
+  final generated = _readObject(generatedCatalogPath);
+  final expectedFiles = <String>{
+    'baseline-approval.v1.json',
+    'review-candidate.v1.json',
+    for (final raw in _array(generated['cases'], 'visualCases.cases'))
+      _string(_object(raw, 'visualCase')['artifact_path'], 'visualCase.path'),
+  };
+  final expectedDirectories = <String>{};
+  for (final file in expectedFiles) {
+    var parent = File(file).parent.path.replaceAll('\\', '/');
+    while (parent != '.' && parent.isNotEmpty) {
+      expectedDirectories.add(parent);
+      parent = File(parent).parent.path.replaceAll('\\', '/');
+    }
+  }
+  final actualFiles = <String>{};
+  final actualDirectories = <String>{};
+  final prefix = '${root.path}${Platform.pathSeparator}';
+  for (final entity in root.listSync(recursive: true, followLinks: false)) {
+    final relative = entity.absolute.path
+        .substring(prefix.length)
+        .replaceAll('\\', '/');
+    final type = FileSystemEntity.typeSync(entity.path, followLinks: false);
+    if (type == FileSystemEntityType.link) {
+      _fail('approved baseline bundle may not contain symbolic links');
+    }
+    if (type == FileSystemEntityType.file) actualFiles.add(relative);
+    if (type == FileSystemEntityType.directory) {
+      actualDirectories.add(relative);
+    }
+  }
+  if (!_setEquals(expectedFiles, actualFiles) ||
+      !_setEquals(expectedDirectories, actualDirectories)) {
+    _fail(
+      'approved baseline bundle must contain exactly 96 PNGs and two metadata files',
+    );
+  }
+}
+
+({String? setSha, String? approvalSha}) _baselineDigests({
+  required bool visual,
+  required String mode,
+  required String sourceSha,
+  String? baselineRoot,
+  String? approvalPath,
+}) {
+  if (!visual) return (setSha: null, approvalSha: null);
+  if (mode == _diagnostic) {
+    if (baselineRoot != null || approvalPath != null) {
+      _fail('diagnostic mode must not consume approved baseline inputs');
+    }
+    return (setSha: null, approvalSha: null);
+  }
+  if (baselineRoot == null || approvalPath == null) {
+    _fail('release-ready visual evidence requires baseline and approval');
+  }
+  final approval = validateBaselineApproval(
+    approvalPath: approvalPath,
+    baselineRoot: baselineRoot,
+    reviewCandidatePath: File.fromUri(
+      Directory(baselineRoot).absolute.uri.resolve('review-candidate.v1.json'),
+    ).path,
+    requireExactBundle: true,
+  );
+  _exactValue(approval['source_sha'], sourceSha, 'baselineApproval.source_sha');
+  return (
+    setSha: visualArtifactSetSha(baselineRoot),
+    approvalSha: _rawSha(approvalPath),
+  );
+}
+
+/// Validates the complete ordered bytes-on-disk result set independently of
+/// checkout/provenance validation. [validateResultManifest] always calls this
+/// after authenticating the producer inputs; exposing the byte validator also
+/// lets contract tests exercise fail-closed mutations without weakening the
+/// production entry point.
+void validateResultArtifacts({
   required String kind,
   required String manifestPath,
   required String artifactRoot,
-  required String buildMarkerPath,
+  String? generatedCatalogPath,
+  String? baselineRoot,
 }) {
   final visual = kind == 'visual';
   if (!visual && kind != 'a11y') _fail('kind must be visual or a11y');
   final manifest = _readObject(manifestPath);
-  _exactKeys(manifest, const [
-    'schema_version',
-    'case_catalog_version',
-    'fixture_ids',
-    'source_sha',
-    'catalog_sha256',
-    'case_catalog_sha256',
-    'assets_lock_sha256',
-    'renderer_lock_sha256',
-    'input_provenance_sha256',
-    'renderer_image',
-    'renderer_image_digest',
-    'capture_network',
-    'unexpected_request_policy',
-    'capture_surface',
-    'device_evidence',
-    'external_accessibility_status',
-    'baseline_status',
-    'case_count',
-    'surface_case_counts',
-    'cases',
-  ], r'$manifest');
-
-  final casePath = visual
-      ? 'evidence/et13/generated/visual-cases.v1.json'
-      : 'evidence/et13/generated/a11y-cases.v1.json';
+  final mode = _mode(manifest['evidence_mode'], 'manifest.evidence_mode');
+  if (mode == _releaseReady && visual && baselineRoot == null) {
+    _fail('release-ready visual artifact validation requires a baseline root');
+  }
+  final casePath =
+      generatedCatalogPath ??
+      (visual
+          ? 'evidence/et13/generated/visual-cases.v1.json'
+          : 'evidence/et13/generated/a11y-cases.v1.json');
   final generated = _readObject(casePath);
   final expectedCases = _array(generated['cases'], 'generated.cases');
   final expectedCount = visual ? 96 : 24;
   final expectedSurfaceCounts = visual
       ? _visualSurfaceCounts
       : _a11ySurfaceCounts;
-  final expectedSchema = visual
-      ? 'leva.et13.visual-manifest.v1'
-      : 'leva.et13.a11y-manifest.v1';
-  _exactValue(manifest['schema_version'], expectedSchema, 'manifest.schema');
-  _exactValue(
-    manifest['case_catalog_version'],
-    _catalogVersion,
-    'manifest.case_catalog_version',
-  );
-  if (!_listEquals(
-    _array(manifest['fixture_ids'], 'manifest.fixture_ids'),
-    _fixtureIds,
-  )) {
-    _fail('manifest fixture order drifted');
-  }
   _exactValue(manifest['case_count'], expectedCount, 'manifest.case_count');
   if (!_mapEquals(
     _object(manifest['surface_case_counts'], 'manifest.surface_case_counts'),
@@ -949,47 +1673,6 @@ void validateResultManifest({
   )) {
     _fail('manifest surface case counts drifted');
   }
-  _exactValue(
-    manifest['catalog_sha256'],
-    _rawSha('evidence/et13/catalog.v1.json'),
-    'manifest.catalog_sha256',
-  );
-  _exactValue(
-    manifest['case_catalog_sha256'],
-    _rawSha(casePath),
-    'manifest.case_catalog_sha256',
-  );
-  _exactValue(
-    manifest['assets_lock_sha256'],
-    _rawSha('evidence/et13/assets.lock.json'),
-    'manifest.assets_lock_sha256',
-  );
-  _exactValue(
-    manifest['renderer_lock_sha256'],
-    _rawSha('evidence/et13/renderer.lock.json'),
-    'manifest.renderer_lock_sha256',
-  );
-  final sourceSha = _string(manifest['source_sha'], 'manifest.source_sha');
-  final provenance = inputProvenance(kind, sourceSha, buildMarkerPath);
-  _exactValue(
-    manifest['input_provenance_sha256'],
-    provenance['provenance_sha256'],
-    'manifest.input_provenance_sha256',
-  );
-  final renderer = validateRendererLock();
-  for (final entry in <String, Object?>{
-    'renderer_image': renderer['image'],
-    'renderer_image_digest': renderer['manifest_digest'],
-    'capture_network': 'none',
-    'unexpected_request_policy': 'fail',
-    'capture_surface': _captureSurface,
-    'device_evidence': false,
-    'external_accessibility_status': _externalAccessibilityStatus,
-    'baseline_status': _pendingReview,
-  }.entries) {
-    _exactValue(manifest[entry.key], entry.value, 'manifest.${entry.key}');
-  }
-
   final cases = _array(manifest['cases'], 'manifest.cases');
   if (cases.length != expectedCount || cases.length != expectedCases.length) {
     _fail('manifest must contain exactly $expectedCount ordered cases');
@@ -1003,22 +1686,10 @@ void validateResultManifest({
     final expected = _object(expectedCases[index], 'generated.cases[$index]');
     _exactKeys(
       result,
-      visual
-          ? const ['case_id', 'artifact_path', 'sha256', 'bytes']
-          : const [
-              'case_id',
-              'artifact_path',
-              'sha256',
-              'bytes',
-              'standard',
-              'critical_violations',
-              'serious_violations',
-              'other_violations',
-              'passes',
-              'incomplete',
-            ],
+      visual ? _visualResultCaseKeys : _a11yResultCaseKeys,
       'manifest.cases[$index]',
     );
+    _exactValue(result['status'], 'passed', 'case[$index].status');
     final id = _string(result['case_id'], 'case[$index].case_id');
     final relativePath = _string(
       result['artifact_path'],
@@ -1050,10 +1721,40 @@ void validateResultManifest({
     if (visual) {
       const pngSignature = <int>[137, 80, 78, 71, 13, 10, 26, 10];
       final prefix = artifact.openSync()..setPositionSync(0);
-      final signature = prefix.readSync(8);
+      final header = prefix.readSync(24);
       prefix.closeSync();
-      if (!_listEquals(signature, pngSignature)) {
+      if (header.length != 24 ||
+          !_listEquals(header.take(8).toList(), pngSignature)) {
         _fail('case[$index] is not a PNG artifact');
+      }
+      int readUint32(int offset) =>
+          (header[offset] << 24) |
+          (header[offset + 1] << 16) |
+          (header[offset + 2] << 8) |
+          header[offset + 3];
+      final expectedWidth =
+          _integer(expected['width'], 'generated[$index].width') *
+          _integer(
+            expected['device_pixel_ratio'],
+            'generated[$index].device_pixel_ratio',
+          );
+      final expectedHeight =
+          _integer(expected['height'], 'generated[$index].height') *
+          _integer(
+            expected['device_pixel_ratio'],
+            'generated[$index].device_pixel_ratio',
+          );
+      if (readUint32(16) != expectedWidth || readUint32(20) != expectedHeight) {
+        _fail('case[$index] PNG IHDR axes differ from its catalog case');
+      }
+      if (mode == _releaseReady) {
+        final baselineArtifact = File.fromUri(
+          Directory(baselineRoot!).absolute.uri.resolve(relativePath),
+        );
+        if (!baselineArtifact.existsSync() ||
+            _rawSha(baselineArtifact.path) != artifactSha) {
+          _fail('case[$index] differs from the approved baseline bytes');
+        }
       }
     } else {
       for (final key in [
@@ -1073,7 +1774,6 @@ void validateResultManifest({
       );
     }
   }
-
   final kindRoot = Directory.fromUri(root.uri.resolve('$kind/'));
   final actualPaths = kindRoot.existsSync()
       ? kindRoot
@@ -1091,15 +1791,1214 @@ void validateResultManifest({
   }
 }
 
+/// Validates the complete result-manifest document without requiring the raw
+/// capture set or build marker. This is the strict trust boundary used when a
+/// four-file sealed package is re-opened independently of the producer job.
+Map<String, Object?> validateResultManifestDocument({
+  required String kind,
+  required String manifestPath,
+  String catalogPath = 'evidence/et13/catalog.v1.json',
+  String? generatedCatalogPath,
+  String assetsLockPath = 'evidence/et13/assets.lock.json',
+  String rendererLockPath = 'evidence/et13/renderer.lock.json',
+}) {
+  final visual = kind == 'visual';
+  if (!visual && kind != 'a11y') _fail('kind must be visual or a11y');
+  final manifest = _readObject(manifestPath);
+  _exactKeys(
+    manifest,
+    visual ? _visualManifestKeys : _a11yManifestKeys,
+    r'$manifest',
+  );
+  final casePath =
+      generatedCatalogPath ??
+      'evidence/et13/generated/${visual ? 'visual' : 'a11y'}-cases.v1.json';
+  final generated = _readObject(casePath);
+  final expectedCases = _array(generated['cases'], 'generated.cases');
+  final expectedCount = visual ? 96 : 24;
+  final expectedSurfaceCounts = visual
+      ? _visualSurfaceCounts
+      : _a11ySurfaceCounts;
+  final expectedSchema = visual
+      ? 'leva.et13.visual-manifest.v1'
+      : 'leva.et13.a11y-manifest.v1';
+  final expectedCaseSchema = visual ? _visualVersion : _a11yVersion;
+  final mode = _mode(manifest['evidence_mode'], 'manifest.evidence_mode');
+  final sourceSha = _string(manifest['source_sha'], 'manifest.source_sha');
+  if (!RegExp(r'^(?!0{40}$)[0-9a-f]{40}$').hasMatch(sourceSha)) {
+    _fail('manifest source SHA must be a non-zero lowercase git SHA');
+  }
+  final catalog = validateCatalog(path: catalogPath);
+  final renderer = validateRendererLock(rendererLockPath);
+  for (final entry in <String, Object?>{
+    'schema_version': expectedSchema,
+    'case_catalog_version': _catalogVersion,
+    'case_catalog_schema_version': expectedCaseSchema,
+    'fixture_ids': _fixtureIds,
+    'catalog_sha256': _rawSha(catalogPath),
+    'case_catalog_sha256': _rawSha(casePath),
+    'projection_contract_sha256': catalog['projection_contract_sha256'],
+    'assets_lock_sha256': _rawSha(assetsLockPath),
+    'renderer_lock_sha256': _rawSha(rendererLockPath),
+    'renderer_image': renderer['image'],
+    'renderer_image_digest': renderer['manifest_digest'],
+    'capture_network': 'none',
+    'unexpected_request_policy': 'fail',
+    'capture_surface': _captureSurface,
+    'device_evidence': false,
+    'external_accessibility_status': _externalAccessibilityStatus,
+    'case_count': expectedCount,
+    'surface_case_counts': expectedSurfaceCounts,
+  }.entries) {
+    _exactValue(manifest[entry.key], entry.value, 'manifest.${entry.key}');
+  }
+  _sha256String(
+    manifest['input_provenance_sha256'],
+    'manifest.input_provenance_sha256',
+  );
+  if (visual) {
+    _exactValue(
+      manifest['baseline_status'],
+      mode == _releaseReady ? _approved : _pendingReview,
+      'manifest.baseline_status',
+    );
+    for (final key in ['baseline_set_sha256', 'baseline_approval_sha256']) {
+      if (mode == _releaseReady) {
+        _sha256String(manifest[key], 'manifest.$key');
+      } else {
+        _exactValue(manifest[key], null, 'manifest.$key');
+      }
+    }
+  }
+  final actualCases = _array(manifest['cases'], 'manifest.cases');
+  if (actualCases.length != expectedCount ||
+      expectedCases.length != expectedCount) {
+    _fail('manifest must contain exactly $expectedCount ordered cases');
+  }
+  for (var index = 0; index < expectedCount; index++) {
+    final actual = _object(actualCases[index], 'manifest.cases[$index]');
+    final expected = _object(expectedCases[index], 'generated.cases[$index]');
+    _exactKeys(
+      actual,
+      visual ? _visualResultCaseKeys : _a11yResultCaseKeys,
+      'manifest.cases[$index]',
+    );
+    _exactValue(
+      actual['case_id'],
+      expected['case_id'],
+      'manifest.cases[$index].case_id',
+    );
+    _exactValue(
+      actual['artifact_path'],
+      expected['artifact_path'],
+      'manifest.cases[$index].artifact_path',
+    );
+    _exactValue(actual['status'], 'passed', 'manifest.cases[$index].status');
+    _sha256String(actual['sha256'], 'manifest.cases[$index].sha256');
+    if (_integer(actual['bytes'], 'manifest.cases[$index].bytes') < 1) {
+      _fail('manifest.cases[$index].bytes must be positive');
+    }
+    if (!visual) {
+      _exactValue(
+        actual['standard'],
+        _a11yStandard,
+        'manifest.cases[$index].standard',
+      );
+      for (final key in ['critical_violations', 'serious_violations']) {
+        _exactValue(actual[key], 0, 'manifest.cases[$index].$key');
+      }
+      for (final key in ['other_violations', 'passes', 'incomplete']) {
+        if (_integer(actual[key], 'manifest.cases[$index].$key') < 0) {
+          _fail('manifest.cases[$index].$key must be non-negative');
+        }
+      }
+    }
+  }
+  return manifest;
+}
+
+void validateResultManifest({
+  required String kind,
+  required String manifestPath,
+  required String artifactRoot,
+  required String buildMarkerPath,
+  String? baselineRoot,
+  String? baselineApprovalPath,
+}) {
+  final visual = kind == 'visual';
+  if (!visual && kind != 'a11y') _fail('kind must be visual or a11y');
+  final manifest = validateResultManifestDocument(
+    kind: kind,
+    manifestPath: manifestPath,
+  );
+
+  final casePath = visual
+      ? 'evidence/et13/generated/visual-cases.v1.json'
+      : 'evidence/et13/generated/a11y-cases.v1.json';
+  final expectedCount = visual ? 96 : 24;
+  final expectedSurfaceCounts = visual
+      ? _visualSurfaceCounts
+      : _a11ySurfaceCounts;
+  final expectedSchema = visual
+      ? 'leva.et13.visual-manifest.v1'
+      : 'leva.et13.a11y-manifest.v1';
+  final expectedCaseSchema = visual ? _visualVersion : _a11yVersion;
+  _exactValue(manifest['schema_version'], expectedSchema, 'manifest.schema');
+  final mode = _mode(manifest['evidence_mode'], 'manifest.evidence_mode');
+  _exactValue(
+    manifest['case_catalog_version'],
+    _catalogVersion,
+    'manifest.case_catalog_version',
+  );
+  _exactValue(
+    manifest['case_catalog_schema_version'],
+    expectedCaseSchema,
+    'manifest.case_catalog_schema_version',
+  );
+  if (!_listEquals(
+    _array(manifest['fixture_ids'], 'manifest.fixture_ids'),
+    _fixtureIds,
+  )) {
+    _fail('manifest fixture order drifted');
+  }
+  _exactValue(manifest['case_count'], expectedCount, 'manifest.case_count');
+  if (!_mapEquals(
+    _object(manifest['surface_case_counts'], 'manifest.surface_case_counts'),
+    expectedSurfaceCounts,
+  )) {
+    _fail('manifest surface case counts drifted');
+  }
+  _exactValue(
+    manifest['catalog_sha256'],
+    _rawSha('evidence/et13/catalog.v1.json'),
+    'manifest.catalog_sha256',
+  );
+  _exactValue(
+    manifest['case_catalog_sha256'],
+    _rawSha(casePath),
+    'manifest.case_catalog_sha256',
+  );
+  _exactValue(
+    manifest['projection_contract_sha256'],
+    validateCatalog()['projection_contract_sha256'],
+    'manifest.projection_contract_sha256',
+  );
+  _exactValue(
+    manifest['assets_lock_sha256'],
+    _rawSha('evidence/et13/assets.lock.json'),
+    'manifest.assets_lock_sha256',
+  );
+  _exactValue(
+    manifest['renderer_lock_sha256'],
+    _rawSha('evidence/et13/renderer.lock.json'),
+    'manifest.renderer_lock_sha256',
+  );
+  final sourceSha = _string(manifest['source_sha'], 'manifest.source_sha');
+  final provenance = inputProvenance(kind, sourceSha, buildMarkerPath);
+  _exactValue(
+    manifest['input_provenance_sha256'],
+    provenance['input_provenance_sha256'],
+    'manifest.input_provenance_sha256',
+  );
+  final renderer = validateRendererLock();
+  for (final entry in <String, Object?>{
+    'renderer_image': renderer['image'],
+    'renderer_image_digest': renderer['manifest_digest'],
+    'capture_network': 'none',
+    'unexpected_request_policy': 'fail',
+    'capture_surface': _captureSurface,
+    'device_evidence': false,
+    'external_accessibility_status': _externalAccessibilityStatus,
+  }.entries) {
+    _exactValue(manifest[entry.key], entry.value, 'manifest.${entry.key}');
+  }
+  final baseline = _baselineDigests(
+    visual: visual,
+    mode: mode,
+    sourceSha: sourceSha,
+    baselineRoot: baselineRoot,
+    approvalPath: baselineApprovalPath,
+  );
+  if (visual) {
+    _exactValue(
+      manifest['baseline_status'],
+      mode == _releaseReady ? _approved : _pendingReview,
+      'manifest.baseline_status',
+    );
+    _exactValue(
+      manifest['baseline_set_sha256'],
+      baseline.setSha,
+      'manifest.baseline_set_sha256',
+    );
+    _exactValue(
+      manifest['baseline_approval_sha256'],
+      baseline.approvalSha,
+      'manifest.baseline_approval_sha256',
+    );
+  }
+  validateResultArtifacts(
+    kind: kind,
+    manifestPath: manifestPath,
+    artifactRoot: artifactRoot,
+    generatedCatalogPath: casePath,
+    baselineRoot: baselineRoot,
+  );
+}
+
+int _positiveInteger(String value, String path) {
+  final parsed = int.tryParse(value);
+  if (parsed == null || parsed < 1) _fail('$path must be a positive integer');
+  return parsed;
+}
+
+String _repository(String value) {
+  if (!RegExp(r'^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$').hasMatch(value)) {
+    _fail('repository must be an owner/name slug');
+  }
+  return value;
+}
+
+Map<String, Object?> _validateCaptureSummary({
+  required String path,
+  required String sourceSha,
+  required String mode,
+}) {
+  final summary = _readObject(path);
+  _exactKeys(summary, const [
+    'schema_version',
+    'source_sha',
+    'evidence_mode',
+    'capture_surface',
+    'device_evidence',
+    'case_count',
+    'cases',
+  ], r'$captureSummary');
+  _exactValue(
+    summary['schema_version'],
+    'leva.et13.capture-summary.v1',
+    'captureSummary.schema_version',
+  );
+  _exactValue(summary['source_sha'], sourceSha, 'captureSummary.source_sha');
+  _exactValue(summary['evidence_mode'], mode, 'captureSummary.evidence_mode');
+  _exactValue(
+    summary['capture_surface'],
+    _captureSurface,
+    'captureSummary.capture_surface',
+  );
+  _exactValue(summary['device_evidence'], false, 'captureSummary.device');
+  _exactValue(summary['case_count'], 120, 'captureSummary.case_count');
+  final actual = _array(summary['cases'], 'captureSummary.cases');
+  final expected = <Map<String, Object?>>[
+    for (final lane in ['visual', 'a11y'])
+      for (final raw in _array(
+        _readObject('evidence/et13/generated/$lane-cases.v1.json')['cases'],
+        '$lane.cases',
+      ))
+        _object(raw, '$lane.case'),
+  ];
+  if (actual.length != expected.length) {
+    _fail('capture summary must contain exactly 120 ordered cases');
+  }
+  for (var index = 0; index < actual.length; index++) {
+    final result = _object(actual[index], 'captureSummary.cases[$index]');
+    final expectedCase = expected[index];
+    final visual = index < 96;
+    _exactKeys(
+      result,
+      visual
+          ? const [
+              'case_id',
+              'lane',
+              'status',
+              'artifact_path',
+              'pixel_diff_percent',
+            ]
+          : const ['case_id', 'lane', 'status', 'artifact_path'],
+      'captureSummary.cases[$index]',
+    );
+    _exactValue(
+      result['case_id'],
+      expectedCase['case_id'],
+      'captureSummary.cases[$index].case_id',
+    );
+    _exactValue(
+      result['artifact_path'],
+      expectedCase['artifact_path'],
+      'captureSummary.cases[$index].artifact_path',
+    );
+    _exactValue(result['lane'], visual ? 'visual' : 'a11y', 'summary.lane');
+    _exactValue(result['status'], 'passed', 'summary.status');
+    if (visual) {
+      _exactValue(
+        result['pixel_diff_percent'],
+        mode == _releaseReady ? 0 : null,
+        'summary.pixel_diff_percent',
+      );
+    }
+  }
+  return summary;
+}
+
+Map<String, Object?> writeCandidateSpec({
+  required String kind,
+  required String sourceSha,
+  required String buildMarkerPath,
+  required String provenancePath,
+  required String mode,
+  required String producerRunId,
+  required String producerRunAttempt,
+  required String repository,
+  required String outputPath,
+  String? baselineRoot,
+  String? baselineApprovalPath,
+}) {
+  final visual = kind == 'visual';
+  if (!visual && kind != 'a11y') _fail('kind must be visual or a11y');
+  _mode(mode, 'candidate.evidence_mode');
+  final provenance = validateInputProvenanceFile(
+    kind: kind,
+    sourceSha: sourceSha,
+    buildMarkerPath: buildMarkerPath,
+    provenancePath: provenancePath,
+  );
+  final baseline = _baselineDigests(
+    visual: visual,
+    mode: mode,
+    sourceSha: sourceSha,
+    baselineRoot: baselineRoot,
+    approvalPath: baselineApprovalPath,
+  );
+  final casePath =
+      'evidence/et13/generated/${visual ? 'visual' : 'a11y'}-cases.v1.json';
+  final generated = _readObject(casePath);
+  final candidate = <String, Object?>{
+    'schema_version': 'leva.et13.candidate-spec.v1',
+    'kind': kind,
+    'evidence_mode': mode,
+    'producer_run_id': _positiveInteger(producerRunId, 'producer_run_id'),
+    'producer_run_attempt': _positiveInteger(
+      producerRunAttempt,
+      'producer_run_attempt',
+    ),
+    'repository': _repository(repository),
+    'source_sha': sourceSha,
+    'case_catalog_sha256': _rawSha(casePath),
+    'case_catalog_version': _catalogVersion,
+    'case_catalog_schema_version': visual ? _visualVersion : _a11yVersion,
+    'projection_contract_sha256':
+        validateCatalog()['projection_contract_sha256'],
+    'fixture_ids': _fixtureIds,
+    'case_count': visual ? 96 : 24,
+    'surface_case_counts': generated['surface_case_counts'],
+    'capture_surface': _captureSurface,
+    'device_evidence': false,
+    'input_provenance_sha256': provenance['input_provenance_sha256'],
+    'input_provenance_file_sha256': _rawSha(provenancePath),
+    if (visual) ...{
+      'baseline_status': mode == _releaseReady ? _approved : _pendingReview,
+      'baseline_set_sha256': baseline.setSha,
+      'baseline_approval_sha256': baseline.approvalSha,
+    },
+  };
+  _writePretty(outputPath, candidate);
+  return candidate;
+}
+
+void validateCandidateProvenanceIdentity({
+  required Map<String, Object?> candidate,
+  required Map<String, Object?> provenance,
+}) {
+  for (final key in ['source_sha', 'input_provenance_sha256']) {
+    _exactValue(candidate[key], provenance[key], 'candidate.$key');
+  }
+}
+
+Map<String, Object?> _validateCandidateSpec({
+  required String kind,
+  required String candidatePath,
+  required String provenancePath,
+}) {
+  final visual = kind == 'visual';
+  final candidate = _readObject(candidatePath);
+  _exactKeys(candidate, [
+    'schema_version',
+    'kind',
+    'evidence_mode',
+    'producer_run_id',
+    'producer_run_attempt',
+    'repository',
+    'source_sha',
+    'case_catalog_sha256',
+    'case_catalog_version',
+    'case_catalog_schema_version',
+    'projection_contract_sha256',
+    'fixture_ids',
+    'case_count',
+    'surface_case_counts',
+    'capture_surface',
+    'device_evidence',
+    'input_provenance_sha256',
+    'input_provenance_file_sha256',
+    if (visual) ...[
+      'baseline_status',
+      'baseline_set_sha256',
+      'baseline_approval_sha256',
+    ],
+  ], r'$candidate');
+  _exactValue(
+    candidate['schema_version'],
+    'leva.et13.candidate-spec.v1',
+    'candidate.schema_version',
+  );
+  _exactValue(candidate['kind'], kind, 'candidate.kind');
+  _mode(candidate['evidence_mode'], 'candidate.evidence_mode');
+  if (_integer(candidate['producer_run_id'], 'candidate.run_id') < 1 ||
+      _integer(candidate['producer_run_attempt'], 'candidate.run_attempt') <
+          1) {
+    _fail('candidate producer run identity must be positive integers');
+  }
+  _repository(_string(candidate['repository'], 'candidate.repository'));
+  final casePath =
+      'evidence/et13/generated/${visual ? 'visual' : 'a11y'}-cases.v1.json';
+  final generated = _readObject(casePath);
+  for (final entry in <String, Object?>{
+    'case_catalog_sha256': _rawSha(casePath),
+    'case_catalog_version': _catalogVersion,
+    'case_catalog_schema_version': visual ? _visualVersion : _a11yVersion,
+    'projection_contract_sha256':
+        validateCatalog()['projection_contract_sha256'],
+    'case_count': visual ? 96 : 24,
+    'capture_surface': _captureSurface,
+    'device_evidence': false,
+    'input_provenance_file_sha256': _rawSha(provenancePath),
+  }.entries) {
+    _exactValue(candidate[entry.key], entry.value, 'candidate.${entry.key}');
+  }
+  if (!_listEquals(
+    _array(candidate['fixture_ids'], 'candidate.fixture_ids'),
+    _fixtureIds,
+  )) {
+    _fail('candidate fixture order drifted');
+  }
+  if (!_mapEquals(
+    _object(candidate['surface_case_counts'], 'candidate.surface_counts'),
+    _object(generated['surface_case_counts'], 'generated.surface_counts'),
+  )) {
+    _fail('candidate surface counts drifted');
+  }
+  final provenance = validateInputProvenanceDocument(
+    kind: kind,
+    provenancePath: provenancePath,
+  );
+  validateCandidateProvenanceIdentity(
+    candidate: candidate,
+    provenance: provenance,
+  );
+  if (visual) {
+    final mode = candidate['evidence_mode'];
+    _exactValue(
+      candidate['baseline_status'],
+      mode == _releaseReady ? _approved : _pendingReview,
+      'candidate.baseline_status',
+    );
+    for (final key in ['baseline_set_sha256', 'baseline_approval_sha256']) {
+      if (mode == _releaseReady) {
+        _sha256String(candidate[key], 'candidate.$key');
+      } else {
+        _exactValue(candidate[key], null, 'candidate.$key');
+      }
+    }
+  }
+  return candidate;
+}
+
+/// Authenticates the exact raw canonical GitOps candidate bytes and the ET13
+/// lane prebindings consumed by this producer. The protected GitOps workflow
+/// owns the surrounding full candidate schema, so this validator deliberately
+/// reads only the immutable fields the frontend producer must enforce.
+String validateCanonicalReleaseCandidateForLane({
+  required String kind,
+  required String canonicalCandidatePath,
+  required String expectedCandidateSha256,
+  required String releaseId,
+  required String sourceSha,
+  required Map<String, Object?> laneBinding,
+  String catalogPath = 'evidence/et13/catalog.v1.json',
+}) {
+  final visual = kind == 'visual';
+  if (!visual && kind != 'a11y') _fail('kind must be visual or a11y');
+  final expectedSha = _sha256String(
+    expectedCandidateSha256,
+    'canonicalCandidate.expectedSha256',
+  );
+  final actualSha = _rawSha(canonicalCandidatePath);
+  _exactValue(actualSha, expectedSha, 'canonicalCandidate.rawSha256');
+  final candidate = _readObject(canonicalCandidatePath);
+  _exactKeys(candidate, const [
+    r'$schema',
+    'schema_version',
+    'document_type',
+    'release_id',
+    'created_at',
+    'gitops',
+    'services',
+    'shared_migration',
+    'frontend',
+    'home',
+    'analytics_privacy',
+    'ai_release_eval_config',
+    'environments',
+    'journey_harness',
+    'quality_evidence_inputs',
+    'rollout',
+  ], r'$canonicalCandidate');
+  _exactValue(
+    candidate['document_type'],
+    'candidate-spec',
+    'canonicalCandidate.document_type',
+  );
+  _exactValue(
+    candidate['release_id'],
+    releaseId,
+    'canonicalCandidate.release_id',
+  );
+  final frontend = _object(
+    candidate['frontend'],
+    'canonicalCandidate.frontend',
+  );
+  _exactValue(
+    frontend['repository'],
+    'DevPathAi/devpath-frontend',
+    'canonicalCandidate.frontend.repository',
+  );
+  _exactValue(
+    frontend['source_sha'],
+    sourceSha,
+    'canonicalCandidate.frontend.source_sha',
+  );
+  _exactValue(
+    laneBinding['repository'],
+    'DevPathAi/devpath-frontend',
+    'laneBinding.repository',
+  );
+  final inputs = _object(
+    candidate['quality_evidence_inputs'],
+    'canonicalCandidate.quality_evidence_inputs',
+  );
+  final projection = _object(
+    inputs['frontend_projection_contract'],
+    'canonicalCandidate.frontend_projection_contract',
+  );
+  _exactKeys(projection, const [
+    'schema_version',
+    'projection_contract_sha256',
+    'projection_matrix',
+  ], r'$canonicalCandidate.frontend_projection_contract');
+  final catalog = validateCatalog(path: catalogPath);
+  for (final entry in <String, Object?>{
+    'schema_version': _projectionContractVersion,
+    'projection_contract_sha256': catalog['projection_contract_sha256'],
+    'projection_matrix': catalog['projection_matrix'],
+  }.entries) {
+    _exactValue(
+      projection[entry.key],
+      entry.value,
+      'canonicalCandidate.frontend_projection_contract.${entry.key}',
+    );
+  }
+  final catalogs = _object(inputs['catalogs'], 'canonicalCandidate.catalogs');
+  final label = visual ? 'frontend-visual' : 'frontend-automated-a11y';
+  final lane = _object(catalogs[label], 'canonicalCandidate.catalogs.$label');
+  final generatedPath =
+      'evidence/et13/generated/${visual ? 'visual' : 'a11y'}-cases.v1.json';
+  final expected = <String, Object?>{
+    'repository': 'DevPathAi/devpath-frontend',
+    'source_sha': sourceSha,
+    'path': generatedPath,
+    'sha256': laneBinding['case_catalog_sha256'],
+    'case_catalog_version': laneBinding['case_catalog_version'],
+    'case_catalog_schema_version': laneBinding['case_catalog_schema_version'],
+    'projection_contract_sha256': laneBinding['projection_contract_sha256'],
+    'fixture_ids': laneBinding['fixture_ids'],
+    'case_count': laneBinding['case_count'],
+    'surface_case_counts': laneBinding['surface_case_counts'],
+    'capture_surface': laneBinding['capture_surface'],
+    'device_evidence': laneBinding['device_evidence'],
+    'evidence_mode': _releaseReady,
+    'input_provenance_sha256': laneBinding['input_provenance_sha256'],
+    'input_provenance_file_sha256': laneBinding['input_provenance_file_sha256'],
+    if (visual) ...{
+      'baseline_status': _approved,
+      'baseline_set_sha256': laneBinding['baseline_set_sha256'],
+      'baseline_approval_sha256': laneBinding['baseline_approval_sha256'],
+    },
+  };
+  _exactKeys(
+    lane,
+    expected.keys.toList(growable: false),
+    r'$canonicalCandidate.catalogs.' + label,
+  );
+  for (final entry in expected.entries) {
+    _exactValue(
+      lane[entry.key],
+      entry.value,
+      'canonicalCandidate.catalogs.$label.${entry.key}',
+    );
+  }
+  return actualSha;
+}
+
+String _evidenceCandidateSha({
+  required String kind,
+  required Map<String, Object?> laneBinding,
+  required String laneBindingPath,
+  String? canonicalCandidatePath,
+  String? canonicalCandidateSha256,
+  String? releaseId,
+}) {
+  final release = laneBinding['evidence_mode'] == _releaseReady;
+  final supplied = [
+    canonicalCandidatePath,
+    canonicalCandidateSha256,
+    releaseId,
+  ];
+  if (release) {
+    if (supplied.any((value) => value == null || value.isEmpty)) {
+      _fail(
+        'release-ready evidence requires the full canonical candidate path, '
+        'raw SHA-256, and release ID',
+      );
+    }
+    return validateCanonicalReleaseCandidateForLane(
+      kind: kind,
+      canonicalCandidatePath: canonicalCandidatePath!,
+      expectedCandidateSha256: canonicalCandidateSha256!,
+      releaseId: releaseId!,
+      sourceSha: _string(laneBinding['source_sha'], 'binding.source_sha'),
+      laneBinding: laneBinding,
+    );
+  }
+  if (supplied.any((value) => value != null)) {
+    _fail('diagnostic evidence must not consume a canonical release candidate');
+  }
+  return _rawSha(laneBindingPath);
+}
+
+void validateAtomicLaneBindingIdentity({
+  required Map<String, Object?> visualBinding,
+  required Map<String, Object?> a11yBinding,
+}) {
+  for (final key in [
+    'evidence_mode',
+    'producer_run_id',
+    'producer_run_attempt',
+    'repository',
+    'source_sha',
+  ]) {
+    _exactValue(
+      a11yBinding[key],
+      visualBinding[key],
+      'atomicLaneIdentity.$key',
+    );
+  }
+}
+
+void validateCanonicalReleaseInputs({
+  required String canonicalCandidatePath,
+  required String canonicalCandidateSha256,
+  required String releaseId,
+  required String visualCandidatePath,
+  required String visualProvenancePath,
+  required String a11yCandidatePath,
+  required String a11yProvenancePath,
+}) {
+  final bindings = <String, Map<String, Object?>>{
+    'visual': _validateCandidateSpec(
+      kind: 'visual',
+      candidatePath: visualCandidatePath,
+      provenancePath: visualProvenancePath,
+    ),
+    'a11y': _validateCandidateSpec(
+      kind: 'a11y',
+      candidatePath: a11yCandidatePath,
+      provenancePath: a11yProvenancePath,
+    ),
+  };
+  final sourceSha = _string(
+    bindings['visual']!['source_sha'],
+    'visualBinding.source_sha',
+  );
+  validateAtomicLaneBindingIdentity(
+    visualBinding: bindings['visual']!,
+    a11yBinding: bindings['a11y']!,
+  );
+  for (final entry in bindings.entries) {
+    _exactValue(
+      entry.value['evidence_mode'],
+      _releaseReady,
+      '${entry.key}Binding.evidence_mode',
+    );
+    _exactValue(
+      entry.value['source_sha'],
+      sourceSha,
+      '${entry.key}Binding.source_sha',
+    );
+    validateCanonicalReleaseCandidateForLane(
+      kind: entry.key,
+      canonicalCandidatePath: canonicalCandidatePath,
+      expectedCandidateSha256: canonicalCandidateSha256,
+      releaseId: releaseId,
+      sourceSha: sourceSha,
+      laneBinding: entry.value,
+    );
+  }
+}
+
+Map<String, Object?> writeResultManifest({
+  required String kind,
+  required String sourceSha,
+  required String buildMarkerPath,
+  required String provenancePath,
+  required String artifactRoot,
+  required String captureSummaryPath,
+  required String mode,
+  required String outputPath,
+  String? baselineRoot,
+  String? baselineApprovalPath,
+}) {
+  final visual = kind == 'visual';
+  if (!visual && kind != 'a11y') _fail('kind must be visual or a11y');
+  _mode(mode, 'manifest.evidence_mode');
+  final provenance = validateInputProvenanceFile(
+    kind: kind,
+    sourceSha: sourceSha,
+    buildMarkerPath: buildMarkerPath,
+    provenancePath: provenancePath,
+  );
+  _validateCaptureSummary(
+    path: captureSummaryPath,
+    sourceSha: sourceSha,
+    mode: mode,
+  );
+  final baseline = _baselineDigests(
+    visual: visual,
+    mode: mode,
+    sourceSha: sourceSha,
+    baselineRoot: baselineRoot,
+    approvalPath: baselineApprovalPath,
+  );
+  final casePath =
+      'evidence/et13/generated/${visual ? 'visual' : 'a11y'}-cases.v1.json';
+  final generated = _readObject(casePath);
+  final cases = <Map<String, Object?>>[];
+  for (final raw in _array(generated['cases'], 'generated.cases')) {
+    final expected = _object(raw, 'generated.case');
+    final relative = _string(expected['artifact_path'], 'generated.path');
+    final artifact = File.fromUri(
+      Directory(artifactRoot).uri.resolve(relative),
+    );
+    if (!artifact.existsSync()) _fail('missing capture artifact $relative');
+    final result = <String, Object?>{
+      'case_id': expected['case_id'],
+      'status': 'passed',
+      'artifact_path': relative,
+      'sha256': _rawSha(artifact.path),
+      'bytes': artifact.lengthSync(),
+    };
+    if (!visual) {
+      final detail = _readObject(artifact.path);
+      for (final key in [
+        'standard',
+        'critical_violations',
+        'serious_violations',
+        'other_violations',
+        'passes',
+        'incomplete',
+      ]) {
+        result[key] = detail[key];
+      }
+      _validateA11yResult(detail, result);
+    }
+    cases.add(result);
+  }
+  final renderer = validateRendererLock();
+  final manifest = <String, Object?>{
+    'schema_version': visual
+        ? 'leva.et13.visual-manifest.v1'
+        : 'leva.et13.a11y-manifest.v1',
+    'evidence_mode': mode,
+    'case_catalog_version': _catalogVersion,
+    'case_catalog_schema_version': visual ? _visualVersion : _a11yVersion,
+    'fixture_ids': _fixtureIds,
+    'source_sha': sourceSha,
+    'catalog_sha256': _rawSha('evidence/et13/catalog.v1.json'),
+    'case_catalog_sha256': _rawSha(casePath),
+    'projection_contract_sha256':
+        validateCatalog()['projection_contract_sha256'],
+    'assets_lock_sha256': _rawSha('evidence/et13/assets.lock.json'),
+    'renderer_lock_sha256': _rawSha('evidence/et13/renderer.lock.json'),
+    'input_provenance_sha256': provenance['input_provenance_sha256'],
+    'renderer_image': renderer['image'],
+    'renderer_image_digest': renderer['manifest_digest'],
+    'capture_network': 'none',
+    'unexpected_request_policy': 'fail',
+    'capture_surface': _captureSurface,
+    'device_evidence': false,
+    'external_accessibility_status': _externalAccessibilityStatus,
+    if (visual) ...{
+      'baseline_status': mode == _releaseReady ? _approved : _pendingReview,
+      'baseline_set_sha256': baseline.setSha,
+      'baseline_approval_sha256': baseline.approvalSha,
+    },
+    'case_count': visual ? 96 : 24,
+    'surface_case_counts': visual ? _visualSurfaceCounts : _a11ySurfaceCounts,
+    'cases': cases,
+  };
+  _writePretty(outputPath, manifest);
+  validateResultManifest(
+    kind: kind,
+    manifestPath: outputPath,
+    artifactRoot: artifactRoot,
+    buildMarkerPath: buildMarkerPath,
+    baselineRoot: baselineRoot,
+    baselineApprovalPath: baselineApprovalPath,
+  );
+  return manifest;
+}
+
+Map<String, Object?> writeSanitizedEvidence({
+  required String kind,
+  required String candidatePath,
+  required String provenancePath,
+  required String manifestPath,
+  required String outputPath,
+  String? canonicalCandidatePath,
+  String? canonicalCandidateSha256,
+  String? releaseId,
+}) {
+  final visual = kind == 'visual';
+  if (!visual && kind != 'a11y') _fail('kind must be visual or a11y');
+  final candidate = _validateCandidateSpec(
+    kind: kind,
+    candidatePath: candidatePath,
+    provenancePath: provenancePath,
+  );
+  final manifest = validateResultManifestDocument(
+    kind: kind,
+    manifestPath: manifestPath,
+  );
+  final cases = _array(manifest['cases'], 'manifest.cases');
+  if (cases.any((raw) => _object(raw, 'case')['status'] != 'passed')) {
+    _fail('sanitized evidence cannot include a failed manifest case');
+  }
+  for (final key in [
+    'source_sha',
+    'case_catalog_sha256',
+    'case_catalog_version',
+    'case_catalog_schema_version',
+    'projection_contract_sha256',
+    'fixture_ids',
+    'case_count',
+    'surface_case_counts',
+    'capture_surface',
+    'device_evidence',
+    'input_provenance_sha256',
+    'evidence_mode',
+  ]) {
+    if (jsonEncode(candidate[key]) != jsonEncode(manifest[key])) {
+      _fail('candidate and result manifest disagree at $key');
+    }
+  }
+  if (visual) {
+    for (final key in [
+      'baseline_status',
+      'baseline_set_sha256',
+      'baseline_approval_sha256',
+    ]) {
+      if (jsonEncode(candidate[key]) != jsonEncode(manifest[key])) {
+        _fail('candidate and result manifest disagree at $key');
+      }
+    }
+  }
+  final candidateSha = _evidenceCandidateSha(
+    kind: kind,
+    laneBinding: candidate,
+    laneBindingPath: candidatePath,
+    canonicalCandidatePath: canonicalCandidatePath,
+    canonicalCandidateSha256: canonicalCandidateSha256,
+    releaseId: releaseId,
+  );
+  final evidence = <String, Object?>{
+    'candidate_spec_sha256': candidateSha,
+    'status': 'passed',
+    'producer_run_id': candidate['producer_run_id'],
+    'producer_run_attempt': candidate['producer_run_attempt'],
+    'repository': candidate['repository'],
+    'source_sha': candidate['source_sha'],
+    'case_catalog_sha256': candidate['case_catalog_sha256'],
+    'case_catalog_version': _catalogVersion,
+    'case_catalog_schema_version': candidate['case_catalog_schema_version'],
+    'projection_contract_sha256': candidate['projection_contract_sha256'],
+    'fixture_ids': _fixtureIds,
+    'case_count': visual ? 96 : 24,
+    'passed_case_count': visual ? 96 : 24,
+    'failed_case_count': 0,
+    'surface_case_counts': candidate['surface_case_counts'],
+    'capture_surface': _captureSurface,
+    'device_evidence': false,
+    'input_provenance_sha256': candidate['input_provenance_sha256'],
+    'input_provenance_file_sha256': _rawSha(provenancePath),
+    'result_manifest_sha256': _rawSha(manifestPath),
+    'evidence_mode': candidate['evidence_mode'],
+    if (visual) ...{
+      'baseline_status': manifest['baseline_status'],
+      'baseline_set_sha256': manifest['baseline_set_sha256'],
+      'baseline_approval_sha256': manifest['baseline_approval_sha256'],
+      'pixel_diff_percent': candidate['evidence_mode'] == _releaseReady
+          ? 0
+          : null,
+    } else ...{
+      'standard': _a11yStandard,
+      'critical_violations': cases.fold<int>(
+        0,
+        (total, raw) =>
+            total + (_object(raw, 'case')['critical_violations'] as int),
+      ),
+      'serious_violations': cases.fold<int>(
+        0,
+        (total, raw) =>
+            total + (_object(raw, 'case')['serious_violations'] as int),
+      ),
+    },
+  };
+  if (!visual &&
+      (evidence['critical_violations'] != 0 ||
+          evidence['serious_violations'] != 0)) {
+    _fail('sanitized a11y evidence must have zero critical/serious violations');
+  }
+  _writePretty(outputPath, evidence);
+  validateSanitizedEvidence(
+    kind: kind,
+    evidencePath: outputPath,
+    candidatePath: candidatePath,
+    provenancePath: provenancePath,
+    manifestPath: manifestPath,
+    canonicalCandidatePath: canonicalCandidatePath,
+    canonicalCandidateSha256: canonicalCandidateSha256,
+    releaseId: releaseId,
+  );
+  return evidence;
+}
+
+void validateSanitizedEvidence({
+  required String kind,
+  required String evidencePath,
+  required String candidatePath,
+  required String provenancePath,
+  required String manifestPath,
+  String? canonicalCandidatePath,
+  String? canonicalCandidateSha256,
+  String? releaseId,
+}) {
+  final visual = kind == 'visual';
+  final evidence = _readObject(evidencePath);
+  _exactKeys(
+    evidence,
+    visual ? _visualEvidenceKeys : _a11yEvidenceKeys,
+    r'$evidence',
+  );
+  final candidate = _validateCandidateSpec(
+    kind: kind,
+    candidatePath: candidatePath,
+    provenancePath: provenancePath,
+  );
+  final manifest = validateResultManifestDocument(
+    kind: kind,
+    manifestPath: manifestPath,
+  );
+  for (final key in [
+    'source_sha',
+    'case_catalog_sha256',
+    'case_catalog_version',
+    'case_catalog_schema_version',
+    'projection_contract_sha256',
+    'fixture_ids',
+    'case_count',
+    'surface_case_counts',
+    'capture_surface',
+    'device_evidence',
+    'input_provenance_sha256',
+    'evidence_mode',
+  ]) {
+    _exactValue(candidate[key], manifest[key], 'candidate.$key');
+  }
+  final candidateSha = _evidenceCandidateSha(
+    kind: kind,
+    laneBinding: candidate,
+    laneBindingPath: candidatePath,
+    canonicalCandidatePath: canonicalCandidatePath,
+    canonicalCandidateSha256: canonicalCandidateSha256,
+    releaseId: releaseId,
+  );
+  for (final entry in <String, Object?>{
+    'candidate_spec_sha256': candidateSha,
+    'status': 'passed',
+    'producer_run_id': candidate['producer_run_id'],
+    'producer_run_attempt': candidate['producer_run_attempt'],
+    'repository': candidate['repository'],
+    'source_sha': candidate['source_sha'],
+    'case_catalog_sha256': candidate['case_catalog_sha256'],
+    'case_catalog_version': _catalogVersion,
+    'case_catalog_schema_version': visual ? _visualVersion : _a11yVersion,
+    'projection_contract_sha256':
+        validateCatalog()['projection_contract_sha256'],
+    'case_count': visual ? 96 : 24,
+    'passed_case_count': visual ? 96 : 24,
+    'failed_case_count': 0,
+    'capture_surface': _captureSurface,
+    'device_evidence': false,
+    'input_provenance_sha256': candidate['input_provenance_sha256'],
+    'input_provenance_file_sha256': _rawSha(provenancePath),
+    'result_manifest_sha256': _rawSha(manifestPath),
+    'evidence_mode': candidate['evidence_mode'],
+  }.entries) {
+    _exactValue(evidence[entry.key], entry.value, 'evidence.${entry.key}');
+  }
+  if (!_listEquals(
+    _array(evidence['fixture_ids'], 'evidence.fixture_ids'),
+    _fixtureIds,
+  )) {
+    _fail('evidence fixture order drifted');
+  }
+  if (!_mapEquals(
+    _object(evidence['surface_case_counts'], 'evidence.surface_counts'),
+    visual ? _visualSurfaceCounts : _a11ySurfaceCounts,
+  )) {
+    _fail('evidence surface counts drifted');
+  }
+  if (visual) {
+    for (final key in [
+      'baseline_status',
+      'baseline_set_sha256',
+      'baseline_approval_sha256',
+    ]) {
+      _exactValue(candidate[key], manifest[key], 'candidate.$key');
+      _exactValue(evidence[key], manifest[key], 'evidence.$key');
+    }
+    _exactValue(
+      evidence['pixel_diff_percent'],
+      candidate['evidence_mode'] == _releaseReady ? 0 : null,
+      'evidence.pixel_diff_percent',
+    );
+  } else {
+    _exactValue(evidence['standard'], _a11yStandard, 'evidence.standard');
+    final cases = _array(manifest['cases'], 'manifest.cases');
+    for (final key in ['critical_violations', 'serious_violations']) {
+      final total = cases.fold<int>(
+        0,
+        (sum, raw) => sum + _integer(_object(raw, 'case')[key], 'case.$key'),
+      );
+      _exactValue(evidence[key], total, 'evidence.$key');
+      _exactValue(evidence[key], 0, 'evidence.$key');
+    }
+  }
+}
+
+void validateReleasePackage({
+  required String kind,
+  required String packageRoot,
+  required String candidatePath,
+  String? canonicalCandidatePath,
+  String? canonicalCandidateSha256,
+  String? releaseId,
+}) {
+  final visual = kind == 'visual';
+  final root = Directory(packageRoot).absolute;
+  validateReleasePackageLayout(kind: kind, packageRoot: packageRoot);
+  final packagedCases = File.fromUri(
+    root.uri.resolve('evidence/et13/generated/$kind-cases.v1.json'),
+  );
+  final sourceCases = File('evidence/et13/generated/$kind-cases.v1.json');
+  if (!packagedCases.existsSync() ||
+      !_listEquals(
+        packagedCases.readAsBytesSync(),
+        sourceCases.readAsBytesSync(),
+      )) {
+    _fail('packaged generated case catalog differs from source bytes');
+  }
+  validateSanitizedEvidence(
+    kind: kind,
+    evidencePath: File.fromUri(root.uri.resolve('evidence.json')).path,
+    candidatePath: candidatePath,
+    provenancePath: File.fromUri(
+      root.uri.resolve('artifacts/et13/provenance.v1.json'),
+    ).path,
+    manifestPath: File.fromUri(
+      root.uri.resolve(
+        'artifacts/et13/${visual ? 'visual' : 'a11y'}-manifest.v1.json',
+      ),
+    ).path,
+    canonicalCandidatePath: canonicalCandidatePath,
+    canonicalCandidateSha256: canonicalCandidateSha256,
+    releaseId: releaseId,
+  );
+}
+
+/// Validates the archive layout separately so path/link mutation tests do not
+/// need to synthesize trusted evidence payloads.
+void validateReleasePackageLayout({
+  required String kind,
+  required String packageRoot,
+}) {
+  if (kind != 'visual' && kind != 'a11y') {
+    _fail('kind must be visual or a11y');
+  }
+  final root = Directory(packageRoot).absolute;
+  if (!root.existsSync()) _fail('release package root is absent');
+  final expected = <String>{
+    'evidence.json',
+    'evidence/et13/generated/${kind}-cases.v1.json',
+    'artifacts/et13/provenance.v1.json',
+    'artifacts/et13/${kind}-manifest.v1.json',
+  };
+  const expectedDirectories = <String>{
+    'artifacts',
+    'artifacts/et13',
+    'evidence',
+    'evidence/et13',
+    'evidence/et13/generated',
+  };
+  final actualFiles = <String>{};
+  final actualDirectories = <String>{};
+  final prefix = '${root.path}${Platform.pathSeparator}';
+  for (final entity in root.listSync(recursive: true, followLinks: false)) {
+    final relative = entity.absolute.path
+        .substring(prefix.length)
+        .replaceAll('\\', '/');
+    final type = FileSystemEntity.typeSync(entity.path, followLinks: false);
+    if (type == FileSystemEntityType.link) {
+      _fail('release package may not contain symbolic links');
+    }
+    if (type == FileSystemEntityType.file) actualFiles.add(relative);
+    if (type == FileSystemEntityType.directory) {
+      actualDirectories.add(relative);
+    }
+  }
+  if (!_setEquals(expected, actualFiles) ||
+      !_setEquals(expectedDirectories, actualDirectories)) {
+    _fail('release package must contain exactly four canonical nested files');
+  }
+}
+
 bool _setEquals(Set<Object?> left, Set<Object?> right) =>
     left.length == right.length && left.containsAll(right);
 
 void _usage() {
   stderr.writeln(
     'Usage: dart run tools/et13_evidence.dart '
-    '<generate|validate|provenance|validate-manifest> '
-    '[--kind=visual|a11y --source-sha=<sha> --build-marker=<path> '
-    '--manifest=<path> --artifact-root=<path>]',
+    '<generate|validate|build-marker|provenance|candidate|manifest|evidence|'
+    'validate-release-inputs|validate-manifest|validate-package> '
+    '[--name=value ...]',
   );
 }
 
@@ -1110,6 +3009,12 @@ Map<String, String> _options(Iterable<String> arguments) => <String, String>{
         argument.indexOf('=') + 1,
       ),
 };
+
+String _requiredOption(Map<String, String> options, String name) {
+  final value = options[name];
+  if (value == null || value.isEmpty) _fail('missing --$name');
+  return value;
+}
 
 void main(List<String> arguments) {
   if (arguments.isEmpty) {
@@ -1125,6 +3030,7 @@ void main(List<String> arguments) {
         stdout.writeln('ET13 generated catalogs: visual=96 a11y=24');
       case 'validate':
         validateCanonicalLineEndings();
+        validateContractDocuments();
         validateCatalog();
         validateGeneratedCatalogs();
         validateAssets();
@@ -1132,24 +3038,110 @@ void main(List<String> arguments) {
         stdout.writeln('ET13 catalog/assets/renderer: OK');
       case 'provenance':
         final options = _options(arguments.skip(1));
-        stdout.write(
-          _pretty(
-            inputProvenance(
-              options['kind'] ?? '',
-              options['source-sha'] ?? '',
-              options['build-marker'] ?? '',
-            ),
-          ),
+        final provenance = writeInputProvenance(
+          kind: _requiredOption(options, 'kind'),
+          sourceSha: _requiredOption(options, 'source-sha'),
+          buildMarkerPath: _requiredOption(options, 'build-marker'),
+          outputPath: _requiredOption(options, 'output'),
         );
+        stdout.writeln(
+          'ET13 ${options['kind']} input provenance: '
+          '${provenance['input_provenance_sha256']}',
+        );
+      case 'build-marker':
+        final options = _options(arguments.skip(1));
+        writeBuildMarker(
+          sourceSha: _requiredOption(options, 'source-sha'),
+          outputPath: _requiredOption(options, 'output'),
+          webRoot: _requiredOption(options, 'web-root'),
+          adminRoot: _requiredOption(options, 'admin-root'),
+          mobileRoot: _requiredOption(options, 'mobile-root'),
+        );
+        stdout.writeln('ET13 build marker: OK');
+      case 'candidate':
+        final options = _options(arguments.skip(1));
+        writeCandidateSpec(
+          kind: _requiredOption(options, 'kind'),
+          sourceSha: _requiredOption(options, 'source-sha'),
+          buildMarkerPath: _requiredOption(options, 'build-marker'),
+          provenancePath: _requiredOption(options, 'provenance'),
+          mode: _requiredOption(options, 'mode'),
+          producerRunId: _requiredOption(options, 'producer-run-id'),
+          producerRunAttempt: _requiredOption(options, 'producer-run-attempt'),
+          repository: _requiredOption(options, 'repository'),
+          outputPath: _requiredOption(options, 'output'),
+          baselineRoot: options['baseline-root'],
+          baselineApprovalPath: options['baseline-approval'],
+        );
+        stdout.writeln('ET13 ${options['kind']} candidate spec: OK');
+      case 'manifest':
+        final options = _options(arguments.skip(1));
+        writeResultManifest(
+          kind: _requiredOption(options, 'kind'),
+          sourceSha: _requiredOption(options, 'source-sha'),
+          buildMarkerPath: _requiredOption(options, 'build-marker'),
+          provenancePath: _requiredOption(options, 'provenance'),
+          artifactRoot: _requiredOption(options, 'artifact-root'),
+          captureSummaryPath: _requiredOption(options, 'capture-summary'),
+          mode: _requiredOption(options, 'mode'),
+          outputPath: _requiredOption(options, 'output'),
+          baselineRoot: options['baseline-root'],
+          baselineApprovalPath: options['baseline-approval'],
+        );
+        stdout.writeln('ET13 ${options['kind']} result manifest: OK');
+      case 'validate-release-inputs':
+        final options = _options(arguments.skip(1));
+        validateCanonicalReleaseInputs(
+          canonicalCandidatePath: _requiredOption(
+            options,
+            'canonical-candidate',
+          ),
+          canonicalCandidateSha256: _requiredOption(
+            options,
+            'canonical-candidate-sha256',
+          ),
+          releaseId: _requiredOption(options, 'release-id'),
+          visualCandidatePath: _requiredOption(options, 'visual-candidate'),
+          visualProvenancePath: _requiredOption(options, 'visual-provenance'),
+          a11yCandidatePath: _requiredOption(options, 'a11y-candidate'),
+          a11yProvenancePath: _requiredOption(options, 'a11y-provenance'),
+        );
+        stdout.writeln('ET13 canonical release inputs: OK');
+      case 'evidence':
+        final options = _options(arguments.skip(1));
+        writeSanitizedEvidence(
+          kind: _requiredOption(options, 'kind'),
+          candidatePath: _requiredOption(options, 'candidate'),
+          provenancePath: _requiredOption(options, 'provenance'),
+          manifestPath: _requiredOption(options, 'manifest'),
+          outputPath: _requiredOption(options, 'output'),
+          canonicalCandidatePath: options['canonical-candidate'],
+          canonicalCandidateSha256: options['canonical-candidate-sha256'],
+          releaseId: options['release-id'],
+        );
+        stdout.writeln('ET13 ${options['kind']} sanitized evidence: OK');
       case 'validate-manifest':
         final options = _options(arguments.skip(1));
         validateResultManifest(
-          kind: options['kind'] ?? '',
-          manifestPath: options['manifest'] ?? '',
-          artifactRoot: options['artifact-root'] ?? '',
-          buildMarkerPath: options['build-marker'] ?? '',
+          kind: _requiredOption(options, 'kind'),
+          manifestPath: _requiredOption(options, 'manifest'),
+          artifactRoot: _requiredOption(options, 'artifact-root'),
+          buildMarkerPath: _requiredOption(options, 'build-marker'),
+          baselineRoot: options['baseline-root'],
+          baselineApprovalPath: options['baseline-approval'],
         );
         stdout.writeln('ET13 ${options['kind']} manifest: OK');
+      case 'validate-package':
+        final options = _options(arguments.skip(1));
+        validateReleasePackage(
+          kind: _requiredOption(options, 'kind'),
+          packageRoot: _requiredOption(options, 'package-root'),
+          candidatePath: _requiredOption(options, 'candidate'),
+          canonicalCandidatePath: options['canonical-candidate'],
+          canonicalCandidateSha256: options['canonical-candidate-sha256'],
+          releaseId: options['release-id'],
+        );
+        stdout.writeln('ET13 ${options['kind']} release package: OK');
       default:
         _usage();
         exitCode = 64;

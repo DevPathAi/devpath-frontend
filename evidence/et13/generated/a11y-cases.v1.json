@@ -1,7 +1,110 @@
 {
   "schema_version": "leva.et13.a11y-cases.v1",
   "case_catalog_version": "leva.et13.catalog.v1",
-  "catalog_sha256": "a4dfdebdbca3d9f4e5287aaffb8f1fdbe07aed89c3e04260ff8d42b3dddd6e64",
+  "catalog_sha256": "fa9067a499793499f67bf4db49184e58727706ee7013d624168fc7ef811d981f",
+  "projection_contract_sha256": "c66d08b6425628a06b27d07e08d648cfb3568d9db7c8d8aca2371172ccf4bde3",
+  "projection_matrix": [
+    {
+      "fixture_id": "web-today-available",
+      "capture_scope": "body_projection",
+      "source_widget": "TodayMissionSection",
+      "substitutions": [
+        "controller/provider state replaced by approved deterministic fixture"
+      ]
+    },
+    {
+      "fixture_id": "web-path-current-week",
+      "capture_scope": "body_projection",
+      "source_widget": "MissionPathPlanView",
+      "substitutions": [
+        "controller/provider state replaced by approved deterministic fixture"
+      ]
+    },
+    {
+      "fixture_id": "web-content-reading",
+      "capture_scope": "body_projection",
+      "source_widget": "WebContentProjection",
+      "substitutions": [
+        "AdSense slot replaced by explicit offline blocked-network evidence slot"
+      ]
+    },
+    {
+      "fixture_id": "web-workspace-idle",
+      "capture_scope": "body_projection",
+      "source_widget": "SandboxLayout",
+      "substitutions": [
+        "controller state replaced by approved deterministic fixture",
+        "Monaco callbacks disabled except production readiness"
+      ]
+    },
+    {
+      "fixture_id": "web-review-loaded",
+      "capture_scope": "component_projection",
+      "source_widget": "WebReviewProjection",
+      "substitutions": [
+        "controller state replaced by approved deterministic fixture"
+      ]
+    },
+    {
+      "fixture_id": "web-mentor-context-preview",
+      "capture_scope": "body_projection",
+      "source_widget": "WebMentorContextProjection",
+      "substitutions": [
+        "controller/provider state replaced by approved deterministic fixture"
+      ]
+    },
+    {
+      "fixture_id": "admin-kpi-dashboard",
+      "capture_scope": "body_projection",
+      "source_widget": "AdminKpiDashboardProjection",
+      "substitutions": [
+        "controller/provider state replaced by approved deterministic fixture"
+      ]
+    },
+    {
+      "fixture_id": "admin-support-long-wire",
+      "capture_scope": "component_projection",
+      "source_widget": "AdminSupportDetailProjection",
+      "substitutions": [
+        "live provider and dialog shell replaced by deterministic AlertDialog host"
+      ]
+    },
+    {
+      "fixture_id": "mobile-today-available",
+      "capture_scope": "body_projection",
+      "source_widget": "MobileTodayProjection",
+      "substitutions": [
+        "native AppBar and route shell omitted",
+        "controller/provider state replaced by approved deterministic fixture"
+      ]
+    },
+    {
+      "fixture_id": "mobile-content-reading",
+      "capture_scope": "body_projection",
+      "source_widget": "MobileContentProjection",
+      "substitutions": [
+        "native AppBar and route shell omitted",
+        "periodic dwell timer frozen",
+        "controller/provider state replaced by approved deterministic fixture"
+      ]
+    },
+    {
+      "fixture_id": "dp-design-mission-ledger",
+      "capture_scope": "component_projection",
+      "source_widget": "DpEt13MissionLedgerFixture",
+      "substitutions": [
+        "hosted by the Flutter Web production distribution"
+      ]
+    },
+    {
+      "fixture_id": "dp-design-context-payload-preview",
+      "capture_scope": "component_projection",
+      "source_widget": "DpEt13ContextPayloadPreviewFixture",
+      "substitutions": [
+        "hosted by the Flutter Web production distribution"
+      ]
+    }
+  ],
   "fixture_ids": [
     "web-today-available",
     "web-path-current-week",
@@ -32,6 +135,11 @@
       "route": "/?fixture=web-today-available",
       "ready_semantics_label": "ET13_READY:web-today-available",
       "surface_label": "web-today-available",
+      "capture_scope": "body_projection",
+      "source_widget": "TodayMissionSection",
+      "substitutions": [
+        "controller/provider state replaced by approved deterministic fixture"
+      ],
       "width": 320,
       "height": 900,
       "device_pixel_ratio": 1,
@@ -50,6 +158,11 @@
       "route": "/?fixture=web-today-available",
       "ready_semantics_label": "ET13_READY:web-today-available",
       "surface_label": "web-today-available",
+      "capture_scope": "body_projection",
+      "source_widget": "TodayMissionSection",
+      "substitutions": [
+        "controller/provider state replaced by approved deterministic fixture"
+      ],
       "width": 1240,
       "height": 900,
       "device_pixel_ratio": 1,
@@ -68,6 +181,11 @@
       "route": "/?fixture=web-path-current-week",
       "ready_semantics_label": "ET13_READY:web-path-current-week",
       "surface_label": "web-path-current-week",
+      "capture_scope": "body_projection",
+      "source_widget": "MissionPathPlanView",
+      "substitutions": [
+        "controller/provider state replaced by approved deterministic fixture"
+      ],
       "width": 320,
       "height": 900,
       "device_pixel_ratio": 1,
@@ -86,6 +204,11 @@
       "route": "/?fixture=web-path-current-week",
       "ready_semantics_label": "ET13_READY:web-path-current-week",
       "surface_label": "web-path-current-week",
+      "capture_scope": "body_projection",
+      "source_widget": "MissionPathPlanView",
+      "substitutions": [
+        "controller/provider state replaced by approved deterministic fixture"
+      ],
       "width": 1240,
       "height": 900,
       "device_pixel_ratio": 1,
@@ -104,6 +227,11 @@
       "route": "/?fixture=web-content-reading",
       "ready_semantics_label": "ET13_READY:web-content-reading",
       "surface_label": "web-content-reading",
+      "capture_scope": "body_projection",
+      "source_widget": "WebContentProjection",
+      "substitutions": [
+        "AdSense slot replaced by explicit offline blocked-network evidence slot"
+      ],
       "width": 320,
       "height": 900,
       "device_pixel_ratio": 1,
@@ -122,6 +250,11 @@
       "route": "/?fixture=web-content-reading",
       "ready_semantics_label": "ET13_READY:web-content-reading",
       "surface_label": "web-content-reading",
+      "capture_scope": "body_projection",
+      "source_widget": "WebContentProjection",
+      "substitutions": [
+        "AdSense slot replaced by explicit offline blocked-network evidence slot"
+      ],
       "width": 1240,
       "height": 900,
       "device_pixel_ratio": 1,
@@ -140,6 +273,12 @@
       "route": "/?fixture=web-workspace-idle",
       "ready_semantics_label": "ET13_READY:web-workspace-idle",
       "surface_label": "web-workspace-idle",
+      "capture_scope": "body_projection",
+      "source_widget": "SandboxLayout",
+      "substitutions": [
+        "controller state replaced by approved deterministic fixture",
+        "Monaco callbacks disabled except production readiness"
+      ],
       "width": 320,
       "height": 900,
       "device_pixel_ratio": 1,
@@ -158,6 +297,12 @@
       "route": "/?fixture=web-workspace-idle",
       "ready_semantics_label": "ET13_READY:web-workspace-idle",
       "surface_label": "web-workspace-idle",
+      "capture_scope": "body_projection",
+      "source_widget": "SandboxLayout",
+      "substitutions": [
+        "controller state replaced by approved deterministic fixture",
+        "Monaco callbacks disabled except production readiness"
+      ],
       "width": 1240,
       "height": 900,
       "device_pixel_ratio": 1,
@@ -176,6 +321,11 @@
       "route": "/?fixture=web-review-loaded",
       "ready_semantics_label": "ET13_READY:web-review-loaded",
       "surface_label": "web-review-loaded",
+      "capture_scope": "component_projection",
+      "source_widget": "WebReviewProjection",
+      "substitutions": [
+        "controller state replaced by approved deterministic fixture"
+      ],
       "width": 320,
       "height": 900,
       "device_pixel_ratio": 1,
@@ -194,6 +344,11 @@
       "route": "/?fixture=web-review-loaded",
       "ready_semantics_label": "ET13_READY:web-review-loaded",
       "surface_label": "web-review-loaded",
+      "capture_scope": "component_projection",
+      "source_widget": "WebReviewProjection",
+      "substitutions": [
+        "controller state replaced by approved deterministic fixture"
+      ],
       "width": 1240,
       "height": 900,
       "device_pixel_ratio": 1,
@@ -212,6 +367,11 @@
       "route": "/?fixture=web-mentor-context-preview",
       "ready_semantics_label": "ET13_READY:web-mentor-context-preview",
       "surface_label": "web-mentor-context-preview",
+      "capture_scope": "body_projection",
+      "source_widget": "WebMentorContextProjection",
+      "substitutions": [
+        "controller/provider state replaced by approved deterministic fixture"
+      ],
       "width": 320,
       "height": 900,
       "device_pixel_ratio": 1,
@@ -230,6 +390,11 @@
       "route": "/?fixture=web-mentor-context-preview",
       "ready_semantics_label": "ET13_READY:web-mentor-context-preview",
       "surface_label": "web-mentor-context-preview",
+      "capture_scope": "body_projection",
+      "source_widget": "WebMentorContextProjection",
+      "substitutions": [
+        "controller/provider state replaced by approved deterministic fixture"
+      ],
       "width": 1240,
       "height": 900,
       "device_pixel_ratio": 1,
@@ -248,6 +413,11 @@
       "route": "/?fixture=admin-kpi-dashboard",
       "ready_semantics_label": "ET13_READY:admin-kpi-dashboard",
       "surface_label": "admin-kpi-dashboard",
+      "capture_scope": "body_projection",
+      "source_widget": "AdminKpiDashboardProjection",
+      "substitutions": [
+        "controller/provider state replaced by approved deterministic fixture"
+      ],
       "width": 320,
       "height": 900,
       "device_pixel_ratio": 1,
@@ -266,6 +436,11 @@
       "route": "/?fixture=admin-kpi-dashboard",
       "ready_semantics_label": "ET13_READY:admin-kpi-dashboard",
       "surface_label": "admin-kpi-dashboard",
+      "capture_scope": "body_projection",
+      "source_widget": "AdminKpiDashboardProjection",
+      "substitutions": [
+        "controller/provider state replaced by approved deterministic fixture"
+      ],
       "width": 1240,
       "height": 900,
       "device_pixel_ratio": 1,
@@ -284,6 +459,11 @@
       "route": "/?fixture=admin-support-long-wire",
       "ready_semantics_label": "ET13_READY:admin-support-long-wire",
       "surface_label": "admin-support-long-wire",
+      "capture_scope": "component_projection",
+      "source_widget": "AdminSupportDetailProjection",
+      "substitutions": [
+        "live provider and dialog shell replaced by deterministic AlertDialog host"
+      ],
       "width": 320,
       "height": 900,
       "device_pixel_ratio": 1,
@@ -302,6 +482,11 @@
       "route": "/?fixture=admin-support-long-wire",
       "ready_semantics_label": "ET13_READY:admin-support-long-wire",
       "surface_label": "admin-support-long-wire",
+      "capture_scope": "component_projection",
+      "source_widget": "AdminSupportDetailProjection",
+      "substitutions": [
+        "live provider and dialog shell replaced by deterministic AlertDialog host"
+      ],
       "width": 1240,
       "height": 900,
       "device_pixel_ratio": 1,
@@ -320,6 +505,12 @@
       "route": "/?fixture=mobile-today-available",
       "ready_semantics_label": "ET13_READY:mobile-today-available",
       "surface_label": "mobile-today-available",
+      "capture_scope": "body_projection",
+      "source_widget": "MobileTodayProjection",
+      "substitutions": [
+        "native AppBar and route shell omitted",
+        "controller/provider state replaced by approved deterministic fixture"
+      ],
       "width": 320,
       "height": 900,
       "device_pixel_ratio": 1,
@@ -338,6 +529,12 @@
       "route": "/?fixture=mobile-today-available",
       "ready_semantics_label": "ET13_READY:mobile-today-available",
       "surface_label": "mobile-today-available",
+      "capture_scope": "body_projection",
+      "source_widget": "MobileTodayProjection",
+      "substitutions": [
+        "native AppBar and route shell omitted",
+        "controller/provider state replaced by approved deterministic fixture"
+      ],
       "width": 1240,
       "height": 900,
       "device_pixel_ratio": 1,
@@ -356,6 +553,13 @@
       "route": "/?fixture=mobile-content-reading",
       "ready_semantics_label": "ET13_READY:mobile-content-reading",
       "surface_label": "mobile-content-reading",
+      "capture_scope": "body_projection",
+      "source_widget": "MobileContentProjection",
+      "substitutions": [
+        "native AppBar and route shell omitted",
+        "periodic dwell timer frozen",
+        "controller/provider state replaced by approved deterministic fixture"
+      ],
       "width": 320,
       "height": 900,
       "device_pixel_ratio": 1,
@@ -374,6 +578,13 @@
       "route": "/?fixture=mobile-content-reading",
       "ready_semantics_label": "ET13_READY:mobile-content-reading",
       "surface_label": "mobile-content-reading",
+      "capture_scope": "body_projection",
+      "source_widget": "MobileContentProjection",
+      "substitutions": [
+        "native AppBar and route shell omitted",
+        "periodic dwell timer frozen",
+        "controller/provider state replaced by approved deterministic fixture"
+      ],
       "width": 1240,
       "height": 900,
       "device_pixel_ratio": 1,
@@ -392,6 +603,11 @@
       "route": "/?fixture=dp-design-mission-ledger",
       "ready_semantics_label": "ET13_READY:dp-design-mission-ledger",
       "surface_label": "dp-design-mission-ledger",
+      "capture_scope": "component_projection",
+      "source_widget": "DpEt13MissionLedgerFixture",
+      "substitutions": [
+        "hosted by the Flutter Web production distribution"
+      ],
       "width": 320,
       "height": 900,
       "device_pixel_ratio": 1,
@@ -410,6 +626,11 @@
       "route": "/?fixture=dp-design-mission-ledger",
       "ready_semantics_label": "ET13_READY:dp-design-mission-ledger",
       "surface_label": "dp-design-mission-ledger",
+      "capture_scope": "component_projection",
+      "source_widget": "DpEt13MissionLedgerFixture",
+      "substitutions": [
+        "hosted by the Flutter Web production distribution"
+      ],
       "width": 1240,
       "height": 900,
       "device_pixel_ratio": 1,
@@ -428,6 +649,11 @@
       "route": "/?fixture=dp-design-context-payload-preview",
       "ready_semantics_label": "ET13_READY:dp-design-context-payload-preview",
       "surface_label": "dp-design-context-payload-preview",
+      "capture_scope": "component_projection",
+      "source_widget": "DpEt13ContextPayloadPreviewFixture",
+      "substitutions": [
+        "hosted by the Flutter Web production distribution"
+      ],
       "width": 320,
       "height": 900,
       "device_pixel_ratio": 1,
@@ -446,6 +672,11 @@
       "route": "/?fixture=dp-design-context-payload-preview",
       "ready_semantics_label": "ET13_READY:dp-design-context-payload-preview",
       "surface_label": "dp-design-context-payload-preview",
+      "capture_scope": "component_projection",
+      "source_widget": "DpEt13ContextPayloadPreviewFixture",
+      "substitutions": [
+        "hosted by the Flutter Web production distribution"
+      ],
       "width": 1240,
       "height": 900,
       "device_pixel_ratio": 1,

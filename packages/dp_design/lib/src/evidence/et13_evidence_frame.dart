@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 
 import '../theme/dp_theme.dart';
+import 'et13_font_asset_ready.dart';
 import 'et13_font_ready_stub.dart'
     if (dart.library.js_interop) 'et13_font_ready_web.dart'
     as font_ready;
 
 typedef Et13ReadyWaiter = Future<void> Function();
 
-Future<void> waitForEt13EvidenceFonts() => font_ready.waitForEt13Fonts();
+Future<void> waitForEt13EvidenceFonts() async {
+  await loadEt13EvidenceAssetFonts();
+  await font_ready.waitForEt13Fonts();
+}
 
 /// Strict launch parameters shared by the three ET13 Flutter Web release
 /// targets. Capture controls the viewport; the renderer owns every other
@@ -19,7 +23,7 @@ final class DpEt13EvidenceLaunchConfig {
     required this.textScale,
     required this.sourceSha,
   }) {
-    if (!_shaPattern.hasMatch(sourceSha)) {
+    if (!_isValidSha(sourceSha)) {
       throw ArgumentError.value(sourceSha, 'sourceSha', 'must be a git SHA-1');
     }
   }
@@ -77,6 +81,9 @@ final class DpEt13EvidenceLaunchConfig {
   }
 
   static final _shaPattern = RegExp(r'^[0-9a-f]{40}$');
+  static bool _isValidSha(String value) =>
+      _shaPattern.hasMatch(value) &&
+      value != '0000000000000000000000000000000000000000';
 
   final String fixtureId;
   final Brightness brightness;
@@ -120,7 +127,7 @@ class _DpEt13EvidenceFrameState extends State<DpEt13EvidenceFrame> {
   @override
   void initState() {
     super.initState();
-    if (!DpEt13EvidenceLaunchConfig._shaPattern.hasMatch(widget.sourceSha)) {
+    if (!DpEt13EvidenceLaunchConfig._isValidSha(widget.sourceSha)) {
       throw ArgumentError.value(
         widget.sourceSha,
         'sourceSha',
@@ -152,6 +159,13 @@ class _DpEt13EvidenceFrameState extends State<DpEt13EvidenceFrame> {
           disableAnimations: true,
           accessibleNavigation: true,
         );
+        final runtimeProfile =
+            'ET13_RUNTIME_PROFILE:fixture=${widget.fixtureId}'
+            ';width=${media.size.width.round()}'
+            ';height=${media.size.height.round()}'
+            ';dpr=${media.devicePixelRatio.toStringAsFixed(0)}'
+            ';brightness=${widget.brightness.name}'
+            ';textScalePercent=${(widget.textScale * 100).round()}';
         return MediaQuery(
           data: media,
           child: Stack(
@@ -170,6 +184,16 @@ class _DpEt13EvidenceFrameState extends State<DpEt13EvidenceFrame> {
                   container: true,
                   explicitChildNodes: true,
                   label: 'ET13_SOURCE_SHA:${widget.sourceSha}',
+                  child: const SizedBox.square(dimension: 1),
+                ),
+              ),
+              Positioned(
+                left: 1,
+                top: 0,
+                child: Semantics(
+                  container: true,
+                  explicitChildNodes: true,
+                  label: runtimeProfile,
                   child: const SizedBox.square(dimension: 1),
                 ),
               ),
