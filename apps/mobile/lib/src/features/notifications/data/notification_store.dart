@@ -67,7 +67,13 @@ class NotificationStore {
       try {
         result.add(_decode(row.payload));
       } on Object {
-        await _data.delete(ownerKey, bucket, row.recordKey);
+        await _data.deleteIfMatches(
+          ownerKey,
+          bucket,
+          row.recordKey,
+          payload: row.payload,
+          updatedAt: row.updatedAt,
+        );
       }
     }
     result.sort((a, b) => b.receivedAt.compareTo(a.receivedAt));

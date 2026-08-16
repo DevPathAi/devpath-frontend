@@ -31,7 +31,13 @@ class ContentOfflineStore {
     if (row == null) return null;
     final age = now.difference(row.updatedAt);
     if (age.isNegative || age >= maxOfflineAge) {
-      await _data.delete(ownerKey, bucket, routeKey);
+      await _data.deleteIfMatches(
+        ownerKey,
+        bucket,
+        routeKey,
+        payload: row.payload,
+        updatedAt: row.updatedAt,
+      );
       return null;
     }
     try {
@@ -43,7 +49,13 @@ class ContentOfflineStore {
       }
       return CachedLearningContent(content: content, cachedAt: row.updatedAt);
     } on Object {
-      await _data.delete(ownerKey, bucket, routeKey);
+      await _data.deleteIfMatches(
+        ownerKey,
+        bucket,
+        routeKey,
+        payload: row.payload,
+        updatedAt: row.updatedAt,
+      );
       return null;
     }
   }
@@ -198,7 +210,13 @@ class ContentProgressQueue {
       }
       return pending;
     } on Object {
-      await remove(ownerKey, routeKey);
+      await _data.deleteIfMatches(
+        ownerKey,
+        bucket,
+        routeKey,
+        payload: row.payload,
+        updatedAt: row.updatedAt,
+      );
       return null;
     }
   }
@@ -215,7 +233,13 @@ class ContentProgressQueue {
           result.add(pending);
         }
       } on Object {
-        await _data.delete(ownerKey, bucket, row.recordKey);
+        await _data.deleteIfMatches(
+          ownerKey,
+          bucket,
+          row.recordKey,
+          payload: row.payload,
+          updatedAt: row.updatedAt,
+        );
       }
     }
     return result;

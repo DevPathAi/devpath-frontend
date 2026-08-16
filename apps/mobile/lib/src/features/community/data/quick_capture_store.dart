@@ -53,7 +53,13 @@ class QuickCaptureStore {
             .toList(),
       );
     } on Object {
-      await _data.delete(ownerKey, bucket, key);
+      await _data.deleteIfMatches(
+        ownerKey,
+        bucket,
+        key,
+        payload: row.payload,
+        updatedAt: row.updatedAt,
+      );
       return null;
     }
   }
