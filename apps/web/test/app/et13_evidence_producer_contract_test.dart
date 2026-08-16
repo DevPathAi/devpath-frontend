@@ -134,6 +134,13 @@ void main() {
       expect(index, contains('changedResources.some(function (resource) {'));
       expect(
         index,
+        contains('showUnused: false'),
+        reason:
+            'Monaco diagnostics must remain visible without fading executable '
+            'code below WCAG text contrast',
+      );
+      expect(
+        index,
         isNot(contains('if (!readySent) { readySent = true; onReady(); }')),
         reason: 'editor creation alone does not mean language markers settled',
       );

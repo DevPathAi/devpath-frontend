@@ -140,6 +140,9 @@
           editor = monaco.editor.create(container, {
             value: pendingCode, language: language, theme: 'vs-dark',
             automaticLayout: true, minimap: { enabled: false }, fontSize: 14,
+            // Preserve diagnostics without fading executable text below WCAG
+            // contrast when a language worker marks it as unnecessary.
+            showUnused: false,
           });
           editor.onDidChangeModelContent(function () { onChange(editor.getValue()); });
           // F5-c DD7: Esc 시 Monaco 밖(dart sentinel)으로 포커스를 넘긴다.
