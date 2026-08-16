@@ -182,9 +182,111 @@ void main() {
         restarted.dispose();
       }, (error, _) => uncaught.add(error));
 
-      expect(store.deleteCalls, 2);
+      expect(store.deleteCalls, 3);
       expect(uncaught, isEmpty);
       expect(await store.read(PendingDeepLinkController.storageKey), isNull);
+      expect(
+        await store.read(PendingDeepLinkController.consumedStorageKey),
+        isNull,
+      );
+    },
+  );
+
+  test(
+    'three delete failures retain an exact consumed tombstone across restart',
+    () async {
+      final store = _FailPendingRouteDeletesStore();
+      final now = DateTime.utc(2026, 8, 16, 12);
+      final first = _container(store, clock: () => now);
+      await first
+          .read(pendingDeepLinkProvider.notifier)
+          .capture('/path/301/today');
+      final consumedRaw = await store.read(
+        PendingDeepLinkController.storageKey,
+      );
+
+      await expectLater(
+        first.read(pendingDeepLinkProvider.notifier).consumeAndWait(),
+        throwsStateError,
+      );
+      expect(first.read(pendingDeepLinkProvider), isNull);
+      expect(store.pendingDeleteCalls, 3);
+      expect(
+        await store.read(PendingDeepLinkController.consumedStorageKey),
+        consumedRaw,
+      );
+      first.dispose();
+
+      final restarted = _container(store, clock: () => now);
+      await restarted.read(pendingDeepLinkProvider.notifier).restore();
+      expect(restarted.read(pendingDeepLinkProvider), isNull);
+      restarted.dispose();
+
+      // An older exact-record marker must not suppress a newer route.
+      final newer = _container(store, clock: () => now);
+      await newer
+          .read(pendingDeepLinkProvider.notifier)
+          .capture('/mission/302/content/77');
+      newer.dispose();
+      final finalRestart = _container(store, clock: () => now);
+      addTearDown(finalRestart.dispose);
+      await finalRestart.read(pendingDeepLinkProvider.notifier).restore();
+      expect(
+        finalRestart.read(pendingDeepLinkProvider),
+        '/mission/302/content/77',
+      );
+    },
+  );
+
+  test(
+    'failed consumed tombstone write leaves route live and retryable',
+    () async {
+      final store = _FailConsumedWriteStore();
+      final container = _container(store);
+      addTearDown(container.dispose);
+      final controller = container.read(pendingDeepLinkProvider.notifier);
+      await controller.capture('/path/301/today');
+      final generation = controller.generation;
+
+      await expectLater(controller.consumeAndWait(), throwsStateError);
+
+      expect(container.read(pendingDeepLinkProvider), '/path/301/today');
+      expect(controller.generation, generation);
+      expect(
+        await store.read(PendingDeepLinkController.storageKey),
+        contains('/path/301/today'),
+      );
+    },
+  );
+
+  test(
+    'new same-route capture differs from an undeletable consumed record',
+    () async {
+      final store = _FailPendingAndConsumedDeletesStore();
+      final now = DateTime.utc(2026, 8, 16, 12);
+      final first = _container(store, clock: () => now);
+      await first
+          .read(pendingDeepLinkProvider.notifier)
+          .capture('/path/301/today');
+      final oldRaw = await store.read(PendingDeepLinkController.storageKey);
+      await expectLater(
+        first.read(pendingDeepLinkProvider.notifier).consumeAndWait(),
+        throwsStateError,
+      );
+      first.dispose();
+
+      final newer = _container(store, clock: () => now);
+      await newer
+          .read(pendingDeepLinkProvider.notifier)
+          .capture('/path/301/today');
+      final newRaw = await store.read(PendingDeepLinkController.storageKey);
+      expect(newRaw, isNot(oldRaw));
+      newer.dispose();
+
+      final restarted = _container(store, clock: () => now);
+      addTearDown(restarted.dispose);
+      await restarted.read(pendingDeepLinkProvider.notifier).restore();
+      expect(restarted.read(pendingDeepLinkProvider), '/path/301/today');
     },
   );
 }
@@ -227,5 +329,62 @@ class _FailFirstDeleteStore implements KeyValueStore {
     deleteCalls += 1;
     if (deleteCalls == 1) throw StateError('transient delete failure');
     await _delegate.delete(key);
+  }
+}
+
+class _FailPendingRouteDeletesStore implements KeyValueStore {
+  final _delegate = InMemoryKeyValueStore();
+  var pendingDeleteCalls = 0;
+
+  @override
+  Future<String?> read(String key) => _delegate.read(key);
+
+  @override
+  Future<void> write(String key, String value) => _delegate.write(key, value);
+
+  @override
+  Future<void> delete(String key) async {
+    if (key == PendingDeepLinkController.storageKey) {
+      pendingDeleteCalls += 1;
+      throw StateError('persistent pending-route delete failure');
+    }
+    await _delegate.delete(key);
+  }
+}
+
+class _FailConsumedWriteStore implements KeyValueStore {
+  final _delegate = InMemoryKeyValueStore();
+
+  @override
+  Future<String?> read(String key) => _delegate.read(key);
+
+  @override
+  Future<void> write(String key, String value) {
+    if (key == PendingDeepLinkController.consumedStorageKey) {
+      throw StateError('consumed tombstone write failed');
+    }
+    return _delegate.write(key, value);
+  }
+
+  @override
+  Future<void> delete(String key) => _delegate.delete(key);
+}
+
+class _FailPendingAndConsumedDeletesStore implements KeyValueStore {
+  final _delegate = InMemoryKeyValueStore();
+
+  @override
+  Future<String?> read(String key) => _delegate.read(key);
+
+  @override
+  Future<void> write(String key, String value) => _delegate.write(key, value);
+
+  @override
+  Future<void> delete(String key) {
+    if (key == PendingDeepLinkController.storageKey ||
+        key == PendingDeepLinkController.consumedStorageKey) {
+      throw StateError('persistent route cleanup failure');
+    }
+    return _delegate.delete(key);
   }
 }

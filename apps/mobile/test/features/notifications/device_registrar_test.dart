@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+import 'package:devpath_mobile/src/data/key_value_store.dart';
 import 'package:devpath_mobile/src/data/owner_data_store.dart';
 import 'package:devpath_mobile/src/features/notifications/application/device_registrar.dart';
 import 'package:devpath_mobile/src/services/push_service.dart';
@@ -19,11 +20,17 @@ class _FakePush implements PushService {
 }
 
 class _LifecyclePush implements PushService, PushTokenLifecycleService {
-  _LifecyclePush({Future<bool>? permission, this.tokenFailures = 0})
-    : _permission = permission ?? Future<bool>.value(true);
+  _LifecyclePush({
+    Future<bool>? permission,
+    this.tokenFailures = 0,
+    this.deleteFailures = 0,
+    this.token = 'fcm-tok',
+  }) : _permission = permission ?? Future<bool>.value(true);
 
   final Future<bool> _permission;
   int tokenFailures;
+  int deleteFailures;
+  final String token;
   var deleteCalls = 0;
   var permissionCalls = 0;
   final events = <String>[];
@@ -37,7 +44,7 @@ class _LifecyclePush implements PushService, PushTokenLifecycleService {
       tokenFailures -= 1;
       throw StateError('APNs token is not ready');
     }
-    return 'fcm-tok';
+    return token;
   }
 
   @override
@@ -47,6 +54,10 @@ class _LifecyclePush implements PushService, PushTokenLifecycleService {
   Future<void> deleteToken() async {
     deleteCalls += 1;
     events.add('deleteToken');
+    if (deleteFailures > 0) {
+      deleteFailures -= 1;
+      throw StateError('platform token deletion failed');
+    }
   }
 
   @override
@@ -367,6 +378,287 @@ void main() {
     );
 
     test(
+      'backend and platform cleanup failure survives owner clear and restart',
+      () async {
+        final adapter = _RevocationRetryAdapter(failedDeletes: 1);
+        final client = ApiClient.create(
+          const ApiConfig(baseUrl: 'https://api.test'),
+        );
+        client.dio.httpClientAdapter = adapter;
+        final data = InMemoryOwnerDataStore();
+        final durable = InMemoryKeyValueStore();
+        await data.write(
+          'owner-a',
+          'push-registration-v1',
+          'ANDROID',
+          'owner-a-token',
+        );
+        final failingPush = _LifecyclePush(
+          token: 'owner-a-token',
+          deleteFailures: 1,
+        );
+        addTearDown(failingPush.close);
+        final first = DeviceRegistrar(
+          client,
+          failingPush,
+          'ANDROID',
+          data,
+          durable,
+        );
+
+        await expectLater(
+          first.unregister('owner-a', credentialOwnerConfirmed: true),
+          throwsA(anyOf(isA<ApiException>(), isA<StateError>())),
+        );
+        await first.dispose();
+        // Mirrors AccountDataCleaner after AuthController contains revocation
+        // failure. The pending handle must not live under owner A.
+        await data.clearOwner('owner-a');
+
+        final recoveredPush = _LifecyclePush(token: 'owner-a-new-token');
+        addTearDown(recoveredPush.close);
+        final restarted = DeviceRegistrar(
+          client,
+          recoveredPush,
+          'ANDROID',
+          data,
+          durable,
+        );
+        addTearDown(restarted.dispose);
+
+        await restarted.activate('owner-a');
+
+        expect(adapter.deletedTokens, ['owner-a-token']);
+        expect(adapter.postedTokens, ['owner-a-new-token']);
+        expect(adapter.events, [
+          'DELETE owner-a-token',
+          'POST owner-a-new-token',
+        ]);
+        expect(
+          (await data.list('owner-a')).single.payload,
+          'owner-a-new-token',
+        );
+
+        await restarted.dispose();
+        final finalPass = DeviceRegistrar(
+          client,
+          _LifecyclePush(token: 'owner-a-new-token'),
+          'ANDROID',
+          data,
+          durable,
+        );
+        await finalPass.activate('owner-a');
+        await finalPass.dispose();
+        expect(adapter.deletedTokens, ['owner-a-token']);
+      },
+    );
+
+    test(
+      'B credential 204 cannot clear A revocation without platform invalidation',
+      () async {
+        final adapter = _CrossOwnerNoOpDeleteAdapter();
+        final client = ApiClient.create(
+          const ApiConfig(baseUrl: 'https://api.test'),
+        );
+        client.dio.httpClientAdapter = adapter;
+        final data = InMemoryOwnerDataStore();
+        final durable = InMemoryKeyValueStore();
+        await data.write(
+          'owner-a',
+          'push-registration-v1',
+          'ANDROID',
+          'owner-a-token',
+        );
+        final firstPush = _LifecyclePush(deleteFailures: 1);
+        addTearDown(firstPush.close);
+        final first = DeviceRegistrar(
+          client,
+          firstPush,
+          'ANDROID',
+          data,
+          durable,
+        );
+        adapter.credentialOwner = 'owner-a';
+        await expectLater(
+          first.unregister('owner-a', credentialOwnerConfirmed: true),
+          throwsA(anything),
+        );
+        await first.dispose();
+        await data.clearOwner('owner-a');
+
+        adapter.credentialOwner = 'owner-b';
+        final bPush = _LifecyclePush(token: 'owner-b-token', deleteFailures: 1);
+        addTearDown(bPush.close);
+        final b = DeviceRegistrar(client, bPush, 'ANDROID', data, durable);
+
+        await expectLater(b.activate('owner-b'), throwsA(isA<StateError>()));
+
+        expect(adapter.deleteOwners, ['owner-a']);
+        expect(adapter.postedTokens, isEmpty);
+        await b.dispose();
+
+        final retryPush = _LifecyclePush(token: 'owner-b-token');
+        addTearDown(retryPush.close);
+        final retry = DeviceRegistrar(
+          client,
+          retryPush,
+          'ANDROID',
+          data,
+          durable,
+        );
+        addTearDown(retry.dispose);
+        await retry.activate('owner-b');
+
+        // Cross-owner retry invalidates the installation token; it never
+        // mistakes B's idempotent 204 for an A-owned backend revocation.
+        expect(adapter.deleteOwners, ['owner-a']);
+        expect(adapter.postedTokens, ['owner-b-token']);
+      },
+    );
+
+    test(
+      'stale successful POST cleanup failure is retried exactly after restart',
+      () async {
+        final adapter = _DelayedStalePostAdapter(failedDeletes: 1);
+        final client = ApiClient.create(
+          const ApiConfig(baseUrl: 'https://api.test'),
+        );
+        client.dio.httpClientAdapter = adapter;
+        final data = InMemoryOwnerDataStore();
+        final durable = InMemoryKeyValueStore();
+        final stalePush = _LifecyclePush(
+          token: 'stale-post-token',
+          deleteFailures: 3,
+        );
+        addTearDown(stalePush.close);
+        final first = DeviceRegistrar(
+          client,
+          stalePush,
+          'ANDROID',
+          data,
+          durable,
+        );
+
+        final activating = first.activate('owner-a');
+        await adapter.postStarted.future;
+        final unregistering = first.unregister('owner-a');
+        adapter.releasePost.complete();
+        await activating;
+        await expectLater(unregistering, throwsA(anything));
+        await first.dispose();
+        await data.clearOwner('owner-a');
+
+        final restartedPush = _LifecyclePush(token: 'owner-a-fresh-token');
+        addTearDown(restartedPush.close);
+        final restarted = DeviceRegistrar(
+          client,
+          restartedPush,
+          'ANDROID',
+          data,
+          durable,
+        );
+        addTearDown(restarted.dispose);
+        await restarted.activate('owner-a');
+
+        expect(adapter.deletedTokens.last, 'stale-post-token');
+        expect(adapter.postedTokens.last, 'owner-a-fresh-token');
+      },
+    );
+
+    test(
+      'POST success followed by local write failure retains an exact handle',
+      () async {
+        final adapter = _RevocationRetryAdapter(failedDeletes: 0);
+        final client = ApiClient.create(
+          const ApiConfig(baseUrl: 'https://api.test'),
+        );
+        client.dio.httpClientAdapter = adapter;
+        final data = _FailOnceRegistrationWriteStore();
+        final durable = InMemoryKeyValueStore();
+        final firstPush = _LifecyclePush(token: 'orphan-risk-token');
+        addTearDown(firstPush.close);
+        final first = DeviceRegistrar(
+          client,
+          firstPush,
+          'ANDROID',
+          data,
+          durable,
+        );
+
+        await expectLater(first.activate('owner-a'), throwsStateError);
+        await first.dispose();
+        expect(await data.list('owner-a'), isEmpty);
+
+        final retryPush = _LifecyclePush(token: 'orphan-risk-token');
+        addTearDown(retryPush.close);
+        final restarted = DeviceRegistrar(
+          client,
+          retryPush,
+          'ANDROID',
+          data,
+          durable,
+        );
+        addTearDown(restarted.dispose);
+        await restarted.activate('owner-a');
+
+        expect(adapter.events, [
+          'POST orphan-risk-token',
+          'DELETE orphan-risk-token',
+          'POST orphan-risk-token',
+        ]);
+        expect(
+          (await data.list('owner-a')).single.payload,
+          'orphan-risk-token',
+        );
+      },
+    );
+
+    test(
+      'registration row plus uncleared handle is revoked before restart reuse',
+      () async {
+        final adapter = _RevocationRetryAdapter(failedDeletes: 0);
+        final client = ApiClient.create(
+          const ApiConfig(baseUrl: 'https://api.test'),
+        );
+        client.dio.httpClientAdapter = adapter;
+        final data = InMemoryOwnerDataStore();
+        final durable = _FailFirstPendingRevocationClearStore();
+        final firstPush = _LifecyclePush(token: 'uncertain-token');
+        addTearDown(firstPush.close);
+        final first = DeviceRegistrar(
+          client,
+          firstPush,
+          'ANDROID',
+          data,
+          durable,
+        );
+
+        await expectLater(first.activate('owner-a'), throwsStateError);
+        await first.dispose();
+        expect((await data.list('owner-a')).single.payload, 'uncertain-token');
+
+        final retryPush = _LifecyclePush(token: 'uncertain-token');
+        addTearDown(retryPush.close);
+        final restarted = DeviceRegistrar(
+          client,
+          retryPush,
+          'ANDROID',
+          data,
+          durable,
+        );
+        addTearDown(restarted.dispose);
+        await restarted.activate('owner-a');
+
+        expect(adapter.events, [
+          'POST uncertain-token',
+          'DELETE uncertain-token',
+          'POST uncertain-token',
+        ]);
+        expect((await data.list('owner-a')).single.payload, 'uncertain-token');
+      },
+    );
+
+    test(
       'permission pending or denied cannot subscribe or apply token refresh',
       () async {
         final permission = Completer<bool>();
@@ -507,6 +799,51 @@ class _DelayedPriorDeleteAdapter implements HttpClientAdapter {
   void close({bool force = false}) {}
 }
 
+class _FailOnceRegistrationWriteStore extends InMemoryOwnerDataStore {
+  var _fail = true;
+
+  @override
+  Future<void> write(
+    String ownerKey,
+    String bucket,
+    String recordKey,
+    String payload, {
+    DateTime? updatedAt,
+  }) {
+    if (_fail && bucket == 'push-registration-v1') {
+      _fail = false;
+      throw StateError('local registration write failed');
+    }
+    return super.write(
+      ownerKey,
+      bucket,
+      recordKey,
+      payload,
+      updatedAt: updatedAt,
+    );
+  }
+}
+
+class _FailFirstPendingRevocationClearStore implements KeyValueStore {
+  final _delegate = InMemoryKeyValueStore();
+  var _fail = true;
+
+  @override
+  Future<String?> read(String key) => _delegate.read(key);
+
+  @override
+  Future<void> write(String key, String value) => _delegate.write(key, value);
+
+  @override
+  Future<void> delete(String key) {
+    if (_fail && key == DeviceRegistrar.pendingRevocationsStorageKey) {
+      _fail = false;
+      throw StateError('pending revocation clear failed');
+    }
+    return _delegate.delete(key);
+  }
+}
+
 class _RotationDeleteFailureAdapter implements HttpClientAdapter {
   var deleteCalls = 0;
   var postCalls = 0;
@@ -542,6 +879,125 @@ class _RotationDeleteFailureAdapter implements HttpClientAdapter {
         Headers.contentTypeHeader: [Headers.jsonContentType],
       },
     );
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
+Map<String, dynamic> _requestBody(RequestOptions options) =>
+    Map<String, dynamic>.from(options.data as Map);
+
+ResponseBody _jsonResponse(int status) => ResponseBody.fromString(
+  jsonEncode(
+    status >= 200 && status < 300
+        ? <String, dynamic>{}
+        : {
+            'error': {'code': 'UNKNOWN', 'message': 'forced failure'},
+          },
+  ),
+  status,
+  headers: {
+    Headers.contentTypeHeader: [Headers.jsonContentType],
+  },
+);
+
+class _RevocationRetryAdapter implements HttpClientAdapter {
+  _RevocationRetryAdapter({required this.failedDeletes});
+
+  int failedDeletes;
+  final deletedTokens = <String>[];
+  final postedTokens = <String>[];
+  final events = <String>[];
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    final token = _requestBody(options)['token'] as String;
+    if (options.method == 'DELETE') {
+      if (failedDeletes > 0) {
+        failedDeletes -= 1;
+        return _jsonResponse(500);
+      }
+      deletedTokens.add(token);
+      events.add('DELETE $token');
+      return _jsonResponse(200);
+    }
+    postedTokens.add(token);
+    events.add('POST $token');
+    return _jsonResponse(200);
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
+class _CrossOwnerNoOpDeleteAdapter implements HttpClientAdapter {
+  String credentialOwner = 'owner-a';
+  var firstOwnerDelete = true;
+  final deleteOwners = <String>[];
+  final postedTokens = <String>[];
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    final token = _requestBody(options)['token'] as String;
+    if (options.method == 'DELETE') {
+      deleteOwners.add(credentialOwner);
+      if (credentialOwner == 'owner-a' && firstOwnerDelete) {
+        firstOwnerDelete = false;
+        return _jsonResponse(500);
+      }
+      // The backend contract is idempotent: B receives 204 even though it did
+      // not remove A's owner-scoped registration.
+      return _jsonResponse(204);
+    }
+    postedTokens.add(token);
+    return _jsonResponse(200);
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
+class _DelayedStalePostAdapter implements HttpClientAdapter {
+  _DelayedStalePostAdapter({required this.failedDeletes});
+
+  int failedDeletes;
+  final postStarted = Completer<void>();
+  final releasePost = Completer<void>();
+  final deletedTokens = <String>[];
+  final postedTokens = <String>[];
+  var _postCalls = 0;
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    final token = _requestBody(options)['token'] as String;
+    if (options.method == 'DELETE') {
+      if (failedDeletes > 0) {
+        failedDeletes -= 1;
+        return _jsonResponse(500);
+      }
+      deletedTokens.add(token);
+      return _jsonResponse(200);
+    }
+    _postCalls += 1;
+    if (_postCalls == 1) {
+      postStarted.complete();
+      await releasePost.future;
+    }
+    postedTokens.add(token);
+    return _jsonResponse(200);
   }
 
   @override

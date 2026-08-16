@@ -31,20 +31,29 @@ class _Cleaner implements AccountDataCleaner {
 }
 
 class _SwitchRegistrar extends DeviceRegistrar {
-  _SwitchRegistrar(this.events, {this.fail = false})
-    : super(
-        _client(const {}),
-        StubPushService(),
-        'ANDROID',
-        InMemoryOwnerDataStore(),
-      );
+  _SwitchRegistrar(
+    this.events, {
+    this.fail = false,
+    List<bool?>? credentialProofs,
+  }) : credentialProofs = credentialProofs ?? <bool?>[],
+       super(
+         _client(const {}),
+         StubPushService(),
+         'ANDROID',
+         InMemoryOwnerDataStore(),
+       );
 
   final List<String> events;
   final bool fail;
+  final List<bool?> credentialProofs;
 
   @override
-  Future<void> unregister(String ownerKey) async {
+  Future<void> unregister(
+    String ownerKey, {
+    bool? credentialOwnerConfirmed,
+  }) async {
     events.add('revoke:$ownerKey');
+    credentialProofs.add(credentialOwnerConfirmed);
     if (fail) throw StateError('local FCM invalidation failed');
   }
 }
@@ -61,7 +70,7 @@ class _ReentrantCredentialRegistrar extends DeviceRegistrar {
   final CredentialMutationCoordinator coordinator;
 
   @override
-  Future<void> unregister(String ownerKey) {
+  Future<void> unregister(String ownerKey, {bool? credentialOwnerConfirmed}) {
     // Models a device-unregister 401 whose AuthInterceptor refresh must enter
     // the same credential mutation boundary.
     return coordinator.run(() async {});
@@ -195,6 +204,7 @@ void main() {
   test('명시적 logout은 토큰보다 owner-scoped 데이터를 먼저 지운다', () async {
     final tokens = InMemoryTokenStore();
     final cleaner = _Cleaner();
+    final credentialProofs = <bool?>[];
     final container = ProviderContainer(
       overrides: [
         tokenStoreProvider.overrideWithValue(tokens),
@@ -216,6 +226,9 @@ void main() {
         ),
         accountDataCleanerProvider.overrideWithValue(cleaner),
         ownerDataStoreProvider.overrideWithValue(InMemoryOwnerDataStore()),
+        deviceRegistrarProvider.overrideWithValue(
+          _SwitchRegistrar([], credentialProofs: credentialProofs),
+        ),
       ],
     );
     addTearDown(container.dispose);
@@ -226,6 +239,7 @@ void main() {
     await controller.logout();
 
     expect(cleaner.owners, ['owner-a']);
+    expect(credentialProofs, [true]);
     expect(await tokens.readAccess(), isNull);
     expect(container.read(authControllerProvider), isA<AuthUnauthenticated>());
   });
@@ -234,6 +248,7 @@ void main() {
     'verified A to server B revokes A before clearing and exposing B',
     () async {
       final events = <String>[];
+      final credentialProofs = <bool?>[];
       final tokens = InMemoryTokenStore();
       final kv = InMemoryKeyValueStore();
       final cleaner = _Cleaner(events);
@@ -245,7 +260,9 @@ void main() {
           keyValueStoreProvider.overrideWithValue(kv),
           accountDataCleanerProvider.overrideWithValue(cleaner),
           ownerDataStoreProvider.overrideWithValue(InMemoryOwnerDataStore()),
-          deviceRegistrarProvider.overrideWithValue(_SwitchRegistrar(events)),
+          deviceRegistrarProvider.overrideWithValue(
+            _SwitchRegistrar(events, credentialProofs: credentialProofs),
+          ),
           apiClientProvider.overrideWithValue(
             _client({'GET /users/me': (200, _userJson('owner-b'))}),
           ),
@@ -256,6 +273,7 @@ void main() {
       await container.read(authControllerProvider.notifier).bootstrapSession();
 
       expect(events, ['revoke:owner-a', 'clear:owner-a']);
+      expect(credentialProofs, [false]);
       expect(container.read(authControllerProvider).ownerKey, 'owner-b');
       expect((await VerifiedSessionStore(kv).read())?.id, 'owner-b');
     },
@@ -284,13 +302,19 @@ void main() {
       final pending = container.read(pendingDeepLinkProvider.notifier);
       expect(await pending.capture('/path/101/today'), isTrue);
       expect(container.read(pendingDeepLinkProvider), '/path/101/today');
-      expect(await kv.read(PendingDeepLinkController.storageKey), isNotNull);
+      final pendingRaw = await kv.read(PendingDeepLinkController.storageKey);
+      expect(pendingRaw, isNotNull);
+      await kv.write(PendingDeepLinkController.consumedStorageKey, pendingRaw!);
 
       await container.read(authControllerProvider.notifier).bootstrapSession();
 
       expect(container.read(authControllerProvider).ownerKey, 'owner-b');
       expect(container.read(pendingDeepLinkProvider), isNull);
       expect(await kv.read(PendingDeepLinkController.storageKey), isNull);
+      expect(
+        await kv.read(PendingDeepLinkController.consumedStorageKey),
+        isNull,
+      );
     },
   );
 

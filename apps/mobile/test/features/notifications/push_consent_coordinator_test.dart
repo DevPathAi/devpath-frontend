@@ -16,6 +16,7 @@ final class _RecordingRegistrar extends DeviceRegistrar {
       );
 
   final events = <String>[];
+  final credentialProofs = <bool?>[];
   var unregisterFailures = 0;
 
   @override
@@ -24,8 +25,12 @@ final class _RecordingRegistrar extends DeviceRegistrar {
   }
 
   @override
-  Future<void> unregister(String ownerKey) async {
+  Future<void> unregister(
+    String ownerKey, {
+    bool? credentialOwnerConfirmed,
+  }) async {
     events.add('deactivate:$ownerKey');
+    credentialProofs.add(credentialOwnerConfirmed);
     if (unregisterFailures > 0) {
       unregisterFailures -= 1;
       throw StateError('forced unregister failure');
@@ -58,6 +63,7 @@ void main() {
       await coordinator.settled;
 
       expect(registrar.events, ['deactivate:owner-a']);
+      expect(registrar.credentialProofs, [true]);
     },
   );
 

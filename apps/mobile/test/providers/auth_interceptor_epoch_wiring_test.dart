@@ -431,7 +431,10 @@ class _CountingRegistrar extends DeviceRegistrar {
   final owners = <String>[];
 
   @override
-  Future<void> unregister(String ownerKey) async => owners.add(ownerKey);
+  Future<void> unregister(
+    String ownerKey, {
+    bool? credentialOwnerConfirmed,
+  }) async => owners.add(ownerKey);
 }
 
 User _user(String id) => User.fromJson(_userJson(id));

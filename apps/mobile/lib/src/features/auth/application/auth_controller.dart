@@ -149,9 +149,7 @@ class AuthController extends Notifier<AuthState> {
             if (switchRevocationFailed) {
               await _store.clear();
               await ref.read(verifiedSessionStoreProvider).clear();
-              await ref
-                  .read(keyValueStoreProvider)
-                  .delete(PendingDeepLinkController.storageKey);
+              await ref.read(pendingDeepLinkProvider.notifier).clearPersisted();
             }
           }
           if (switchRevocationFailed) return _isCurrent(epoch);
@@ -314,9 +312,12 @@ class AuthController extends Notifier<AuthState> {
   }
 
   Future<void> logout() async {
+    final liveOwnerKey = state.ownerKey;
     final ownerKey =
-        state.ownerKey ??
+        liveOwnerKey ??
         (await ref.read(verifiedSessionStoreProvider).read())?.id;
+    final credentialOwnerConfirmed =
+        liveOwnerKey != null && liveOwnerKey == ownerKey;
     final epoch = ++_epoch;
     _bootstrapInFlight = null;
     _invalidateCredentialBoundary();
@@ -325,7 +326,10 @@ class AuthController extends Notifier<AuthState> {
     state = const AuthUnauthenticated();
     ref.read(pendingDeepLinkProvider.notifier).consume();
     try {
-      await _revokePush(ownerKey);
+      await _revokePush(
+        ownerKey,
+        credentialOwnerConfirmed: credentialOwnerConfirmed,
+      );
       if (!_isCurrent(epoch)) return;
       await _mutateCredentials(() async {
         if (!_isCurrent(epoch)) return false;
@@ -338,9 +342,7 @@ class AuthController extends Notifier<AuthState> {
           await _store.clear();
           await ref.read(verifiedSessionStoreProvider).clear();
           await ref.read(keyValueStoreProvider).delete(_kPkceVerifier);
-          await ref
-              .read(keyValueStoreProvider)
-              .delete(PendingDeepLinkController.storageKey);
+          await ref.read(pendingDeepLinkProvider.notifier).clearPersisted();
         }
         return _isCurrent(epoch);
       });
@@ -424,16 +426,22 @@ class AuthController extends Notifier<AuthState> {
     } finally {
       await _store.clear();
       await sessionStore.clear();
-      await ref
-          .read(keyValueStoreProvider)
-          .delete(PendingDeepLinkController.storageKey);
+      await ref.read(pendingDeepLinkProvider.notifier).clearPersisted();
     }
   }
 
-  Future<bool> _revokePush(String? ownerKey) async {
+  Future<bool> _revokePush(
+    String? ownerKey, {
+    bool credentialOwnerConfirmed = false,
+  }) async {
     if (ownerKey == null) return true;
     try {
-      await ref.read(deviceRegistrarProvider).unregister(ownerKey);
+      await ref
+          .read(deviceRegistrarProvider)
+          .unregister(
+            ownerKey,
+            credentialOwnerConfirmed: credentialOwnerConfirmed,
+          );
       return true;
     } on Object {
       // Credential and owner cleanup must remain fail-closed locally.
@@ -451,9 +459,7 @@ class AuthController extends Notifier<AuthState> {
     } finally {
       await _store.clear();
       await ref.read(verifiedSessionStoreProvider).clear();
-      await ref
-          .read(keyValueStoreProvider)
-          .delete(PendingDeepLinkController.storageKey);
+      await ref.read(pendingDeepLinkProvider.notifier).clearPersisted();
     }
     ref.read(pendingDeepLinkProvider.notifier).consume();
   }

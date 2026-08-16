@@ -54,7 +54,7 @@ class PushConsentCoordinator {
         );
       } else {
         _run(
-          () => _registrar.unregister(user.id),
+          () => _registrar.unregister(user.id, credentialOwnerConfirmed: true),
           onFailure: () {
             if (_ownerKey == user.id && _consented == false) {
               _consented = null;
@@ -74,7 +74,7 @@ class PushConsentCoordinator {
       _consented = false;
       _activatedOnline = false;
       _run(
-        () => _registrar.unregister(user.id),
+        () => _registrar.unregister(user.id, credentialOwnerConfirmed: true),
         onFailure: () {
           if (_ownerKey == user.id && _consented == false) {
             _consented = null;
