@@ -627,6 +627,59 @@ void main() {
       },
     );
 
+    test(
+      'AuthLoading tap buffer keeps only the latest sixteen unique messages',
+      () async {
+        final push = _FakeInteractivePush();
+        addTearDown(push.close);
+        final store = NotificationStore(InMemoryOwnerDataStore());
+        final container = ProviderContainer(
+          overrides: [
+            pushServiceProvider.overrideWithValue(push),
+            keyValueStoreProvider.overrideWithValue(InMemoryKeyValueStore()),
+            authControllerProvider.overrideWith(
+              _NotificationAuthController.new,
+            ),
+            notificationStoreProvider.overrideWithValue(store),
+          ],
+        );
+        addTearDown(container.dispose);
+        final subscription = container.listen(
+          notificationControllerProvider,
+          (_, _) {},
+        );
+        addTearDown(subscription.close);
+
+        for (var index = 0; index < 18; index += 1) {
+          push.openedController.add(
+            PushMessage.ownerScoped(
+              id: 'buffered-$index',
+              title: 'Today',
+              body: 'queued tap',
+              intendedOwnerKey: 'owner-a',
+              target: const PushTarget.today(pathId: 301),
+            ),
+          );
+        }
+        await pumpEventQueue(times: 3);
+        final auth =
+            container.read(authControllerProvider.notifier)
+                as _NotificationAuthController;
+        auth.authenticate('owner-a');
+        await pumpEventQueue(times: 24);
+
+        final persisted = await store.list('owner-a');
+        expect(persisted, hasLength(16));
+        expect(persisted.map((item) => item.message.id).toSet(), {
+          for (var index = 2; index < 18; index += 1) 'buffered-$index',
+        });
+        expect(
+          container.read(notificationControllerProvider).messages,
+          hasLength(16),
+        );
+      },
+    );
+
     test('Loading push is discarded on unauthenticated terminal', () async {
       final push = _FakeInteractivePush();
       addTearDown(push.close);

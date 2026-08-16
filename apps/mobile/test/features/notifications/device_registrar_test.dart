@@ -222,6 +222,41 @@ void main() {
     );
 
     test(
+      'failed prior-token rotation delete preserves the retryable old handle',
+      () async {
+        final adapter = _RotationDeleteFailureAdapter();
+        final client = ApiClient.create(
+          const ApiConfig(baseUrl: 'https://api.test'),
+        );
+        client.dio.httpClientAdapter = adapter;
+        final push = _LifecyclePush();
+        addTearDown(push.close);
+        final data = InMemoryOwnerDataStore();
+        await data.write(
+          'owner-a',
+          'push-registration-v1',
+          'ANDROID',
+          'old-token',
+        );
+        final registrar = DeviceRegistrar(client, push, 'ANDROID', data);
+        addTearDown(registrar.dispose);
+
+        await expectLater(
+          registrar.activate('owner-a'),
+          throwsA(isA<ApiException>()),
+        );
+
+        expect(adapter.postCalls, 0);
+        expect((await data.list('owner-a')).single.payload, 'old-token');
+
+        await registrar.unregister('owner-a');
+
+        expect(adapter.deleteCalls, 2);
+        expect(await data.list('owner-a'), isEmpty);
+      },
+    );
+
+    test(
       'permission pending or denied cannot subscribe or apply token refresh',
       () async {
         final permission = Completer<bool>();
@@ -334,6 +369,47 @@ class _DelayedPriorDeleteAdapter implements HttpClientAdapter {
         await releaseFirstDelete.future;
       }
       final status = deleteCalls == 2 ? 500 : 200;
+      return ResponseBody.fromString(
+        jsonEncode(
+          status == 200
+              ? <String, dynamic>{}
+              : {
+                  'error': {'code': 'UNKNOWN', 'message': 'forced failure'},
+                },
+        ),
+        status,
+        headers: {
+          Headers.contentTypeHeader: [Headers.jsonContentType],
+        },
+      );
+    }
+    if (options.method == 'POST') postCalls += 1;
+    return ResponseBody.fromString(
+      '{}',
+      200,
+      headers: {
+        Headers.contentTypeHeader: [Headers.jsonContentType],
+      },
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
+class _RotationDeleteFailureAdapter implements HttpClientAdapter {
+  var deleteCalls = 0;
+  var postCalls = 0;
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    if (options.method == 'DELETE') {
+      deleteCalls += 1;
+      final status = deleteCalls == 1 ? 500 : 200;
       return ResponseBody.fromString(
         jsonEncode(
           status == 200

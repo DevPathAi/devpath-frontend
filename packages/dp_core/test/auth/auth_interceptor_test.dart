@@ -321,8 +321,10 @@ void main() {
                 refresh: 'refresh',
               );
             var refreshCalls = 0;
+            var terminalSignals = 0;
             final interceptor = AuthInterceptor(
               store: store,
+              onSessionInvalidated: (_) async => terminalSignals += 1,
               refresh: (_) async {
                 refreshCalls += 1;
                 return const TokenPair(access: 'NEW', refresh: 'NEW-REFRESH');
@@ -349,6 +351,7 @@ void main() {
             expect(await store.readAccess(), isNull);
             expect(await store.readRefresh(), isNull);
             expect(refreshCalls, branch == 'rotation' ? 0 : 1);
+            expect(terminalSignals, 1);
             expect(handler.advanced, isTrue);
           },
         );
@@ -366,8 +369,10 @@ void main() {
               access: branch == 'rotation' ? 'rotated' : 'old',
               refresh: 'refresh',
             );
+          var terminalSignals = 0;
           final interceptor = AuthInterceptor(
             store: store,
+            onSessionInvalidated: (_) async => terminalSignals += 1,
             refresh: (_) async =>
                 const TokenPair(access: 'NEW', refresh: 'NEW-REFRESH'),
             retry: (request) async => throw DioException(
@@ -397,6 +402,7 @@ void main() {
             await store.readAccess(),
             branch == 'rotation' ? 'rotated' : 'NEW',
           );
+          expect(terminalSignals, 0);
           expect(handler.advanced, isTrue);
         },
       );
@@ -410,8 +416,10 @@ void main() {
         ..save(access: 'access', refresh: 'refresh');
       var refreshCalls = 0;
       var retryCalls = 0;
+      var terminalSignals = 0;
       final interceptor = AuthInterceptor(
         store: store,
+        onSessionInvalidated: (_) async => terminalSignals += 1,
         refresh: (_) async {
           refreshCalls += 1;
           return null;
@@ -436,6 +444,7 @@ void main() {
       expect(await store.readAccess(), 'access');
       expect(refreshCalls, 0);
       expect(retryCalls, 0);
+      expect(terminalSignals, 0);
       expect(handler.advanced, isTrue);
     },
   );
@@ -687,6 +696,54 @@ void main() {
     expect(await store.readRefresh(), 'B-refresh');
     expect(retryCalls, 0);
   });
+
+  test(
+    'post-clear terminal signal is dropped after a same-owner session ABA',
+    () async {
+      var epoch = 1;
+      var terminalSignals = 0;
+      final clearCompleted = Completer<void>();
+      final releaseMutation = Completer<void>();
+      final store = InMemoryTokenStore()
+        ..save(access: 'A-access', refresh: 'A-refresh');
+      Future<T> delayedMutation<T>(Future<T> Function() mutation) async {
+        final result = await mutation();
+        if (!clearCompleted.isCompleted) clearCompleted.complete();
+        await releaseMutation.future;
+        return result;
+      }
+
+      final interceptor = AuthInterceptor(
+        store: store,
+        sessionEpoch: () async => epoch,
+        credentialMutation: delayedMutation,
+        onSessionInvalidated: (_) async => terminalSignals += 1,
+        refresh: (_) async => null,
+        retry: (request) async => Response(requestOptions: request),
+      );
+      final request = RequestOptions(path: '/contents/1');
+      await interceptor.onRequest(request, RequestInterceptorHandler());
+      final error = DioException(
+        requestOptions: request,
+        response: Response(requestOptions: request, statusCode: 401),
+        type: DioExceptionType.badResponse,
+      );
+      final handler = _InspectableErrorHandler();
+      final consumed = handler.consume();
+      final handling = interceptor.onError(error, handler);
+
+      await clearCompleted.future;
+      epoch = 2;
+      await store.save(access: 'A-new-session', refresh: 'A-new-refresh');
+      releaseMutation.complete();
+      await handling;
+      await consumed;
+
+      expect(await store.readAccess(), 'A-new-session');
+      expect(await store.readRefresh(), 'A-new-refresh');
+      expect(terminalSignals, 0);
+    },
+  );
 
   test('blocked retry never holds the credential mutation boundary', () async {
     var epoch = 1;
