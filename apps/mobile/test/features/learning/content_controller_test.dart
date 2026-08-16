@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:dio/dio.dart';
 import 'package:devpath_mobile/src/features/learning/application/content_controller.dart';
 import 'package:devpath_mobile/src/features/auth/application/auth_controller.dart';
 import 'package:devpath_mobile/src/data/owner_data_store.dart';
@@ -11,10 +14,13 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/mock_api.dart';
 
-Map<String, dynamic> _content({required bool completed}) => {
+Map<String, dynamic> _content({
+  required bool completed,
+  String title = 'Future/async-await 정리',
+}) => {
   'id': 1,
   'slug': 'future-async-await',
-  'title': 'Future/async-await 정리',
+  'title': title,
   'track': 'BACKEND',
   'markdown': '# 비동기 기초\n본문',
   'estimatedMinutes': 8,
@@ -227,5 +233,66 @@ void main() {
         );
       },
     );
+
+    test('mounted controller drops late A and automatically loads B', () async {
+      final api = _QueuedContentApi();
+      final data = InMemoryOwnerDataStore();
+      final c = ProviderContainer(
+        overrides: [
+          apiClientProvider.overrideWithValue(api),
+          currentOwnerKeyProvider.overrideWith(
+            (ref) => ref.watch(_contentOwnerProvider),
+          ),
+          ownerDataStoreProvider.overrideWithValue(data),
+          connectivityProvider.overrideWith((_) => const Stream.empty()),
+        ],
+      );
+      addTearDown(c.dispose);
+      final provider = contentControllerProvider('future-async-await');
+      final subscription = c.listen(provider, (_, _) {});
+      addTearDown(subscription.close);
+
+      final aLoad = c.read(provider.notifier).load();
+      expect(api.getRequests, hasLength(1));
+      c.read(_contentOwnerProvider.notifier).setOwner('owner-b');
+      await pumpEventQueue();
+      expect(api.getRequests, hasLength(2));
+      expect(c.read(provider), isA<ContentLoading>());
+
+      api.getRequests[0].complete(
+        _content(completed: false, title: 'A content'),
+      );
+      await aLoad;
+      expect(c.read(provider), isA<ContentLoading>());
+      api.getRequests[1].complete(
+        _content(completed: false, title: 'B content'),
+      );
+      await pumpEventQueue();
+      expect((c.read(provider) as ContentLoaded).content.title, 'B content');
+    });
   });
+}
+
+final class _QueuedContentApi extends ApiClient {
+  _QueuedContentApi() : super(Dio());
+
+  final getRequests = <Completer<Map<String, dynamic>>>[];
+
+  @override
+  Future<T> get<T>(String path, {Map<String, dynamic>? query}) async {
+    final request = Completer<Map<String, dynamic>>();
+    getRequests.add(request);
+    return await request.future as T;
+  }
+}
+
+final _contentOwnerProvider = NotifierProvider<_ContentOwner, String?>(
+  _ContentOwner.new,
+);
+
+class _ContentOwner extends Notifier<String?> {
+  @override
+  String? build() => 'owner-a';
+
+  void setOwner(String? owner) => state = owner;
 }
