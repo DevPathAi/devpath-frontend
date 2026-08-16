@@ -3,6 +3,7 @@ import 'dart:collection';
 import 'learning_path.dart';
 
 const _currentMissionTaskTypes = <String>{'READ', 'PRACTICE', 'QUIZ'};
+const _maxJsSafeInteger = 9007199254740991;
 final _rfc3339Instant = RegExp(
   r'^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})'
   r'(?:\.(\d{1,9}))?(Z|[+-]\d{2}:\d{2})$',
@@ -220,7 +221,7 @@ final class CurrentMission {
   }
 
   static int? _positiveInt(Object? value) =>
-      value is int && value > 0 ? value : null;
+      value is int && value > 0 && value <= _maxJsSafeInteger ? value : null;
 
   static DateTime? _parseRfc3339Instant(String value) {
     final match = _rfc3339Instant.firstMatch(value);
