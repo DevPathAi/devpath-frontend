@@ -191,33 +191,181 @@ void main() {
       expect(await kv.read(_kVerifier), isNull);
     });
 
-    test('one PKCE verifier coalesces all concurrent callback codes', () async {
-      final store = InMemoryTokenStore();
+    test(
+      'stale callback is rejected before a distinct current callback runs',
+      () async {
+        final store = InMemoryTokenStore();
+        final kv = InMemoryKeyValueStore();
+        final launcher = _FakeLauncher();
+        final exchangeStarted = Completer<void>();
+        final releaseExchange = Completer<void>();
+        final exchanges = <Map<String, dynamic>>[];
+        final client = _client(_userOk);
+        client.dio.interceptors.insert(
+          0,
+          InterceptorsWrapper(
+            onRequest: (options, handler) async {
+              if (options.path != '/auth/oauth/token') {
+                handler.next(options);
+                return;
+              }
+              final body = (options.data as Map).cast<String, dynamic>();
+              exchanges.add(body);
+              if (body['code'] == 'stale-code') {
+                if (!exchangeStarted.isCompleted) exchangeStarted.complete();
+                await releaseExchange.future;
+                handler.reject(
+                  DioException(
+                    requestOptions: options,
+                    response: Response<Map<String, dynamic>>(
+                      requestOptions: options,
+                      statusCode: 401,
+                      data: const {
+                        'error': {
+                          'code': 'UNAUTHORIZED',
+                          'message': 'PKCE mismatch',
+                        },
+                      },
+                    ),
+                    type: DioExceptionType.badResponse,
+                  ),
+                );
+                return;
+              }
+              handler.resolve(
+                Response<Map<String, dynamic>>(
+                  requestOptions: options,
+                  statusCode: 200,
+                  data: const {
+                    'access_token': 'current-access',
+                    'refresh_token': 'current-refresh',
+                  },
+                ),
+              );
+            },
+          ),
+        );
+        final c = ProviderContainer(
+          overrides: [
+            tokenStoreProvider.overrideWithValue(store),
+            apiClientProvider.overrideWithValue(client),
+            oauthLauncherProvider.overrideWithValue(launcher),
+            keyValueStoreProvider.overrideWithValue(kv),
+            accountDataCleanerProvider.overrideWithValue(_NoopCleaner()),
+            ownerDataStoreProvider.overrideWithValue(InMemoryOwnerDataStore()),
+          ],
+        );
+        addTearDown(c.dispose);
+        final controller = c.read(authControllerProvider.notifier);
+        await pumpEventQueue();
+        await controller.login();
+        await controller.login();
+        final currentVerifier = await kv.read(_kVerifier);
+        expect(currentVerifier, isNotNull);
+
+        final stale = controller.completeFromCode('stale-code');
+        await exchangeStarted.future;
+        final duplicateStale = controller.completeFromCode('stale-code');
+        final current = controller.completeFromCode('current-code');
+        releaseExchange.complete();
+        await Future.wait([stale, duplicateStale, current]);
+
+        expect(exchanges, [
+          {'code': 'stale-code', 'code_verifier': currentVerifier},
+          {'code': 'current-code', 'code_verifier': currentVerifier},
+        ]);
+        expect(c.read(authControllerProvider), isA<AuthAuthenticated>());
+        expect(await store.readAccess(), 'current-access');
+        expect(await kv.read(_kVerifier), isNull);
+      },
+    );
+
+    test(
+      'accepted current callback prevents a later stale code from exchanging',
+      () async {
+        final store = InMemoryTokenStore();
+        final kv = InMemoryKeyValueStore();
+        final launcher = _FakeLauncher();
+        final exchanges = <Map<String, dynamic>>[];
+        final client = _client(_userOk);
+        client.dio.interceptors.insert(
+          0,
+          InterceptorsWrapper(
+            onRequest: (options, handler) {
+              if (options.path != '/auth/oauth/token') {
+                handler.next(options);
+                return;
+              }
+              exchanges.add((options.data as Map).cast<String, dynamic>());
+              handler.resolve(
+                Response<Map<String, dynamic>>(
+                  requestOptions: options,
+                  statusCode: 200,
+                  data: const {
+                    'access_token': 'current-access',
+                    'refresh_token': 'current-refresh',
+                  },
+                ),
+              );
+            },
+          ),
+        );
+        final c = ProviderContainer(
+          overrides: [
+            tokenStoreProvider.overrideWithValue(store),
+            apiClientProvider.overrideWithValue(client),
+            oauthLauncherProvider.overrideWithValue(launcher),
+            keyValueStoreProvider.overrideWithValue(kv),
+            accountDataCleanerProvider.overrideWithValue(_NoopCleaner()),
+            ownerDataStoreProvider.overrideWithValue(InMemoryOwnerDataStore()),
+          ],
+        );
+        addTearDown(c.dispose);
+        final controller = c.read(authControllerProvider.notifier);
+        await pumpEventQueue();
+        await controller.login();
+        await controller.login();
+        final verifier = await kv.read(_kVerifier);
+
+        await controller.completeFromCode('current-code');
+        await controller.completeFromCode('stale-code');
+
+        expect(exchanges, [
+          {'code': 'current-code', 'code_verifier': verifier},
+        ]);
+        expect(await store.readAccess(), 'current-access');
+        expect(c.read(authControllerProvider), isA<AuthAuthenticated>());
+      },
+    );
+
+    test('OAuth callback candidates are bounded per login flow', () async {
       final kv = InMemoryKeyValueStore();
-      await kv.write(_kVerifier, 'the-verifier');
-      final exchangeStarted = Completer<void>();
-      final releaseExchange = Completer<void>();
+      await kv.write(_kVerifier, 'bounded-verifier');
       var exchangeCalls = 0;
       final client = _client(_userOk);
       client.dio.interceptors.insert(
         0,
         InterceptorsWrapper(
-          onRequest: (options, handler) async {
+          onRequest: (options, handler) {
             if (options.path != '/auth/oauth/token') {
               handler.next(options);
               return;
             }
             exchangeCalls += 1;
-            if (!exchangeStarted.isCompleted) exchangeStarted.complete();
-            await releaseExchange.future;
-            handler.resolve(
-              Response<Map<String, dynamic>>(
+            handler.reject(
+              DioException(
                 requestOptions: options,
-                statusCode: 200,
-                data: const {
-                  'access_token': 'deep-a',
-                  'refresh_token': 'deep-r',
-                },
+                response: Response<Map<String, dynamic>>(
+                  requestOptions: options,
+                  statusCode: 401,
+                  data: const {
+                    'error': {
+                      'code': 'UNAUTHORIZED',
+                      'message': 'PKCE mismatch',
+                    },
+                  },
+                ),
+                type: DioExceptionType.badResponse,
               ),
             );
           },
@@ -225,7 +373,6 @@ void main() {
       );
       final c = ProviderContainer(
         overrides: [
-          tokenStoreProvider.overrideWithValue(store),
           apiClientProvider.overrideWithValue(client),
           keyValueStoreProvider.overrideWithValue(kv),
           accountDataCleanerProvider.overrideWithValue(_NoopCleaner()),
@@ -236,18 +383,78 @@ void main() {
       final controller = c.read(authControllerProvider.notifier);
       await pumpEventQueue();
 
-      final firstA = controller.completeFromCode('code-a');
-      await exchangeStarted.future;
-      final differentB = controller.completeFromCode('code-b');
-      final replayA = controller.completeFromCode('code-a');
-      await pumpEventQueue();
-      releaseExchange.complete();
-      await Future.wait([firstA, differentB, replayA]);
+      await Future.wait(
+        List.generate(
+          20,
+          (index) => controller.completeFromCode('candidate-$index'),
+        ),
+      );
 
-      expect(exchangeCalls, 1);
-      expect(c.read(authControllerProvider), isA<AuthAuthenticated>());
-      expect(await store.readAccess(), 'deep-a');
+      expect(exchangeCalls, 16);
+      expect(await kv.read(_kVerifier), 'bounded-verifier');
     });
+
+    test(
+      'late prior-flow mismatch preserves current verifier and verified session',
+      () async {
+        final store = InMemoryTokenStore();
+        final kv = InMemoryKeyValueStore();
+        final launcher = _FakeLauncher();
+        final client = _client(_userOk);
+        client.dio.interceptors.insert(
+          0,
+          InterceptorsWrapper(
+            onRequest: (options, handler) {
+              if (options.path != '/auth/oauth/token') {
+                handler.next(options);
+                return;
+              }
+              handler.reject(
+                DioException(
+                  requestOptions: options,
+                  response: Response<Map<String, dynamic>>(
+                    requestOptions: options,
+                    statusCode: 401,
+                    data: const {
+                      'error': {
+                        'code': 'UNAUTHORIZED',
+                        'message': 'PKCE mismatch',
+                      },
+                    },
+                  ),
+                  type: DioExceptionType.badResponse,
+                ),
+              );
+            },
+          ),
+        );
+        final c = ProviderContainer(
+          overrides: [
+            tokenStoreProvider.overrideWithValue(store),
+            apiClientProvider.overrideWithValue(client),
+            oauthLauncherProvider.overrideWithValue(launcher),
+            keyValueStoreProvider.overrideWithValue(kv),
+            accountDataCleanerProvider.overrideWithValue(_NoopCleaner()),
+            ownerDataStoreProvider.overrideWithValue(InMemoryOwnerDataStore()),
+          ],
+        );
+        addTearDown(c.dispose);
+        final controller = c.read(authControllerProvider.notifier);
+        await pumpEventQueue();
+        await controller.mockLogin();
+        expect(c.read(authControllerProvider), isA<AuthAuthenticated>());
+
+        await controller.login();
+        await controller.login();
+        final currentVerifier = await kv.read(_kVerifier);
+        await controller.completeFromCode('late-prior-code');
+
+        expect(await kv.read(_kVerifier), currentVerifier);
+        expect(await store.readAccess(), 'mock-access');
+        expect(await store.readRefresh(), 'mock-refresh');
+        expect(c.read(authControllerProvider), isA<AuthAuthenticated>());
+      },
+    );
 
     test(
       'a new login flow retires a stalled callback from the previous verifier',
@@ -389,9 +596,10 @@ void main() {
       },
     );
 
-    test('completeFromCode: 교환 실패해도 verifier 폐기(1회용)', () async {
-      // code는 교환을 시도한 순간 서버에서 소비되므로, 실패해도 verifier는 더 이상
-      // 유효하지 않다. 잔존 시 secure_storage에 만료된 1회용 비밀이 남는다 → 폐기 보장.
+    test('completeFromCode: 실패 후보는 current verifier를 보존한다', () async {
+      // 딥링크 code에는 flow correlation이 없으므로 이 401은 이전 flow의 code와
+      // current verifier를 조합한 PKCE mismatch일 수 있다. 성공한 교환만 verifier를
+      // 소비해야 뒤이어 도착한 current callback을 처리할 수 있다.
       final store = InMemoryTokenStore();
       final kv = InMemoryKeyValueStore();
       await kv.write(_kVerifier, 'the-verifier');
@@ -416,8 +624,8 @@ void main() {
       expect(await store.readAccess(), isNull, reason: '교환 실패 → 토큰 미저장');
       expect(
         await kv.read(_kVerifier),
-        isNull,
-        reason: '실패해도 1회용 verifier는 폐기',
+        'the-verifier',
+        reason: '실패 후보는 뒤이은 current callback의 verifier를 지우지 않음',
       );
     });
 
@@ -522,7 +730,11 @@ void main() {
         expect(c.read(authControllerProvider), isA<AuthUnauthenticated>());
         expect(await store.readAccess(), isNull);
         expect(await store.readRefresh(), isNull);
-        expect(await kv.read(_kVerifier), isNull);
+        expect(
+          await kv.read(_kVerifier),
+          'the-verifier',
+          reason: 'malformed 2xx도 유효한 token exchange 성공으로 간주하지 않음',
+        );
       },
     );
 

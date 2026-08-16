@@ -28,8 +28,10 @@ class AuthController extends Notifier<AuthState> {
 
   /// PKCE verifier 임시 보관 키(콜백이 새 프로세스로 와도 복원되도록 영속 저장).
   static const _kPkceVerifier = 'dp.auth.pkce_verifier';
+  static const _maxOAuthCodesPerFlow = 16;
   Future<void>? _bootstrapInFlight;
-  Future<void>? _oauthCompletionInFlight;
+  Future<void> _oauthCompletionTail = Future<void>.value();
+  final Map<String, Future<void>> _oauthCompletions = {};
   var _oauthFlowGeneration = 0;
   var _epoch = 0;
 
@@ -39,7 +41,7 @@ class AuthController extends Notifier<AuthState> {
       _epoch += 1;
       _oauthFlowGeneration += 1;
       _bootstrapInFlight = null;
-      _oauthCompletionInFlight = null;
+      _resetOAuthCallbackQueue();
     });
     Future.microtask(() {
       if (ref.mounted) bootstrapSession();
@@ -55,9 +57,9 @@ class AuthController extends Notifier<AuthState> {
     final flowGeneration = ++_oauthFlowGeneration;
     final epoch = ++_epoch;
     _bootstrapInFlight = null;
-    // The previous Future cannot be cancelled, but it is now epoch-stale and
-    // must not coalesce a callback belonging to this newly generated verifier.
-    _oauthCompletionInFlight = null;
+    // Previous Futures cannot be cancelled, but their captured flow generation
+    // is now stale. A new flow owns an independent bounded callback queue.
+    _resetOAuthCallbackQueue();
     final pkce = PkcePair.generate();
     final stored = await _mutateCredentials(() async {
       if (!_isOAuthFlowCurrent(flowGeneration, epoch)) return false;
@@ -213,26 +215,39 @@ class AuthController extends Notifier<AuthState> {
   /// 딥링크 콜백 code 수신 — 보관한 PKCE verifier와 함께 `/auth/oauth/token`으로 교환,
   /// 토큰 저장 후 세션 복원. verifier가 없거나(만료/유실) 교환 실패 시 미인증으로 둔다.
   Future<void> completeFromCode(String code) {
-    final active = _oauthCompletionInFlight;
-    // One persisted PKCE verifier authorizes one exchange. A different link
-    // racing the active callback cannot represent an independent login flow.
-    if (active != null) return active;
+    final existing = _oauthCompletions[code];
+    if (existing != null) return existing;
+    if (_oauthCompletions.length >= _maxOAuthCodesPerFlow) {
+      return Future<void>.value();
+    }
+
+    final flowGeneration = _oauthFlowGeneration;
+    final predecessor = _oauthCompletionTail;
     late final Future<void> tracked;
-    tracked = _completeFromCode(code).whenComplete(() {
-      if (identical(_oauthCompletionInFlight, tracked)) {
-        _oauthCompletionInFlight = null;
-      }
+    tracked = predecessor.then((_) async {
+      if (!_isOAuthFlowGenerationCurrent(flowGeneration)) return;
+      await _completeFromCode(code, flowGeneration: flowGeneration);
     });
-    _oauthCompletionInFlight = tracked;
+    _oauthCompletions[code] = tracked;
+    _oauthCompletionTail = tracked.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
     return tracked;
   }
 
-  Future<void> _completeFromCode(String code) async {
+  Future<void> _completeFromCode(
+    String code, {
+    required int flowGeneration,
+  }) async {
     final kv = ref.read(keyValueStoreProvider);
-    final flowGeneration = _oauthFlowGeneration;
-    final observedEpoch = _epoch;
+    if (!_isOAuthFlowGenerationCurrent(flowGeneration)) return;
+    // Capture the operation boundary when this queue item starts. Capturing at
+    // enqueue time would make a valid callback stale after an earlier rejected
+    // candidate completes.
+    final requestEpoch = _epoch;
     final verifier = await _mutateCredentials(() => kv.read(_kPkceVerifier));
-    if (!_isOAuthFlowCurrent(flowGeneration, observedEpoch)) return;
+    if (!_isOAuthFlowCurrent(flowGeneration, requestEpoch)) return;
     if (verifier == null || verifier.isEmpty) {
       // `app_links` can redeliver an already-consumed callback. Without a
       // verifier it is not a new login attempt and must never tear down an
@@ -245,16 +260,13 @@ class AuthController extends Notifier<AuthState> {
       state = const AuthUnauthenticated(error: 'PKCE verifier 없음(로그인 재시도 필요)');
       return;
     }
-    final epoch = ++_epoch;
-    _bootstrapInFlight = null;
-    final previousUser = await ref.read(verifiedSessionStoreProvider).read();
-    if (!_isCurrent(epoch)) return;
+    var acceptedExchange = false;
     try {
       final data = await _client.post<Map<String, dynamic>>(
         '/auth/oauth/token',
         body: {'code': code, 'code_verifier': verifier},
       );
-      if (!_isCurrent(epoch)) return;
+      if (!_isOAuthFlowCurrent(flowGeneration, requestEpoch)) return;
       final access = data['access_token'];
       final refresh = data['refresh_token'];
       if (access is! String ||
@@ -262,6 +274,14 @@ class AuthController extends Notifier<AuthState> {
           refresh is! String ||
           refresh.isEmpty) {
         throw const FormatException('malformed OAuth token payload');
+      }
+      acceptedExchange = true;
+      final epoch = ++_epoch;
+      _bootstrapInFlight = null;
+      final previousUser = await ref.read(verifiedSessionStoreProvider).read();
+      if (!_isCurrent(epoch) ||
+          !_isOAuthFlowGenerationCurrent(flowGeneration)) {
+        return;
       }
       _invalidateCredentialBoundary();
       if (previousUser != null) {
@@ -293,22 +313,49 @@ class AuthController extends Notifier<AuthState> {
       }
       await bootstrapSession();
     } on ApiException catch (e) {
-      if (!_isCurrent(epoch)) return;
-      state = AuthUnauthenticated(error: e.message);
+      _recordOAuthFailure(
+        e.message,
+        flowGeneration: flowGeneration,
+        requestEpoch: requestEpoch,
+      );
     } on Object {
-      if (!_isCurrent(epoch)) return;
-      state = const AuthUnauthenticated(
-        error: '로그인 응답 형식을 확인하지 못했어요. 다시 시도해 주세요.',
+      _recordOAuthFailure(
+        '로그인 응답 형식을 확인하지 못했어요. 다시 시도해 주세요.',
+        flowGeneration: flowGeneration,
+        requestEpoch: requestEpoch,
       );
     } finally {
-      // 1회용 PKCE verifier: code는 교환을 시도한 순간 서버에서 소비되므로
-      // 성공/실패와 무관하게 폐기한다(secure_storage에 만료된 비밀 잔존 방지).
-      await _mutateCredentials(() async {
-        if (await kv.read(_kPkceVerifier) == verifier) {
-          await kv.delete(_kPkceVerifier);
-        }
-      });
+      // The callback has no client flow identifier. A rejected code can belong
+      // to a superseded challenge, so only a valid token response consumes the
+      // exact verifier used for that exchange.
+      if (acceptedExchange && _isOAuthFlowGenerationCurrent(flowGeneration)) {
+        await _mutateCredentials(() async {
+          if (_isOAuthFlowGenerationCurrent(flowGeneration) &&
+              await kv.read(_kPkceVerifier) == verifier) {
+            await kv.delete(_kPkceVerifier);
+          }
+        });
+      }
     }
+  }
+
+  void _recordOAuthFailure(
+    String message, {
+    required int flowGeneration,
+    required int requestEpoch,
+  }) {
+    if (!_isOAuthFlowCurrent(flowGeneration, requestEpoch)) return;
+    if (state is AuthAuthenticated ||
+        state is AuthOfflineAuthenticated ||
+        state is AuthLoading) {
+      return;
+    }
+    state = AuthUnauthenticated(error: message);
+  }
+
+  void _resetOAuthCallbackQueue() {
+    _oauthCompletionTail = Future<void>.value();
+    _oauthCompletions.clear();
   }
 
   Future<void> logout() async {
@@ -465,6 +512,9 @@ class AuthController extends Notifier<AuthState> {
   }
 
   bool _isCurrent(int epoch) => ref.mounted && epoch == _epoch;
+
+  bool _isOAuthFlowGenerationCurrent(int generation) =>
+      ref.mounted && generation == _oauthFlowGeneration;
 
   bool _isOAuthFlowCurrent(int generation, int epoch) =>
       ref.mounted && generation == _oauthFlowGeneration && epoch == _epoch;
