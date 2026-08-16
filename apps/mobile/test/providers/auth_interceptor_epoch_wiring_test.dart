@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:devpath_mobile/src/app/app_config.dart';
 import 'package:devpath_mobile/src/data/account_data_cleaner.dart';
 import 'package:devpath_mobile/src/data/key_value_store.dart';
@@ -176,6 +177,167 @@ void main() {
         container.read(credentialMutationCoordinatorProvider).generation,
         generationBefore + 1,
       );
+    },
+  );
+
+  test(
+    'terminal cleanup cannot deadlock on same-client unregister 401',
+    () async {
+      final tokens = InMemoryTokenStore();
+      final kv = InMemoryKeyValueStore();
+      final data = InMemoryOwnerDataStore();
+      await tokens.save(access: 'access-a', refresh: 'refresh-a');
+      await VerifiedSessionStore(kv).write(_user('owner-a'));
+      await data.write(
+        'owner-a',
+        'push-registration-v1',
+        'ANDROID',
+        'old-device-token',
+      );
+      final refreshClient = ApiClient.create(
+        const ApiConfig(baseUrl: 'https://api.test'),
+      );
+      refreshClient.dio.httpClientAdapter = MockHttpAdapter({
+        'POST /auth/refresh': (
+          401,
+          {
+            'error': {'code': 'UNAUTHORIZED', 'message': 'refresh rejected'},
+          },
+        ),
+      });
+      final container = ProviderContainer(
+        overrides: [
+          tokenStoreProvider.overrideWithValue(tokens),
+          keyValueStoreProvider.overrideWithValue(kv),
+          ownerDataStoreProvider.overrideWithValue(data),
+          pushServiceProvider.overrideWithValue(StubPushService()),
+          authFlowClientProvider.overrideWithValue(refreshClient),
+          appConfigProvider.overrideWithValue(
+            const AppConfig(baseUrl: 'https://api.test', useMock: false),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      final client = container.read(apiClientProvider);
+      client.dio.httpClientAdapter = MockHttpAdapter({
+        'GET /users/me': (200, _userJson('owner-a')),
+        'GET /contents/77': (
+          401,
+          {
+            'error': {'code': 'UNAUTHORIZED', 'message': 'access expired'},
+          },
+        ),
+        'DELETE /notifications/devices': (
+          401,
+          {
+            'error': {'code': 'UNAUTHORIZED', 'message': 'already expired'},
+          },
+        ),
+      });
+      final auth = container.read(authControllerProvider.notifier);
+      await auth.bootstrapSession();
+      final terminal = Completer<void>();
+      final subscription = container.listen(authControllerProvider, (_, next) {
+        if (next is AuthUnauthenticated && !terminal.isCompleted) {
+          terminal.complete();
+        }
+      });
+      addTearDown(subscription.close);
+
+      await expectLater(
+        client
+            .get<Map<String, dynamic>>('/contents/77')
+            .timeout(const Duration(seconds: 1)),
+        throwsA(isA<ApiException>()),
+      );
+      await terminal.future.timeout(const Duration(seconds: 1));
+      await pumpEventQueue(times: 8);
+
+      expect(await VerifiedSessionStore(kv).read(), isNull);
+      expect(await data.list('owner-a'), isEmpty);
+    },
+  );
+
+  test(
+    'terminal rejection during retry Loading supersedes late users-me success',
+    () async {
+      final tokens = InMemoryTokenStore();
+      final kv = InMemoryKeyValueStore();
+      final registrar = _CountingRegistrar();
+      await tokens.save(access: 'access-a', refresh: 'refresh-a');
+      await VerifiedSessionStore(kv).write(_user('owner-a'));
+      final refreshClient = ApiClient.create(
+        const ApiConfig(baseUrl: 'https://api.test'),
+      );
+      refreshClient.dio.httpClientAdapter = MockHttpAdapter({
+        'POST /auth/refresh': (
+          401,
+          {
+            'error': {'code': 'UNAUTHORIZED', 'message': 'refresh rejected'},
+          },
+        ),
+      });
+      final container = ProviderContainer(
+        overrides: [
+          tokenStoreProvider.overrideWithValue(tokens),
+          keyValueStoreProvider.overrideWithValue(kv),
+          ownerDataStoreProvider.overrideWithValue(InMemoryOwnerDataStore()),
+          accountDataCleanerProvider.overrideWithValue(
+            _OwnerCleaner(InMemoryOwnerDataStore()),
+          ),
+          deviceRegistrarProvider.overrideWithValue(registrar),
+          authFlowClientProvider.overrideWithValue(refreshClient),
+          appConfigProvider.overrideWithValue(
+            const AppConfig(baseUrl: 'https://api.test', useMock: false),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      addTearDown(registrar.dispose);
+      final client = container.read(apiClientProvider);
+      client.dio.httpClientAdapter = MockHttpAdapter({
+        'GET /users/me': (200, _userJson('owner-a')),
+        'GET /contents/77': (
+          401,
+          {
+            'error': {'code': 'UNAUTHORIZED', 'message': 'access expired'},
+          },
+        ),
+      });
+      final auth = container.read(authControllerProvider.notifier);
+      await auth.bootstrapSession();
+      final retryStarted = Completer<void>();
+      final releaseRetry = Completer<void>();
+      client.dio.interceptors.insert(
+        1,
+        InterceptorsWrapper(
+          onRequest: (options, handler) async {
+            if (options.path == '/users/me') {
+              retryStarted.complete();
+              await releaseRetry.future;
+            }
+            handler.next(options);
+          },
+        ),
+      );
+
+      final retrying = auth.retrySession();
+      await retryStarted.future;
+      expect(container.read(authControllerProvider), isA<AuthLoading>());
+      await expectLater(
+        client.get<Map<String, dynamic>>('/contents/77'),
+        throwsA(isA<ApiException>()),
+      );
+      await pumpEventQueue(times: 4);
+      releaseRetry.complete();
+      await retrying;
+      await pumpEventQueue(times: 4);
+
+      expect(
+        container.read(authControllerProvider),
+        isA<AuthUnauthenticated>(),
+      );
+      expect(await tokens.readAccess(), isNull);
     },
   );
 }
