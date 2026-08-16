@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:devpath_mobile/src/data/mobile_mock_fixtures.dart';
 import 'package:devpath_mobile/src/features/learning/presentation/mobile_content_projection.dart';
 import 'package:devpath_mobile/src/features/today/presentation/mobile_today_projection.dart';
@@ -45,17 +47,26 @@ void main() {
   testWidgets(
     'approved content fixture uses the native production projection',
     (tester) async {
+      final semantics = tester.ensureSemantics();
       final content = LearningContent.fromJson(
         Map<String, dynamic>.from(mockContent('future-async-await')),
       );
       var completions = 0;
+      var contextExpanded = false;
+      final scrollController = ScrollController();
+      addTearDown(scrollController.dispose);
 
       await tester.pumpWidget(
         _host(
-          MobileContentProjection(
-            content: content,
-            scrollController: ScrollController(),
-            onComplete: () => completions += 1,
+          StatefulBuilder(
+            builder: (context, setState) => MobileContentProjection(
+              content: content,
+              scrollController: scrollController,
+              contextExpanded: contextExpanded,
+              onContextDisclosurePressed: () =>
+                  setState(() => contextExpanded = !contextExpanded),
+              onComplete: () => completions += 1,
+            ),
           ),
         ),
       );
@@ -67,8 +78,22 @@ void main() {
       expect(find.text('#async-await'), findsOneWidget);
       expect(find.text('완료로 표시'), findsOneWidget);
 
+      final collapsed = find.bySemanticsLabel('이 콘텐츠의 학습 맥락, 접힘');
+      expect(collapsed, findsOneWidget);
+      final collapsedNode = tester.getSemantics(collapsed);
+      final collapsedData = collapsedNode.getSemanticsData();
+      expect(collapsedData.flagsCollection.isButton, isTrue);
+      expect(collapsedData.hasAction(ui.SemanticsAction.tap), isTrue);
+      expect(find.text('학습 경로'), findsNothing);
+
+      await tester.tap(collapsed);
+      await tester.pump();
+      expect(find.bySemanticsLabel('이 콘텐츠의 학습 맥락, 펼침'), findsOneWidget);
+      expect(find.text('학습 경로'), findsOneWidget);
+
       await tester.tap(find.text('완료로 표시'));
       expect(completions, 1);
+      semantics.dispose();
     },
   );
 }

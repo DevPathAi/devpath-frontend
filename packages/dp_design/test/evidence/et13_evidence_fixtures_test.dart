@@ -43,6 +43,46 @@ void main() {
       'error',
       'review',
     ]);
+    expect(
+      capsule.fields
+          .map(
+            (field) => (
+              label: field.label,
+              value: field.valueSummary,
+              source: field.source,
+              sensitivity: field.sensitivity,
+              inclusion: field.inclusion,
+              editable: field.editable,
+            ),
+          )
+          .toList(),
+      const [
+        (
+          label: '학습 목표',
+          value: 'Spring 백엔드 취업 준비',
+          source: '활성 경로',
+          sensitivity: DpContextSensitivity.low,
+          inclusion: DpContextInclusion.included,
+          editable: true,
+        ),
+        (
+          label: '최근 오류',
+          value: 'LazyInitializationException',
+          source: '최근 실행',
+          sensitivity: DpContextSensitivity.potentiallySensitive,
+          inclusion: DpContextInclusion.excluded,
+          editable: false,
+        ),
+        (
+          label: '기존 리뷰',
+          value: '소유 관계를 다시 확인하세요',
+          source: '리뷰 응답',
+          sensitivity: DpContextSensitivity.medium,
+          inclusion: DpContextInclusion.rejected,
+          editable: false,
+        ),
+      ],
+    );
     expect(find.text('포함 1개 · 제외 또는 거절 2개'), findsOneWidget);
 
     await tester.tap(find.text('전송 전에 수정'));

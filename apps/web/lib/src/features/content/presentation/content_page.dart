@@ -287,7 +287,7 @@ class _ContentPageState extends ConsumerState<ContentPage>
                       ),
                       const SizedBox(height: DpSpacing.md),
                     ],
-                    _ContentBody(content: content),
+                    WebContentProjection(content: content),
                     if (workspaceKey != null) ...[
                       const SizedBox(height: DpSpacing.xl),
                       DpNextActionBand(
@@ -684,10 +684,17 @@ class _InlineContentError extends StatelessWidget {
   }
 }
 
-class _ContentBody extends StatelessWidget {
-  const _ContentBody({required this.content});
+/// Loaded content production projection shared by the live page and the ET13
+/// browser-distribution fixture.
+class WebContentProjection extends StatelessWidget {
+  const WebContentProjection({
+    super.key,
+    required this.content,
+    this.adSlot = const AdSlotWidget(slot: 'CONTENT_PAGE'),
+  });
 
   final LearningContent content;
+  final Widget adSlot;
 
   @override
   Widget build(BuildContext context) {
@@ -742,7 +749,7 @@ class _ContentBody extends StatelessWidget {
             const SizedBox(height: DpSpacing.xl),
             DpMarkdown(data: content.markdown),
             const SizedBox(height: DpSpacing.lg),
-            const AdSlotWidget(slot: 'CONTENT_PAGE'),
+            adSlot,
           ],
         ),
       ),

@@ -23,6 +23,7 @@ external _JsEditorHandle _createDevpathEditor(
   String language,
   JSFunction onChange,
   JSFunction onEscape,
+  JSFunction onReady,
 );
 
 int _seq = 0;
@@ -33,6 +34,7 @@ MonacoHandle createMonacoHandle({
   required String initialCode,
   required SandboxLanguage language,
   ValueChanged<String>? onChanged,
+  VoidCallback? onReady,
   VoidCallback? onEscape,
 }) {
   final viewType = 'monaco-${_seq++}';
@@ -44,12 +46,14 @@ MonacoHandle createMonacoHandle({
       ..style.height = '100%';
     final cb = ((JSString v) => onChanged?.call(v.toDart)).toJS;
     final esc = (() => onEscape?.call()).toJS; // F5-c: Esc→dart sentinel
+    final ready = (() => onReady?.call()).toJS;
     jsHandle = _createDevpathEditor(
       container,
       initialCode,
       language.wireName,
       cb,
       esc,
+      ready,
     );
     return container;
   });

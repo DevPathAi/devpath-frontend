@@ -24,10 +24,12 @@ class MonacoEditorView extends StatefulWidget {
     required this.initialCode,
     required this.language,
     this.onChanged,
+    this.onReady,
   });
   final String initialCode;
   final SandboxLanguage language;
   final ValueChanged<String>? onChanged;
+  final VoidCallback? onReady;
 
   @override
   State<MonacoEditorView> createState() => MonacoEditorViewState();
@@ -46,6 +48,7 @@ class MonacoEditorViewState extends State<MonacoEditorView> {
       initialCode: widget.initialCode,
       language: widget.language,
       onChanged: widget.onChanged,
+      onReady: widget.onReady,
       onEscape: () => _focusNode.requestFocus(), // Esc→컨테이너 밖 sentinel로 탈출
     );
   }

@@ -13,6 +13,8 @@ class MobileContentProjection extends StatelessWidget {
     required this.content,
     required this.scrollController,
     required this.onComplete,
+    required this.contextExpanded,
+    required this.onContextDisclosurePressed,
     this.progressFailureMessage,
     this.loadFailureMessage,
     this.fromOfflineCache = false,
@@ -21,6 +23,8 @@ class MobileContentProjection extends StatelessWidget {
   final LearningContent content;
   final ScrollController scrollController;
   final VoidCallback onComplete;
+  final bool contextExpanded;
+  final VoidCallback onContextDisclosurePressed;
   final String? progressFailureMessage;
   final String? loadFailureMessage;
   final bool fromOfflineCache;
@@ -100,7 +104,10 @@ class MobileContentProjection extends StatelessWidget {
                   const SizedBox(height: DpSpacing.lg),
                 DpContextCapsule(
                   name: '이 콘텐츠의 학습 맥락',
-                  mode: DpContextCapsuleMode.collapsed,
+                  mode: contextExpanded
+                      ? DpContextCapsuleMode.expanded
+                      : DpContextCapsuleMode.collapsed,
+                  onDisclosurePressed: onContextDisclosurePressed,
                   fields: [
                     DpContextFieldViewModel(
                       id: 'track',

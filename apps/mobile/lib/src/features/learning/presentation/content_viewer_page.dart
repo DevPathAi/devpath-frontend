@@ -37,6 +37,7 @@ class _ContentViewerPageState extends ConsumerState<ContentViewerPage>
   var _boundaryGeneration = 0;
   int? _loadStartedGeneration;
   String? _ownerKey;
+  bool _contextExpanded = false;
 
   @override
   void initState() {
@@ -75,6 +76,7 @@ class _ContentViewerPageState extends ConsumerState<ContentViewerPage>
     _trackedSlug = null;
     _latestState = null;
     _dwellSec = 0;
+    _contextExpanded = false;
   }
 
   void _scheduleLoad() {
@@ -144,6 +146,9 @@ class _ContentViewerPageState extends ConsumerState<ContentViewerPage>
             progressFailureMessage: s.progressFailureMessage,
             loadFailureMessage: s.loadFailureMessage,
             fromOfflineCache: s.fromOfflineCache,
+            contextExpanded: _contextExpanded,
+            onContextDisclosurePressed: () =>
+                setState(() => _contextExpanded = !_contextExpanded),
             onComplete: () => unawaited(controller.markComplete()),
           ),
         ContentLoaded() => const DpLoading(),

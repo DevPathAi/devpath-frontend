@@ -94,7 +94,7 @@ class _ReviewPanelState extends ConsumerState<ReviewPanel> {
                 message: message,
                 onRetry: _requestCurrentSession,
               ),
-      ReviewLoaded(:final review) => _ReviewBody(
+      ReviewLoaded(:final review) => WebReviewProjection(
         review: review,
         nextAction: widget.nextAction,
         onAskMentor: widget.onAskMentor,
@@ -183,7 +183,7 @@ class _ReviewWithStatus extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Column(
     children: [
-      Expanded(child: _ReviewBody(review: review)),
+      Expanded(child: WebReviewProjection(review: review)),
       Semantics(
         liveRegion: true,
         child: Container(
@@ -230,8 +230,15 @@ class _ReviewWithStatus extends StatelessWidget {
   };
 }
 
-class _ReviewBody extends StatelessWidget {
-  const _ReviewBody({required this.review, this.nextAction, this.onAskMentor});
+/// Loaded review production projection shared by the live panel and the ET13
+/// browser-distribution fixture.
+class WebReviewProjection extends StatelessWidget {
+  const WebReviewProjection({
+    super.key,
+    required this.review,
+    this.nextAction,
+    this.onAskMentor,
+  });
   final CodeReview review;
   final Widget? nextAction;
   final VoidCallback? onAskMentor;

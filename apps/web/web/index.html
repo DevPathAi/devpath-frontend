@@ -75,12 +75,13 @@
     require.config({ paths: { vs: 'vendor/monaco/vs' }});
     // F5-a/F5-c 반영: { dispose, layout, update } 핸들 반환 + Esc 포커스 탈출.
     // require가 비동기라 editor가 즉시 없을 수 있으므로 핸들은 클로저로 editor를 지연 참조.
-    window.createDevpathEditor = function (container, code, runtime, onChange, onEscape) {
+    window.createDevpathEditor = function (container, code, runtime, onChange, onEscape, onReady) {
       var editor = null;
       var pendingCode = code;
       var pendingRuntime = runtime;
       var monacoReady = false;
       var disposed = false;
+      var readySent = false;
       function monacoLanguage(value) {
         if (value === 'JAVA') return 'java';
         if (value === 'NODE') return 'javascript';
@@ -105,6 +106,7 @@
           editor.onDidChangeModelContent(function () { onChange(editor.getValue()); });
           // F5-c DD7: Esc 시 Monaco 밖(dart sentinel)으로 포커스를 넘긴다.
           editor.addCommand(monaco.KeyCode.Escape, function () { onEscape(); });
+          if (!readySent) { readySent = true; onReady(); }
           return;
         }
         if (editor.getValue() !== pendingCode) editor.setValue(pendingCode);

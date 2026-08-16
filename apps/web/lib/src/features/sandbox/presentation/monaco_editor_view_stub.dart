@@ -9,8 +9,12 @@ MonacoHandle createMonacoHandle({
   required String initialCode,
   required SandboxLanguage language,
   ValueChanged<String>? onChanged,
+  VoidCallback? onReady,
   VoidCallback? onEscape,
-}) => _StubHandle(initialCode);
+}) {
+  onReady?.call();
+  return _StubHandle(initialCode);
+}
 
 class _StubHandle implements MonacoHandle {
   _StubHandle(String code) : _code = ValueNotifier(code);
