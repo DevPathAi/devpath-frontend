@@ -1071,9 +1071,10 @@ void main() {
     expect(
       producer,
       contains(
-        'python3 -m unittest tools/et13/test_verify_release_auth_bridge.py -v',
+        'python3 -B -m unittest tools/et13/test_verify_release_auth_bridge.py -v',
       ),
     );
+    expect(producer, isNot(contains('python3 -m py_compile')));
     expect(producer, contains('auth.json'));
     expect(producer, isNot(contains('secrets.')));
     expect(producer, isNot(contains('create-github-app-token')));
