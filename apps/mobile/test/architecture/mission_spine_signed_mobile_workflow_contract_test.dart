@@ -39,6 +39,14 @@ void main() {
     );
     expect(source, contains('flutter build apk --release --no-pub'));
     expect(source, contains('flutter build ipa --release --no-pub'));
+    final iosJob = source.substring(source.indexOf('  sign-ios:'));
+    const disableSwiftPm = 'flutter config --no-enable-swift-package-manager';
+    expect(RegExp(disableSwiftPm).allMatches(iosJob), hasLength(1));
+    expect(
+      iosJob.indexOf(disableSwiftPm),
+      lessThan(iosJob.indexOf('flutter pub get --enforce-lockfile')),
+      reason: 'the protected iOS build must resolve plugins with CocoaPods',
+    );
     expect(source, contains('--dart-define=USE_MOCK=false'));
     expect(source, contains('API_BASE_URL=https://api.leva.ai.kr'));
     expect(source, contains('WEB_APP_URL=https://app.leva.ai.kr'));

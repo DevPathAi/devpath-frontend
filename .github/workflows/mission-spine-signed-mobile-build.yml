@@ -258,6 +258,9 @@ jobs:
             .github/workflows/mission-spine-signed-mobile-build.yml \
             | shasum -a 256 --check
 
+      - name: Use CocoaPods for iOS plugins
+        run: flutter config --no-enable-swift-package-manager
+
       - name: Resolve exact locked workspace
         run: flutter pub get --enforce-lockfile
 

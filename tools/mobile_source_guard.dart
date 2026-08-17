@@ -184,6 +184,12 @@ void main(List<String> args) {
   _guardWorkflowActions(workflowSource);
   final toolchainViolation = mobileWorkflowToolchainViolation(workflowSource);
   if (toolchainViolation != null) _fail(toolchainViolation);
+  final iosDependencyManagerViolation = mobileIosDependencyManagerViolation(
+    workflowSource,
+  );
+  if (iosDependencyManagerViolation != null) {
+    _fail(iosDependencyManagerViolation);
+  }
   if (!workflowSource.contains("flutter-version: '3.44.1'")) {
     _fail('Flutter toolchain is not pinned to 3.44.1');
   }
@@ -286,6 +292,28 @@ String? mobileWorkflowToolchainViolation(String workflowSource) {
   return null;
 }
 
+String? mobileIosDependencyManagerViolation(String workflowSource) {
+  final iosJobStart = workflowSource.indexOf('  ios-no-codesign:');
+  if (iosJobStart < 0) return 'mobile CI must define ios-no-codesign';
+  final iosJob = workflowSource.substring(iosJobStart);
+  const marker = 'flutter config --no-enable-swift-package-manager';
+  final markerMatches = RegExp(
+    RegExp.escape(marker),
+  ).allMatches(iosJob).toList();
+  if (markerMatches.length != 1) {
+    return 'iOS CI must disable Flutter SwiftPM exactly once and use CocoaPods';
+  }
+  final resolve = iosJob.indexOf('name: Resolve locked workspace');
+  final firstBuild = iosJob.indexOf('flutter build ios --release');
+  if (resolve < 0 || firstBuild < 0) {
+    return 'iOS CI must resolve and build the CocoaPods-backed app';
+  }
+  if (markerMatches.single.start > resolve || resolve > firstBuild) {
+    return 'iOS CI must disable Flutter SwiftPM before pub get and iOS builds';
+  }
+  return null;
+}
+
 String? mobileIosDeploymentTargetViolation(String xcodeProjectSource) {
   final targets = RegExp(
     r'IPHONEOS_DEPLOYMENT_TARGET = ([^;]+);',
@@ -294,7 +322,7 @@ String? mobileIosDeploymentTargetViolation(String xcodeProjectSource) {
     return 'iOS project must declare exactly 3 deployment targets';
   }
   if (targets.any((target) => target != '15.0')) {
-    return 'every iOS deployment target must be 15.0 for Firebase SwiftPM';
+    return 'every iOS deployment target must be 15.0 for Firebase plugins';
   }
   return null;
 }

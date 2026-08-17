@@ -129,6 +129,8 @@ jobs:
           test "${apple_toolchain}" = $'Xcode 26.4.1\nBuild version 17E202'
           iphoneos_sdk="$(xcrun --sdk iphoneos --show-sdk-version)"
           test "${iphoneos_sdk}" = '26.4'
+      - name: Use CocoaPods for iOS plugins
+        run: flutter config --no-enable-swift-package-manager
       - name: Resolve locked workspace
         run: flutter pub get --enforce-lockfile
       - name: Enforce native companion source boundary

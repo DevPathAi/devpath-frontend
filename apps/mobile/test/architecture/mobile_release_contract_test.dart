@@ -139,6 +139,20 @@ void main() {
     );
   });
 
+  test('iOS CI disables Flutter SwiftPM before resolving with CocoaPods', () {
+    final workflow = _read('../../.github/workflows/mobile.yml');
+    expect(source_guard.mobileIosDependencyManagerViolation(workflow), isNull);
+
+    final drift = workflow.replaceFirst(
+      'flutter config --no-enable-swift-package-manager',
+      'flutter config --enable-swift-package-manager',
+    );
+    expect(
+      source_guard.mobileIosDependencyManagerViolation(drift),
+      contains('disable Flutter SwiftPM exactly once'),
+    );
+  });
+
   test('source guard rejects exact Temurin patch and build drift', () {
     final workflow = _read('../../.github/workflows/mobile.yml');
     expect(source_guard.mobileWorkflowToolchainViolation(workflow), isNull);
@@ -170,7 +184,7 @@ void main() {
     expect(properties, contains('kotlin.incremental=false'));
   });
 
-  test('every declared iOS deployment target satisfies Firebase SwiftPM', () {
+  test('every declared iOS deployment target satisfies Firebase plugins', () {
     final xcodeProject = _read('ios/Runner.xcodeproj/project.pbxproj');
     final targets = RegExp(
       r'IPHONEOS_DEPLOYMENT_TARGET = ([^;]+);',
@@ -185,7 +199,7 @@ void main() {
       targets,
       everyElement('15.0'),
       reason:
-          'firebase-core and firebase-messaging Swift packages require the '
+          'firebase-core and firebase-messaging require the '
           'app target to support iOS 15.0 or newer',
     );
 
