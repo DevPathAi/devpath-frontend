@@ -59,11 +59,12 @@ void main() {
   Future<ProcessResult> runImmutableBind(
     String candidateConfigDigest, {
     String indexFixture = 'valid',
+    bool initiallyAbsent = false,
   }) async {
     final resolverInstall = stepRun('Install immutable image resolver');
-    final bindScript = stepRun(
-      'Bind immutable tag once',
-    ).replaceAll(r'${{ matrix.identity }}', 'off');
+    final bindScript = stepRun('Bind immutable tag once')
+        .replaceAll(r'${{ matrix.identity }}', 'off')
+        .replaceAll('source tools/immutable_registry.sh', '');
     final harness =
         r'''
 set -u
@@ -76,21 +77,34 @@ attestation_digest=sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffff
 github_output="$(mktemp)"
 mutation_log="$(mktemp)"
 runner_temp="$(mktemp -d)"
-trap 'rm -f "${github_output}" "${mutation_log}" "${runner_temp}/resolve-web-image-config.sh" "${runner_temp}/immutable-tag-bind-off.err"; rmdir "${runner_temp}"' EXIT
+pushed_marker="${runner_temp}/pushed"
+trap 'rm -f "${github_output}" "${mutation_log}" "${runner_temp}/resolve-web-image-config.sh" "${pushed_marker}"; rmdir "${runner_temp}"' EXIT
 export TAG_REFERENCE="ghcr.io/devpathai/devpath-web:${source_sha}-mission-off"
 export IMAGE_REPOSITORY=ghcr.io/devpathai/devpath-web
 export CANDIDATE_REFERENCE="leva-web-candidate:${source_sha}-mission-off"
 export CANDIDATE_CONFIG_DIGEST=__CANDIDATE_CONFIG_DIGEST__
-export PREFLIGHT_STATE=present
-export PREFLIGHT_DIGEST="${registry_digest}"
-export PREFLIGHT_CONFIG_DIGEST="${registry_config_digest}"
+export PREFLIGHT_STATE=__PREFLIGHT_STATE__
+export PREFLIGHT_DIGEST=__PREFLIGHT_DIGEST__
+export PREFLIGHT_CONFIG_DIGEST=__PREFLIGHT_CONFIG_DIGEST__
 export SOURCE_SHA="${source_sha}"
+export IDENTITY=off
 export MISSION_SPINE_ENABLED=false
 export ANALYTICS_CONTRACT_VERSION=mission-spine.analytics.v1
 export ANALYTICS_ENVIRONMENT=production
 export INDEX_FIXTURE=__INDEX_FIXTURE__
 export RUNNER_TEMP="${runner_temp}"
 export GITHUB_OUTPUT="${github_output}"
+export INITIALLY_ABSENT=__INITIALLY_ABSENT__
+
+ghcr_manifest_lookup() {
+  test "$1" = "${IMAGE_REPOSITORY}"
+  test "$2" = "${SOURCE_SHA}-mission-${IDENTITY}"
+  if test "${INITIALLY_ABSENT}" = true && ! test -f "${pushed_marker}"; then
+    printf 'absent\n'
+    return
+  fi
+  printf 'present %s\n' "${registry_digest}"
+}
 
 emit_root_manifest() {
   case "${INDEX_FIXTURE}" in
@@ -201,6 +215,12 @@ emit_root_manifest() {
 docker() {
   if test "$1" = "tag" || test "$1" = "push"; then
     printf '%s\n' "$*" >>"${mutation_log}"
+    if test "${INITIALLY_ABSENT}" = true; then
+      if test "$1" = "push"; then
+        : >"${pushed_marker}"
+      fi
+      return 0
+    fi
     return 97
   fi
   if test "$1 $2 $3" != "buildx imagetools inspect"; then
@@ -276,7 +296,23 @@ exit "${status}"
     process.stdin.write(
       harness
           .replaceAll('__CANDIDATE_CONFIG_DIGEST__', candidateConfigDigest)
-          .replaceAll('__INDEX_FIXTURE__', indexFixture),
+          .replaceAll('__INDEX_FIXTURE__', indexFixture)
+          .replaceAll(
+            '__PREFLIGHT_STATE__',
+            initiallyAbsent ? 'absent' : 'present',
+          )
+          .replaceAll(
+            '__PREFLIGHT_DIGEST__',
+            initiallyAbsent ? "''" : '"\${registry_digest}"',
+          )
+          .replaceAll(
+            '__PREFLIGHT_CONFIG_DIGEST__',
+            initiallyAbsent ? "''" : '"\${registry_config_digest}"',
+          )
+          .replaceAll(
+            '__INITIALLY_ABSENT__',
+            initiallyAbsent ? 'true' : 'false',
+          ),
     );
     await process.stdin.close();
     final stdout = await process.stdout.transform(utf8.decoder).join();
@@ -296,7 +332,12 @@ exit "${status}"
         nextJob: 'web-image-release-contract',
       );
 
-      expect(publishJob, contains("if: github.ref == 'refs/heads/main'"));
+      expect(publishJob, contains("github.event_name == 'push'"));
+      expect(
+        publishJob,
+        contains("github.repository == 'DevPathAi/devpath-frontend'"),
+      );
+      expect(publishJob, contains("github.ref == 'refs/heads/main'"));
       expect(
         publishJob,
         contains('group: web-image-\${{ github.sha }}-\${{ matrix.identity }}'),
@@ -366,6 +407,15 @@ exit "${status}"
     expect(publishJob, contains('id: candidate-metadata'));
     expect(publishJob, contains('name: Install immutable image resolver'));
     expect(
+      'source tools/immutable_registry.sh'.allMatches(publishJob).length,
+      3,
+      reason: 'preflight, bind, and evidence use the strict GHCR client',
+    );
+    expect(
+      publishJob,
+      isNot(matches(RegExp(r'grep[^\n]*(?:not found|manifest unknown|404)'))),
+    );
+    expect(
       RegExp(
         r'resolve_linux_amd64_config "\$\{IMAGE_REPOSITORY\}"',
       ).allMatches(publishJob).length,
@@ -384,10 +434,7 @@ exit "${status}"
       publishJob.indexOf('Refusing to overwrite immutable tag'),
       lessThan(tagMutation),
     );
-    expect(
-      publishJob,
-      contains('docker buildx imagetools inspect "\${tag_reference}"'),
-    );
+    expect(publishJob, contains('ghcr_manifest_lookup'));
   });
 
   test('the same immutable candidate is reused without a tag mutation', () async {
@@ -421,6 +468,23 @@ exit "${status}"
     expect(result.exitCode, isNot(0));
     expect(result.stderr as String, contains('candidate digest drift'));
     expect(mutationLog(result), isEmpty);
+  });
+
+  test('an absent web tag is pushed once and then re-inspected', () async {
+    const matchingConfig =
+        'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    final result = await runImmutableBind(
+      matchingConfig,
+      initiallyAbsent: true,
+    );
+
+    expect(result.exitCode, 0, reason: result.stderr as String);
+    expect(result.stdout as String, contains('mode=created'));
+    expect(mutationLog(result), contains('tag leva-web-candidate:'));
+    expect(
+      mutationLog(result),
+      contains('push ghcr.io/devpathai/devpath-web:'),
+    );
   });
 
   test('an index missing linux amd64 is rejected without mutation', () async {
@@ -476,12 +540,7 @@ exit "${status}"
         'docker buildx imagetools inspect "\${exact_reference}" --format \'{{json .Image}}\'',
       ),
     );
-    expect(
-      publishJob,
-      contains(
-        'docker buildx imagetools inspect "\${tag_reference}" --format \'{{.Manifest.Digest}}\'',
-      ),
-    );
+    expect(publishJob, contains('lookup="\$(ghcr_manifest_lookup'));
     expect(
       publishJob,
       contains('test "\${tag_digest}" = "\${registry_digest}"'),
@@ -508,9 +567,16 @@ exit "${status}"
     expect(
       publishJob,
       contains(
-        'name: leva-web-\${{ github.sha }}-mission-\${{ matrix.identity }}-registry-evidence',
+        'name: leva-web-\${{ github.sha }}-mission-\${{ matrix.identity }}-registry-evidence-run-\${{ github.run_id }}-attempt-\${{ github.run_attempt }}',
       ),
     );
+    expect(
+      verifyJob,
+      contains(
+        'pattern: leva-web-\${{ github.sha }}-mission-*-registry-evidence-run-\${{ github.run_id }}-attempt-\${{ github.run_attempt }}',
+      ),
+    );
+    expect(publishJob, isNot(contains('overwrite: true')));
     expect(publishJob, isNot(contains('sha256sum')));
     expect(publishJob, isNot(contains('to_entries')));
     expect(publishJob, isNot(contains('env |')));
@@ -527,6 +593,12 @@ exit "${status}"
     expect(verifyJob, contains('merge-multiple: true'));
     expect(verifyJob, contains('continue-on-error: true'));
     expect(verifyJob, contains('!cancelled()'));
+    expect(verifyJob, contains("github.event_name == 'push'"));
+    expect(
+      verifyJob,
+      contains("github.repository == 'DevPathAi/devpath-frontend'"),
+    );
+    expect(verifyJob, contains("github.ref == 'refs/heads/main'"));
     expect(
       verifyJob,
       contains('WEB_IMAGE_RESULT: \${{ needs.web-image.result }}'),

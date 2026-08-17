@@ -63,9 +63,11 @@ void main() {
       expect(
         contractJob,
         contains(
-          'name: leva-web-\${{ github.sha }}-mission-\${{ matrix.identity }}',
+          'name: leva-web-\${{ github.sha }}-mission-\${{ matrix.identity }}-run-'
+          '\${{ github.run_id }}-attempt-\${{ github.run_attempt }}',
         ),
       );
+      expect(contractJob, isNot(contains('overwrite: true')));
       expect(
         contractJob,
         contains(':\${{ github.sha }}-mission-\${{ matrix.identity }}'),

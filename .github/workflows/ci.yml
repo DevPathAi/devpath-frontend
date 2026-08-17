@@ -38,6 +38,8 @@ jobs:
         run: dart run melos run analyze
       - name: Test
         run: dart run melos run test
+      - name: Validate immutable registry client
+        run: node --test tools/immutable_registry.test.mjs
 
   # ET1 contract proof only: build both compiled identities locally in CI.
   # Publishing, exact-digest promotion, deployment and rollback belong to ET10.
@@ -97,7 +99,7 @@ jobs:
       - name: Preserve OFF/ON OCI artifact and manifest
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: leva-web-${{ github.sha }}-mission-${{ matrix.identity }}
+          name: leva-web-${{ github.sha }}-mission-${{ matrix.identity }}-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
           path: |
             ${{ runner.temp }}/leva-web-${{ matrix.identity }}.tar
             ${{ runner.temp }}/leva-web-${{ matrix.identity }}.manifest.json
@@ -107,7 +109,10 @@ jobs:
 
   web-image:
     needs: analyze-test
-    if: github.ref == 'refs/heads/main'
+    if: >-
+      github.event_name == 'push' &&
+      github.repository == 'DevPathAi/devpath-frontend' &&
+      github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -265,16 +270,22 @@ jobs:
           TAG_REFERENCE: ghcr.io/devpathai/devpath-web:${{ github.sha }}-mission-${{ matrix.identity }}
           IMAGE_REPOSITORY: ghcr.io/devpathai/devpath-web
           SOURCE_SHA: ${{ github.sha }}
+          IDENTITY: ${{ matrix.identity }}
           MISSION_SPINE_ENABLED: ${{ matrix.enabled }}
           ANALYTICS_CONTRACT_VERSION: mission-spine.analytics.v1
           ANALYTICS_ENVIRONMENT: production
+          GHCR_ACTOR: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           source "${RUNNER_TEMP}/resolve-web-image-config.sh"
-          inspect_error="${RUNNER_TEMP}/immutable-tag-preflight-${{ matrix.identity }}.err"
-          if tag_digest="$(docker buildx imagetools inspect "${TAG_REFERENCE}" --format '{{.Manifest.Digest}}' 2>"${inspect_error}")"; then
-            test "${tag_digest}" != ""
-            test "${tag_digest}" != "sha256:"
+          source tools/immutable_registry.sh
+          lookup="$(ghcr_manifest_lookup "${IMAGE_REPOSITORY}" "${SOURCE_SHA}-mission-${IDENTITY}")"
+          read -r state tag_digest trailing <<<"${lookup}"
+          test -z "${trailing:-}"
+          case "${state}" in
+          present)
+            [[ "${tag_digest}" =~ ^sha256:[0-9a-f]{64}$ ]]
             exact_reference="${IMAGE_REPOSITORY}@${tag_digest}"
             config_digest="$(resolve_linux_amd64_config "${IMAGE_REPOSITORY}" "${tag_digest}")"
             image_json="$(docker buildx imagetools inspect "${exact_reference}" --format '{{json .Image}}')"
@@ -306,17 +317,20 @@ jobs:
               echo "digest=${tag_digest}"
               echo "config_digest=${config_digest}"
             } >>"${GITHUB_OUTPUT}"
-          elif grep -Eqi 'not found|manifest unknown|404' "${inspect_error}"; then
+            ;;
+          absent)
+            test -z "${tag_digest:-}"
             {
               echo "state=absent"
               echo "digest="
               echo "config_digest="
             } >>"${GITHUB_OUTPUT}"
-          else
-            cat "${inspect_error}" >&2
-            echo "Immutable tag preflight failed closed" >&2
+            ;;
+          *)
+            echo "Immutable tag preflight returned an invalid state" >&2
             exit 1
-          fi
+            ;;
+          esac
       - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         id: candidate
         with:
@@ -382,16 +396,38 @@ jobs:
           PREFLIGHT_DIGEST: ${{ steps.immutable-tag.outputs.digest }}
           PREFLIGHT_CONFIG_DIGEST: ${{ steps.immutable-tag.outputs.config_digest }}
           SOURCE_SHA: ${{ github.sha }}
+          IDENTITY: ${{ matrix.identity }}
           MISSION_SPINE_ENABLED: ${{ matrix.enabled }}
           ANALYTICS_CONTRACT_VERSION: mission-spine.analytics.v1
           ANALYTICS_ENVIRONMENT: production
+          GHCR_ACTOR: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           source "${RUNNER_TEMP}/resolve-web-image-config.sh"
+          source tools/immutable_registry.sh
           candidate_config_digest="${CANDIDATE_CONFIG_DIGEST}"
-          test "${candidate_config_digest}" != ""
-          inspect_error="${RUNNER_TEMP}/immutable-tag-bind-${{ matrix.identity }}.err"
-          if observed_digest="$(docker buildx imagetools inspect "${TAG_REFERENCE}" --format '{{.Manifest.Digest}}' 2>"${inspect_error}")"; then
+          [[ "${candidate_config_digest}" =~ ^sha256:[0-9a-f]{64}$ ]]
+          case "${PREFLIGHT_STATE}" in
+          present)
+            [[ "${PREFLIGHT_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]]
+            [[ "${PREFLIGHT_CONFIG_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]]
+            ;;
+          absent)
+            test -z "${PREFLIGHT_DIGEST}"
+            test -z "${PREFLIGHT_CONFIG_DIGEST}"
+            ;;
+          *)
+            echo "Invalid immutable tag preflight state" >&2
+            exit 1
+            ;;
+          esac
+          lookup="$(ghcr_manifest_lookup "${IMAGE_REPOSITORY}" "${SOURCE_SHA}-mission-${IDENTITY}")"
+          read -r state observed_digest trailing <<<"${lookup}"
+          test -z "${trailing:-}"
+          case "${state}" in
+          present)
+            [[ "${observed_digest}" =~ ^sha256:[0-9a-f]{64}$ ]]
             exact_reference="${IMAGE_REPOSITORY}@${observed_digest}"
             observed_config_digest="$(resolve_linux_amd64_config "${IMAGE_REPOSITORY}" "${observed_digest}")"
             image_json="$(docker buildx imagetools inspect "${exact_reference}" --format '{{json .Image}}')"
@@ -432,7 +468,9 @@ jobs:
             fi
             registry_digest="${observed_digest}"
             publish_mode="reused"
-          elif grep -Eqi 'not found|manifest unknown|404' "${inspect_error}"; then
+            ;;
+          absent)
+            test -z "${observed_digest:-}"
             test "${PREFLIGHT_STATE}" = "absent" || {
               echo "Refusing to recreate immutable tag ${TAG_REFERENCE} after it disappeared" >&2
               exit 1
@@ -440,15 +478,20 @@ jobs:
             tag_reference="${TAG_REFERENCE}"
             docker tag "${CANDIDATE_REFERENCE}" "${tag_reference}"
             docker push "${tag_reference}"
-            registry_digest="$(docker buildx imagetools inspect "${tag_reference}" --format '{{.Manifest.Digest}}')"
+            lookup="$(ghcr_manifest_lookup "${IMAGE_REPOSITORY}" "${SOURCE_SHA}-mission-${IDENTITY}")"
+            read -r state registry_digest trailing <<<"${lookup}"
+            test -z "${trailing:-}"
+            test "${state}" = "present"
+            [[ "${registry_digest}" =~ ^sha256:[0-9a-f]{64}$ ]]
             observed_config_digest="$(resolve_linux_amd64_config "${IMAGE_REPOSITORY}" "${registry_digest}")"
             test "${observed_config_digest}" = "${candidate_config_digest}"
             publish_mode="created"
-          else
-            cat "${inspect_error}" >&2
-            echo "Immutable tag bind failed closed" >&2
+            ;;
+          *)
+            echo "Immutable tag bind returned an invalid state" >&2
             exit 1
-          fi
+            ;;
+          esac
           test "${registry_digest}" != ""
           test "${registry_digest}" != "sha256:"
           {
@@ -465,14 +508,19 @@ jobs:
           REGISTRY_DIGEST: ${{ steps.bind-tag.outputs.digest }}
           ANALYTICS_CONTRACT_VERSION: mission-spine.analytics.v1
           ANALYTICS_ENVIRONMENT: production
+          GHCR_ACTOR: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          source tools/immutable_registry.sh
           test "${IDENTITY}" = "off" || test "${IDENTITY}" = "on"
           image_repository="ghcr.io/devpathai/devpath-web"
           image_tag="${SOURCE_SHA}-mission-${IDENTITY}"
-          tag_reference="${image_repository}:${image_tag}"
           registry_digest="${REGISTRY_DIGEST}"
-          tag_digest="$(docker buildx imagetools inspect "${tag_reference}" --format '{{.Manifest.Digest}}')"
+          lookup="$(ghcr_manifest_lookup "${image_repository}" "${image_tag}")"
+          read -r state tag_digest trailing <<<"${lookup}"
+          test -z "${trailing:-}"
+          test "${state}" = "present"
           test "${tag_digest}" = "${registry_digest}"
           exact_reference="${image_repository}@${registry_digest}"
           manifest_json="$(docker buildx imagetools inspect "${exact_reference}" --format '{{json .Manifest}}')"
@@ -548,14 +596,17 @@ jobs:
       - name: Preserve immutable registry evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: leva-web-${{ github.sha }}-mission-${{ matrix.identity }}-registry-evidence
+          name: leva-web-${{ github.sha }}-mission-${{ matrix.identity }}-registry-evidence-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
           path: ${{ runner.temp }}/leva-web-${{ matrix.identity }}.registry.json
           if-no-files-found: error
           retention-days: 30
 
   web-image-release-contract:
     needs: web-image
-    if: ${{ !cancelled() && github.ref == 'refs/heads/main' }}
+    if: >-
+      ${{ !cancelled() && github.event_name == 'push' &&
+      github.repository == 'DevPathAi/devpath-frontend' &&
+      github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -570,7 +621,7 @@ jobs:
         uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
         continue-on-error: true
         with:
-          pattern: leva-web-${{ github.sha }}-mission-*-registry-evidence
+          pattern: leva-web-${{ github.sha }}-mission-*-registry-evidence-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
           path: evidence
           merge-multiple: true
       - name: Verify distinct immutable compiled identities
@@ -621,11 +672,17 @@ jobs:
 
   admin-image:
     needs: analyze-test
-    if: github.ref == 'refs/heads/main'
+    if: >-
+      github.event_name == 'push' &&
+      github.repository == 'DevPathAi/devpath-frontend' &&
+      github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
       packages: write
+    concurrency:
+      group: admin-image-${{ github.sha }}
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
@@ -638,53 +695,64 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Inspect immutable admin tag
+        id: immutable-admin-tag
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+          GHCR_ACTOR: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash tools/admin_immutable_image.sh preflight
       - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        id: admin-candidate
         with:
           context: .
           file: apps/admin/Dockerfile
           platforms: linux/amd64
-          push: true
+          load: true
+          push: false
+          provenance: false
           build-args: |
             API_BASE_URL=${{ vars.WEB_API_BASE_URL }}
             USE_MOCK=false
-          tags: |
-            ghcr.io/devpathai/devpath-admin:${{ github.sha }}
-            ghcr.io/devpathai/devpath-admin:main
+          tags: leva-admin-candidate:${{ github.sha }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=https://github.com/DevPathAi/devpath-frontend
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-  admin-deploy:
-    needs: admin-image
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        id: app-token
+      - name: Inspect admin candidate config
+        id: admin-candidate-metadata
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+        run: bash tools/admin_immutable_image.sh candidate
+      - name: Bind immutable admin tag once
+        id: bind-admin-tag
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+          PREFLIGHT_STATE: ${{ steps.immutable-admin-tag.outputs.state }}
+          PREFLIGHT_DIGEST: ${{ steps.immutable-admin-tag.outputs.digest }}
+          PREFLIGHT_CONFIG_DIGEST: ${{ steps.immutable-admin-tag.outputs.config_digest }}
+          CANDIDATE_CONFIG_DIGEST: ${{ steps.admin-candidate-metadata.outputs.config_digest }}
+          GHCR_ACTOR: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash tools/admin_immutable_image.sh bind
+      - name: Record immutable admin digest evidence
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+          REGISTRY_DIGEST: ${{ steps.bind-admin-tag.outputs.digest }}
+          PUBLISH_MODE: ${{ steps.bind-admin-tag.outputs.mode }}
+          EVIDENCE_PATH: ${{ runner.temp }}/leva-admin.registry.json
+          GHCR_ACTOR: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash tools/admin_immutable_image.sh evidence
+      - name: Preserve immutable admin registry evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          app-id: ${{ secrets.GITOPS_APP_ID }}
-          private-key: ${{ secrets.GITOPS_APP_PRIVATE_KEY }}
-          owner: DevPathAi
-          repositories: devpath-gitops
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
-        with:
-          repository: DevPathAi/devpath-gitops
-          token: ${{ steps.app-token.outputs.token }}
-          path: gitops
-      - name: Install kustomize
-        run: |
-          set -euo pipefail
-          curl -fsSLo kustomize.tar.gz https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.4.3/kustomize_v5.4.3_linux_amd64.tar.gz
-          printf '%s  %s\n' '3669470b454d865c8184d6bce78df05e977c9aea31c30df3c669317d43bcc7a7' kustomize.tar.gz | sha256sum -c -
-          tar -xzf kustomize.tar.gz && sudo mv kustomize /usr/local/bin/
-      - name: set image to commit SHA
-        working-directory: gitops/apps/devpath-admin/base
-        run: kustomize edit set image ghcr.io/devpathai/devpath-admin=ghcr.io/devpathai/devpath-admin:${{ github.sha }}
-      - name: commit & push
-        working-directory: gitops
-        run: |
-          git config user.name "devpath-gitops-bot[bot]"
-          git config user.email "devpath-gitops-bot[bot]@users.noreply.github.com"
-          git add -A
-          git diff --cached --quiet && echo "no change" && exit 0
-          git commit -m "deploy(admin): ${{ github.sha }}"
-          for i in 1 2 3; do git push && break || (git pull --rebase && sleep 2); done
+          name: leva-admin-${{ github.sha }}-registry-evidence-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/leva-admin.registry.json
+          if-no-files-found: error
+          retention-days: 30

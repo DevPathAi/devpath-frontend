@@ -15,8 +15,6 @@ const _uploadArtifact =
     'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02';
 const _downloadArtifact =
     'actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53';
-const _githubAppToken =
-    'actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1';
 
 const _buildkitImage =
     'moby/buildkit:v0.30.0@sha256:0168606be2315b7c807a03b3d8aa79beefdb31c98740cebdffdfeebf31190c9f';
@@ -27,8 +25,6 @@ const _nginxRuntime =
 const _flutterArchiveSha =
     '287937458126a53284ed112c8c7dbc647bea2d09ab65d46e2d5cf94e901aac69';
 const _flutterRevision = '924134a44c189315be2148659913dda1671cbe99';
-const _kustomizeSha =
-    '3669470b454d865c8184d6bce78df05e977c9aea31c30df3c669317d43bcc7a7';
 const _gradleDistributionSha =
     'b84e04fa845fecba48551f425957641074fcc00a88a84d2aae5808743b35fc85';
 const _flutterVersion = '3.44.1';
@@ -217,8 +213,7 @@ List<String> _workflowPinErrors(String source) {
     '$_setupBuildx # v3.12.0',
     '$_dockerLogin # v4.6.0',
     '$_buildPush # v7.3.0',
-    '$_githubAppToken # v3.2.0',
-    '$_checkout # v6.1.0',
+    '$_uploadArtifact # v4.6.2',
   ];
 
   if (uses.length != expectedUses.length ||
@@ -237,8 +232,8 @@ List<String> _workflowPinErrors(String source) {
   if (RegExp(r'\b[a-z0-9-]+-latest\b').hasMatch(source)) {
     errors.add('latest runner labels are forbidden');
   }
-  if (_count(source, 'runs-on: ubuntu-24.04') != 6) {
-    errors.add('all six ET10 jobs must use ubuntu-24.04');
+  if (_count(source, 'runs-on: ubuntu-24.04') != 5) {
+    errors.add('all five CI jobs must use ubuntu-24.04');
   }
   final setupBuildxSteps = _actionStepBodies(source, _setupBuildx);
   if (setupBuildxSteps.length != 3 ||
@@ -265,10 +260,10 @@ List<String> _workflowPinErrors(String source) {
     errors.add('CI must use the locked Flutter workspace Melos');
   }
   errors.addAll(_flutterTuplePinErrors(source));
-  if (!source.contains(_kustomizeSha) ||
-      !source.contains('sha256sum -c -') ||
-      !source.contains('kustomize_v5.4.3_linux_amd64.tar.gz')) {
-    errors.add('Kustomize 5.4.3 download must be checksum verified');
+  if (source.contains('kustomize') ||
+      source.contains('devpath-gitops') ||
+      source.contains('git push')) {
+    errors.add('frontend CI must not mutate deployment state');
   }
   return errors;
 }
