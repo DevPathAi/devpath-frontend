@@ -41,8 +41,12 @@ jobs:
     name: Authenticate manual AT inputs
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    environment:
+      name: mission-spine-manual-at-auth
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
 
       - name: Reject branch, source, and rerun ambiguity
         shell: bash
@@ -56,20 +60,61 @@ jobs:
           }
           [[ "${RELEASE_ID}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]]
           test "${GITHUB_REPOSITORY}" = DevPathAi/devpath-frontend
+          test "${GITHUB_EVENT_NAME}" = workflow_dispatch
           test "${GITHUB_REF}" = refs/heads/main
           test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
           test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Authenticate protected input-reader approval
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          approval_root="${RUNNER_TEMP}/manual-at-auth-approval"
+          test ! -e "${approval_root}"
+          mkdir "${approval_root}"
+          node tools/mission_spine_protected_approval.mjs \
+            --workflow-path=.github/workflows/mission-spine-manual-at-evidence.yml \
+            --environment=mission-spine-manual-at-auth \
+            --job-name='Authenticate manual AT inputs' \
+            --output="${approval_root}/approval.json"
 
       - name: Mint read-only GitOps candidate token
         id: gitops-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
-          app-id: ${{ secrets.GITOPS_APP_ID }}
-          private-key: ${{ secrets.GITOPS_APP_PRIVATE_KEY }}
+          app-id: ${{ secrets.MISSION_SPINE_EVIDENCE_READER_APP_ID }}
+          private-key: ${{ secrets.MISSION_SPINE_EVIDENCE_READER_APP_PRIVATE_KEY }}
           owner: DevPathAi
-          repositories: devpath-gitops
           permission-actions: read
           permission-contents: read
+
+      - name: Verify evidence reader App is GitOps-only
+        shell: bash
+        env:
+          GITOPS_TOKEN: ${{ steps.gitops-token.outputs.token }}
+          APP_SLUG: ${{ steps.gitops-token.outputs.app-slug }}
+          INSTALLATION_ID: ${{ steps.gitops-token.outputs.installation-id }}
+        run: |
+          set -euo pipefail
+          test -n "${GITOPS_TOKEN}"
+          test "${APP_SLUG}" = devpath-evidence-reader
+          [[ "${INSTALLATION_ID}" =~ ^[1-9][0-9]*$ ]]
+          inventory="${RUNNER_TEMP}/evidence-reader-repositories.json"
+          test ! -e "${inventory}"
+          curl --fail --silent --show-error \
+            --proto '=https' \
+            -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer ${GITOPS_TOKEN}" \
+            -H 'X-GitHub-Api-Version: 2026-03-10' \
+            'https://api.github.com/installation/repositories?per_page=100' \
+            --output "${inventory}"
+          jq -e '
+            .total_count == 1 and
+            (.repositories | length) == 1 and
+            .repositories[0].full_name == "DevPathAi/devpath-gitops"
+          ' "${inventory}" >/dev/null
 
       - name: Authenticate canonical candidate metadata
         id: candidate-metadata
