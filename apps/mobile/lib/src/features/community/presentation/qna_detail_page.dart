@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../auth/application/auth_controller.dart';
+import '../../mission/state/mobile_mission_route.dart';
 import '../application/qna_detail_controller.dart';
 import '../data/community_source.dart';
 import '../state/qna_detail_state.dart';
@@ -11,7 +15,7 @@ import '../state/qna_detail_state.dart';
 class QnaDetailPage extends ConsumerStatefulWidget {
   const QnaDetailPage({super.key, required this.postId});
 
-  /// 라우트 경로 파라미터(문자열) — 백엔드 id는 long이라 [int.parse]로 변환.
+  /// 라우트 경로 파라미터. Positive JavaScript-safe integer만 허용한다.
   final String postId;
 
   @override
@@ -21,14 +25,34 @@ class QnaDetailPage extends ConsumerStatefulWidget {
 class _QnaDetailPageState extends ConsumerState<QnaDetailPage> {
   final _answerCtrl = TextEditingController();
 
-  int get _id => int.parse(widget.postId);
+  int? get _id => _parsePostId(widget.postId);
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => ref.read(qnaDetailControllerProvider.notifier).load(_id),
-    );
+    ref.listenManual(currentOwnerKeyProvider, (previous, next) {
+      if (previous != next) _answerCtrl.clear();
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final id = _id;
+      if (id != null) {
+        ref.read(qnaDetailControllerProvider.notifier).load(id);
+      }
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant QnaDetailPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.postId == widget.postId) return;
+    _answerCtrl.clear();
+    final expectedPostId = widget.postId;
+    final id = _id;
+    scheduleMicrotask(() {
+      if (!mounted || widget.postId != expectedPostId) return;
+      final notifier = ref.read(qnaDetailControllerProvider.notifier)..reset();
+      if (id != null) unawaited(notifier.load(id));
+    });
   }
 
   @override
@@ -39,6 +63,13 @@ class _QnaDetailPageState extends ConsumerState<QnaDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    final id = _id;
+    if (id == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Q&A')),
+        body: const DpError(message: '잘못된 질문 경로입니다.'),
+      );
+    }
     // 액션 실패(예: 비작성자 채택 403)는 상세를 유지한 채 SnackBar로 표면화.
     ref.listen(qnaDetailControllerProvider, (prev, next) {
       if (next is QnaLoaded && next.actionError != null) {
@@ -54,14 +85,23 @@ class _QnaDetailPageState extends ConsumerState<QnaDetailPage> {
       body: switch (s) {
         QnaLoading() => const DpLoading(),
         QnaFailed(:final message) => DpError(message: message),
-        QnaLoaded(:final detail, :final submitting) => _Loaded(
-          detail: detail,
-          submitting: submitting,
-          answerCtrl: _answerCtrl,
-        ),
+        QnaLoaded(:final detail, :final submitting) when detail.id == id =>
+          _Loaded(
+            detail: detail,
+            submitting: submitting,
+            answerCtrl: _answerCtrl,
+          ),
+        QnaLoaded() => const DpLoading(),
       },
     );
   }
+}
+
+int? _parsePostId(String value) {
+  if (!RegExp(r'^[1-9][0-9]*$').hasMatch(value)) return null;
+  final parsed = int.tryParse(value);
+  if (parsed == null || parsed > MobileMissionRoute.maxSafeInteger) return null;
+  return parsed;
 }
 
 class _Loaded extends ConsumerWidget {

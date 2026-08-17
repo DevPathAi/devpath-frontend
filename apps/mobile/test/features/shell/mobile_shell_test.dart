@@ -1,6 +1,9 @@
 import 'dart:async';
 
 import 'package:devpath_mobile/src/features/shell/presentation/mobile_shell.dart';
+import 'package:devpath_mobile/src/features/auth/application/auth_controller.dart';
+import 'package:devpath_mobile/src/features/notifications/data/notification_store.dart';
+import 'package:devpath_mobile/src/data/owner_data_store.dart';
 import 'package:devpath_mobile/src/services/push_service.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
@@ -44,7 +47,13 @@ GoRouter _testRouter() => GoRouter(
 );
 
 Widget _host(GoRouter router, {PushService? push}) => ProviderScope(
-  overrides: [pushServiceProvider.overrideWithValue(push ?? StubPushService())],
+  overrides: [
+    pushServiceProvider.overrideWithValue(push ?? StubPushService()),
+    currentOwnerKeyProvider.overrideWithValue('owner-a'),
+    notificationStoreProvider.overrideWithValue(
+      NotificationStore(InMemoryOwnerDataStore()),
+    ),
+  ],
   child: MaterialApp.router(theme: DpTheme.light(), routerConfig: router),
 );
 
@@ -54,7 +63,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(NavigationBar), findsOneWidget);
-    expect(find.text('홈'), findsOneWidget);
+    expect(find.text('오늘'), findsOneWidget);
     expect(find.text('학습'), findsOneWidget);
     expect(find.text('커뮤니티'), findsOneWidget);
     expect(find.text('알림'), findsOneWidget);
@@ -81,7 +90,7 @@ void main() {
     final ctrl = StreamController<PushMessage>();
     addTearDown(ctrl.close);
     // 셸이 컨트롤러를 watch → 구독 시점에 버퍼된 수신이 전달되어 미읽음 1.
-    ctrl.add(const PushMessage(id: '1', title: '새 알림', body: '본문'));
+    ctrl.add(const PushMessage.local(id: '1', title: '새 알림', body: '본문'));
 
     await tester.pumpWidget(_host(_testRouter(), push: _FakePush(ctrl)));
     await tester.pumpAndSettle();

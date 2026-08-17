@@ -5,6 +5,13 @@ class ContentProgressFlush {
 
   final double scrollPct;
   final int dwellSec;
+
+  /// Concurrent/retried writes are monotonic on each progress axis.
+  ContentProgressFlush merge(ContentProgressFlush other) =>
+      ContentProgressFlush(
+        scrollPct: scrollPct > other.scrollPct ? scrollPct : other.scrollPct,
+        dwellSec: dwellSec > other.dwellSec ? dwellSec : other.dwellSec,
+      );
 }
 
 class ContentProgressTracker {

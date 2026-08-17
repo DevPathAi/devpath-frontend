@@ -17,8 +17,8 @@ class ContentController extends Notifier<ContentState> {
           .read(apiClientProvider)
           .get<Map<String, dynamic>>('/contents/$idOrSlug');
       state = ContentLoaded(LearningContent.fromJson(json));
-    } on ApiException catch (e) {
-      state = ContentFailed(e.message);
+    } on Object catch (error) {
+      state = ContentFailed(_failureMessage(error, loading: true));
     }
   }
 
@@ -44,11 +44,23 @@ class ContentController extends Notifier<ContentState> {
         );
       }
       return response;
-    } on ApiException catch (e) {
-      state = ContentFailed(e.message);
+    } on Object catch (error) {
+      final current = state;
+      if (current is ContentLoaded) {
+        state = ContentLoaded(
+          current.content,
+          progressError: _failureMessage(error, loading: false),
+        );
+      }
       return null;
     }
   }
+
+  String _failureMessage(Object error, {required bool loading}) =>
+      switch (error) {
+        ApiException(:final message) => message,
+        _ => loading ? '콘텐츠 형식을 확인하지 못했어요.' : '진행률을 저장하지 못했어요.',
+      };
 
   ContentProgress _mergeProgress(
     ContentProgress current,

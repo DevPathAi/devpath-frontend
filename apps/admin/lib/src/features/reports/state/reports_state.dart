@@ -1,23 +1,23 @@
 import '../data/report.dart';
 
 sealed class ReportsState {
-  const ReportsState();
-}
+  const ReportsState({this.status = 'OPEN'});
 
-class ReportsLoading extends ReportsState {
-  const ReportsLoading();
-}
-
-class ReportsLoaded extends ReportsState {
-  const ReportsLoaded(this.reports, {this.status = 'OPEN'});
-
-  final List<AdminReport> reports;
-
-  /// 현재 필터. null 이면 전체. 재조회 시 이 값을 유지한다.
+  /// 현재 필터. null 이면 전체이며 loading/failed/retry에서도 보존한다.
   final String? status;
 }
 
+class ReportsLoading extends ReportsState {
+  const ReportsLoading({super.status});
+}
+
+class ReportsLoaded extends ReportsState {
+  const ReportsLoaded(this.reports, {super.status});
+
+  final List<AdminReport> reports;
+}
+
 class ReportsFailed extends ReportsState {
-  const ReportsFailed(this.message);
+  const ReportsFailed(this.message, {super.status});
   final String message;
 }

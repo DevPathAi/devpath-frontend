@@ -3,6 +3,9 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../services/push_service.dart';
+import '../../auth/application/auth_controller.dart';
+import '../../auth/state/auth_state.dart';
+import '../data/notification_store.dart';
 import '../state/notification_state.dart';
 
 /// 알림센터 컨트롤러.
@@ -11,25 +14,293 @@ import '../state/notification_state.dart';
 ///
 /// 실 FCM 전환 시에도 이 컨트롤러는 그대로 — `pushServiceProvider`만 교체된다.
 class NotificationController extends Notifier<NotificationState> {
+  static const _maxDeferredOpened = 16;
   StreamSubscription<PushMessage>? _sub;
+  StreamSubscription<PushMessage>? _openedSub;
+  String? _ownerKey;
+  var _ownerEpoch = 0;
+  final _markAllReadFlights = <String, Future<void>>{};
+  final _deferred = <String, _DeferredNotification>{};
 
   @override
   NotificationState build() {
-    _sub = ref.read(pushServiceProvider).incoming.listen(_onMessage);
-    ref.onDispose(() => _sub?.cancel());
+    _ownerKey = ref.read(currentOwnerKeyProvider);
+    final push = ref.read(pushServiceProvider);
+    _sub = push.incoming.listen(_onMessage);
+    final interactions = push is PushInteractionService
+        ? push as PushInteractionService
+        : null;
+    if (interactions != null) {
+      _openedSub = interactions.opened.listen(_onOpened);
+      unawaited(_loadInitial(interactions));
+    }
+    ref.listen(currentOwnerKeyProvider, (_, owner) {
+      if (owner == _ownerKey) return;
+      final previousOwner = _ownerKey;
+      _ownerKey = owner;
+      _ownerEpoch += 1;
+      if (previousOwner != null && previousOwner != owner) {
+        _deferred.clear();
+      }
+      state = NotificationState(isRestoring: owner != null);
+      if (owner != null) {
+        unawaited(_restore(owner, _ownerEpoch));
+      }
+    });
+    ref.listen(authControllerProvider, (_, auth) => _onAuthState(auth));
+    ref.onDispose(() {
+      _ownerEpoch += 1;
+      _deferred.clear();
+      _sub?.cancel();
+      _openedSub?.cancel();
+    });
+    if (_ownerKey != null) {
+      Future.microtask(() => _restore(_ownerKey!, _ownerEpoch));
+      return const NotificationState(isRestoring: true);
+    }
     return const NotificationState();
   }
 
-  void _onMessage(PushMessage m) {
+  void _onMessage(PushMessage message) =>
+      unawaited(_receive(message, shouldNavigate: false));
+
+  Future<void> _loadInitial(PushInteractionService interactions) async {
+    try {
+      final initial = await interactions.initialMessage();
+      if (!ref.mounted || initial == null) return;
+      await _onOpened(initial);
+    } on Object {
+      // The platform channel is best-effort and one-shot. A cold-start lookup
+      // failure must not leak through the zone or disable later warm taps.
+    }
+  }
+
+  Future<bool> _persist(
+    PushMessage message, {
+    _NotificationOwnerBoundary? boundary,
+  }) async {
+    final captured = boundary ?? await _captureBoundary(message);
+    if (captured == null || message.id.isEmpty) return false;
+    final store = ref.read(notificationStoreProvider);
+    final receivedAt = DateTime.now().toUtc();
+    final added = await store.add(
+      captured.ownerKey,
+      message,
+      receivedAt: receivedAt,
+    );
+    if (!_isCurrent(captured)) {
+      if (added) {
+        await store.discardIfMatches(
+          captured.ownerKey,
+          message,
+          receivedAt: receivedAt,
+        );
+      }
+      return false;
+    }
+    if (added) {
+      state = NotificationState(
+        messages: [message, ...state.messages],
+        unreadCount: state.unreadCount + 1,
+        navigationTarget: state.navigationTarget,
+      );
+    }
+    return true;
+  }
+
+  Future<void> _restore(String owner, int epoch) async {
+    final saved = await ref.read(notificationStoreProvider).list(owner);
+    if (!ref.mounted || owner != _ownerKey || epoch != _ownerEpoch) return;
     state = NotificationState(
-      messages: [m, ...state.messages],
-      unreadCount: state.unreadCount + 1,
+      messages: saved.map((item) => item.message).toList(),
+      unreadCount: saved.where((item) => !item.isRead).length,
+      navigationTarget: state.navigationTarget,
     );
   }
 
-  void markAllRead() {
-    if (state.unreadCount == 0) return;
-    state = NotificationState(messages: state.messages);
+  Future<void> _onOpened(PushMessage message) async {
+    await _receive(message, shouldNavigate: true);
+  }
+
+  Future<void> _receive(
+    PushMessage message, {
+    required bool shouldNavigate,
+  }) async {
+    if (!ref.mounted) return;
+    final auth = ref.read(authControllerProvider);
+    if (_ownerKey == null) {
+      if (auth is AuthLoading) {
+        _defer(message, shouldNavigate: shouldNavigate);
+      } else if (auth.ownerKey != null) {
+        _defer(message, shouldNavigate: shouldNavigate);
+        _scheduleDeferredDrain(auth.ownerKey!);
+      }
+      return;
+    }
+    await _process(message, shouldNavigate: shouldNavigate);
+  }
+
+  Future<void> _process(
+    PushMessage message, {
+    required bool shouldNavigate,
+  }) async {
+    final boundary = await _captureBoundary(message);
+    if (boundary == null || !await _persist(message, boundary: boundary)) {
+      return;
+    }
+    if (!shouldNavigate || message.target == null || !_isCurrent(boundary)) {
+      return;
+    }
+    state = NotificationState(
+      messages: state.messages,
+      unreadCount: state.unreadCount,
+      navigationTarget: message.target,
+    );
+  }
+
+  void _onAuthState(AuthState auth) {
+    switch (auth) {
+      case AuthLoading():
+        return;
+      case AuthAuthenticated(:final user) ||
+          AuthOfflineAuthenticated(:final user):
+        _scheduleDeferredDrain(user.id);
+        return;
+      case AuthUnauthenticated() || AuthSessionUnavailable():
+        _deferred.clear();
+        return;
+    }
+  }
+
+  void _defer(PushMessage message, {required bool shouldNavigate}) {
+    if (message.id.isEmpty) return;
+    // Repeated taps refresh recency; Map assignment alone retains the old
+    // insertion slot and could evict the newest interaction as "oldest".
+    final previous = _deferred.remove(message.id);
+    _deferred[message.id] = _DeferredNotification(
+      message: previous?.shouldNavigate == true && !shouldNavigate
+          ? previous!.message
+          : message,
+      shouldNavigate: shouldNavigate || previous?.shouldNavigate == true,
+    );
+    while (_deferred.length > _maxDeferredOpened) {
+      _deferred.remove(_deferred.keys.first);
+    }
+  }
+
+  void _scheduleDeferredDrain(String ownerKey) {
+    if (_deferred.isEmpty) return;
+    final pending = List<_DeferredNotification>.of(_deferred.values);
+    _deferred.clear();
+    Future.microtask(() => _drainDeferred(ownerKey, pending));
+  }
+
+  Future<void> _drainDeferred(
+    String ownerKey,
+    List<_DeferredNotification> pending,
+  ) async {
+    for (final deferred in pending) {
+      if (!ref.mounted ||
+          ref.read(authControllerProvider).ownerKey != ownerKey ||
+          ref.read(currentOwnerKeyProvider) != ownerKey ||
+          _ownerKey != ownerKey) {
+        return;
+      }
+      await _process(deferred.message, shouldNavigate: deferred.shouldNavigate);
+    }
+  }
+
+  Future<_NotificationOwnerBoundary?> _captureBoundary(
+    PushMessage message,
+  ) async {
+    final owner = _ownerKey;
+    final memoryEpoch = _ownerEpoch;
+    if (owner == null || !_matchesIntendedOwner(message, owner)) return null;
+    final boundary = _NotificationOwnerBoundary(
+      ownerKey: owner,
+      memoryEpoch: memoryEpoch,
+    );
+    return _isCurrent(boundary) ? boundary : null;
+  }
+
+  bool _isCurrent(_NotificationOwnerBoundary boundary) =>
+      ref.mounted &&
+      boundary.ownerKey == _ownerKey &&
+      boundary.memoryEpoch == _ownerEpoch &&
+      ref.read(currentOwnerKeyProvider) == boundary.ownerKey;
+
+  bool _matchesIntendedOwner(PushMessage message, String ownerKey) {
+    return message.isForOwner(ownerKey);
+  }
+
+  void open(PushMessage message) {
+    final owner = _ownerKey;
+    if (owner == null || !message.isForOwner(owner)) return;
+    final target = message.target;
+    if (target == null) return;
+    state = NotificationState(
+      messages: state.messages,
+      unreadCount: state.unreadCount,
+      navigationTarget: target,
+    );
+  }
+
+  void consumeNavigation() {
+    if (state.navigationTarget == null) return;
+    state = NotificationState(
+      messages: state.messages,
+      unreadCount: state.unreadCount,
+    );
+  }
+
+  Future<void> markAllRead() {
+    if (state.unreadCount == 0) return Future<void>.value();
+    final owner = _ownerKey;
+    if (owner == null) return Future<void>.value();
+    final boundary = _NotificationOwnerBoundary(
+      ownerKey: owner,
+      memoryEpoch: _ownerEpoch,
+    );
+    final capturedUnreadCount = state.unreadCount;
+    final flightKey = '${boundary.ownerKey}\u0000${boundary.memoryEpoch}';
+    final active = _markAllReadFlights[flightKey];
+    if (active != null) return active;
+    late final Future<void> operation;
+    operation = _markAllRead(boundary, capturedUnreadCount).whenComplete(() {
+      if (identical(_markAllReadFlights[flightKey], operation)) {
+        _markAllReadFlights.remove(flightKey);
+      }
+    });
+    _markAllReadFlights[flightKey] = operation;
+    return operation;
+  }
+
+  Future<void> _markAllRead(
+    _NotificationOwnerBoundary boundary,
+    int capturedUnreadCount,
+  ) async {
+    try {
+      await ref
+          .read(notificationStoreProvider)
+          .markAllRead(
+            boundary.ownerKey,
+            isCurrent: () => _isCurrent(boundary),
+          );
+    } on Object {
+      // Reading notifications must remain usable if durable marking fails.
+      return;
+    }
+    if (!_isCurrent(boundary)) return;
+    final latest = state;
+    final unreadCount = latest.unreadCount > capturedUnreadCount
+        ? latest.unreadCount - capturedUnreadCount
+        : 0;
+    state = NotificationState(
+      messages: latest.messages,
+      unreadCount: unreadCount,
+      navigationTarget: latest.navigationTarget,
+      isRestoring: latest.isRestoring,
+    );
   }
 }
 
@@ -37,3 +308,23 @@ final notificationControllerProvider =
     NotifierProvider<NotificationController, NotificationState>(
       NotificationController.new,
     );
+
+final class _NotificationOwnerBoundary {
+  const _NotificationOwnerBoundary({
+    required this.ownerKey,
+    required this.memoryEpoch,
+  });
+
+  final String ownerKey;
+  final int memoryEpoch;
+}
+
+final class _DeferredNotification {
+  const _DeferredNotification({
+    required this.message,
+    required this.shouldNavigate,
+  });
+
+  final PushMessage message;
+  final bool shouldNavigate;
+}

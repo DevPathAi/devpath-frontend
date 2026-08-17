@@ -1,23 +1,111 @@
+import 'dart:async';
+
 import 'package:dp_core/dp_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../providers/api_providers.dart';
+import '../../dashboard/application/current_mission_controller.dart';
+import '../../mission/state/mission_workspace_key.dart';
 import '../state/review_state.dart';
 
+/// Owner- and workspace-bound review polling coordinator.
+///
+/// A session identity is carried by every non-idle state. New-session polls
+/// supersede older responses, while duplicate taps for the same session share
+/// one request loop. The last valid review remains available through refresh
+/// and failure states so transient delivery errors never blank the pane.
 class ReviewController extends Notifier<ReviewState> {
-  @override
-  ReviewState build() => const ReviewIdle();
+  ReviewController([this.workspaceKey]);
 
-  /// 실행 완료 후 sandboxSessionId로 리뷰가 DONE/FAILED로 수렴할 때까지 폴링.
-  /// GET /reviews?sandboxSessionId={id} — status PENDING→재시도, DONE→ReviewLoaded,
-  /// FAILED→ReviewFailed. killSwitch/quota ApiException→각 상태. 타임아웃→ReviewFailed.
+  final MissionWorkspaceKey? workspaceKey;
+  String? _ownerKey;
+  var _generation = 0;
+  var _disposed = false;
+  int? _inFlightSessionId;
+  Future<void>? _inFlight;
+
+  @override
+  ReviewState build() {
+    _disposed = false;
+    _inFlight = null;
+    _inFlightSessionId = null;
+    if (workspaceKey != null) {
+      _ownerKey = ref.read(currentMissionOwnerKeyProvider);
+      ref.listen(currentMissionOwnerKeyProvider, (_, nextOwner) {
+        if (_disposed || nextOwner == _ownerKey) return;
+        _ownerKey = nextOwner;
+        _generation += 1;
+        _inFlight = null;
+        _inFlightSessionId = null;
+        state = const ReviewIdle();
+      });
+    }
+    ref.onDispose(() {
+      _disposed = true;
+      _generation += 1;
+      _inFlight = null;
+      _inFlightSessionId = null;
+    });
+    return const ReviewIdle();
+  }
+
+  /// Polls `GET /reviews?sandboxSessionId={id}` until a terminal review.
   Future<void> pollForSession(
     int sandboxSessionId, {
     Duration interval = const Duration(seconds: 2),
     int maxAttempts = 30,
+  }) {
+    if (sandboxSessionId <= 0 ||
+        sandboxSessionId > MissionWorkspaceKey.maxSafeInteger) {
+      return Future.error(
+        ArgumentError.value(
+          sandboxSessionId,
+          'sandboxSessionId',
+          'must be a positive JS-safe ID',
+        ),
+      );
+    }
+    final active = _inFlight;
+    if (active != null && _inFlightSessionId == sandboxSessionId) {
+      return active;
+    }
+
+    _generation += 1;
+    final generation = _generation;
+    final ownerKey = _ownerKey;
+    final previous = state.retainedReview;
+    state = ReviewLoading(previous: previous, sessionId: sandboxSessionId);
+
+    late final Future<void> tracked;
+    tracked =
+        _poll(
+          sandboxSessionId,
+          generation: generation,
+          ownerKey: ownerKey,
+          previous: previous,
+          interval: interval,
+          maxAttempts: maxAttempts,
+        ).whenComplete(() {
+          if (identical(_inFlight, tracked)) {
+            _inFlight = null;
+            _inFlightSessionId = null;
+          }
+        });
+    _inFlightSessionId = sandboxSessionId;
+    _inFlight = tracked;
+    return tracked;
+  }
+
+  Future<void> _poll(
+    int sandboxSessionId, {
+    required int generation,
+    required String? ownerKey,
+    required CodeReview? previous,
+    required Duration interval,
+    required int maxAttempts,
   }) async {
-    state = const ReviewLoading();
     for (var attempt = 0; attempt < maxAttempts; attempt++) {
+      if (!_isCurrent(generation, ownerKey)) return;
       try {
         final json = await ref
             .read(apiClientProvider)
@@ -25,42 +113,83 @@ class ReviewController extends Notifier<ReviewState> {
               '/reviews',
               query: {'sandboxSessionId': '$sandboxSessionId'},
             );
+        if (!_isCurrent(generation, ownerKey)) return;
         final review = CodeReview.fromJson(json);
         switch (review.status) {
           case 'DONE':
-            state = ReviewLoaded(review);
+            state = ReviewLoaded(review, sessionId: sandboxSessionId);
             return;
           case 'FAILED':
-            state = const ReviewFailed('AI 리뷰 생성에 실패했습니다');
+            state = ReviewFailed(
+              'AI 리뷰 생성에 실패했습니다',
+              previous: previous,
+              sessionId: sandboxSessionId,
+            );
             return;
           default:
-            // PENDING 또는 null — 계속 폴링
             break;
         }
-      } on ApiException catch (e) {
-        if (e.isKillSwitch) {
-          state = const ReviewKillSwitch();
+      } on ApiException catch (error) {
+        if (!_isCurrent(generation, ownerKey)) return;
+        if (error.isKillSwitch) {
+          state = ReviewKillSwitch(
+            previous: previous,
+            sessionId: sandboxSessionId,
+          );
           return;
         }
-        if (e.isQuota) {
-          state = ReviewQuota(e.retryAfterSeconds);
+        if (error.isQuota) {
+          state = ReviewQuota(
+            error.retryAfterSeconds,
+            previous: previous,
+            sessionId: sandboxSessionId,
+          );
           return;
         }
-        // 아직 리뷰 미생성 — 계속 폴링.
-        // 실 ai-svc는 ReviewNotFoundException을 Spring 기본 404(중첩 error.code 없음)로
-        // 반환하므로 HTTP 404도 미생성 신호로 취급한다. mock은 {error:{code:RESOURCE_NOT_FOUND}}.
-        if (e.code == ApiErrorCode.resourceNotFound || e.status == 404) {
-          // fall through to delay and retry
-        } else {
-          state = ReviewFailed(e.message);
+        // A review is created asynchronously; both normalized resource-not-
+        // found and Spring's bare 404 mean "not ready yet".
+        if (error.code != ApiErrorCode.resourceNotFound &&
+            error.status != 404) {
+          state = ReviewFailed(
+            error.message,
+            previous: previous,
+            sessionId: sandboxSessionId,
+          );
           return;
         }
+      } on Object {
+        if (_isCurrent(generation, ownerKey)) {
+          state = ReviewFailed(
+            '리뷰를 불러오지 못했어요.',
+            previous: previous,
+            sessionId: sandboxSessionId,
+          );
+        }
+        return;
       }
-      await Future<void>.delayed(interval);
+      if (attempt + 1 < maxAttempts) {
+        await Future<void>.delayed(interval);
+      }
     }
-    state = const ReviewFailed('AI 리뷰 시간이 초과되었습니다');
+    if (_isCurrent(generation, ownerKey)) {
+      state = ReviewFailed(
+        'AI 리뷰 시간이 초과되었습니다',
+        previous: previous,
+        sessionId: sandboxSessionId,
+      );
+    }
   }
+
+  bool _isCurrent(int generation, String? ownerKey) =>
+      !_disposed && generation == _generation && ownerKey == _ownerKey;
 }
 
-final reviewControllerProvider =
-    NotifierProvider<ReviewController, ReviewState>(ReviewController.new);
+final reviewControllerFamilyProvider =
+    NotifierProvider.family<
+      ReviewController,
+      ReviewState,
+      MissionWorkspaceKey?
+    >(ReviewController.new);
+
+/// Backward-compatible standalone `/sandbox` review state.
+final reviewControllerProvider = reviewControllerFamilyProvider(null);

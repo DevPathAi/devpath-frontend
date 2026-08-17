@@ -1,13 +1,13 @@
-# DESIGN.md — DevPath AI 프론트엔드 디자인 시스템
+# DESIGN.md — Leva 프론트엔드 디자인 시스템
 
 > 대상: `dp_design`(Material 3) 공용 디자인 시스템 + web/admin/mobile 앱.
-> 출처: `/plan-design-review`(2026-06-14) 결정 + 승인된 와이어프레임 방향(인디고/slate/카드).
-> 이 문서가 토큰의 단일 출처(Single Source of Truth). 모든 화면 디자인은 여기에 정렬한다.
+> 출처: 승인된 Mission Spine / Mission Ledger 디자인·엔지니어링 계약(2026-08-15).
+> 역할: `packages/dp_design/lib/src/theme/`가 token **값과 typed mapping의 SSoT**이고, 이 문서는 **의도와 허용 사용 규칙의 SSoT**다. 표의 값은 코드를 mirror하며 모든 화면 디자인은 이 사용 규칙에 정렬한다.
 
 ## 0. 분류 & 원칙
 
 - **앱 셸(web/admin/mobile)** = APP UI: 차분한 surface 위계, 강한 타이포, 적은 색, 최소 chrome. 카드는 "카드가 곧 인터랙션"일 때만.
-- **landing(Jaspr)** = MARKETING: 별도 표현형 디자인(본 문서 범위 밖, 토큰만 공유).
+- **landing(vanilla HTML/CSS)** = MARKETING: 별도 표현형 디자인이며 versioned semantic token manifest만 mirror한다. Flutter package를 import하거나 token 값을 별도로 정하지 않는다.
 - 보편 규칙: CSS/토큰 변수로 색 정의 · 기본 폰트 스택 금지 · 섹션당 한 가지 일 · 카드는 존재 이유 증명 · 본문 ≥16px & 대비 ≥4.5:1.
 
 ## 1. 컬러 토큰
@@ -23,11 +23,13 @@
 - 대비는 17조합 × 라이트·다크 = 34건을 실측해 미달 0건을 확인했다(2026-08-03).
   검증 스크립트: `docs/superpowers/specs/2026-08-03-token-contrast-check.py`
 - `ColorScheme.fromSeed` 의 시드도 앰버(`#B45309`)로 교체했다(`dp_theme.dart`). 토큰만 바꾸고
-  시드를 인디고로 남기면 `ColorScheme`가 파생하는 Material 색(예: `surfaceTint`·`secondaryContainer`)이
+  시드를 이전 팔레트로 남기면 `ColorScheme`가 파생하는 Material 색(예: `surfaceTint`·`secondaryContainer`)이
   옛 팔레트로 남는다 — 이번 작업에서 얻은 교훈이다.
 
 32개 토큰 전부가 `DpColors`(`packages/dp_design/lib/src/theme/dp_colors.dart`)의 단일 클래스에 있으며,
 이 문서의 값은 그 코드에서 그대로 옮긴 것이다(코드가 SSoT, 이 표는 사본).
+`DpSemanticTokenManifest`(`dp_semantic_tokens.dart`) v1.0.0은 Flutter name, CSS custom property,
+light/dark 값, allowed usage와 default/hover/pressed/focus/selected/disabled/error mapping을 공개한다.
 
 **면 (Surface) — 3단계**
 | 토큰 | 라이트 | 다크 | 용도 |
@@ -48,12 +50,12 @@
 §9 셸 구조에서 배선한다.
 | 토큰 | 라이트 | 다크 | 용도 |
 |---|---|---|---|
-| `railBg` | `#1A1815` | `#131210` | 사이드바 배경 |
+| `railBg` | `#1A1815` | `#221E1A` | 사이드바 배경 |
 | `railText` | `#F2F0EC` | `#EAE7E2` | 사이드바 활성·브랜드 |
-| `railMuted` | `#A9A298` | `#948D85` | 사이드바 비활성 항목 |
-| `railFaint` | `#9C958B` | `#8A837B` | 사이드바 섹션 레이블 |
-| `railActive` | `#2F2B24` | `#231F1B` | 사이드바 활성 배경 |
-| `railBorder` | `#2B2823` | `#2A2621` | 사이드바 내부 구분선 |
+| `railMuted` | `#A9A298` | `#A09991` | 사이드바 비활성 항목 |
+| `railFaint` | `#9C958B` | `#9A938A` | 사이드바 섹션 레이블 |
+| `railActive` | `#2F2B24` | `#332E28` | 사이드바 활성 배경 |
+| `railBorder` | `#2B2823` | `#3A342D` | 사이드바 내부 구분선 |
 
 **액센트 (앰버)**
 | 토큰 | 라이트 | 다크 | 용도 | 대비 비고 |
@@ -137,14 +139,16 @@ Material 3 타입 스케일(Pretendard 적용):
 | displaySmall | 36/44 | 대시보드 KPI 숫자(예: "7일", "62%") |
 | headlineSmall | 24/32 | 화면 제목 |
 | titleMedium | 16/24 (w600) | 카드 제목·과제명 |
-| bodyMedium | 14/22 (한글 1.6) | 본문 |
+| bodyLarge | 16/26 (한글 1.6) | 학습·문서 읽기 본문(기본) |
+| bodyMedium | 14/22 (한글 1.6) | 짧은 UI 설명·상태 보조문 |
 | bodySmall | 13/20 | 보조 정보·메타 |
 | labelLarge | 14/20 (w600) | 버튼·탭 레이블 |
 | titleLarge | 20/28 (w700) | 섹션 제목 |
 | titleSmall | 14/20 (w600) | 카드 소제목 |
 | labelMedium | 12/16 (w600) | 칩·뱃지 |
 
-> 본문 최소 14px(메타) / 주요 본문 16px. 11px 이하 보조 텍스트는 색 대비 ≥4.5:1 유지.
+> 학습·문서 읽기 본문은 `bodyLarge` 16px을 기본으로 하고 18px까지 허용한다. 메타는 `bodySmall` 13px,
+> 11px `labelSmall`은 짧은 UI 레이블에만 쓰며 모든 읽어야 하는 텍스트는 대비 ≥4.5:1을 유지한다.
 
 ## 3. 간격 · 라운드 · 고도
 
@@ -183,13 +187,13 @@ Material 3 타입 스케일(Pretendard 적용):
 
 ## 6. 접근성 베이스라인 (필수)
 
-- **대비**: 본문/링크 텍스트 ≥4.5:1(인디고는 `primaryText`/`primaryTextStrong` 사용), 큰 텍스트·UI 컴포넌트 ≥3:1.
+- **대비**: 본문/링크 텍스트 ≥4.5:1(앰버 채움인 `primary`를 텍스트로 쓰지 않고 `primaryText`/`primaryTextStrong` 사용), 큰 텍스트·UI 컴포넌트 ≥3:1.
 - **터치 타깃**: ≥44×44 (하단탭·아이콘 버튼·칩).
-- **키보드**: 전체 포커스 순서·가시 포커스 링(2px `primaryText` + 2px offset)·skip-to-content. **Monaco는 포커스 트랩 → `Esc`로 에디터 탈출** 명시.
+- **키보드**: 전체 포커스 순서·가시 포커스 링(2px `primaryText`)·skip-to-content. **Monaco는 포커스 트랩 → `Esc`로 에디터 탈출** 명시.
 - **스크린리더**: 시맨틱 랜드마크(`nav`/`main`/`complementary`), `lang="ko"`. **SSE 실시간 업데이트는 `aria-live="polite"` 영역**(경로생성 단계·실행로그·멘토 스트리밍)에서 고지. 로딩 `aria-busy`, 에러 즉시 announce.
 - **상태 전달**: 색만으로 의미 전달 금지(텍스트 레이블 병행).
 - **`semanticChildCount`**: `ListView`/`GridView.count`는 자동으로 채우지만 **`CustomScrollView`는 기본 `null`**이다. 스크린리더의 「N개 중 M번째」에 쓰이므로 **동적 목록 화면에는 지정하고, 문서형·폼·정적 섹션(`SliverList.list`)에는 지정하지 않는다.** 지정할 때는 `itemCount`가 아니라 **콘텐츠 항목 수**를 센다 — 광고 슬롯·「더 보기」 버튼은 `itemCount`에 들어가지만 목록 항목이 아니다. **틀린 개수는 없는 것보다 나쁘다.**
-- **reduced-motion**: `prefers-reduced-motion` 존중 — 스트리밍 shimmer·entrance 모션 비활성화, 즉시 표시로 대체.
+- **reduced-motion**: `prefers-reduced-motion`/platform `disableAnimations` 존중 — 스트리밍 shimmer·entrance·위치 이동·count-up을 비활성화하고 상태 설명을 유지한 즉시 표시로 대체.
 
 ## 7. 모션
 
@@ -208,6 +212,21 @@ Loading/Empty/Error 외에 다음 전용 상태를 dp_design에 추가:
 - **SSE 단계 상태**: connecting / streaming(단계별) / partial(중단·단계 보존) / reconnecting / complete / failed.
 
 각 상태는 **사용자가 보는 것** 기준으로 설계: 따뜻한 카피 + 단일 1차 행동 + 맥락. "결과 없음" 같은 빈 문구 금지.
+
+### 8.1 Mission presentation primitives
+
+`packages/dp_design/lib/src/mission/`은 표현과 semantic behavior만 소유한다. network, Riverpod,
+GoRouter, route/action 결정, 상태 추론, mutation, analytics는 import하거나 수행하지 않는다.
+
+| Primitive | 표현 입력 / 상태 | 접근성·focus 계약 |
+|---|---|---|
+| `DpMissionHeader` | compact/standard; loading/stale/active/completed | week→heading→why→완료 조건→label+value progress 순서. heading은 프로그램 focus 가능, 일반 tab 순서에서는 제외 |
+| `DpProgressSpine` | stable ordered IDs; vertical/horizontal/text; upcoming/current/completed/unavailable | ordered semantics와 상태 text를 함께 제공. callback이 있을 때만 Enter/Space 대상이며 focus는 2px `primaryText` |
+| `DpContextCapsule` | collapsed/expanded/payloadPreview; ready/loading/partial/error; included/excluded/rejected field | disclosure focus 유지, source·포함·민감도 공개, callback은 intent만 반환 |
+| `DpNextActionBand` | inline/sticky-safe; ready/pending/disabled/retry/completed | action과 예상 결과를 함께 읽고 disabled reason 제공. pending rebuild에서 focus 유지, subordinate escape는 text action |
+
+Primary action hover는 `primary` 위에 `onPrimary` 8% overlay를 합성한 같은 action pair의 파생값을
+사용한다. `primaryText`/`primaryTextStrong`을 surface fill로 전용하지 않는다.
 
 ## 9. 셸 구조
 

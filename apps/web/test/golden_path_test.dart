@@ -1,4 +1,5 @@
 import 'package:devpath_web/src/app/app.dart';
+import 'package:devpath_web/src/app/app_config.dart';
 import 'package:devpath_web/src/features/auth/application/auth_controller.dart';
 import 'package:devpath_web/src/features/auth/state/auth_state.dart';
 import 'package:devpath_web/src/features/diagnostic/application/diagnostic_controller.dart';
@@ -6,6 +7,7 @@ import 'package:devpath_web/src/features/diagnostic/presentation/diagnostic_page
 import 'package:devpath_web/src/features/path/presentation/path_page.dart';
 import 'package:devpath_web/src/features/sandbox/data/sandbox_run_source.dart';
 import 'package:devpath_web/src/features/sandbox/presentation/sandbox_page.dart';
+import 'package:devpath_web/src/providers/api_providers.dart';
 import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
@@ -60,6 +62,13 @@ void main() {
 
     final container = ProviderContainer(
       overrides: [
+        appConfigProvider.overrideWithValue(
+          const AppConfig(
+            baseUrl: 'https://mock.devpath.ai',
+            useMock: true,
+            missionSpineEnabled: true,
+          ),
+        ),
         authControllerProvider.overrideWith(_NoBootstrapAuthController.new),
         assessmentApiProvider.overrideWithValue(_FastCompleteAssessmentApi()),
         sandboxRunConnectProvider.overrideWithValue((_, _) => _logs(['OK'])),
@@ -81,13 +90,20 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(DiagnosticPage), findsOneWidget);
 
-    // 3) 진단 시작 → 즉시 완료(next=null) → PATH 생성 화면
+    // 3) 진단 시작 → 즉시 완료(next=null) → 실제 결과 preview
     // 트랙을 고르기 전에는 시작 버튼이 비활성이다.
     await tester.tap(find.byKey(const ValueKey('diagnostic-track')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('백엔드 (Spring)').last);
     await tester.pumpAndSettle();
     await tester.tap(find.text('진단 시작하기'));
+    await tester.pumpAndSettle();
+    expect(find.byType(DiagnosticPage), findsOneWidget);
+    expect(find.textContaining('현재 레벨 MID'), findsOneWidget);
+    expect(find.byType(PathPage), findsNothing);
+
+    // 결과를 확인한 뒤 명시적인 handoff CTA를 눌러야 PATH로 간다.
+    await tester.tap(find.text('기존 경로로 계속'));
     await tester.pumpAndSettle();
     expect(find.byType(PathPage), findsOneWidget);
 

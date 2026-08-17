@@ -2,6 +2,7 @@ import 'package:devpath_admin/src/features/users/application/users_controller.da
 import 'package:devpath_admin/src/features/users/data/admin_user_row.dart';
 import 'package:devpath_admin/src/features/users/data/users_source.dart';
 import 'package:devpath_admin/src/features/users/presentation/users_page.dart';
+import 'package:devpath_admin/src/widgets/admin_status_widgets.dart';
 import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart' hide Page;
@@ -16,9 +17,10 @@ class _SpyController extends UsersController {
   final List<String> preApprovedEmails = [];
 
   @override
-  Future<void> approve(String userId) async {
+  Future<String?> approve(String userId) async {
     approvedIds.add(userId);
     // load()를 실제 호출하지 않으므로 state를 직접 갱신하지 않음
+    return null;
   }
 
   @override
@@ -66,9 +68,9 @@ Widget _wrap(ProviderContainer container) => UncontrolledProviderScope(
 
 void main() {
   // -------------------------------------------------------------------------
-  // (a) 상태 필터에 BETA_PENDING 칩이 존재한다
+  // (a) 상태 필터에 BETA_PENDING wire 값이 손실 없이 존재한다
   // -------------------------------------------------------------------------
-  testWidgets('(a) 상태 필터에 BETA_PENDING ChoiceChip이 가장 먼저 렌더된다', (tester) async {
+  testWidgets('(a) 상태 필터에 승인 대기 (BETA_PENDING)가 가장 먼저 렌더된다', (tester) async {
     tester.view.physicalSize = const Size(1400, 900);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
@@ -79,26 +81,21 @@ void main() {
     await tester.pumpWidget(_wrap(c));
     await tester.pumpAndSettle();
 
-    // 칩이 존재해야 한다 (테이블 셀에도 BETA_PENDING이 나타날 수 있으므로 findsWidgets)
-    expect(find.text('BETA_PENDING'), findsWidgets);
+    expect(find.text('(BETA_PENDING)'), findsOneWidget);
 
-    // BETA_PENDING이 ACTIVE 칩보다 먼저 나타나야 한다
-    // ChoiceChip 위젯 기준으로 위치 비교 (테이블 셀의 ACTIVE 텍스트와 혼동 방지)
-    final chips = find.byType(ChoiceChip);
-    final chipWidgets = tester.widgetList<ChoiceChip>(chips).toList();
-    final chipLabels = chipWidgets.map((c) {
-      final label = c.label;
-      if (label is Text) return label.data ?? '';
-      return '';
-    }).toList();
-    final betaIdx = chipLabels.indexOf('BETA_PENDING');
-    final activeIdx = chipLabels.indexOf('ACTIVE');
-    expect(
-      betaIdx,
-      greaterThanOrEqualTo(0),
-      reason: 'BETA_PENDING chip not found',
+    final dropdown = tester.widget<DropdownButton<String>>(
+      find.descendant(
+        of: find.byType(AdminStatusFilter),
+        matching: find.byType(DropdownButton<String>),
+      ),
     );
-    expect(activeIdx, greaterThanOrEqualTo(0), reason: 'ACTIVE chip not found');
+    final labels = dropdown.items!
+        .map((item) => (item.child as Text).data ?? '')
+        .toList();
+    final betaIdx = labels.indexOf('승인 대기 (BETA_PENDING)');
+    final activeIdx = labels.indexOf('활성 (ACTIVE)');
+    expect(betaIdx, greaterThanOrEqualTo(0));
+    expect(activeIdx, greaterThanOrEqualTo(0));
     expect(betaIdx, lessThan(activeIdx));
   });
 
@@ -127,6 +124,9 @@ void main() {
     expect(find.text('영구 밴'), findsNothing); // BETA_PENDING엔 제재 없음
 
     await tester.tap(find.widgetWithText(MenuItemButton, '승인'));
+    await tester.pumpAndSettle();
+    expect(find.text('사용자 승인'), findsOneWidget);
+    await tester.tap(find.text('승인 확정'));
     await tester.pumpAndSettle();
     expect(spy.approvedIds, contains('u-pending'));
   });

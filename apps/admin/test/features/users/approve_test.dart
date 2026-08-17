@@ -15,7 +15,7 @@ class _CapturingAdapter implements HttpClientAdapter {
   final List<RequestOptions> captured = [];
 
   /// 기본값: 204 No Content (approve/preApprove 엔드포인트 규약)
-  /// users 목록(GET /admin/users)은 빈 Page JSON 반환.
+  /// users 목록(GET /admin/users)은 승인 대기 사용자 1명을 반환한다.
   @override
   Future<ResponseBody> fetch(
     RequestOptions options,
@@ -25,9 +25,20 @@ class _CapturingAdapter implements HttpClientAdapter {
     captured.add(options);
 
     if (options.method == 'GET' && options.path.contains('/admin/users')) {
-      // load() 내부의 GET /admin/users 호출 — 빈 페이지 반환
+      // approve()가 현재 상태를 재검증할 수 있는 승인 대기 행.
       return ResponseBody.fromString(
-        jsonEncode({'data': [], 'limit': 20}),
+        jsonEncode({
+          'data': [
+            {
+              'id': '1',
+              'nickname': '대기자',
+              'email': 'pending@example.com',
+              'role': 'LEARNER',
+              'status': 'BETA_PENDING',
+            },
+          ],
+          'limit': 20,
+        }),
         200,
         headers: {
           Headers.contentTypeHeader: [Headers.jsonContentType],
@@ -67,6 +78,8 @@ void main() {
       final container = _container(adapter);
       addTearDown(container.dispose);
 
+      await container.read(adminUsersProvider.notifier).load();
+      adapter.captured.clear();
       await container.read(adminUsersProvider.notifier).approve('1');
 
       final posts = adapter.captured.where((r) => r.method == 'POST').toList();
@@ -79,6 +92,8 @@ void main() {
       final container = _container(adapter);
       addTearDown(container.dispose);
 
+      await container.read(adminUsersProvider.notifier).load();
+      adapter.captured.clear();
       await container.read(adminUsersProvider.notifier).approve('1');
 
       final gets = adapter.captured

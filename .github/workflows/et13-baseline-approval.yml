@@ -1,0 +1,795 @@
+---
+# Immutable action pins intentionally exceed 80 columns.
+# yamllint disable rule:line-length
+name: ET13 Baseline Approval
+
+'on':
+  workflow_dispatch:
+    inputs:
+      release_id:
+        description: Release identifier for the approved visual baseline artifact
+        required: true
+        type: string
+      raw_run_id:
+        description: Successful ET13 diagnostic producer run ID
+        required: true
+        type: string
+      raw_run_attempt:
+        description: Exact successful ET13 diagnostic producer attempt
+        required: true
+        type: string
+      raw_artifact_id:
+        description: Immutable unsealed raw review artifact ID
+        required: true
+        type: string
+      raw_artifact_digest:
+        description: GitHub artifact digest in sha256:<hex> form
+        required: true
+        type: string
+      raw_workflow_sha256:
+        description: SHA-256 of the exact ET13 producer workflow bytes
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: et13-baseline-approval-${{ inputs.release_id }}-${{ inputs.raw_artifact_id }}
+  cancel-in-progress: false
+
+jobs:
+  approve-baseline:
+    name: Approve exact ET13 visual baseline
+    environment:
+      name: et13-baseline-approval
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6.1.0
+
+      - name: Bind immutable input and protected human review
+        id: approval
+        shell: bash
+        env:
+          GH_READ_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ inputs.release_id }}
+          RAW_RUN_ID: ${{ inputs.raw_run_id }}
+          RAW_RUN_ATTEMPT: ${{ inputs.raw_run_attempt }}
+          RAW_ARTIFACT_ID: ${{ inputs.raw_artifact_id }}
+          RAW_ARTIFACT_DIGEST: ${{ inputs.raw_artifact_digest }}
+          RAW_WORKFLOW_SHA256: ${{ inputs.raw_workflow_sha256 }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const { appendFileSync } = require('node:fs');
+          const { createHash } = require('node:crypto');
+
+          function fail(message) {
+            throw new Error(`ET13 baseline approval refused: ${message}`);
+          }
+
+          function exact(actual, expected, name) {
+            if (actual !== expected) fail(`${name} mismatch`);
+          }
+
+          function positiveInteger(value, name) {
+            if (!/^[1-9][0-9]*$/.test(value ?? '')) {
+              fail(`${name} must be a positive integer`);
+            }
+            const parsed = Number(value);
+            if (!Number.isSafeInteger(parsed)) fail(`${name} is not safe`);
+            return parsed;
+          }
+
+          function utcTimestamp(value, name) {
+            if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(value ?? '')) {
+              fail(`${name} must be an ISO-8601 UTC Z timestamp`);
+            }
+            const parsed = Date.parse(value);
+            if (!Number.isFinite(parsed)) fail(`${name} is invalid`);
+            return parsed;
+          }
+
+          async function github(path) {
+            const response = await fetch(`https://api.github.com${path}`, {
+              headers: {
+                Accept: 'application/vnd.github+json',
+                Authorization: `Bearer ${process.env.GH_READ_TOKEN}`,
+                'X-GitHub-Api-Version': '2022-11-28',
+              },
+              redirect: 'error',
+            });
+            if (!response.ok) fail(`GitHub API ${path} returned ${response.status}`);
+            return response.json();
+          }
+
+          function exactWorkflow(run, expectedPath, name) {
+            const acceptedPaths = new Set([
+              expectedPath,
+              `${expectedPath}@main`,
+              `${expectedPath}@refs/heads/main`,
+            ]);
+            if (!acceptedPaths.has(run.path)) {
+              fail(`${name}.path mismatch`);
+            }
+          }
+
+          async function main() {
+            const repository = process.env.GITHUB_REPOSITORY;
+            const sourceSha = process.env.GITHUB_SHA;
+            const currentRunId = positiveInteger(process.env.GITHUB_RUN_ID, 'current run ID');
+            const currentRunAttempt = positiveInteger(
+              process.env.GITHUB_RUN_ATTEMPT,
+              'current run attempt',
+            );
+            const rawRunId = positiveInteger(process.env.RAW_RUN_ID, 'raw run ID');
+            const rawRunAttempt = positiveInteger(
+              process.env.RAW_RUN_ATTEMPT,
+              'raw run attempt',
+            );
+            const rawArtifactId = positiveInteger(
+              process.env.RAW_ARTIFACT_ID,
+              'raw artifact ID',
+            );
+            const releaseId = process.env.RELEASE_ID ?? '';
+            const rawArtifactDigest = process.env.RAW_ARTIFACT_DIGEST ?? '';
+            const rawWorkflowSha256 = process.env.RAW_WORKFLOW_SHA256 ?? '';
+            const environmentName = 'et13-baseline-approval';
+            const approvalWorkflow = '.github/workflows/et13-baseline-approval.yml';
+            const rawWorkflow = '.github/workflows/et13-evidence.yml';
+
+            if (!process.env.GH_READ_TOKEN) fail('read-only GitHub token is absent');
+            if (repository !== 'DevPathAi/devpath-frontend') fail('repository mismatch');
+            if (process.env.GITHUB_REF !== 'refs/heads/main') fail('approval must target main');
+            if (!/^(?!0{40}$)[0-9a-f]{40}$/.test(sourceSha)) fail('source SHA is invalid');
+            if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(releaseId)) {
+              fail('release identifier is unsafe');
+            }
+            if (!/^sha256:[0-9a-f]{64}$/.test(rawArtifactDigest)) {
+              fail('raw artifact digest is invalid');
+            }
+            if (!/^[0-9a-f]{64}$/.test(rawWorkflowSha256)) {
+              fail('raw workflow digest is invalid');
+            }
+            if (currentRunId === rawRunId) fail('approval run cannot be its own raw input');
+
+            const currentRun = await github(
+              `/repos/${repository}/actions/runs/${currentRunId}/attempts/${currentRunAttempt}`,
+            );
+            exact(currentRun.id, currentRunId, 'currentRun.id');
+            exact(currentRun.run_attempt, 1, 'currentRun.run_attempt');
+            exact(currentRunAttempt, 1, 'GITHUB_RUN_ATTEMPT');
+            exact(currentRun.event, 'workflow_dispatch', 'currentRun.event');
+            exact(currentRun.head_sha, sourceSha, 'currentRun.head_sha');
+            exact(currentRun.head_branch, 'main', 'currentRun.head_branch');
+            exact(currentRun.repository?.full_name, repository, 'currentRun.repository');
+            exactWorkflow(currentRun, approvalWorkflow, 'currentRun');
+
+            const environment = await github(
+              `/repos/${repository}/environments/${encodeURIComponent(environmentName)}`,
+            );
+            exact(environment.name, environmentName, 'environment.name');
+            if (!Number.isSafeInteger(environment.id) || environment.id < 1) {
+              fail('environment identity is absent');
+            }
+            if (!Array.isArray(environment.protection_rules)) {
+              fail('environment protection rules are absent');
+            }
+            const requiredRules = environment.protection_rules.filter(
+              (rule) => rule.type === 'required_reviewers',
+            );
+            if (requiredRules.length !== 1) fail('required reviewer rule is absent or ambiguous');
+            const requiredRule = requiredRules[0];
+            if (requiredRule.prevent_self_review !== true) {
+              fail('environment must prevent self review');
+            }
+            if (!Array.isArray(requiredRule.reviewers) || requiredRule.reviewers.length < 1) {
+              fail('environment has no configured reviewer');
+            }
+
+            let approvals = [];
+            let jobs = null;
+            for (let attempt = 0; attempt < 10; attempt += 1) {
+              approvals = await github(
+                `/repos/${repository}/actions/runs/${currentRunId}/approvals`,
+              );
+              jobs = await github(
+                `/repos/${repository}/actions/runs/${currentRunId}` +
+                  `/attempts/${currentRunAttempt}/jobs?per_page=100`,
+              );
+              const protectedReviewVisible = Array.isArray(approvals) &&
+                approvals.some((review) =>
+                  review.state === 'approved' &&
+                  review.environments?.some(
+                    (entry) => entry.id === environment.id && entry.name === environmentName,
+                  ),
+                );
+              if (protectedReviewVisible && jobs?.jobs?.some(
+                (job) => job.name === 'Approve exact ET13 visual baseline' && job.started_at,
+              )) break;
+              await new Promise((resolve) => setTimeout(resolve, 2000));
+            }
+            if (!Array.isArray(approvals) || approvals.length !== 1) {
+              fail('approval history must contain exactly one review');
+            }
+            const matchingReviews = approvals.filter((review) =>
+              review.state === 'approved' &&
+              Array.isArray(review.environments) &&
+              review.environments.length === 1 &&
+              review.environments[0]?.id === environment.id &&
+              review.environments[0]?.name === environmentName,
+            );
+            if (matchingReviews.length !== 1) fail('exact environment approval is absent');
+            const review = matchingReviews[0];
+            const approvedBy = review.user?.login;
+            if (!/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/.test(approvedBy ?? '')) {
+              fail('approved reviewer login is absent or non-human');
+            }
+            if (
+              review.user?.type !== 'User' ||
+              !Number.isSafeInteger(review.user?.id) ||
+              review.user.id < 1
+            ) {
+              fail('approved reviewer identity is invalid');
+            }
+            if (
+              approvedBy === currentRun.actor?.login ||
+              approvedBy === currentRun.triggering_actor?.login ||
+              review.user.id === currentRun.actor?.id ||
+              review.user.id === currentRun.triggering_actor?.id
+            ) {
+              fail('the workflow initiator cannot approve this baseline');
+            }
+            const configuredUserMatch = requiredRule.reviewers.some(
+              (entry) => entry.type === 'User' && entry.reviewer?.id === review.user.id,
+            );
+            const configuredTeamGate = requiredRule.reviewers.some(
+              (entry) =>
+                entry.type === 'Team' &&
+                Number.isSafeInteger(entry.reviewer?.id) &&
+                entry.reviewer.id > 0,
+            );
+            if (!configuredUserMatch && !configuredTeamGate) {
+              fail('approved reviewer is not represented by the configured gate');
+            }
+
+            if (!jobs || jobs.total_count !== 1 || jobs.jobs.length !== 1) {
+              fail('protected approval job identity is absent or ambiguous');
+            }
+            const currentJob = jobs.jobs[0];
+            exact(currentJob.name, 'Approve exact ET13 visual baseline', 'currentJob.name');
+            exact(currentJob.run_id, currentRunId, 'currentJob.run_id');
+            exact(currentJob.head_sha, sourceSha, 'currentJob.head_sha');
+            const createdMillis = utcTimestamp(currentRun.created_at, 'run creation time');
+            const approvalEffectiveAt = currentJob.started_at;
+            const effectiveMillis = utcTimestamp(
+              approvalEffectiveAt,
+              'approval effective time',
+            );
+            if (effectiveMillis < createdMillis || effectiveMillis > Date.now()) {
+              fail('approval effective time is outside the protected run interval');
+            }
+
+            const rawRun = await github(
+              `/repos/${repository}/actions/runs/${rawRunId}/attempts/${rawRunAttempt}`,
+            );
+            exact(rawRun.id, rawRunId, 'rawRun.id');
+            exact(rawRun.run_attempt, rawRunAttempt, 'rawRun.run_attempt');
+            exact(rawRun.event, 'push', 'rawRun.event');
+            exact(rawRun.status, 'completed', 'rawRun.status');
+            exact(rawRun.conclusion, 'success', 'rawRun.conclusion');
+            exact(rawRun.head_sha, sourceSha, 'rawRun.head_sha');
+            exact(rawRun.head_branch, 'main', 'rawRun.head_branch');
+            exact(rawRun.repository?.full_name, repository, 'rawRun.repository');
+            exactWorkflow(rawRun, rawWorkflow, 'rawRun');
+
+            const rawArtifact = await github(
+              `/repos/${repository}/actions/artifacts/${rawArtifactId}`,
+            );
+            exact(rawArtifact.id, rawArtifactId, 'rawArtifact.id');
+            exact(
+              rawArtifact.name,
+              `et13-unsealed-raw-review-run-${rawRunId}-attempt-${rawRunAttempt}`,
+              'rawArtifact.name',
+            );
+            exact(rawArtifact.expired, false, 'rawArtifact.expired');
+            exact(rawArtifact.workflow_run?.id, rawRunId, 'rawArtifact.workflow_run.id');
+            exact(rawArtifact.workflow_run?.head_sha, sourceSha, 'rawArtifact.workflow_run.head_sha');
+            exact(rawArtifact.digest, rawArtifactDigest, 'rawArtifact.digest');
+            if (!Number.isSafeInteger(rawArtifact.size_in_bytes) || rawArtifact.size_in_bytes < 1) {
+              fail('raw artifact is empty');
+            }
+            if (utcTimestamp(rawArtifact.expires_at, 'raw artifact expiration') <= Date.now()) {
+              fail('raw artifact has expired');
+            }
+
+            const encodedWorkflow = rawWorkflow
+              .split('/')
+              .map((part) => encodeURIComponent(part))
+              .join('/');
+            const workflow = await github(
+              `/repos/${repository}/contents/${encodedWorkflow}?ref=${sourceSha}`,
+            );
+            exact(workflow.type, 'file', 'rawWorkflow.type');
+            exact(workflow.path, rawWorkflow, 'rawWorkflow.path');
+            exact(workflow.encoding, 'base64', 'rawWorkflow.encoding');
+            if (!/^(?!0{40}$)[0-9a-f]{40}$/.test(workflow.sha ?? '')) {
+              fail('raw workflow Git identity is absent');
+            }
+            const workflowBytes = Buffer.from(
+              (workflow.content ?? '').replace(/\s/g, ''),
+              'base64',
+            );
+            if (workflowBytes.length < 1) fail('raw workflow bytes are absent');
+            exact(
+              createHash('sha256').update(workflowBytes).digest('hex'),
+              rawWorkflowSha256,
+              'raw workflow SHA-256',
+            );
+
+            const encodedApprovalWorkflow = approvalWorkflow
+              .split('/')
+              .map((part) => encodeURIComponent(part))
+              .join('/');
+            const approvalWorkflowFile = await github(
+              `/repos/${repository}/contents/${encodedApprovalWorkflow}?ref=${sourceSha}`,
+            );
+            exact(approvalWorkflowFile.type, 'file', 'approvalWorkflow.type');
+            exact(approvalWorkflowFile.path, approvalWorkflow, 'approvalWorkflow.path');
+            exact(approvalWorkflowFile.encoding, 'base64', 'approvalWorkflow.encoding');
+            if (!/^(?!0{40}$)[0-9a-f]{40}$/.test(approvalWorkflowFile.sha ?? '')) {
+              fail('approval workflow Git identity is absent');
+            }
+            const approvalWorkflowBytes = Buffer.from(
+              (approvalWorkflowFile.content ?? '').replace(/\s/g, ''),
+              'base64',
+            );
+            if (approvalWorkflowBytes.length < 1) fail('approval workflow bytes are absent');
+            const approvalWorkflowSha256 = createHash('sha256')
+              .update(approvalWorkflowBytes)
+              .digest('hex');
+
+            if (!process.env.GITHUB_OUTPUT) fail('GITHUB_OUTPUT is absent');
+            appendFileSync(
+              process.env.GITHUB_OUTPUT,
+              `approved_by=${approvedBy}\n` +
+                `approved_by_id=${review.user.id}\n` +
+                `approval_environment_id=${environment.id}\n` +
+                `approval_effective_at=${approvalEffectiveAt}\n` +
+                `approval_workflow_sha256=${approvalWorkflowSha256}\n`,
+            );
+          }
+
+          main().catch((error) => {
+            console.error(error.message);
+            process.exitCode = 1;
+          });
+          NODE
+
+      - name: Verify exact checkout and producer workflow bytes
+        shell: bash
+        env:
+          RAW_WORKFLOW_SHA256: ${{ inputs.raw_workflow_sha256 }}
+          APPROVAL_WORKFLOW_SHA256: ${{ steps.approval.outputs.approval_workflow_sha256 }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test "${GITHUB_REF}" = refs/heads/main
+          printf '%s  %s\n' \
+            "${RAW_WORKFLOW_SHA256}" \
+            .github/workflows/et13-evidence.yml | sha256sum --check --strict
+          printf '%s  %s\n' \
+            "${APPROVAL_WORKFLOW_SHA256}" \
+            .github/workflows/et13-baseline-approval.yml | sha256sum --check --strict
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Download and hard-verify exact raw artifact archive
+        shell: bash
+        env:
+          GH_READ_TOKEN: ${{ github.token }}
+          RAW_ARTIFACT_ID: ${{ inputs.raw_artifact_id }}
+          RAW_ARTIFACT_DIGEST: ${{ inputs.raw_artifact_digest }}
+        run: |
+          set -euo pipefail
+          if [[ -e build || -L build ]]; then
+            test -d build
+            test ! -L build
+          else
+            mkdir -- build
+          fi
+          test ! -e build/et13
+          test ! -L build/et13
+          mkdir -- build/et13
+          curl --fail --silent --show-error --location \
+            --proto '=https' --proto-redir '=https' \
+            -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer ${GH_READ_TOKEN}" \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "https://api.github.com/repos/DevPathAi/devpath-frontend/actions/artifacts/${RAW_ARTIFACT_ID}/zip" \
+            --output build/et13/raw-review.zip
+          printf '%s  %s\n' \
+            "${RAW_ARTIFACT_DIGEST#sha256:}" \
+            build/et13/raw-review.zip | sha256sum --check --strict
+
+          python3 - build/et13/raw-review.zip <<'PYTHON'
+          import stat
+          import sys
+          import zipfile
+
+          archive = sys.argv[1]
+          try:
+              with zipfile.ZipFile(archive) as raw_zip:
+                  entries = raw_zip.infolist()
+          except (OSError, zipfile.BadZipFile) as error:
+              raise SystemExit(f'invalid raw artifact archive: {error}') from error
+          if not entries:
+              raise SystemExit('raw artifact archive is empty')
+
+          seen = set()
+          for entry in entries:
+              name = entry.filename
+              normalized = name[:-1] if name.endswith('/') else name
+              parts = normalized.split('/')
+              if (
+                  not normalized
+                  or '\\' in name
+                  or any(part in ('', '.', '..') for part in parts)
+              ):
+                  raise SystemExit(f'unsafe raw artifact archive entry: {name!r}')
+              if normalized in seen:
+                  raise SystemExit(f'duplicate raw artifact archive entry: {name!r}')
+              seen.add(normalized)
+              if entry.flag_bits & 0x1:
+                  raise SystemExit(f'encrypted raw artifact archive entry: {name!r}')
+              file_type = stat.S_IFMT((entry.external_attr >> 16) & 0xFFFF)
+              if file_type == stat.S_IFLNK:
+                  raise SystemExit(f'raw artifact archive link is forbidden: {name!r}')
+              expected_type = stat.S_IFDIR if entry.is_dir() else stat.S_IFREG
+              if file_type not in (0, expected_type):
+                  raise SystemExit(f'raw artifact archive special entry is forbidden: {name!r}')
+          PYTHON
+
+          test ! -e build/et13/raw
+          test ! -L build/et13/raw
+          test ! -e build/et13/raw-archive
+          test ! -L build/et13/raw-archive
+          mkdir -- build/et13/raw build/et13/raw-archive
+          test -d build/et13/raw
+          test ! -L build/et13/raw
+          test -d build/et13/raw-archive
+          test ! -L build/et13/raw-archive
+
+      - name: Download exact unsealed raw review artifact
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53  # v6.0.0
+        with:
+          artifact-ids: ${{ inputs.raw_artifact_id }}
+          repository: DevPathAi/devpath-frontend
+          run-id: ${{ inputs.raw_run_id }}
+          github-token: ${{ github.token }}
+          merge-multiple: true
+          path: build/et13/raw
+
+      - name: Bind action extraction to the verified raw archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d build/et13/raw
+          test ! -L build/et13/raw
+          test -d build/et13/raw-archive
+          test ! -L build/et13/raw-archive
+          test -z "$(find build/et13/raw-archive -mindepth 1 -print -quit)"
+          zipinfo -1 build/et13/raw-review.zip > "${RUNNER_TEMP}/raw-zip-entries.txt"
+          test -s "${RUNNER_TEMP}/raw-zip-entries.txt"
+          while IFS= read -r entry; do
+            case "${entry}" in
+              /*|..|../*|*/..|*/../*|*\\*)
+                echo "unsafe raw artifact archive entry: ${entry}" >&2
+                exit 1
+                ;;
+            esac
+          done < "${RUNNER_TEMP}/raw-zip-entries.txt"
+          unzip -q build/et13/raw-review.zip -d build/et13/raw-archive
+          test -z "$(find build/et13/raw-archive -type l -print -quit)"
+          test -z "$(find build/et13/raw-archive -mindepth 1 ! -type f ! -type d -print -quit)"
+          diff --recursive --brief build/et13/raw-archive build/et13/raw
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2  # v2.23.0
+        with:
+          flutter-version: '3.44.1'
+          cache: true
+
+      - name: Resolve locked verifier workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter --version --machine | grep -q '"frameworkVersion": "3.44.1"'
+          flutter --version --machine | grep -q '"dartSdkVersion": "3.12.1"'
+          flutter --version --machine \
+            | grep -q '"frameworkRevision": "924134a44c189315be2148659913dda1671cbe99"'
+          flutter pub get --enforce-lockfile
+          dart run tools/et13_evidence.dart validate
+
+      - name: Reject raw links, extras, identity drift, and hash drift
+        shell: bash
+        env:
+          RAW_RUN_ID: ${{ inputs.raw_run_id }}
+          RAW_RUN_ATTEMPT: ${{ inputs.raw_run_attempt }}
+        run: |
+          set -euo pipefail
+          raw_root=build/et13/raw
+          test -d "${raw_root}"
+          test -z "$(find "${raw_root}" -type l -print -quit)"
+          test -z "$(find "${raw_root}" -mindepth 1 ! -type f ! -type d -print -quit)"
+
+          {
+            printf '%s\n' \
+              build-marker.v1.json \
+              capture/artifacts/et13/capture-summary.v1.json \
+              producer/visual/evidence.json \
+              producer/visual/provenance.v1.json \
+              producer/visual/review-candidate.v1.json \
+              producer/visual/visual-manifest.v1.json \
+              producer/a11y/evidence.json \
+              producer/a11y/provenance.v1.json \
+              producer/a11y/review-candidate.v1.json \
+              producer/a11y/a11y-manifest.v1.json
+            jq -er '.cases[].artifact_path | "capture/" + .' \
+              evidence/et13/generated/visual-cases.v1.json
+            jq -er '.cases[].artifact_path | "capture/" + .' \
+              evidence/et13/generated/a11y-cases.v1.json
+            while IFS= read -r fixture; do
+              for theme in light dark; do
+                smoke="${fixture}--browser-smoke--w320--${theme}--text200"
+                printf 'capture/review/browser-smoke/%s--first.png\n' "${smoke}"
+                printf 'capture/review/browser-smoke/%s--second.png\n' "${smoke}"
+              done
+            done < <(jq -er '.fixtures[] | select(.distribution == "web") | .id' \
+              evidence/et13/catalog.v1.json)
+          } | LC_ALL=C sort > "${RUNNER_TEMP}/expected-raw-files.txt"
+          find "${raw_root}" -type f -printf '%P\n' | LC_ALL=C sort \
+            > "${RUNNER_TEMP}/actual-raw-files.txt"
+          test "$(wc -l < "${RUNNER_TEMP}/expected-raw-files.txt")" -eq 162
+          diff -u \
+            "${RUNNER_TEMP}/expected-raw-files.txt" \
+            "${RUNNER_TEMP}/actual-raw-files.txt"
+
+          while IFS= read -r path; do
+            directory="$(dirname "${path}")"
+            while [[ "${directory}" != . ]]; do
+              printf '%s\n' "${directory}"
+              directory="$(dirname "${directory}")"
+            done
+          done < "${RUNNER_TEMP}/expected-raw-files.txt" \
+            | LC_ALL=C sort -u > "${RUNNER_TEMP}/expected-raw-directories.txt"
+          find "${raw_root}" -mindepth 1 -type d -printf '%P\n' | LC_ALL=C sort \
+            > "${RUNNER_TEMP}/actual-raw-directories.txt"
+          diff -u \
+            "${RUNNER_TEMP}/expected-raw-directories.txt" \
+            "${RUNNER_TEMP}/actual-raw-directories.txt"
+
+          jq -e --arg source "${GITHUB_SHA}" \
+            '.source_sha == $source' "${raw_root}/build-marker.v1.json" > /dev/null
+          for lane in visual a11y; do
+            candidate="${raw_root}/producer/${lane}/review-candidate.v1.json"
+            jq -e \
+              --arg source "${GITHUB_SHA}" \
+              --argjson run_id "${RAW_RUN_ID}" \
+              --argjson run_attempt "${RAW_RUN_ATTEMPT}" \
+              '.source_sha == $source and
+               .repository == "DevPathAi/devpath-frontend" and
+               .producer_run_id == $run_id and
+               .producer_run_attempt == $run_attempt and
+               .evidence_mode == "diagnostic"' \
+              "${candidate}" > /dev/null
+            if [[ "${lane}" == visual ]]; then
+              jq -e '
+                .baseline_status == "pending_external_review" and
+                .baseline_set_sha256 == null and
+                .baseline_approval_sha256 == null
+              ' "${candidate}" > /dev/null
+            else
+              jq -e '
+                (has("baseline_status") | not) and
+                (has("baseline_set_sha256") | not) and
+                (has("baseline_approval_sha256") | not)
+              ' "${candidate}" > /dev/null
+            fi
+            dart run tools/et13_evidence.dart validate-review-manifest \
+              --kind="${lane}" \
+              --manifest="${raw_root}/producer/${lane}/${lane}-manifest.v1.json" \
+              --artifact-root="${raw_root}/capture" \
+              --build-marker="${raw_root}/build-marker.v1.json" \
+              --provenance="${raw_root}/producer/${lane}/provenance.v1.json"
+            package_root="build/et13/raw-package/${lane}"
+            install -D -m 0644 \
+              "${raw_root}/producer/${lane}/evidence.json" \
+              "${package_root}/evidence.json"
+            install -D -m 0644 \
+              "evidence/et13/generated/${lane}-cases.v1.json" \
+              "${package_root}/evidence/et13/generated/${lane}-cases.v1.json"
+            install -D -m 0644 \
+              "${raw_root}/producer/${lane}/provenance.v1.json" \
+              "${package_root}/artifacts/et13/provenance.v1.json"
+            install -D -m 0644 \
+              "${raw_root}/producer/${lane}/${lane}-manifest.v1.json" \
+              "${package_root}/artifacts/et13/${lane}-manifest.v1.json"
+            dart run tools/et13_evidence.dart validate-package \
+              --kind="${lane}" \
+              --package-root="${package_root}" \
+              --candidate="${candidate}"
+          done
+
+      - name: Assemble exact approved visual baseline
+        shell: bash
+        env:
+          APPROVED_BY: ${{ steps.approval.outputs.approved_by }}
+          APPROVED_BY_ID: ${{ steps.approval.outputs.approved_by_id }}
+          APPROVAL_ENVIRONMENT_ID: ${{ steps.approval.outputs.approval_environment_id }}
+          APPROVAL_EFFECTIVE_AT: ${{ steps.approval.outputs.approval_effective_at }}
+          APPROVAL_WORKFLOW_SHA256: ${{ steps.approval.outputs.approval_workflow_sha256 }}
+          RAW_WORKFLOW_SHA256: ${{ inputs.raw_workflow_sha256 }}
+          RAW_RUN_ID: ${{ inputs.raw_run_id }}
+          RAW_RUN_ATTEMPT: ${{ inputs.raw_run_attempt }}
+          RAW_ARTIFACT_ID: ${{ inputs.raw_artifact_id }}
+          RAW_ARTIFACT_DIGEST: ${{ inputs.raw_artifact_digest }}
+        run: |
+          set -euo pipefail
+          raw_root=build/et13/raw
+          approved_root=build/et13/approved
+          test -n "${APPROVED_BY}"
+          [[ "${APPROVED_BY_ID}" =~ ^[1-9][0-9]*$ ]]
+          [[ "${APPROVAL_ENVIRONMENT_ID}" =~ ^[1-9][0-9]*$ ]]
+          [[ "${APPROVAL_EFFECTIVE_AT}" =~ Z$ ]]
+          [[ "${APPROVAL_WORKFLOW_SHA256}" =~ ^[0-9a-f]{64}$ ]]
+          test ! -e "${approved_root}"
+          mkdir -p "${approved_root}"
+          mapfile -t visual_paths < <(
+            jq -er '.cases[].artifact_path' \
+              evidence/et13/generated/visual-cases.v1.json
+          )
+          test "${#visual_paths[@]}" -eq 96
+          for path in "${visual_paths[@]}"; do
+            install -D -m 0644 \
+              "${raw_root}/capture/${path}" \
+              "${approved_root}/${path}"
+            cmp --silent "${raw_root}/capture/${path}" "${approved_root}/${path}"
+          done
+          install -D -m 0644 \
+            "${raw_root}/producer/visual/review-candidate.v1.json" \
+            "${approved_root}/review-candidate.v1.json"
+          cmp --silent \
+            "${raw_root}/producer/visual/review-candidate.v1.json" \
+            "${approved_root}/review-candidate.v1.json"
+
+          artifact_lines="${RUNNER_TEMP}/approved-artifact-lines.txt"
+          : > "${artifact_lines}"
+          for path in "${visual_paths[@]}"; do
+            digest="$(sha256sum "${approved_root}/${path}" | cut -d' ' -f1)"
+            printf '%s %s\n' "${path}" "${digest}" >> "${artifact_lines}"
+          done
+          candidate_set_sha256="$(sha256sum "${artifact_lines}" | cut -d' ' -f1)"
+          catalog_sha256="$(sha256sum evidence/et13/catalog.v1.json | cut -d' ' -f1)"
+          case_catalog_sha256="$(sha256sum \
+            evidence/et13/generated/visual-cases.v1.json | cut -d' ' -f1)"
+          review_candidate_sha256="$(sha256sum \
+            "${approved_root}/review-candidate.v1.json" | cut -d' ' -f1)"
+          fixture_ids="$(jq -c '.fixture_ids' \
+            evidence/et13/generated/visual-cases.v1.json)"
+          jq -n \
+            --arg source_sha "${GITHUB_SHA}" \
+            --arg catalog_sha256 "${catalog_sha256}" \
+            --arg case_catalog_sha256 "${case_catalog_sha256}" \
+            --arg review_candidate_sha256 "${review_candidate_sha256}" \
+            --argjson fixture_ids "${fixture_ids}" \
+            --arg candidate_set_sha256 "${candidate_set_sha256}" \
+            --arg approval_repository "${GITHUB_REPOSITORY}" \
+            --arg approval_workflow_path ".github/workflows/et13-baseline-approval.yml" \
+            --arg approval_workflow_sha256 "${APPROVAL_WORKFLOW_SHA256}" \
+            --argjson approval_run_id "${GITHUB_RUN_ID}" \
+            --argjson approval_run_attempt "${GITHUB_RUN_ATTEMPT}" \
+            --arg approval_head_sha "${GITHUB_SHA}" \
+            --arg approval_environment "et13-baseline-approval" \
+            --argjson approval_environment_id "${APPROVAL_ENVIRONMENT_ID}" \
+            --argjson approved_by_id "${APPROVED_BY_ID}" \
+            --arg approved_by "${APPROVED_BY}" \
+            --arg approval_effective_at "${APPROVAL_EFFECTIVE_AT}" \
+            --arg raw_review_workflow_sha256 "${RAW_WORKFLOW_SHA256}" \
+            --argjson raw_review_run_id "${RAW_RUN_ID}" \
+            --argjson raw_review_run_attempt "${RAW_RUN_ATTEMPT}" \
+            --arg raw_review_head_sha "${GITHUB_SHA}" \
+            --argjson raw_review_artifact_id "${RAW_ARTIFACT_ID}" \
+            --arg raw_review_artifact_name \
+              "et13-unsealed-raw-review-run-${RAW_RUN_ID}-attempt-${RAW_RUN_ATTEMPT}" \
+            --arg raw_review_artifact_digest "${RAW_ARTIFACT_DIGEST}" \
+            '{
+              schema_version: "leva.et13.baseline-approval.v1",
+              status: "approved",
+              source_sha: $source_sha,
+              catalog_sha256: $catalog_sha256,
+              case_catalog_sha256: $case_catalog_sha256,
+              review_candidate_sha256: $review_candidate_sha256,
+              fixture_ids: $fixture_ids,
+              case_count: 96,
+              candidate_set_sha256: $candidate_set_sha256,
+              approval_repository: $approval_repository,
+              approval_workflow_path: $approval_workflow_path,
+              approval_workflow_sha256: $approval_workflow_sha256,
+              approval_run_id: $approval_run_id,
+              approval_run_attempt: $approval_run_attempt,
+              approval_head_sha: $approval_head_sha,
+              approval_environment: $approval_environment,
+              approval_environment_id: $approval_environment_id,
+              approved_by_id: $approved_by_id,
+              approved_by: $approved_by,
+              approval_effective_at: $approval_effective_at,
+              raw_review_workflow_sha256: $raw_review_workflow_sha256,
+              raw_review_run_id: $raw_review_run_id,
+              raw_review_run_attempt: $raw_review_run_attempt,
+              raw_review_head_sha: $raw_review_head_sha,
+              raw_review_artifact_id: $raw_review_artifact_id,
+              raw_review_artifact_name: $raw_review_artifact_name,
+              raw_review_artifact_digest: $raw_review_artifact_digest
+            }' > "${approved_root}/baseline-approval.v1.json"
+
+      - name: Validate exact approved bundle and freeze paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          approved_root=build/et13/approved
+          test -z "$(find "${approved_root}" -type l -print -quit)"
+          test -z "$(find "${approved_root}" -mindepth 1 ! -type f ! -type d -print -quit)"
+          {
+            printf '%s\n' baseline-approval.v1.json review-candidate.v1.json
+            jq -er '.cases[].artifact_path' \
+              evidence/et13/generated/visual-cases.v1.json
+          } | LC_ALL=C sort > "${RUNNER_TEMP}/expected-files.txt"
+          find "${approved_root}" -type f -printf '%P\n' | LC_ALL=C sort \
+            > "${RUNNER_TEMP}/actual-files.txt"
+          test "$(wc -l < "${RUNNER_TEMP}/actual-files.txt")" -eq 98
+          diff -u "${RUNNER_TEMP}/expected-files.txt" "${RUNNER_TEMP}/actual-files.txt"
+
+          while IFS= read -r path; do
+            directory="$(dirname "${path}")"
+            while [[ "${directory}" != . ]]; do
+              printf '%s\n' "${directory}"
+              directory="$(dirname "${directory}")"
+            done
+          done < "${RUNNER_TEMP}/expected-files.txt" \
+            | LC_ALL=C sort -u > "${RUNNER_TEMP}/expected-directories.txt"
+          find "${approved_root}" -mindepth 1 -type d -printf '%P\n' | LC_ALL=C sort \
+            > "${RUNNER_TEMP}/actual-directories.txt"
+          diff -u \
+            "${RUNNER_TEMP}/expected-directories.txt" \
+            "${RUNNER_TEMP}/actual-directories.txt"
+
+          cat > build/et13/validate-approved-baseline.dart <<'DART'
+          import '../../tools/et13_evidence.dart' as et13;
+
+          void main(List<String> arguments) {
+            if (arguments.length != 1) throw StateError('expected baseline root');
+            final root = arguments.single;
+            et13.validateBaselineApproval(
+              approvalPath: '$root/baseline-approval.v1.json',
+              baselineRoot: root,
+              reviewCandidatePath: '$root/review-candidate.v1.json',
+              requireExactBundle: true,
+            );
+          }
+          DART
+          dart run build/et13/validate-approved-baseline.dart "${approved_root}"
+
+          jq -er '.cases[] | "\(.sha256)  build/et13/approved/\(.artifact_path)"' \
+            build/et13/raw/producer/visual/visual-manifest.v1.json \
+            > "${RUNNER_TEMP}/approved-sha256.txt"
+          sha256sum --check --strict "${RUNNER_TEMP}/approved-sha256.txt"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Upload exact approved visual baseline
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: ${{ inputs.release_id }}-frontend-visual-approved-baseline-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          if-no-files-found: error
+          retention-days: 30
+          path: build/et13/approved/

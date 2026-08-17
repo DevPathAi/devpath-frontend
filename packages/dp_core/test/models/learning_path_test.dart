@@ -78,8 +78,38 @@ void main() {
     expect(path.milestones.first.weekNum, 1);
     expect(path.milestones.first.expectedOutcome, contains('API'));
     expect(path.milestones.first.tasks, hasLength(3));
+    expect(path.milestones.first.tasks.first.taskId, isNull);
+    expect(path.milestones.first.tasks.first.completedAt, isNull);
     expect(path.milestones.first.tasks[1].completed, isTrue);
     expect(path.milestones[1].locked, isTrue);
     expect(path.milestones[1].tasks, isEmpty);
+  });
+
+  test('WeeklyTask는 additive taskId와 completedAt을 읽고 기존 payload도 유지한다', () {
+    final task = WeeklyTask.fromJson({
+      'taskId': 501,
+      'orderNum': 1,
+      'taskType': 'READ',
+      'title': 'Future 정리',
+      'required': true,
+      'contentId': null,
+      'contentSlug': null,
+      'completed': true,
+      'completedAt': '2026-08-15T10:20:30.123456Z',
+      'futureField': {'ignored': true},
+    });
+
+    expect(task.taskId, 501);
+    expect(task.contentId, isNull);
+    expect(task.completedAt, DateTime.utc(2026, 8, 15, 10, 20, 30, 123, 456));
+
+    final oldTask = WeeklyTask.fromJson({
+      'orderNum': 2,
+      'taskType': 'PRACTICE',
+      'title': '기존 과제',
+      'completed': false,
+    });
+    expect(oldTask.taskId, isNull);
+    expect(oldTask.completedAt, isNull);
   });
 }

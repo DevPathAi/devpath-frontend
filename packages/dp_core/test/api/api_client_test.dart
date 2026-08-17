@@ -94,4 +94,27 @@ void main() {
       ),
     );
   });
+
+  test('interceptor가 정규화한 ApiException을 마지막 경계가 보존한다', () async {
+    const failure = ApiException(
+      code: ApiErrorCode.network,
+      message: 'refresh offline',
+    );
+    final client = ApiClient.create(
+      const ApiConfig(baseUrl: 'https://api.test/api/v1'),
+      interceptors: [
+        InterceptorsWrapper(
+          onRequest: (options, handler) => handler.reject(
+            DioException(
+              requestOptions: options,
+              type: DioExceptionType.unknown,
+              error: failure,
+            ),
+          ),
+        ),
+      ],
+    );
+
+    await expectLater(client.get('/resource'), throwsA(same(failure)));
+  });
 }

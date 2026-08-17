@@ -1,0 +1,19 @@
+{
+  "schema_version": "leva.et13.renderer-lock.v1",
+  "image": "mcr.microsoft.com/playwright:v1.55.0-noble@sha256:ffc33305f7b4b04057ae4a0caa70aad4fde87454fb403a1a22e7f931707dfcf9",
+  "platform": "linux/amd64",
+  "index_digest": "sha256:b27e719ecbfef153e13fd24e8341736733bf2658b229677eb21ff57ff5d7fb29",
+  "manifest_digest": "sha256:ffc33305f7b4b04057ae4a0caa70aad4fde87454fb403a1a22e7f931707dfcf9",
+  "playwright_version": "1.55.0",
+  "chromium_revision": "1187",
+  "chromium_version": "140.0.7339.16",
+  "locale": "ko-KR",
+  "timezone": "UTC",
+  "device_pixel_ratio": 1,
+  "reduced_motion": true,
+  "capture_network": "none",
+  "unexpected_request_policy": "fail",
+  "capture_surface": "flutter_web_release_projection",
+  "device_evidence": false,
+  "external_accessibility_status": "not_satisfied"
+}

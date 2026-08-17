@@ -1,0 +1,89 @@
+{
+  "schema_version": "leva.et13.assets-lock.v1",
+  "assets": [
+    {
+      "id": "pretendard-400",
+      "kind": "font",
+      "path": "packages/dp_design/fonts/Pretendard-Regular.otf",
+      "bytes": 1574352,
+      "sha256": "3ffbacde6ab8411f1d2db54bb9b1f0b3ee2a738932033722cf0388c06aed1c93",
+      "source": "https://github.com/orioncactus/pretendard",
+      "weight": 400
+    },
+    {
+      "id": "pretendard-500",
+      "kind": "font",
+      "path": "packages/dp_design/fonts/Pretendard-Medium.otf",
+      "bytes": 1584068,
+      "sha256": "d39e50e4bb52b4993b6a4eeb821a171254745bd824446af01e1f616b89fface0",
+      "source": "https://github.com/orioncactus/pretendard",
+      "weight": 500
+    },
+    {
+      "id": "pretendard-600",
+      "kind": "font",
+      "path": "packages/dp_design/fonts/Pretendard-SemiBold.otf",
+      "bytes": 1583704,
+      "sha256": "c89bc43027dc7cde5726e96223376f8eec09302b2fc1f8147fd5b57cfc376118",
+      "source": "https://github.com/orioncactus/pretendard",
+      "weight": 600
+    },
+    {
+      "id": "pretendard-700",
+      "kind": "font",
+      "path": "packages/dp_design/fonts/Pretendard-Bold.otf",
+      "bytes": 1576660,
+      "sha256": "2e91915fab54df71cc9598ebf608b2bdb54c6fe3c066ac61dff0bc44fca71cc7",
+      "source": "https://github.com/orioncactus/pretendard",
+      "weight": 700
+    },
+    {
+      "id": "d2coding",
+      "kind": "font",
+      "path": "packages/dp_design/fonts/D2Coding.ttf",
+      "bytes": 4185844,
+      "sha256": "8b1b23e5de4dff652fb0b938528150d2f531edfda281d3944618b655711aba84",
+      "source": "https://github.com/naver/d2codingfont",
+      "weight": 400
+    },
+    {
+      "id": "material-symbols-rounded",
+      "kind": "package_font",
+      "path": "lib/fonts/MaterialSymbolsRounded.ttf",
+      "bytes": 14808068,
+      "sha256": "24e0438c39c69593a11c80d80dcba68b3057933f90d642d2de1ec888c7873c78",
+      "source": "https://pub.dev/packages/material_symbols_icons/versions/4.2928.1",
+      "package": "material_symbols_icons",
+      "package_version": "4.2928.1",
+      "package_sha256": "10a74aaa9e566c92f8aa14809d2dd78156fb93743348ebffec0345c38eb35706"
+    },
+    {
+      "id": "material-icons",
+      "kind": "flutter_sdk_font",
+      "path": "bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf",
+      "bytes": 1645184,
+      "sha256": "d9865b671a09d683d13a863089d8825e0f61a37696ce5d7d448bc8023aa62453",
+      "source": "https://storage.googleapis.com/flutter_infra_release/releases/stable/windows/flutter_windows_3.44.1-stable.zip",
+      "flutter_version": "3.44.1",
+      "flutter_revision": "924134a44c189315be2148659913dda1671cbe99"
+    },
+    {
+      "id": "monaco-editor",
+      "kind": "vendored_tree",
+      "path": "apps/web/web/vendor/monaco",
+      "bytes": 14007996,
+      "sha256": "f60e2ed76e47203a4d01e71ac6fd09a760473552e8f544d97bc2a5b922aba289",
+      "source": "https://registry.npmjs.org/monaco-editor/-/monaco-editor-0.52.2.tgz",
+      "version": "0.52.2",
+      "archive_sha256": "c280cdcf0b0c13d1a2bf01af958d4387ed06d7f6c918401d00c4adcae1bc72b6",
+      "archive_integrity": "sha512-GEQWEZmfkOGLdd3XK8ryrfWz3AIP8YymVXiPHEdewrUq7mh0qrKrfHLNCXcbB6sTnMLnOZ3ztSiKcciFUkIJwQ==",
+      "file_count": 105,
+      "license_path": "LICENSE",
+      "license_bytes": 1098,
+      "license_sha256": "33e4ff1a06ef62ba21788ea162564ee8165269a24a9ce6ef301837447eab0ac6",
+      "notices_path": "ThirdPartyNotices.txt",
+      "notices_bytes": 63064,
+      "notices_sha256": "790537262fc78a764e121e6b92b959bcd3f5c310b47d9d9b9e92e17fe0af5336"
+    }
+  ]
+}

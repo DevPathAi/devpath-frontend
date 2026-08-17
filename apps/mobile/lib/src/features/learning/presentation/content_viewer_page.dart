@@ -5,10 +5,11 @@ import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../providers/api_providers.dart';
+import '../../auth/application/auth_controller.dart';
 import '../application/content_controller.dart';
 import '../application/content_progress_tracker.dart';
 import '../state/content_state.dart';
+import 'mobile_content_projection.dart';
 
 /// 모바일 학습 뷰어 — 콘텐츠 마크다운 렌더 + 진척 자동추적(스크롤·체류) + 수동 완료.
 ///
@@ -26,32 +27,71 @@ class ContentViewerPage extends ConsumerStatefulWidget {
 class _ContentViewerPageState extends ConsumerState<ContentViewerPage>
     with WidgetsBindingObserver {
   final _scrollController = ScrollController();
-  late final ContentController _contentController;
-  late final ApiClient _apiClient;
+  ContentController? _activeController;
   Timer? _dwellTimer;
   ContentProgressTracker? _tracker;
   String? _trackedSlug;
   ContentState? _latestState;
   int _dwellSec = 0;
-  bool _posting = false;
+  int? _postingGeneration;
+  var _boundaryGeneration = 0;
+  int? _loadStartedGeneration;
+  String? _ownerKey;
+  bool _contextExpanded = false;
 
   @override
   void initState() {
     super.initState();
-    // dispose 시 ref 사용이 불가하므로 의존성을 미리 캐싱(web content_page와 동일 패턴).
-    _contentController = ref.read(contentControllerProvider.notifier);
-    _apiClient = ref.read(apiClientProvider);
+    _ownerKey = ref.read(currentOwnerKeyProvider);
+    ref.listenManual(currentOwnerKeyProvider, (previous, next) {
+      if (_ownerKey == next) return;
+      _ownerKey = next;
+      _resetBoundary();
+    });
     WidgetsBinding.instance.addObserver(this);
     _scrollController.addListener(_maybeFlushProgress);
     _dwellTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      final state = ref.read(contentControllerProvider);
+      final state = ref.read(contentControllerProvider(widget.slug));
       if (state is! ContentLoaded || state.content.progress.completed) return;
       _dwellSec++;
       _maybeFlushProgress();
     });
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _contentController.load(widget.slug),
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scheduleLoad();
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant ContentViewerPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.slug == widget.slug) return;
+    _resetBoundary();
+    _scheduleLoad();
+  }
+
+  void _resetBoundary() {
+    _boundaryGeneration += 1;
+    _activeController = null;
+    _tracker = null;
+    _trackedSlug = null;
+    _latestState = null;
+    _dwellSec = 0;
+    _contextExpanded = false;
+  }
+
+  void _scheduleLoad() {
+    final slug = widget.slug;
+    final generation = _boundaryGeneration;
+    if (_loadStartedGeneration == generation) return;
+    _loadStartedGeneration = generation;
+    scheduleMicrotask(() {
+      if (!mounted ||
+          slug != widget.slug ||
+          generation != _boundaryGeneration) {
+        return;
+      }
+      unawaited(ref.read(contentControllerProvider(slug).notifier).load());
+    });
   }
 
   @override
@@ -75,9 +115,12 @@ class _ContentViewerPageState extends ConsumerState<ContentViewerPage>
 
   @override
   Widget build(BuildContext context) {
-    final s = ref.watch(contentControllerProvider);
+    final provider = contentControllerProvider(widget.slug);
+    final controller = ref.read(provider.notifier);
+    _activeController = controller;
+    final s = ref.watch(provider);
     _latestState = s;
-    ref.listen<ContentState>(contentControllerProvider, (_, next) {
+    ref.listen<ContentState>(provider, (_, next) {
       _latestState = next;
       if (next case ContentLoaded(:final content)) _syncTracker(content);
     });
@@ -92,13 +135,23 @@ class _ContentViewerPageState extends ConsumerState<ContentViewerPage>
         ContentLoading() => const DpLoading(),
         ContentFailed(:final message) => DpError(
           message: message,
-          onRetry: () => _contentController.load(widget.slug),
+          onRetry: controller.load,
         ),
-        ContentLoaded(:final content) => _ContentBody(
-          slug: widget.slug,
-          content: content,
-          controller: _scrollController,
-        ),
+        ContentLoaded(:final content)
+            when content.slug == widget.slug ||
+                content.id.toString() == widget.slug =>
+          MobileContentProjection(
+            content: content,
+            scrollController: _scrollController,
+            progressFailureMessage: s.progressFailureMessage,
+            loadFailureMessage: s.loadFailureMessage,
+            fromOfflineCache: s.fromOfflineCache,
+            contextExpanded: _contextExpanded,
+            onContextDisclosurePressed: () =>
+                setState(() => _contextExpanded = !_contextExpanded),
+            onComplete: () => unawaited(controller.markComplete()),
+          ),
+        ContentLoaded() => const DpLoading(),
       },
     );
   }
@@ -119,8 +172,8 @@ class _ContentViewerPageState extends ConsumerState<ContentViewerPage>
   }
 
   void _maybeFlushProgress({bool force = false}) {
-    if (_posting) return;
-    final state = ref.read(contentControllerProvider);
+    if (_postingGeneration == _boundaryGeneration) return;
+    final state = ref.read(contentControllerProvider(widget.slug));
     _latestState = state;
     if (state is! ContentLoaded) return;
     _syncTracker(state.content);
@@ -142,22 +195,34 @@ class _ContentViewerPageState extends ConsumerState<ContentViewerPage>
   }
 
   Future<void> _postProgress(ContentProgressFlush flush) async {
-    _posting = true;
+    final controller = _activeController;
+    if (controller == null) return;
+    final slug = widget.slug;
+    final boundaryGeneration = _boundaryGeneration;
+    _postingGeneration = boundaryGeneration;
     try {
-      final resp = await _contentController.reportProgress(
-        widget.slug,
+      final resp = await controller.reportProgress(
+        slug,
         scrollPct: flush.scrollPct,
         dwellSec: flush.dwellSec,
       );
-      if (resp?.completed == true) _tracker?.markCompleted();
+      if (boundaryGeneration == _boundaryGeneration &&
+          resp?.completed == true) {
+        _tracker?.markCompleted();
+      }
     } finally {
-      _posting = false;
+      if (_postingGeneration == boundaryGeneration) {
+        _postingGeneration = null;
+      }
     }
   }
 
-  /// 페이지 이탈 시 잔여 진척을 캐싱된 [_apiClient]로 직접 보고한다(ref 미사용 — dispose 안전).
+  /// 페이지 이탈 시에도 같은 controller 경계로 보내 완료 무효화와 단조 병합을 유지한다.
   void _flushOnDispose() {
-    if (_posting) return;
+    if (_postingGeneration == _boundaryGeneration) return;
+    final controller = _activeController;
+    if (controller == null) return;
+    final slug = widget.slug;
     final state = _latestState;
     if (state is! ContentLoaded) return;
     _syncTracker(state.content);
@@ -169,107 +234,13 @@ class _ContentViewerPageState extends ConsumerState<ContentViewerPage>
     final flush = recorded ?? tracker.disposeFlush();
     if (flush == null) return;
     unawaited(
-      _apiClient
-          .post<Map<String, dynamic>>(
-            '/contents/${widget.slug}/progress',
-            body: {'scrollPct': flush.scrollPct, 'dwellSec': flush.dwellSec},
-          )
-          .catchError((_) => <String, dynamic>{}),
-    );
-  }
-}
-
-class _ContentBody extends ConsumerWidget {
-  const _ContentBody({
-    required this.slug,
-    required this.content,
-    required this.controller,
-  });
-
-  final String slug;
-  final LearningContent content;
-  final ScrollController controller;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final progress = content.progress;
-    final completed = progress.completed;
-    final percent = (progress.scrollPct * 100).round().clamp(0, 100);
-    final meta = [
-      if (content.estimatedMinutes != null) '${content.estimatedMinutes}분',
-      if (content.bloomLevel != null) content.bloomLevel!,
-      if (content.difficulty != null) '난이도 ${content.difficulty}',
-    ];
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-          child: Row(
-            children: [
-              Expanded(
-                child: LinearProgressIndicator(
-                  value: progress.scrollPct.clamp(0, 1).toDouble(),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                completed ? '완료' : '$percent%',
-                style: Theme.of(context).textTheme.labelMedium,
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: SingleChildScrollView(
-            controller: controller,
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (meta.isNotEmpty)
-                  Text(
-                    meta.join(' · '),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: context.dpColors.textSecondary,
-                    ),
-                  ),
-                if (content.conceptTags.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final t in content.conceptTags)
-                        Chip(label: Text('#$t')),
-                    ],
-                  ),
-                ],
-                if (meta.isNotEmpty || content.conceptTags.isNotEmpty)
-                  const SizedBox(height: 16),
-                DpMarkdown(data: content.markdown),
-              ],
-            ),
-          ),
-        ),
-        SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: completed
-                    ? null
-                    : () => ref
-                          .read(contentControllerProvider.notifier)
-                          .markComplete(slug),
-                icon: const Icon(DpIcons.stepDone),
-                label: Text(completed ? '완료됨' : '완료로 표시'),
-              ),
-            ),
-          ),
-        ),
-      ],
+      Future<void>.microtask(() async {
+        await controller.reportProgress(
+          slug,
+          scrollPct: flush.scrollPct,
+          dwellSec: flush.dwellSec,
+        );
+      }),
     );
   }
 }

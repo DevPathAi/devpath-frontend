@@ -31,8 +31,16 @@ abstract class ContentProgress with _$ContentProgress {
     String? completedAt,
   }) = _ContentProgress;
 
-  factory ContentProgress.fromJson(Map<String, dynamic> json) =>
-      _$ContentProgressFromJson(json);
+  factory ContentProgress.fromJson(Map<String, dynamic> json) {
+    final progress = _$ContentProgressFromJson(json);
+    _validateProgress(
+      scrollPct: progress.scrollPct,
+      dwellSec: progress.dwellSec,
+      completed: progress.completed,
+      completedAt: progress.completedAt,
+    );
+    return progress;
+  }
 }
 
 @freezed
@@ -45,6 +53,36 @@ abstract class ContentProgressUpdateResponse
     String? completedAt,
   }) = _ContentProgressUpdateResponse;
 
-  factory ContentProgressUpdateResponse.fromJson(Map<String, dynamic> json) =>
-      _$ContentProgressUpdateResponseFromJson(json);
+  factory ContentProgressUpdateResponse.fromJson(Map<String, dynamic> json) {
+    final response = _$ContentProgressUpdateResponseFromJson(json);
+    _validateProgress(
+      scrollPct: response.scrollPct,
+      dwellSec: response.dwellSec,
+      completed: response.completed,
+      completedAt: response.completedAt,
+    );
+    return response;
+  }
+}
+
+void _validateProgress({
+  required double scrollPct,
+  required int dwellSec,
+  required bool completed,
+  required String? completedAt,
+}) {
+  if (!scrollPct.isFinite || scrollPct < 0 || scrollPct > 1 || dwellSec < 0) {
+    throw const FormatException('invalid content progress range');
+  }
+  if (!completed) {
+    if (completedAt != null) {
+      throw const FormatException('incomplete progress has completedAt');
+    }
+    return;
+  }
+  if (completedAt == null ||
+      !RegExp(r'(?:[zZ]|[+-]\d{2}:\d{2})$').hasMatch(completedAt) ||
+      DateTime.tryParse(completedAt) == null) {
+    throw const FormatException('completed progress lacks a valid instant');
+  }
 }

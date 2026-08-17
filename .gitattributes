@@ -4,3 +4,17 @@
 # 일반 .dart는 기존 autocrlf 동작을 유지하도록 좁게 생성 파일만 지정한다.
 *.freezed.dart text eol=lf
 *.g.dart text eol=lf
+
+# 이 JSON은 JS/Dart가 raw SHA-256으로 동일성을 검증하므로 checkout에서도 LF를 유지한다.
+apps/web/lib/src/analytics/mission-spine.analytics.v1.json text eol=lf
+
+# Raw SHA-256 inputs must have checkout-independent bytes.
+pubspec.lock text eol=lf
+evidence/et13/**/*.json text eol=lf
+
+# Monaco is vendored byte-for-byte from the pinned npm archive. Treat upstream
+# minified assets/notices as binary so Git does not normalize or whitespace-check
+# their exact bytes.
+apps/web/web/vendor/monaco/vs/** -text -diff
+apps/web/web/vendor/monaco/LICENSE text eol=lf
+apps/web/web/vendor/monaco/ThirdPartyNotices.txt text eol=lf

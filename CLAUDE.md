@@ -46,21 +46,21 @@
 **규칙:**
 - 작업 브랜치는 항상 `develop`에서 분기하고 `develop`으로 PR한다. `main`을 직접 base로 PR하지 않는다(릴리스 PR 제외).
 - `main`·`develop`에 직접 push 금지. 모든 변경은 PR을 거친다.
-- 머지 전 CI(`melos run analyze`·`melos run test`)가 **녹색**임을 확인한다(실패 시 머지 금지).
+- 머지 전 CI(`dart run melos run analyze`·`dart run melos run test`)가 **녹색**임을 확인한다(실패 시 머지 금지).
 - 이력 보존을 위해 머지는 기본 **merge commit**(스쿼시·리베이스 머지는 명시 요청 시에만).
 
 ## 빌드·테스트 (모노레포 루트에서 melos로 실행)
 
 > 구조: **Dart pub workspaces + melos 7**. 멤버 = `packages/dp_core`(순수 Dart)·`packages/dp_design`(Flutter 디자인 시스템) + `apps/{web,admin,mobile}`(Flutter). `web`·`admin`은 **Flutter Web**. 설정은 루트 `pubspec.yaml`의 `workspace:`+`melos:` 키(과거 `melos.yaml` 대체). 사용법 요약은 `melos_README.md`.
 
-- 의존성 동기화: `melos bootstrap` (별칭 `melos bs`)
-- 정적 분석: `melos run analyze` (Flutter=`flutter analyze`, 순수 Dart=`dart analyze`)
-- 테스트: `melos run test` (Flutter=`flutter test --exclude-tags golden`, 순수 Dart=`dart test`)
-- 포맷: `melos run format`(CI 게이트, `dart format --set-exit-if-changed .`) / 적용 `melos run fix`
+- 의존성 동기화: `dart pub get --enforce-lockfile` 후 `dart run melos bootstrap --enforce-lockfile`
+- 정적 분석: `dart run melos run analyze` (Flutter=`flutter analyze`, 순수 Dart=`dart analyze`)
+- 테스트: `dart run melos run test` (Flutter=`flutter test --exclude-tags golden`, 순수 Dart=`dart test`)
+- 포맷: `dart run melos run format`(CI 게이트, `dart format --set-exit-if-changed .`) / 적용 `dart run melos run fix`
 - 단일 앱 실행: `cd apps/web && flutter run -d chrome`(admin 동일) · `cd apps/mobile && flutter run`
-- melos 호출: 최초 1회 `dart pub global activate melos 7.0.0`; PATH 미설정 환경에선 `dart pub global run melos <cmd>`.
+- melos 호출: global activation을 사용하지 않는다. 커밋된 `pubspec.lock`의 Melos를 `dart run melos <cmd>`로 실행한다.
 
-테스트는 **Flutter 테스트 스택**으로 작성한다(`flutter_test` + `flutter_riverpod`의 `ProviderContainer`/위젯 테스트). 실패 테스트를 먼저 쓰고 `melos run test`로 통과를 눈으로 확인한다(절대 조건 2). 위젯 테스트의 폭 의존은 `tester.view.physicalSize`, `context.dpColors`를 쓰는 위젯엔 `theme: DpTheme.light()`를 준다.
+테스트는 **Flutter 테스트 스택**으로 작성한다(`flutter_test` + `flutter_riverpod`의 `ProviderContainer`/위젯 테스트). 실패 테스트를 먼저 쓰고 `dart run melos run test`로 통과를 눈으로 확인한다(절대 조건 2). 위젯 테스트의 폭 의존은 `tester.view.physicalSize`, `context.dpColors`를 쓰는 위젯엔 `theme: DpTheme.light()`를 준다.
 
 ## 환경 변수
 

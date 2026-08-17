@@ -1,4 +1,5 @@
-/// DevPath AI 디자인 시스템(Material 3). 토큰 SSoT=DESIGN.md.
+/// Leva 디자인 시스템(Material 3).
+/// Token 값 SSoT는 src/theme, 의도/사용 규칙 SSoT는 DESIGN.md다.
 library;
 
 export 'src/theme/dp_colors.dart';
@@ -7,6 +8,7 @@ export 'src/theme/dp_typography.dart';
 export 'src/theme/dp_theme.dart';
 export 'src/theme/dp_tokens.dart';
 export 'src/theme/dp_state_style.dart';
+export 'src/theme/dp_semantic_tokens.dart';
 export 'src/layout/dp_max_width.dart';
 export 'src/layout/dp_selectable.dart';
 export 'src/layout/dp_scrollbar.dart';
@@ -38,3 +40,11 @@ export 'src/data/dp_list_row.dart';
 export 'src/data/dp_data_table.dart';
 export 'src/data/dp_tag.dart';
 export 'src/data/dp_chart_legend.dart';
+export 'src/data/dp_learning_labels.dart';
+export 'src/mission/dp_mission_header.dart';
+export 'src/mission/dp_progress_spine.dart';
+export 'src/mission/dp_context_capsule.dart';
+export 'src/mission/dp_next_action_band.dart';
+export 'src/evidence/et13_evidence_fixtures.dart';
+export 'src/evidence/et13_evidence_frame.dart';
+export 'src/evidence/et13_font_asset_ready.dart';

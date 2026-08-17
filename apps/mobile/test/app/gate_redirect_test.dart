@@ -36,23 +36,23 @@ void main() {
       expect(gateRedirect(AuthAuthenticated(_user()), '/learn'), isNull);
     });
 
-    test('인증 + 온보딩 미완료 + 보호경로 → /onboarding', () {
+    test('인증 + 진단 미완료 + 보호경로 → 웹 activation handoff', () {
       final pending = AuthAuthenticated(
         _user(onboarding: OnboardingStatus.pending),
       );
-      expect(gateRedirect(pending, '/home'), '/onboarding');
-      expect(gateRedirect(pending, '/community'), '/onboarding');
+      expect(gateRedirect(pending, '/home'), '/activation');
+      expect(gateRedirect(pending, '/community'), '/activation');
     });
 
-    test('인증 + 온보딩 미완료 + /onboarding → 허용(null)', () {
+    test('인증 + 진단 미완료 + /activation → 허용(null)', () {
       final pending = AuthAuthenticated(
         _user(onboarding: OnboardingStatus.pending),
       );
-      expect(gateRedirect(pending, '/onboarding'), isNull);
+      expect(gateRedirect(pending, '/activation'), isNull);
     });
 
-    test('인증 + 온보딩 완료 + /onboarding → /home', () {
-      expect(gateRedirect(AuthAuthenticated(_user()), '/onboarding'), '/home');
+    test('인증 + 진단 완료 + /activation → /home', () {
+      expect(gateRedirect(AuthAuthenticated(_user()), '/activation'), '/home');
     });
   });
 }

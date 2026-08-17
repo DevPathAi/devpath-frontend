@@ -89,6 +89,7 @@ Map<String, dynamic> _$PathMilestoneToJson(_PathMilestone instance) =>
     };
 
 _WeeklyTask _$WeeklyTaskFromJson(Map<String, dynamic> json) => _WeeklyTask(
+  taskId: (json['taskId'] as num?)?.toInt(),
   orderNum: (json['orderNum'] as num).toInt(),
   taskType: json['taskType'] as String,
   title: json['title'] as String,
@@ -96,10 +97,14 @@ _WeeklyTask _$WeeklyTaskFromJson(Map<String, dynamic> json) => _WeeklyTask(
   contentId: (json['contentId'] as num?)?.toInt(),
   contentSlug: json['contentSlug'] as String?,
   completed: json['completed'] as bool? ?? false,
+  completedAt: json['completedAt'] == null
+      ? null
+      : DateTime.parse(json['completedAt'] as String),
 );
 
 Map<String, dynamic> _$WeeklyTaskToJson(_WeeklyTask instance) =>
     <String, dynamic>{
+      'taskId': instance.taskId,
       'orderNum': instance.orderNum,
       'taskType': instance.taskType,
       'title': instance.title,
@@ -107,4 +112,5 @@ Map<String, dynamic> _$WeeklyTaskToJson(_WeeklyTask instance) =>
       'contentId': instance.contentId,
       'contentSlug': instance.contentSlug,
       'completed': instance.completed,
+      'completedAt': instance.completedAt?.toIso8601String(),
     };

@@ -15,6 +15,10 @@ Future<void> main() async {
   // (`Firebase.initializeApp()`은 네이티브 설정 파일을 자동으로 읽는다 → docs/FCM_SETUP.md)
   if (!AppConfig.fromEnvironment().useMock) {
     await Firebase.initializeApp();
+    // Defense in depth for installs that persisted an older auto-init=true
+    // preference. Consent activation requests a token explicitly and never
+    // enables implicit FCM initialization.
+    await FirebaseMessaging.instance.setAutoInitEnabled(false);
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   }
 

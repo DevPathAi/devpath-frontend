@@ -1,8 +1,14 @@
 import 'dart:async';
 
 import 'package:devpath_mobile/src/features/notifications/application/notification_controller.dart';
+import 'package:devpath_mobile/src/features/auth/application/auth_controller.dart';
+import 'package:devpath_mobile/src/features/notifications/data/notification_store.dart';
+import 'package:devpath_mobile/src/data/key_value_store.dart';
+import 'package:devpath_mobile/src/data/owner_data_store.dart';
 import 'package:devpath_mobile/src/features/notifications/presentation/notifications_page.dart';
+import 'package:devpath_mobile/src/providers/api_providers.dart';
 import 'package:devpath_mobile/src/services/push_service.dart';
+import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -29,7 +35,15 @@ Widget _host(ProviderContainer c) => UncontrolledProviderScope(
   final ctrl = StreamController<PushMessage>();
   addTearDown(ctrl.close);
   final c = ProviderContainer(
-    overrides: [pushServiceProvider.overrideWithValue(_FakePush(ctrl))],
+    overrides: [
+      pushServiceProvider.overrideWithValue(_FakePush(ctrl)),
+      tokenStoreProvider.overrideWithValue(InMemoryTokenStore()),
+      keyValueStoreProvider.overrideWithValue(InMemoryKeyValueStore()),
+      currentOwnerKeyProvider.overrideWithValue('owner-a'),
+      notificationStoreProvider.overrideWithValue(
+        NotificationStore(InMemoryOwnerDataStore()),
+      ),
+    ],
   );
   addTearDown(c.dispose);
   return (container: c, push: ctrl);
@@ -67,7 +81,7 @@ void main() {
   testWidgets('수신 메시지 → 목록에 제목·본문 표시', (tester) async {
     final (:container, :push) = _setup();
     await _emit(tester, container, push, const [
-      PushMessage(id: '1', title: '새 멘토 답변', body: '리뷰가 도착했어요'),
+      PushMessage.local(id: '1', title: '새 멘토 답변', body: '리뷰가 도착했어요'),
     ]);
 
     await tester.pumpWidget(_host(container));
@@ -81,7 +95,7 @@ void main() {
   testWidgets('진입 시 미읽음을 읽음 처리(markAllRead) + 목록 유지', (tester) async {
     final (:container, :push) = _setup();
     await _emit(tester, container, push, const [
-      PushMessage(id: '1', title: 'A', body: 'a'),
+      PushMessage.local(id: '1', title: 'A', body: 'a'),
     ]);
     expect(container.read(notificationControllerProvider).unreadCount, 1);
 

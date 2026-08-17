@@ -9,6 +9,7 @@ class SandboxLayout extends StatefulWidget {
     required this.log,
     required this.review,
     this.onEditorVisible,
+    this.onReviewVisibilityChanged,
   });
 
   final Widget editor;
@@ -17,19 +18,46 @@ class SandboxLayout extends StatefulWidget {
 
   /// F5-b: 에디터 페인이 (재)가시화될 때 호출 — Monaco `editor.layout()` 보정용.
   final VoidCallback? onEditorVisible;
+  final ValueChanged<bool>? onReviewVisibilityChanged;
 
   @override
-  State<SandboxLayout> createState() => _SandboxLayoutState();
+  State<SandboxLayout> createState() => SandboxLayoutState();
 }
 
-class _SandboxLayoutState extends State<SandboxLayout> {
+class SandboxLayoutState extends State<SandboxLayout> {
   int _tab = 0; // <1024 세그먼트: 0=editor 1=log 2=review
   bool _logOpen = true; // 1024–1239 로그 접이
+  bool _reviewVisible = false;
+  bool? _lastReportedReviewVisibility;
+
+  bool get isReviewVisible => _reviewVisible;
+
+  void showEditor() => _showPane(0);
+  void showLog() => _showPane(1);
+  void showReview() => _showPane(2);
+
+  void _showPane(int pane) {
+    if (!mounted || _tab == pane) return;
+    setState(() => _tab = pane);
+    if (pane == 0) widget.onEditorVisible?.call();
+  }
+
+  void _reportReviewVisibility(bool visible) {
+    _reviewVisible = visible;
+    if (_lastReportedReviewVisibility == visible) return;
+    _lastReportedReviewVisibility = visible;
+    final callback = widget.onReviewVisibilityChanged;
+    if (callback == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _reviewVisible == visible) callback(visible);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final w = MediaQuery.sizeOf(context).width;
     final c = context.dpColors;
+    _reportReviewVisibility(w >= 1024 || _tab == 2);
 
     Widget pane(Widget child) => Container(
       decoration: BoxDecoration(border: Border.all(color: c.border)),

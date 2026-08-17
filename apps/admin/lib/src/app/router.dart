@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../features/auth/application/auth_controller.dart';
 import '../features/auth/presentation/auth_callback_page.dart';
+import '../features/auth/presentation/forbidden_page.dart';
 import '../features/auth/presentation/login_page.dart';
 import '../features/ads/presentation/ads_page.dart';
 import '../features/auth/state/auth_state.dart';
@@ -41,9 +42,7 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/forbidden',
-        builder: (_, _) => const Scaffold(
-          body: Center(child: Text('권한이 없습니다 (ADMIN/OWNER 전용)')),
-        ),
+        builder: (_, _) => const AdminForbiddenPage(),
       ),
       ShellRoute(
         builder: (_, _, child) => AdminShell(child: child),

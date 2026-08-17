@@ -46,6 +46,7 @@ void main() {
         'VALIDATION_FAILED': ApiErrorCode.validationFailed,
         'CONFLICT': ApiErrorCode.conflict,
         'QUOTA_EXCEEDED': ApiErrorCode.quotaExceeded,
+        'MENTOR_BUSY': ApiErrorCode.mentorBusy,
         'AI_KILL_SWITCH_ACTIVE': ApiErrorCode.aiKillSwitchActive,
         'SANDBOX_UNAVAILABLE': ApiErrorCode.sandboxUnavailable,
         'INTERNAL_ERROR':
@@ -73,6 +74,18 @@ void main() {
       );
       expect(ex.code, ApiErrorCode.quotaExceeded);
       expect(ex.retryAfterSeconds, 45);
+    });
+
+    test('Mentor capacity 429는 quota와 별도 typed code로 보존한다', () {
+      final ex = fromResponse(429, {
+        'error': {
+          'code': 'MENTOR_BUSY',
+          'message': 'mentor is busy; retry later',
+        },
+      });
+      expect(ex.code, ApiErrorCode.mentorBusy);
+      expect(ex.isMentorBusy, isTrue);
+      expect(ex.isQuota, isFalse);
     });
 
     test('네트워크 타입은 network로 매핑한다', () {

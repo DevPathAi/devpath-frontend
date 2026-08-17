@@ -27,9 +27,9 @@
 - **Why:** standalone 결정의 필연 — 별도 해석이라 melos 일괄 검증 대상 아님. 미추가 시 landing이 CI에서 미검증.
 - **Effort:** S (human) → S (CC) · **Priority:** P3 · **Depends on:** P7 구현 + 최초 CI.
 
-### T-CI-FLUTTER-PIN — CI flutter-action 버전 핀
-- **What:** CI `subosito/flutter-action@v2`의 `channel: stable`을 Dart 3.12.1 호환 `flutter-version`으로 핀할지 최초 CI 실행 결과로 확정.
-- **Why:** stable이 Dart 3.12.1 미만으로 드리프트하면 빌드 깨짐. (melos는 F2로 7.0.0 핀 완료.)
+### T-CI-FLUTTER-PIN — 완료(ET13 reproducibility preflight)
+- **What:** CI action은 `v2.23.0`의 full commit SHA, Flutter는 `3.44.1`/revision `924134a44c189315be2148659913dda1671cbe99`/Dart `3.12.1`로 고정했다.
+- **Evidence:** Docker archive SHA와 base image digest, locked Melos `7.8.1` 호출까지 `frontend_reproducibility_contract_test.dart`가 fail-closed로 검증한다.
 - **Effort:** S (human) → S (CC) · **Priority:** P2 · **Depends on:** 최초 CI green 확인.
 
 ## P2·P3 리뷰에서 도출 (2026-06-14)

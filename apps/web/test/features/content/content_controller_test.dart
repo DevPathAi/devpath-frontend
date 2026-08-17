@@ -135,6 +135,59 @@ void main() {
     expect(s.content.progress.dwellSec, 30);
   });
 
+  test('진행률 저장 실패는 이미 읽은 문서와 진행률을 보존한다', () async {
+    final adapter = _CaptureAdapter({
+      'GET /contents/future-async-await': (200, _contentJson()),
+      'POST /contents/future-async-await/progress': (
+        500,
+        {
+          'error': {'code': 'INTERNAL_ERROR', 'message': '저장 지연'},
+        },
+      ),
+    });
+    final container = ProviderContainer(
+      overrides: [apiClientProvider.overrideWithValue(_client(adapter))],
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(contentControllerProvider.notifier);
+    await controller.load('future-async-await');
+    final response = await controller.reportProgress(
+      idOrSlug: 'future-async-await',
+      scrollPct: 0.8,
+      dwellSec: 45,
+    );
+
+    expect(response, isNull);
+    final state = container.read(contentControllerProvider);
+    expect(state, isA<ContentLoaded>());
+    final loaded = state as ContentLoaded;
+    expect(loaded.content.title, 'Future/async-await 정리');
+    expect(loaded.content.progress.scrollPct, 0.2);
+    expect(loaded.progressError, '저장 지연');
+  });
+
+  test('깨진 콘텐츠 응답은 loading에 남지 않고 안전한 실패가 된다', () async {
+    final container = ProviderContainer(
+      overrides: [
+        apiClientProvider.overrideWithValue(
+          _client(
+            _CaptureAdapter({
+              'GET /contents/broken': (200, {'id': 'not-an-int'}),
+            }),
+          ),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(contentControllerProvider.notifier).load('broken');
+
+    final state = container.read(contentControllerProvider);
+    expect(state, isA<ContentFailed>());
+    expect((state as ContentFailed).message, '콘텐츠 형식을 확인하지 못했어요.');
+  });
+
   test('API 실패는 ContentFailed가 된다', () async {
     final container = ProviderContainer(
       overrides: [

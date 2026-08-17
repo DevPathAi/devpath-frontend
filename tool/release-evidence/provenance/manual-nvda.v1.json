@@ -1,0 +1,21 @@
+{
+  "schema_version": "leva.mission-spine.manual-at-test-provenance.v1",
+  "lane": "manual-nvda",
+  "catalog_path": "tool/release-evidence/catalogs/manual-nvda.v1.json",
+  "catalog_sha256": "f900678464064d0f481ab736d682fea1587622fb633ab19d5f7566cdc47974e2",
+  "assistive_technology": "NVDA+Chromium",
+  "execution_mode": "manual_human",
+  "required_platform": "windows_physical_host",
+  "required_client": "chromium",
+  "required_artifact": "exact_source_web_release_build",
+  "case_ids": [
+    "nvda-web-today-mission-spine",
+    "nvda-web-next-action-navigation"
+  ],
+  "pass_policy": {
+    "all_cases_required": true,
+    "failed_case_count": 0,
+    "synthetic_results_allowed": false,
+    "emulator_allowed": false
+  }
+}

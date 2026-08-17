@@ -26,6 +26,7 @@ final Map<String, MockFixture> mobileMockFixtures = {
   ),
   // FCM 디바이스 토큰 등록(트랙 C). 목 모드에선 스텁 토큰으로 no-op 성공.
   'POST /notifications/devices': (200, <String, dynamic>{}),
+  'DELETE /notifications/devices': (200, <String, dynamic>{}),
   // 홈 대시보드(DASH-001).
   'GET /dashboard': (
     200,
@@ -38,12 +39,16 @@ final Map<String, MockFixture> mobileMockFixtures = {
   ),
   // 학습 경로(PATH-001 결과) — 학습 뷰어 진입 목록.
   'GET /learning-paths/me': (200, mockLearningPath()),
+  // Today Mission Spine — native는 이 authoritative pair만 deep link로 연다.
+  'GET /learning-paths/me/this-week': (200, mockCurrentMission()),
   // 학습 콘텐츠(CNT-001).
   'GET /contents/future-async-await': (200, mockContent('future-async-await')),
   'GET /contents/stream-subscription': (
     200,
     mockContent('stream-subscription'),
   ),
+  'GET /contents/1': (200, mockContent('future-async-await')),
+  'GET /contents/2': (200, mockContent('stream-subscription')),
   'POST /contents/future-async-await/progress': (
     200,
     {
@@ -54,6 +59,24 @@ final Map<String, MockFixture> mobileMockFixtures = {
     },
   ),
   'POST /contents/stream-subscription/progress': (
+    200,
+    {
+      'scrollPct': 1.0,
+      'dwellSec': 60,
+      'completed': true,
+      'completedAt': '2026-06-27T10:00:00Z',
+    },
+  ),
+  'POST /contents/1/progress': (
+    200,
+    {
+      'scrollPct': 1.0,
+      'dwellSec': 60,
+      'completed': true,
+      'completedAt': '2026-06-27T10:00:00Z',
+    },
+  ),
+  'POST /contents/2/progress': (
     200,
     {
       'scrollPct': 1.0,
@@ -186,6 +209,41 @@ final Map<String, MockFixture> mobileMockFixtures = {
   'POST /community/answers/11/vote': (200, <String, dynamic>{}),
   'POST /community/answers/20/vote': (200, <String, dynamic>{}),
 };
+
+Map<String, dynamic> mockCurrentMission() {
+  final first = <String, Object?>{
+    'taskId': 1001,
+    'orderNum': 1,
+    'taskType': 'READ',
+    'title': 'Future/async-await 정리',
+    'required': true,
+    'contentId': 1,
+    'contentSlug': 'future-async-await',
+    'completed': false,
+    'completedAt': null,
+  };
+  return <String, Object?>{
+    'outcome': 'AVAILABLE',
+    'pathId': 101,
+    'weekNum': 1,
+    'tasks': <Object?>[
+      first,
+      <String, Object?>{
+        'taskId': 1002,
+        'orderNum': 2,
+        'taskType': 'PRACTICE',
+        'title': 'Stream 구독 실습',
+        'required': true,
+        'contentId': 2,
+        'contentSlug': 'stream-subscription',
+        'completed': false,
+        'completedAt': null,
+      },
+    ],
+    'nextTask': first,
+    'pathCompleted': false,
+  };
+}
 
 Map<String, dynamic> mockContent(String slug) {
   final isStream = slug == 'stream-subscription';

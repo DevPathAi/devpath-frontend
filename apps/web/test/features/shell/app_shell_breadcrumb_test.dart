@@ -5,7 +5,29 @@ void main() {
   test('최상위 화면은 [섹션, 페이지]', () {
     expect(breadcrumbFor('/dashboard'), const [
       (label: '학습', path: null),
-      (label: '대시보드', path: null),
+      (label: '오늘', path: null),
+    ]);
+  });
+
+  test('canonical Today와 mission child는 Today 위치를 유지한다', () {
+    expect(breadcrumbFor('/path/301/today'), const [
+      (label: '학습', path: null),
+      (label: '오늘', path: null),
+    ]);
+    expect(breadcrumbFor('/mission/302/content/77'), const [
+      (label: '학습', path: null),
+      (label: '오늘', path: '/dashboard'),
+      (label: '학습 콘텐츠', path: null),
+    ]);
+    expect(breadcrumbFor('/mission/302/sandbox'), const [
+      (label: '학습', path: null),
+      (label: '오늘', path: '/dashboard'),
+      (label: '실습 샌드박스', path: null),
+    ]);
+    expect(breadcrumbFor('/mission/302/mentor'), const [
+      (label: '학습', path: null),
+      (label: '오늘', path: '/dashboard'),
+      (label: 'AI 멘토', path: null),
     ]);
   });
 

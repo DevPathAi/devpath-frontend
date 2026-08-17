@@ -24,6 +24,38 @@ class _Fake extends SupportListController {
 }
 
 void main() {
+  testWidgets('unknown status keeps the raw wire beside an explicit label', (
+    tester,
+  ) async {
+    final c = ProviderContainer(
+      overrides: [
+        supportListProvider.overrideWith(
+          () => _Fake(const [
+            SupportRequestRow(
+              id: 1,
+              type: 'ERROR',
+              title: '새 상태',
+              status: 'ESCALATED_BY_VENDOR',
+              failureCount: 0,
+            ),
+          ]),
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: c,
+        child: MaterialApp(theme: DpTheme.light(), home: const SupportPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('알 수 없는 상태'), findsOneWidget);
+    expect(find.text('(ESCALATED_BY_VENDOR)'), findsOneWidget);
+  });
+
   testWidgets('DpPageHeader 제목은 "오류 신고·문의" + 상태 필터가 filters 슬롯에 렌더', (
     tester,
   ) async {

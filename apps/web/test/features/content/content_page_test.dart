@@ -341,6 +341,63 @@ void main() {
     expect(find.text('Future/async-await 정리'), findsOneWidget);
     expect(find.textContaining('재시도 성공'), findsWidgets);
   });
+
+  testWidgets('진행률 저장 실패는 문서를 보존하고 같은 진행분을 재시도한다', (tester) async {
+    tester.view.physicalSize = const Size(900, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final adapter = _SequenceAdapter({
+      'GET /contents/future-async-await': [
+        (200, _contentJson(markdown: _longMarkdown(), scrollPct: 0)),
+      ],
+      'POST /contents/future-async-await/progress': [
+        (
+          500,
+          {
+            'error': {'code': 'INTERNAL_ERROR', 'message': '저장 지연'},
+          },
+        ),
+        (
+          200,
+          {
+            'scrollPct': 0.5,
+            'dwellSec': 6,
+            'completed': false,
+            'completedAt': null,
+          },
+        ),
+      ],
+    });
+
+    await tester.pumpWidget(_host(adapter));
+    await _pumpLoad(tester);
+    final headerHeight = tester.getSize(find.byType(DpPageHeader)).height;
+    final controller = tester
+        .widget<CustomScrollView>(find.byType(CustomScrollView))
+        .controller!;
+    final bodyMax = controller.position.maxScrollExtent - headerHeight;
+    await tester.pump(const Duration(seconds: 6));
+    controller.jumpTo(headerHeight + bodyMax * 0.5);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('Future/async-await 정리'), findsOneWidget);
+    expect(find.text('저장 지연'), findsOneWidget);
+    expect(find.text('진행률 저장 다시 시도'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('진행률 저장 다시 시도'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('진행률 저장 다시 시도'));
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(adapter.count('POST /contents/future-async-await/progress'), 2);
+    expect(adapter.postBodies[1], adapter.postBodies[0]);
+    expect(find.text('저장 지연'), findsNothing);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 100));
+  });
 }
 
 Widget _host(_SequenceAdapter adapter) {

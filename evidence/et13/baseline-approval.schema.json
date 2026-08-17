@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://leva.ai.kr/schemas/et13/baseline-approval.v1.json",
+  "title": "Leva ET13 externally reviewed visual baseline approval",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "source_sha",
+    "catalog_sha256",
+    "case_catalog_sha256",
+    "review_candidate_sha256",
+    "fixture_ids",
+    "case_count",
+    "candidate_set_sha256",
+    "approval_repository",
+    "approval_workflow_path",
+    "approval_workflow_sha256",
+    "approval_run_id",
+    "approval_run_attempt",
+    "approval_head_sha",
+    "approval_environment",
+    "approval_environment_id",
+    "approved_by_id",
+    "approved_by",
+    "approval_effective_at",
+    "raw_review_workflow_sha256",
+    "raw_review_run_id",
+    "raw_review_run_attempt",
+    "raw_review_head_sha",
+    "raw_review_artifact_id",
+    "raw_review_artifact_name",
+    "raw_review_artifact_digest"
+  ],
+  "properties": {
+    "schema_version": {"const": "leva.et13.baseline-approval.v1"},
+    "status": {"const": "approved"},
+    "source_sha": {
+      "type": "string",
+      "pattern": "^(?!0{40}$)[0-9a-f]{40}$"
+    },
+    "catalog_sha256": {"$ref": "#/$defs/sha256"},
+    "case_catalog_sha256": {"$ref": "#/$defs/sha256"},
+    "review_candidate_sha256": {"$ref": "#/$defs/sha256"},
+    "fixture_ids": {"$ref": "#/$defs/fixtureIds"},
+    "case_count": {"const": 96},
+    "candidate_set_sha256": {"$ref": "#/$defs/sha256"},
+    "approval_repository": {"const": "DevPathAi/devpath-frontend"},
+    "approval_workflow_path": {
+      "const": ".github/workflows/et13-baseline-approval.yml"
+    },
+    "approval_workflow_sha256": {"$ref": "#/$defs/sha256"},
+    "approval_run_id": {"$ref": "#/$defs/positiveInteger"},
+    "approval_run_attempt": {"$ref": "#/$defs/positiveInteger"},
+    "approval_head_sha": {"$ref": "#/$defs/gitSha"},
+    "approval_environment": {"const": "et13-baseline-approval"},
+    "approval_environment_id": {"$ref": "#/$defs/positiveInteger"},
+    "approved_by_id": {"$ref": "#/$defs/positiveInteger"},
+    "approved_by": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$"
+    },
+    "approval_effective_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$"
+    },
+    "raw_review_workflow_sha256": {"$ref": "#/$defs/sha256"},
+    "raw_review_run_id": {"$ref": "#/$defs/positiveInteger"},
+    "raw_review_run_attempt": {"$ref": "#/$defs/positiveInteger"},
+    "raw_review_head_sha": {"$ref": "#/$defs/gitSha"},
+    "raw_review_artifact_id": {"$ref": "#/$defs/positiveInteger"},
+    "raw_review_artifact_name": {
+      "type": "string",
+      "pattern": "^et13-unsealed-raw-review-run-[1-9][0-9]*-attempt-[1-9][0-9]*$"
+    },
+    "raw_review_artifact_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "gitSha": {
+      "type": "string",
+      "pattern": "^(?!0{40}$)[0-9a-f]{40}$"
+    },
+    "positiveInteger": {"type": "integer", "minimum": 1},
+    "fixtureIds": {
+      "type": "array",
+      "minItems": 12,
+      "maxItems": 12,
+      "prefixItems": [
+        {"const": "web-today-available"},
+        {"const": "web-path-current-week"},
+        {"const": "web-content-reading"},
+        {"const": "web-workspace-idle"},
+        {"const": "web-review-loaded"},
+        {"const": "web-mentor-context-preview"},
+        {"const": "admin-kpi-dashboard"},
+        {"const": "admin-support-long-wire"},
+        {"const": "mobile-today-available"},
+        {"const": "mobile-content-reading"},
+        {"const": "dp-design-mission-ledger"},
+        {"const": "dp-design-context-payload-preview"}
+      ],
+      "items": false
+    }
+  }
+}

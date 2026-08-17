@@ -1,0 +1,203 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../data/owner_data_store.dart';
+import '../../../services/push_service.dart';
+
+final class StoredNotification {
+  const StoredNotification({
+    required this.message,
+    required this.receivedAt,
+    required this.isRead,
+  });
+
+  final PushMessage message;
+  final DateTime receivedAt;
+  final bool isRead;
+}
+
+class NotificationStore {
+  NotificationStore(this._data);
+
+  static const bucket = 'notification-v1';
+  final OwnerDataStore _data;
+  final _addTails = <String, Future<void>>{};
+
+  Future<bool> add(
+    String ownerKey,
+    PushMessage message, {
+    required DateTime receivedAt,
+  }) {
+    if (message.id.isEmpty || !message.isForOwner(ownerKey)) {
+      return Future.value(false);
+    }
+    final key = '$ownerKey\u0000${message.id}';
+    final previous = _addTails[key] ?? Future<void>.value();
+    final result = previous.then((_) async {
+      if (await _data.read(ownerKey, bucket, message.id) != null) return false;
+      await _write(
+        ownerKey,
+        StoredNotification(
+          message: message,
+          receivedAt: receivedAt,
+          isRead: false,
+        ),
+      );
+      return true;
+    });
+    final tail = result.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
+    _addTails[key] = tail;
+    unawaited(
+      tail.then((_) {
+        if (identical(_addTails[key], tail)) _addTails.remove(key);
+      }),
+    );
+    return result;
+  }
+
+  Future<List<StoredNotification>> list(String ownerKey) async {
+    final rows = await _data.list(ownerKey, bucket);
+    final result = <StoredNotification>[];
+    for (final row in rows) {
+      try {
+        result.add(_decode(row.payload));
+      } on Object {
+        await _data.deleteIfMatches(
+          ownerKey,
+          bucket,
+          row.recordKey,
+          payload: row.payload,
+          updatedAt: row.updatedAt,
+        );
+      }
+    }
+    result.sort((a, b) => b.receivedAt.compareTo(a.receivedAt));
+    return result;
+  }
+
+  Future<void> markAllRead(
+    String ownerKey, {
+    bool Function()? isCurrent,
+  }) async {
+    final notifications = await list(ownerKey);
+    if (isCurrent?.call() == false) return;
+    for (final notification in notifications) {
+      if (isCurrent?.call() == false) return;
+      if (!notification.isRead) {
+        final marked = StoredNotification(
+          message: notification.message,
+          receivedAt: notification.receivedAt,
+          isRead: true,
+        );
+        await _write(ownerKey, marked);
+        if (isCurrent?.call() == false) {
+          await _data.deleteIfMatches(
+            ownerKey,
+            bucket,
+            marked.message.id,
+            payload: _encode(marked),
+            updatedAt: marked.receivedAt,
+          );
+          return;
+        }
+      }
+    }
+  }
+
+  /// Removes only the exact unread write created by a now-stale account
+  /// boundary. A later write with the same message id is left untouched.
+  Future<void> discardIfMatches(
+    String ownerKey,
+    PushMessage message, {
+    required DateTime receivedAt,
+  }) {
+    final notification = StoredNotification(
+      message: message,
+      receivedAt: receivedAt,
+      isRead: false,
+    );
+    return _data.deleteIfMatches(
+      ownerKey,
+      bucket,
+      message.id,
+      payload: _encode(notification),
+      updatedAt: receivedAt,
+    );
+  }
+
+  Future<void> _write(String ownerKey, StoredNotification notification) {
+    return _data.write(
+      ownerKey,
+      bucket,
+      notification.message.id,
+      _encode(notification),
+      updatedAt: notification.receivedAt,
+    );
+  }
+
+  String _encode(StoredNotification notification) {
+    final target = notification.message.target;
+    return jsonEncode({
+      'id': notification.message.id,
+      'title': notification.message.title,
+      'body': notification.message.body,
+      'scope': notification.message.scope.name,
+      'intendedOwnerKey': notification.message.intendedOwnerKey,
+      'targetType': target?.kind.name,
+      'primaryId': target?.primaryId,
+      'secondaryId': target?.secondaryId,
+      'receivedAt': notification.receivedAt.toUtc().toIso8601String(),
+      'isRead': notification.isRead,
+    });
+  }
+
+  StoredNotification _decode(String payload) {
+    final json = jsonDecode(payload) as Map<String, dynamic>;
+    final target = switch (json['targetType']) {
+      'today' => PushTarget.today(pathId: (json['primaryId'] as num).toInt()),
+      'content' => PushTarget.content(
+        taskId: (json['primaryId'] as num).toInt(),
+        contentId: (json['secondaryId'] as num).toInt(),
+      ),
+      _ => null,
+    };
+    final id = json['id'] as String;
+    final title = json['title'] as String? ?? '';
+    final body = json['body'] as String? ?? '';
+    final intendedOwnerKey = json['intendedOwnerKey'] as String?;
+    final message = switch (json['scope']) {
+      'local' => PushMessage.local(
+        id: id,
+        title: title,
+        body: body,
+        target: target,
+      ),
+      'remoteOwner'
+          when intendedOwnerKey != null &&
+              intendedOwnerKey.isNotEmpty &&
+              intendedOwnerKey == intendedOwnerKey.trim() =>
+        PushMessage.ownerScoped(
+          id: id,
+          title: title,
+          body: body,
+          target: target,
+          intendedOwnerKey: intendedOwnerKey,
+        ),
+      _ => throw const FormatException('unscoped persisted notification'),
+    };
+    return StoredNotification(
+      message: message,
+      receivedAt: DateTime.parse(json['receivedAt'] as String).toUtc(),
+      isRead: json['isRead'] as bool? ?? false,
+    );
+  }
+}
+
+final notificationStoreProvider = Provider<NotificationStore>(
+  (ref) => NotificationStore(ref.watch(ownerDataStoreProvider)),
+);

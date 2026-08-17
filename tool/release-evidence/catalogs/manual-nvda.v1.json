@@ -1,0 +1,39 @@
+{
+  "schema_version": "leva.mission-spine.manual-at-catalog.v1",
+  "lane": "manual-nvda",
+  "assistive_technology": "NVDA+Chromium",
+  "test_provenance_path": "tool/release-evidence/provenance/manual-nvda.v1.json",
+  "case_count": 2,
+  "cases": [
+    {
+      "id": "nvda-web-today-mission-spine",
+      "surface": "web",
+      "entry_point": "today",
+      "procedure": [
+        "Windows physical host에서 후보 소스의 Web release build를 Chromium으로 열고 NVDA를 시작한다.",
+        "오늘의 미션 화면을 제목 탐색과 읽기 모드로 순서대로 탐색한다.",
+        "현재 주차, 미션 상태, 진행률, 태스크와 다음 행동을 읽고 포커스 순서를 확인한다."
+      ],
+      "expected": [
+        "미션 구조와 AVAILABLE 상태가 시각적 순서와 같은 논리적 순서로 읽힌다.",
+        "진행률과 각 태스크의 이름 및 상태가 중복이나 누락 없이 구분된다.",
+        "키보드만으로 다음 행동에 도달하며 현재 포커스를 식별할 수 있다."
+      ]
+    },
+    {
+      "id": "nvda-web-next-action-navigation",
+      "surface": "web",
+      "entry_point": "next_action",
+      "procedure": [
+        "오늘의 미션에서 NVDA 포커스를 다음 행동으로 이동하고 Enter로 활성화한다.",
+        "도착한 콘텐츠의 제목, 본문, 코드 블록과 컨텍스트 정보를 읽기 모드와 키보드로 탐색한다.",
+        "브라우저 뒤로 가기 후 동일한 다음 행동을 다시 실행해 미션 문맥과 포커스 복원을 확인한다."
+      ],
+      "expected": [
+        "활성화 한 번에 후보 소스가 정의한 현재 콘텐츠 경로로 이동한다.",
+        "본문과 코드 블록은 읽기 가능하고 가로 오버플로는 키보드로 조작 가능하다.",
+        "복귀와 재진입 뒤에도 오늘의 미션 문맥과 탐색 순서가 유지된다."
+      ]
+    }
+  ]
+}

@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:devpath_web/src/analytics/journey_analytics.dart';
 import 'package:devpath_web/src/features/auth/application/auth_controller.dart';
 import 'package:devpath_web/src/features/auth/application/oauth_launcher.dart';
 import 'package:devpath_web/src/features/auth/state/auth_state.dart';
@@ -21,6 +23,29 @@ class _FakeOAuthLauncher implements OAuthLauncher {
   void launch(String url) {
     launchedUrl = url;
   }
+}
+
+class _SpyJourneyAnalytics implements JourneyAnalytics {
+  final identified = <String>[];
+  var resetCount = 0;
+
+  @override
+  AnalyticsCaptureStatus capture(
+    String event,
+    Map<String, Object?> properties,
+  ) => AnalyticsCaptureStatus.accepted;
+
+  @override
+  bool identify(String userId) {
+    identified.add(userId);
+    return true;
+  }
+
+  @override
+  void reset() => resetCount++;
+
+  @override
+  void setOptedOut(bool optedOut) {}
 }
 
 // ---------------------------------------------------------------------------
@@ -49,8 +74,11 @@ class _ThrowingAdapter implements HttpClientAdapter {
 // ---------------------------------------------------------------------------
 class _MockRefreshAdapter implements HttpClientAdapter {
   final int statusCode;
+  final Completer<void>? gate;
+  final entered = Completer<void>();
+  int calls = 0;
 
-  _MockRefreshAdapter({this.statusCode = 200});
+  _MockRefreshAdapter({this.statusCode = 200, this.gate});
 
   @override
   Future<ResponseBody> fetch(
@@ -58,12 +86,15 @@ class _MockRefreshAdapter implements HttpClientAdapter {
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
   ) async {
+    calls++;
+    if (!entered.isCompleted) entered.complete();
+    await gate?.future;
     if (statusCode == 200) {
       return ResponseBody.fromString(
         jsonEncode({
           'access_token': 'test-access-token',
           'user': {
-            'id': 'u-1',
+            'id': '101',
             'email': 'test@devpath.ai',
             'nickname': '테스터',
             'role': 'LEARNER',
@@ -106,7 +137,7 @@ class _DoneUserRefreshAdapter implements HttpClientAdapter {
       jsonEncode({
         'access_token': 'test-access-token',
         'user': {
-          'id': 'u-2',
+          'id': '102',
           'email': 'done@devpath.ai',
           'nickname': '완료자',
           'role': 'LEARNER',
@@ -182,6 +213,50 @@ void main() {
   // bootstrapFromCallback() — /auth/refresh 세션 복원 테스트
   // -------------------------------------------------------------------------
   group('bootstrapFromCallback()', () {
+    test('callback 두 번과 startup refresh가 겹쳐도 한 요청을 공유한다', () async {
+      final gate = Completer<void>();
+      final adapter = _MockRefreshAdapter(gate: gate);
+      final container = _containerWithAdapter(adapter);
+      addTearDown(container.dispose);
+      final controller = container.read(authControllerProvider.notifier);
+
+      final first = controller.bootstrapFromCallback();
+      final replay = controller.bootstrapFromCallback();
+      await adapter.entered.future;
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      expect(adapter.calls, 1);
+
+      gate.complete();
+      await Future.wait([first, replay]);
+      expect(container.read(authControllerProvider), isA<AuthAuthenticated>());
+    });
+
+    test('startup refresh에 callback이 합류한 실패도 callback 오류를 보존한다', () async {
+      final gate = Completer<void>();
+      final adapter = _MockRefreshAdapter(statusCode: 401, gate: gate);
+      final container = _containerWithAdapter(adapter);
+      addTearDown(container.dispose);
+
+      // provider build의 startup bootstrap이 includeApiError:false로 먼저 진입한다.
+      container.read(authControllerProvider);
+      await adapter.entered.future;
+      final callback = container
+          .read(authControllerProvider.notifier)
+          .bootstrapFromCallback();
+      expect(adapter.calls, 1);
+
+      gate.complete();
+      await callback;
+
+      final state = container.read(authControllerProvider);
+      expect(state, isA<AuthUnauthenticated>());
+      expect(
+        (state as AuthUnauthenticated).error,
+        isNotNull,
+        reason: 'callback이 합류하면 startup 요청 실패도 복구 UI가 설명해야 한다',
+      );
+    });
+
     test('POST /auth/refresh 성공 시 AuthAuthenticated로 전이하고 user를 담는다', () async {
       final container = _containerWithAdapter(
         _MockRefreshAdapter(statusCode: 200),
@@ -195,7 +270,7 @@ void main() {
       final state = container.read(authControllerProvider);
       expect(state, isA<AuthAuthenticated>());
       final auth = state as AuthAuthenticated;
-      expect(auth.user.id, 'u-1');
+      expect(auth.user.id, '101');
       expect(auth.user.nickname, '테스터');
       expect(auth.user.onboardingStatus, OnboardingStatus.pending);
     });
@@ -246,7 +321,7 @@ void main() {
       final state = container.read(authControllerProvider);
       expect(state, isA<AuthAuthenticated>());
       final auth = state as AuthAuthenticated;
-      expect(auth.user.id, 'u-1');
+      expect(auth.user.id, '101');
       expect(auth.user.nickname, '테스터');
     });
 
@@ -399,5 +474,29 @@ void main() {
 
     expect(container.read(authControllerProvider), isA<AuthUnauthenticated>());
     expect(await container.read(tokenStoreProvider).readAccess(), isNull);
+  });
+
+  test('인증 성공은 내부 user id를 identify하고 logout은 reset한다', () async {
+    final analytics = _SpyJourneyAnalytics();
+    final container = ProviderContainer(
+      overrides: [
+        apiClientProvider.overrideWith((ref) {
+          final client = ApiClient.create(
+            const ApiConfig(baseUrl: 'http://test.local'),
+          );
+          client.dio.httpClientAdapter = _MockRefreshAdapter(statusCode: 200);
+          return client;
+        }),
+        journeyAnalyticsProvider.overrideWithValue(analytics),
+      ],
+    );
+    addTearDown(container.dispose);
+    final controller = container.read(authControllerProvider.notifier);
+
+    await controller.bootstrapFromCallback();
+    await controller.logout();
+
+    expect(analytics.identified, ['101']);
+    expect(analytics.resetCount, 1);
   });
 }

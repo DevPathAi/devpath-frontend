@@ -38,7 +38,7 @@ class _DpInteractiveCardState extends State<DpInteractiveCard> {
     final Color borderColor;
     final double borderWidth;
     if (_focused) {
-      borderColor = c.primary;
+      borderColor = c.primaryText;
       borderWidth = 2;
     } else if (_hovered) {
       borderColor = c.primary;

@@ -14,6 +14,19 @@ void _setWidth(WidgetTester tester, double w) {
 }
 
 void main() {
+  test('첫 목적지 라벨은 Today다', () {
+    expect(kShellDestinations.first.label, '오늘');
+  });
+
+  test('셸 위치 resolver는 canonical child만 Today로 묶고 legacy content는 중립이다', () {
+    expect(shellDestinationIndexFor('/dashboard'), 0);
+    expect(shellDestinationIndexFor('/path/301/today'), 0);
+    expect(shellDestinationIndexFor('/mission/302/content/77'), 0);
+    expect(shellDestinationIndexFor('/mission/302/sandbox'), 0);
+    expect(shellDestinationIndexFor('/path'), 1);
+    expect(shellDestinationIndexFor('/content/77'), isNull);
+  });
+
   testWidgets('좁은 폭(<840)은 NavigationBar', (tester) async {
     _setWidth(tester, 390);
     await tester.pumpWidget(
@@ -143,6 +156,21 @@ void main() {
       isNull,
       reason: '/settings는 kShellDestinations에 없다 — 0(대시보드)으로 폴백하면 잘못 강조된다',
     );
+  });
+
+  testWidgets('canonical mission child는 rail에서 Today를 선택한다', (tester) async {
+    _setWidth(tester, 1200);
+    await tester.pumpWidget(
+      _host(
+        const AppShellView(
+          location: '/mission/302/content/77',
+          child: Text('본문'),
+        ),
+      ),
+    );
+
+    final rail = tester.widget<DpNavRail>(find.byType(DpNavRail));
+    expect(rail.selectedIndex, 0);
   });
 
   testWidgets('비-compact 폭: 계정 아이콘은 색을 상속하고 레일의 railMuted가 된다', (tester) async {

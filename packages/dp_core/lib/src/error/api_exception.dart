@@ -20,6 +20,7 @@ class ApiException implements Exception {
 
   bool get isKillSwitch => code == ApiErrorCode.aiKillSwitchActive;
   bool get isQuota => code == ApiErrorCode.quotaExceeded;
+  bool get isMentorBusy => code == ApiErrorCode.mentorBusy;
   bool get isOnboardingIncomplete => code == ApiErrorCode.onboardingIncomplete;
 
   factory ApiException.fromDio(DioException e) {
