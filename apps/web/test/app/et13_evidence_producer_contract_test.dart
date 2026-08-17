@@ -968,6 +968,146 @@ void main() {
     expect(workflow, isNot(contains('update-snapshot')));
   });
 
+  test('release input authentication is isolated from diagnostic production', () {
+    final workflow = File(
+      '../../.github/workflows/et13-evidence.yml',
+    ).readAsStringSync().replaceAll('\r\n', '\n');
+    final authenticationStart = workflow.indexOf(
+      '  authenticate-release-inputs:',
+    );
+    final producerStart = workflow.indexOf('  produce-atomic-pair:');
+    expect(authenticationStart, greaterThanOrEqualTo(0));
+    expect(producerStart, greaterThan(authenticationStart));
+    final authentication = workflow.substring(
+      authenticationStart,
+      producerStart,
+    );
+    final producer = workflow.substring(producerStart);
+
+    expect(
+      authentication,
+      contains("if: github.event_name == 'workflow_dispatch'"),
+    );
+    expect(authentication, contains('name: mission-spine-et13-release-auth'));
+    expect(authentication, contains('persist-credentials: false'));
+    expect(
+      authentication,
+      contains('test "\${GITHUB_EVENT_NAME}" = workflow_dispatch'),
+    );
+    expect(authentication, contains('test "\${GITHUB_REF}" = refs/heads/main'));
+    expect(authentication, contains('test "\${GITHUB_RUN_ATTEMPT}" = 1'));
+    expect(
+      authentication,
+      contains('secrets.MISSION_SPINE_EVIDENCE_READER_APP_ID'),
+    );
+    expect(
+      authentication,
+      contains('secrets.MISSION_SPINE_EVIDENCE_READER_APP_PRIVATE_KEY'),
+    );
+    expect(authentication, contains('owner: DevPathAi'));
+    expect(authentication, isNot(contains('repositories:')));
+    expect(authentication, contains('devpath-evidence-reader'));
+    expect(authentication, contains('/installation/repositories?per_page=100'));
+    expect(
+      authentication,
+      contains('Hard-verify exact external artifact archives'),
+    );
+    expect(authentication, contains('candidate-source'));
+    expect(authentication, contains('auth.json'));
+    expect(
+      authentication,
+      contains(
+        r'et13-release-auth-${{ inputs.release_id }}-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}',
+      ),
+    );
+    expect(authentication, contains('overwrite: false'));
+    expect(authentication, contains('path: build/et13/release-auth/'));
+    final sourceGuard = authentication.indexOf(
+      'Reject release authentication ambiguity',
+    );
+    final protectedApproval = authentication.indexOf(
+      'Authenticate protected release-reader approval',
+    );
+    final mint = authentication.indexOf(
+      'Mint read-only GitOps candidate token',
+    );
+    final inventory = authentication.indexOf(
+      'Verify evidence reader App is GitOps-only',
+    );
+    final externalMetadata = authentication.indexOf(
+      'Authenticate exact external release artifact metadata',
+    );
+    final upload = authentication.indexOf(
+      'Upload authenticated release inputs',
+    );
+    expect(sourceGuard, greaterThanOrEqualTo(0));
+    expect(protectedApproval, greaterThan(sourceGuard));
+    expect(mint, greaterThan(protectedApproval));
+    expect(inventory, greaterThan(mint));
+    expect(externalMetadata, greaterThan(inventory));
+    expect(upload, greaterThan(externalMetadata));
+
+    expect(producer, contains('needs: authenticate-release-inputs'));
+    expect(
+      producer,
+      contains(
+        "github.event_name != 'workflow_dispatch' || needs.authenticate-release-inputs.result == 'success'",
+      ),
+    );
+    expect(
+      producer,
+      contains('needs.authenticate-release-inputs.outputs.artifact_id'),
+    );
+    expect(
+      producer,
+      contains('needs.authenticate-release-inputs.outputs.artifact_digest'),
+    );
+    expect(producer, contains('Download authenticated release inputs'));
+    expect(producer, contains('Execute authenticated release bridge verifier'));
+    expect(
+      producer,
+      contains('python3 tools/et13/verify_release_auth_bridge.py'),
+    );
+    expect(
+      producer,
+      contains(
+        'python3 -m unittest tools/et13/test_verify_release_auth_bridge.py -v',
+      ),
+    );
+    expect(producer, contains('auth.json'));
+    expect(producer, isNot(contains('secrets.')));
+    expect(producer, isNot(contains('create-github-app-token')));
+    expect(producer, isNot(contains('GitOps candidate token')));
+    expect(producer, isNot(contains('external-metadata.outputs')));
+    final download = producer.indexOf('Download authenticated release inputs');
+    final bridge = producer.indexOf(
+      'Execute authenticated release bridge verifier',
+    );
+    final install = producer.indexOf(
+      'Validate and install authenticated release inputs',
+    );
+    expect(download, greaterThanOrEqualTo(0));
+    expect(bridge, greaterThan(download));
+    expect(install, greaterThan(bridge));
+
+    final legacyAppId = ['secrets', 'GITOPS_APP_ID'].join('.');
+    final legacyAppKey = ['secrets', 'GITOPS_APP_PRIVATE_KEY'].join('.');
+    expect(workflow, isNot(contains(legacyAppId)));
+    expect(workflow, isNot(contains(legacyAppKey)));
+    expect(
+      RegExp(
+        r'secrets\.MISSION_SPINE_EVIDENCE_READER_APP_ID',
+      ).allMatches(workflow).length,
+      1,
+    );
+    expect(
+      RegExp(
+        r'secrets\.MISSION_SPINE_EVIDENCE_READER_APP_PRIVATE_KEY',
+      ).allMatches(workflow).length,
+      1,
+    );
+  });
+
   test(
     'external baseline updater is incapable of self-approval in CI',
     () async {

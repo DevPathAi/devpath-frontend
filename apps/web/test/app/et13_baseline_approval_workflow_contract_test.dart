@@ -8,7 +8,7 @@ void main() {
   setUpAll(() {
     final file = File('../../.github/workflows/et13-baseline-approval.yml');
     expect(file.existsSync(), isTrue);
-    workflow = file.readAsStringSync();
+    workflow = file.readAsStringSync().replaceAll('\r\n', '\n');
   });
 
   test(

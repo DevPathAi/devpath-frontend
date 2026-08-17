@@ -5,20 +5,53 @@ import { pathToFileURL } from 'node:url';
 import process from 'node:process';
 
 const frontendRepository = 'DevPathAi/devpath-frontend';
+const frozenReviewers = Object.freeze([
+  Object.freeze({ id: 77432570, login: 'VelkaressiaBlutkrone' }),
+]);
+
+function protectedBinding(jobName) {
+  return Object.freeze({ jobName, reviewers: frozenReviewers });
+}
+
 const allowedBindings = new Map([
+  [
+    '.github/workflows/et13-evidence.yml',
+    new Map([
+      [
+        'mission-spine-et13-release-auth',
+        protectedBinding('Authenticate ET13 release inputs'),
+      ],
+    ]),
+  ],
   [
     '.github/workflows/mission-spine-signed-mobile-build.yml',
     new Map([
-      ['mission-spine-mobile-signing-android', 'Sign Android release'],
-      ['mission-spine-mobile-signing-ios', 'Sign iOS release'],
+      [
+        'mission-spine-mobile-signing-android',
+        protectedBinding('Sign Android release'),
+      ],
+      [
+        'mission-spine-mobile-signing-ios',
+        protectedBinding('Sign iOS release'),
+      ],
     ]),
   ],
   [
     '.github/workflows/mission-spine-manual-at-evidence.yml',
     new Map([
-      ['manual-at-nvda', 'Approve manual NVDA evidence'],
-      ['manual-at-voiceover', 'Approve manual VoiceOver evidence'],
-      ['manual-at-talkback', 'Approve manual TalkBack evidence'],
+      [
+        'mission-spine-manual-at-auth',
+        protectedBinding('Authenticate manual AT inputs'),
+      ],
+      ['manual-at-nvda', protectedBinding('Approve manual NVDA evidence')],
+      [
+        'manual-at-voiceover',
+        protectedBinding('Approve manual VoiceOver evidence'),
+      ],
+      [
+        'manual-at-talkback',
+        protectedBinding('Approve manual TalkBack evidence'),
+      ],
     ]),
   ],
 ]);
@@ -62,23 +95,24 @@ function utc(value, name) {
 }
 
 function validateWorkflowPath(run, workflowPath) {
-  const allowed = new Set([
-    workflowPath,
-    `${workflowPath}@main`,
-    `${workflowPath}@refs/heads/main`,
-  ]);
-  if (!allowed.has(run.path)) fail('run.path/ref mismatch');
+  exact(run.path, workflowPath, 'run.path');
 }
 
 function validateBinding(workflowPath, environmentName, jobName) {
   const environments = allowedBindings.get(workflowPath);
-  if (!environments || environments.get(environmentName) !== jobName) {
+  const binding = environments?.get(environmentName);
+  if (!binding || binding.jobName !== jobName) {
     fail('workflow/environment/job binding is not allowlisted');
   }
+  return binding;
 }
 
 export function validateProtectedApprovalFacts(facts) {
-  validateBinding(facts.workflowPath, facts.environmentName, facts.jobName);
+  const binding = validateBinding(
+    facts.workflowPath,
+    facts.environmentName,
+    facts.jobName,
+  );
   exact(facts.repository, frontendRepository, 'repository');
   sha1(facts.sourceSha, 'sourceSha');
   const runId = positiveInteger(facts.runId, 'runId');
@@ -90,6 +124,8 @@ export function validateProtectedApprovalFacts(facts) {
   exact(facts.run.id, runId, 'run.id');
   exact(facts.run.run_attempt, runAttempt, 'run.run_attempt');
   exact(facts.run.event, 'workflow_dispatch', 'run.event');
+  exact(facts.run.status, 'in_progress', 'run.status');
+  exact(facts.run.conclusion, null, 'run.conclusion');
   exact(facts.run.head_sha, facts.sourceSha, 'run.head_sha');
   exact(facts.run.head_branch, 'main', 'run.head_branch');
   exact(facts.run.repository?.full_name, frontendRepository, 'run.repository');
@@ -105,6 +141,46 @@ export function validateProtectedApprovalFacts(facts) {
   exact(facts.branch.protected, true, 'protected branch policy');
 
   exact(facts.environment.name, facts.environmentName, 'environment.name');
+  exact(
+    facts.environment.can_admins_bypass,
+    false,
+    'environment can_admins_bypass',
+  );
+  if (
+    !facts.environment.deployment_branch_policy ||
+    typeof facts.environment.deployment_branch_policy !== 'object' ||
+    Array.isArray(facts.environment.deployment_branch_policy)
+  ) {
+    fail('environment deployment branch policy is absent');
+  }
+  exact(
+    facts.environment.deployment_branch_policy.protected_branches,
+    false,
+    'environment protected_branches policy',
+  );
+  exact(
+    facts.environment.deployment_branch_policy.custom_branch_policies,
+    true,
+    'environment custom_branch_policies policy',
+  );
+  if (
+    !facts.branchPolicies ||
+    typeof facts.branchPolicies !== 'object' ||
+    Array.isArray(facts.branchPolicies)
+  ) {
+    fail('environment branch policies are absent');
+  }
+  exact(facts.branchPolicies.total_count, 1, 'environment branch policy count');
+  if (
+    !Array.isArray(facts.branchPolicies.branch_policies) ||
+    facts.branchPolicies.branch_policies.length !== 1
+  ) {
+    fail('environment branch policy list is absent or ambiguous');
+  }
+  const branchPolicy = facts.branchPolicies.branch_policies[0];
+  positiveInteger(branchPolicy?.id, 'environment branch policy id');
+  exact(branchPolicy?.name, 'main', 'environment branch policy name');
+  exact(branchPolicy?.type, 'branch', 'environment branch policy type');
   const environmentId = positiveInteger(
     facts.environment.id,
     'environment.id',
@@ -126,6 +202,36 @@ export function validateProtectedApprovalFacts(facts) {
   );
   if (!Array.isArray(reviewerRule.reviewers) || reviewerRule.reviewers.length < 1) {
     fail('environment has no configured reviewer');
+  }
+  exact(
+    reviewerRule.reviewers.length,
+    binding.reviewers.length,
+    'environment reviewer count',
+  );
+  const configuredReviewers = reviewerRule.reviewers
+    .map((entry) => {
+      exact(entry?.type, 'User', 'environment reviewer type');
+      exact(entry?.reviewer?.type, 'User', 'environment reviewer account type');
+      return {
+        id: positiveInteger(entry.reviewer?.id, 'environment reviewer id'),
+        login: entry.reviewer?.login,
+      };
+    })
+    .sort((left, right) => left.id - right.id);
+  const expectedReviewers = [...binding.reviewers].sort(
+    (left, right) => left.id - right.id,
+  );
+  for (let index = 0; index < expectedReviewers.length; index += 1) {
+    exact(
+      configuredReviewers[index].id,
+      expectedReviewers[index].id,
+      'environment reviewer id',
+    );
+    exact(
+      configuredReviewers[index].login,
+      expectedReviewers[index].login,
+      'environment reviewer login',
+    );
   }
 
   if (!Array.isArray(facts.approvals)) fail('approval history is absent');
@@ -157,17 +263,11 @@ export function validateProtectedApprovalFacts(facts) {
   ) {
     fail('the workflow initiator cannot approve this environment');
   }
-  const configuredUser = reviewerRule.reviewers.some(
-    (entry) => entry.type === 'User' && entry.reviewer?.id === reviewerId,
+  const configuredUser = expectedReviewers.some(
+    (entry) => entry.id === reviewerId && entry.login === login,
   );
-  const configuredTeam = reviewerRule.reviewers.some(
-    (entry) =>
-      entry.type === 'Team' &&
-      Number.isSafeInteger(entry.reviewer?.id) &&
-      entry.reviewer.id > 0,
-  );
-  if (!configuredUser && !configuredTeam) {
-    fail('approved reviewer is not represented by the configured gate');
+  if (!configuredUser) {
+    fail('approved reviewer is not the exact configured user reviewer');
   }
 
   if (!facts.jobs || !Array.isArray(facts.jobs.jobs)) {
@@ -208,7 +308,7 @@ async function github(path, token, fetchImpl = fetch) {
     headers: {
       Accept: 'application/vnd.github+json',
       Authorization: `Bearer ${token}`,
-      'X-GitHub-Api-Version': '2022-11-28',
+      'X-GitHub-Api-Version': '2026-03-10',
     },
     redirect: 'error',
   });
@@ -269,6 +369,10 @@ async function authenticate(options) {
     `/repos/${repository}/environments/${encodeURIComponent(environmentName)}`,
     token,
   );
+  const branchPolicies = await github(
+    `/repos/${repository}/environments/${encodeURIComponent(environmentName)}/deployment-branch-policies?per_page=100`,
+    token,
+  );
   const encodedWorkflow = workflowPath
     .split('/')
     .map((part) => encodeURIComponent(part))
@@ -321,6 +425,7 @@ async function authenticate(options) {
     run,
     branch,
     environment,
+    branchPolicies,
     approvals,
     jobs,
     workflowBytes,

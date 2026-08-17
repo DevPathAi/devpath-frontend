@@ -1,5 +1,7 @@
 # WS-B 데모 웹 이미지·빌드 설정 Implementation Plan
 
+> **Historical plan — do not execute.** 이후 릴리스 보안 작업에서 mutable 태그와 Frontend CI의 직접 GitOps 변경을 제거했다. 아래 App 자격증명 예시는 폐기된 흐름을 설명하는 비실행 placeholder이며 실제 시크릿으로 만들거나 재사용하면 안 된다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** `apps/web`(Flutter Web)을 실 API에 물린 Docker 이미지로 빌드하고, 백엔드 svc와 동일한 CI 패턴으로 ghcr 푸시 + gitops 이미지 태그 커밋을 자동화한다.
@@ -197,8 +199,8 @@ git commit -m "feat(web): Flutter Web Docker 이미지(멀티스테이지 nginx:
       - uses: actions/create-github-app-token@v3
         id: app-token
         with:
-          app-id: ${{ secrets.GITOPS_APP_ID }}
-          private-key: ${{ secrets.GITOPS_APP_PRIVATE_KEY }}
+          app-id: ${{ secrets.LEGACY_RELEASE_WRITER_APP_ID_DO_NOT_USE }}
+          private-key: ${{ secrets.LEGACY_RELEASE_WRITER_APP_PRIVATE_KEY_DO_NOT_USE }}
           owner: DevPathAi
           repositories: devpath-gitops
       - uses: actions/checkout@v6
