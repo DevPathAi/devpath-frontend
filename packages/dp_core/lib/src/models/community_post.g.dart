@@ -36,10 +36,11 @@ _CommunityAnswer _$CommunityAnswerFromJson(Map<String, dynamic> json) =>
     _CommunityAnswer(
       id: (json['id'] as num).toInt(),
       authorId: (json['authorId'] as num?)?.toInt(),
-      bodyMd: json['bodyMd'] as String,
+      bodyMd: json['bodyMd'] as String? ?? '',
       aiGenerated: json['aiGenerated'] as bool? ?? false,
       accepted: json['accepted'] as bool? ?? false,
       upvoteCount: (json['upvoteCount'] as num?)?.toInt() ?? 0,
+      deleted: json['deleted'] as bool? ?? false,
     );
 
 Map<String, dynamic> _$CommunityAnswerToJson(_CommunityAnswer instance) =>
@@ -50,6 +51,7 @@ Map<String, dynamic> _$CommunityAnswerToJson(_CommunityAnswer instance) =>
       'aiGenerated': instance.aiGenerated,
       'accepted': instance.accepted,
       'upvoteCount': instance.upvoteCount,
+      'deleted': instance.deleted,
     };
 
 _CommunityQuestionDetail _$CommunityQuestionDetailFromJson(
@@ -58,6 +60,7 @@ _CommunityQuestionDetail _$CommunityQuestionDetailFromJson(
   id: (json['id'] as num).toInt(),
   title: json['title'] as String,
   bodyMd: json['bodyMd'] as String,
+  authorId: (json['authorId'] as num?)?.toInt(),
   solved: json['solved'] as bool? ?? false,
   acceptedAnswerId: (json['acceptedAnswerId'] as num?)?.toInt(),
   upvoteCount: (json['upvoteCount'] as num?)?.toInt() ?? 0,
@@ -78,6 +81,7 @@ Map<String, dynamic> _$CommunityQuestionDetailToJson(
   'id': instance.id,
   'title': instance.title,
   'bodyMd': instance.bodyMd,
+  'authorId': instance.authorId,
   'solved': instance.solved,
   'acceptedAnswerId': instance.acceptedAnswerId,
   'upvoteCount': instance.upvoteCount,
@@ -149,9 +153,10 @@ _CommunityComment _$CommunityCommentFromJson(Map<String, dynamic> json) =>
     _CommunityComment(
       id: (json['id'] as num).toInt(),
       authorId: (json['authorId'] as num?)?.toInt(),
-      bodyMd: json['bodyMd'] as String,
+      bodyMd: json['bodyMd'] as String? ?? '',
       upvoteCount: (json['upvoteCount'] as num?)?.toInt() ?? 0,
       createdAt: json['createdAt'] as String,
+      deleted: json['deleted'] as bool? ?? false,
     );
 
 Map<String, dynamic> _$CommunityCommentToJson(_CommunityComment instance) =>
@@ -161,4 +166,5 @@ Map<String, dynamic> _$CommunityCommentToJson(_CommunityComment instance) =>
       'bodyMd': instance.bodyMd,
       'upvoteCount': instance.upvoteCount,
       'createdAt': instance.createdAt,
+      'deleted': instance.deleted,
     };

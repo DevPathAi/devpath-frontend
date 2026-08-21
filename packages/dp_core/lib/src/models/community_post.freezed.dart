@@ -299,7 +299,8 @@ as String,
 /// @nodoc
 mixin _$CommunityAnswer {
 
- int get id; int? get authorId; String get bodyMd; bool get aiGenerated; bool get accepted; int get upvoteCount;
+ int get id; int? get authorId; String get bodyMd; bool get aiGenerated; bool get accepted; int get upvoteCount;/// 작성자·관리자가 지운 답변. true 면 본문과 작성자가 비어 있고 카드는 비석으로 렌더한다.
+ bool get deleted;
 /// Create a copy of CommunityAnswer
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -312,16 +313,16 @@ $CommunityAnswerCopyWith<CommunityAnswer> get copyWith => _$CommunityAnswerCopyW
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is CommunityAnswer&&(identical(other.id, id) || other.id == id)&&(identical(other.authorId, authorId) || other.authorId == authorId)&&(identical(other.bodyMd, bodyMd) || other.bodyMd == bodyMd)&&(identical(other.aiGenerated, aiGenerated) || other.aiGenerated == aiGenerated)&&(identical(other.accepted, accepted) || other.accepted == accepted)&&(identical(other.upvoteCount, upvoteCount) || other.upvoteCount == upvoteCount));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is CommunityAnswer&&(identical(other.id, id) || other.id == id)&&(identical(other.authorId, authorId) || other.authorId == authorId)&&(identical(other.bodyMd, bodyMd) || other.bodyMd == bodyMd)&&(identical(other.aiGenerated, aiGenerated) || other.aiGenerated == aiGenerated)&&(identical(other.accepted, accepted) || other.accepted == accepted)&&(identical(other.upvoteCount, upvoteCount) || other.upvoteCount == upvoteCount)&&(identical(other.deleted, deleted) || other.deleted == deleted));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,authorId,bodyMd,aiGenerated,accepted,upvoteCount);
+int get hashCode => Object.hash(runtimeType,id,authorId,bodyMd,aiGenerated,accepted,upvoteCount,deleted);
 
 @override
 String toString() {
-  return 'CommunityAnswer(id: $id, authorId: $authorId, bodyMd: $bodyMd, aiGenerated: $aiGenerated, accepted: $accepted, upvoteCount: $upvoteCount)';
+  return 'CommunityAnswer(id: $id, authorId: $authorId, bodyMd: $bodyMd, aiGenerated: $aiGenerated, accepted: $accepted, upvoteCount: $upvoteCount, deleted: $deleted)';
 }
 
 
@@ -332,7 +333,7 @@ abstract mixin class $CommunityAnswerCopyWith<$Res>  {
   factory $CommunityAnswerCopyWith(CommunityAnswer value, $Res Function(CommunityAnswer) _then) = _$CommunityAnswerCopyWithImpl;
 @useResult
 $Res call({
- int id, int? authorId, String bodyMd, bool aiGenerated, bool accepted, int upvoteCount
+ int id, int? authorId, String bodyMd, bool aiGenerated, bool accepted, int upvoteCount, bool deleted
 });
 
 
@@ -349,7 +350,7 @@ class _$CommunityAnswerCopyWithImpl<$Res>
 
 /// Create a copy of CommunityAnswer
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? authorId = freezed,Object? bodyMd = null,Object? aiGenerated = null,Object? accepted = null,Object? upvoteCount = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? authorId = freezed,Object? bodyMd = null,Object? aiGenerated = null,Object? accepted = null,Object? upvoteCount = null,Object? deleted = null,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,authorId: freezed == authorId ? _self.authorId : authorId // ignore: cast_nullable_to_non_nullable
@@ -357,7 +358,8 @@ as int?,bodyMd: null == bodyMd ? _self.bodyMd : bodyMd // ignore: cast_nullable_
 as String,aiGenerated: null == aiGenerated ? _self.aiGenerated : aiGenerated // ignore: cast_nullable_to_non_nullable
 as bool,accepted: null == accepted ? _self.accepted : accepted // ignore: cast_nullable_to_non_nullable
 as bool,upvoteCount: null == upvoteCount ? _self.upvoteCount : upvoteCount // ignore: cast_nullable_to_non_nullable
-as int,
+as int,deleted: null == deleted ? _self.deleted : deleted // ignore: cast_nullable_to_non_nullable
+as bool,
   ));
 }
 
@@ -442,10 +444,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  int? authorId,  String bodyMd,  bool aiGenerated,  bool accepted,  int upvoteCount)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  int? authorId,  String bodyMd,  bool aiGenerated,  bool accepted,  int upvoteCount,  bool deleted)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _CommunityAnswer() when $default != null:
-return $default(_that.id,_that.authorId,_that.bodyMd,_that.aiGenerated,_that.accepted,_that.upvoteCount);case _:
+return $default(_that.id,_that.authorId,_that.bodyMd,_that.aiGenerated,_that.accepted,_that.upvoteCount,_that.deleted);case _:
   return orElse();
 
 }
@@ -463,10 +465,10 @@ return $default(_that.id,_that.authorId,_that.bodyMd,_that.aiGenerated,_that.acc
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  int? authorId,  String bodyMd,  bool aiGenerated,  bool accepted,  int upvoteCount)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  int? authorId,  String bodyMd,  bool aiGenerated,  bool accepted,  int upvoteCount,  bool deleted)  $default,) {final _that = this;
 switch (_that) {
 case _CommunityAnswer():
-return $default(_that.id,_that.authorId,_that.bodyMd,_that.aiGenerated,_that.accepted,_that.upvoteCount);case _:
+return $default(_that.id,_that.authorId,_that.bodyMd,_that.aiGenerated,_that.accepted,_that.upvoteCount,_that.deleted);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -483,10 +485,10 @@ return $default(_that.id,_that.authorId,_that.bodyMd,_that.aiGenerated,_that.acc
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  int? authorId,  String bodyMd,  bool aiGenerated,  bool accepted,  int upvoteCount)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  int? authorId,  String bodyMd,  bool aiGenerated,  bool accepted,  int upvoteCount,  bool deleted)?  $default,) {final _that = this;
 switch (_that) {
 case _CommunityAnswer() when $default != null:
-return $default(_that.id,_that.authorId,_that.bodyMd,_that.aiGenerated,_that.accepted,_that.upvoteCount);case _:
+return $default(_that.id,_that.authorId,_that.bodyMd,_that.aiGenerated,_that.accepted,_that.upvoteCount,_that.deleted);case _:
   return null;
 
 }
@@ -498,15 +500,17 @@ return $default(_that.id,_that.authorId,_that.bodyMd,_that.aiGenerated,_that.acc
 @JsonSerializable()
 
 class _CommunityAnswer implements CommunityAnswer {
-  const _CommunityAnswer({required this.id, this.authorId, required this.bodyMd, this.aiGenerated = false, this.accepted = false, this.upvoteCount = 0});
+  const _CommunityAnswer({required this.id, this.authorId, this.bodyMd = '', this.aiGenerated = false, this.accepted = false, this.upvoteCount = 0, this.deleted = false});
   factory _CommunityAnswer.fromJson(Map<String, dynamic> json) => _$CommunityAnswerFromJson(json);
 
 @override final  int id;
 @override final  int? authorId;
-@override final  String bodyMd;
+@override@JsonKey() final  String bodyMd;
 @override@JsonKey() final  bool aiGenerated;
 @override@JsonKey() final  bool accepted;
 @override@JsonKey() final  int upvoteCount;
+/// 작성자·관리자가 지운 답변. true 면 본문과 작성자가 비어 있고 카드는 비석으로 렌더한다.
+@override@JsonKey() final  bool deleted;
 
 /// Create a copy of CommunityAnswer
 /// with the given fields replaced by the non-null parameter values.
@@ -521,16 +525,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _CommunityAnswer&&(identical(other.id, id) || other.id == id)&&(identical(other.authorId, authorId) || other.authorId == authorId)&&(identical(other.bodyMd, bodyMd) || other.bodyMd == bodyMd)&&(identical(other.aiGenerated, aiGenerated) || other.aiGenerated == aiGenerated)&&(identical(other.accepted, accepted) || other.accepted == accepted)&&(identical(other.upvoteCount, upvoteCount) || other.upvoteCount == upvoteCount));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _CommunityAnswer&&(identical(other.id, id) || other.id == id)&&(identical(other.authorId, authorId) || other.authorId == authorId)&&(identical(other.bodyMd, bodyMd) || other.bodyMd == bodyMd)&&(identical(other.aiGenerated, aiGenerated) || other.aiGenerated == aiGenerated)&&(identical(other.accepted, accepted) || other.accepted == accepted)&&(identical(other.upvoteCount, upvoteCount) || other.upvoteCount == upvoteCount)&&(identical(other.deleted, deleted) || other.deleted == deleted));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,authorId,bodyMd,aiGenerated,accepted,upvoteCount);
+int get hashCode => Object.hash(runtimeType,id,authorId,bodyMd,aiGenerated,accepted,upvoteCount,deleted);
 
 @override
 String toString() {
-  return 'CommunityAnswer(id: $id, authorId: $authorId, bodyMd: $bodyMd, aiGenerated: $aiGenerated, accepted: $accepted, upvoteCount: $upvoteCount)';
+  return 'CommunityAnswer(id: $id, authorId: $authorId, bodyMd: $bodyMd, aiGenerated: $aiGenerated, accepted: $accepted, upvoteCount: $upvoteCount, deleted: $deleted)';
 }
 
 
@@ -541,7 +545,7 @@ abstract mixin class _$CommunityAnswerCopyWith<$Res> implements $CommunityAnswer
   factory _$CommunityAnswerCopyWith(_CommunityAnswer value, $Res Function(_CommunityAnswer) _then) = __$CommunityAnswerCopyWithImpl;
 @override @useResult
 $Res call({
- int id, int? authorId, String bodyMd, bool aiGenerated, bool accepted, int upvoteCount
+ int id, int? authorId, String bodyMd, bool aiGenerated, bool accepted, int upvoteCount, bool deleted
 });
 
 
@@ -558,7 +562,7 @@ class __$CommunityAnswerCopyWithImpl<$Res>
 
 /// Create a copy of CommunityAnswer
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? authorId = freezed,Object? bodyMd = null,Object? aiGenerated = null,Object? accepted = null,Object? upvoteCount = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? authorId = freezed,Object? bodyMd = null,Object? aiGenerated = null,Object? accepted = null,Object? upvoteCount = null,Object? deleted = null,}) {
   return _then(_CommunityAnswer(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,authorId: freezed == authorId ? _self.authorId : authorId // ignore: cast_nullable_to_non_nullable
@@ -566,7 +570,8 @@ as int?,bodyMd: null == bodyMd ? _self.bodyMd : bodyMd // ignore: cast_nullable_
 as String,aiGenerated: null == aiGenerated ? _self.aiGenerated : aiGenerated // ignore: cast_nullable_to_non_nullable
 as bool,accepted: null == accepted ? _self.accepted : accepted // ignore: cast_nullable_to_non_nullable
 as bool,upvoteCount: null == upvoteCount ? _self.upvoteCount : upvoteCount // ignore: cast_nullable_to_non_nullable
-as int,
+as int,deleted: null == deleted ? _self.deleted : deleted // ignore: cast_nullable_to_non_nullable
+as bool,
   ));
 }
 
@@ -577,7 +582,8 @@ as int,
 /// @nodoc
 mixin _$CommunityQuestionDetail {
 
- int get id; String get title; String get bodyMd; bool get solved; int? get acceptedAnswerId; int get upvoteCount; int get downvoteCount; List<String> get tags; List<CommunityAnswer> get answers;
+ int get id; String get title; String get bodyMd;/// 질문 작성자. 프론트가 「내 질문인가」를 판단하는 유일한 근거다(1부 부록에서 추가됨).
+ int? get authorId; bool get solved; int? get acceptedAnswerId; int get upvoteCount; int get downvoteCount; List<String> get tags; List<CommunityAnswer> get answers;
 /// Create a copy of CommunityQuestionDetail
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -590,16 +596,16 @@ $CommunityQuestionDetailCopyWith<CommunityQuestionDetail> get copyWith => _$Comm
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is CommunityQuestionDetail&&(identical(other.id, id) || other.id == id)&&(identical(other.title, title) || other.title == title)&&(identical(other.bodyMd, bodyMd) || other.bodyMd == bodyMd)&&(identical(other.solved, solved) || other.solved == solved)&&(identical(other.acceptedAnswerId, acceptedAnswerId) || other.acceptedAnswerId == acceptedAnswerId)&&(identical(other.upvoteCount, upvoteCount) || other.upvoteCount == upvoteCount)&&(identical(other.downvoteCount, downvoteCount) || other.downvoteCount == downvoteCount)&&const DeepCollectionEquality().equals(other.tags, tags)&&const DeepCollectionEquality().equals(other.answers, answers));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is CommunityQuestionDetail&&(identical(other.id, id) || other.id == id)&&(identical(other.title, title) || other.title == title)&&(identical(other.bodyMd, bodyMd) || other.bodyMd == bodyMd)&&(identical(other.authorId, authorId) || other.authorId == authorId)&&(identical(other.solved, solved) || other.solved == solved)&&(identical(other.acceptedAnswerId, acceptedAnswerId) || other.acceptedAnswerId == acceptedAnswerId)&&(identical(other.upvoteCount, upvoteCount) || other.upvoteCount == upvoteCount)&&(identical(other.downvoteCount, downvoteCount) || other.downvoteCount == downvoteCount)&&const DeepCollectionEquality().equals(other.tags, tags)&&const DeepCollectionEquality().equals(other.answers, answers));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,title,bodyMd,solved,acceptedAnswerId,upvoteCount,downvoteCount,const DeepCollectionEquality().hash(tags),const DeepCollectionEquality().hash(answers));
+int get hashCode => Object.hash(runtimeType,id,title,bodyMd,authorId,solved,acceptedAnswerId,upvoteCount,downvoteCount,const DeepCollectionEquality().hash(tags),const DeepCollectionEquality().hash(answers));
 
 @override
 String toString() {
-  return 'CommunityQuestionDetail(id: $id, title: $title, bodyMd: $bodyMd, solved: $solved, acceptedAnswerId: $acceptedAnswerId, upvoteCount: $upvoteCount, downvoteCount: $downvoteCount, tags: $tags, answers: $answers)';
+  return 'CommunityQuestionDetail(id: $id, title: $title, bodyMd: $bodyMd, authorId: $authorId, solved: $solved, acceptedAnswerId: $acceptedAnswerId, upvoteCount: $upvoteCount, downvoteCount: $downvoteCount, tags: $tags, answers: $answers)';
 }
 
 
@@ -610,7 +616,7 @@ abstract mixin class $CommunityQuestionDetailCopyWith<$Res>  {
   factory $CommunityQuestionDetailCopyWith(CommunityQuestionDetail value, $Res Function(CommunityQuestionDetail) _then) = _$CommunityQuestionDetailCopyWithImpl;
 @useResult
 $Res call({
- int id, String title, String bodyMd, bool solved, int? acceptedAnswerId, int upvoteCount, int downvoteCount, List<String> tags, List<CommunityAnswer> answers
+ int id, String title, String bodyMd, int? authorId, bool solved, int? acceptedAnswerId, int upvoteCount, int downvoteCount, List<String> tags, List<CommunityAnswer> answers
 });
 
 
@@ -627,12 +633,13 @@ class _$CommunityQuestionDetailCopyWithImpl<$Res>
 
 /// Create a copy of CommunityQuestionDetail
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? title = null,Object? bodyMd = null,Object? solved = null,Object? acceptedAnswerId = freezed,Object? upvoteCount = null,Object? downvoteCount = null,Object? tags = null,Object? answers = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? title = null,Object? bodyMd = null,Object? authorId = freezed,Object? solved = null,Object? acceptedAnswerId = freezed,Object? upvoteCount = null,Object? downvoteCount = null,Object? tags = null,Object? answers = null,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,title: null == title ? _self.title : title // ignore: cast_nullable_to_non_nullable
 as String,bodyMd: null == bodyMd ? _self.bodyMd : bodyMd // ignore: cast_nullable_to_non_nullable
-as String,solved: null == solved ? _self.solved : solved // ignore: cast_nullable_to_non_nullable
+as String,authorId: freezed == authorId ? _self.authorId : authorId // ignore: cast_nullable_to_non_nullable
+as int?,solved: null == solved ? _self.solved : solved // ignore: cast_nullable_to_non_nullable
 as bool,acceptedAnswerId: freezed == acceptedAnswerId ? _self.acceptedAnswerId : acceptedAnswerId // ignore: cast_nullable_to_non_nullable
 as int?,upvoteCount: null == upvoteCount ? _self.upvoteCount : upvoteCount // ignore: cast_nullable_to_non_nullable
 as int,downvoteCount: null == downvoteCount ? _self.downvoteCount : downvoteCount // ignore: cast_nullable_to_non_nullable
@@ -723,10 +730,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String title,  String bodyMd,  bool solved,  int? acceptedAnswerId,  int upvoteCount,  int downvoteCount,  List<String> tags,  List<CommunityAnswer> answers)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String title,  String bodyMd,  int? authorId,  bool solved,  int? acceptedAnswerId,  int upvoteCount,  int downvoteCount,  List<String> tags,  List<CommunityAnswer> answers)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _CommunityQuestionDetail() when $default != null:
-return $default(_that.id,_that.title,_that.bodyMd,_that.solved,_that.acceptedAnswerId,_that.upvoteCount,_that.downvoteCount,_that.tags,_that.answers);case _:
+return $default(_that.id,_that.title,_that.bodyMd,_that.authorId,_that.solved,_that.acceptedAnswerId,_that.upvoteCount,_that.downvoteCount,_that.tags,_that.answers);case _:
   return orElse();
 
 }
@@ -744,10 +751,10 @@ return $default(_that.id,_that.title,_that.bodyMd,_that.solved,_that.acceptedAns
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String title,  String bodyMd,  bool solved,  int? acceptedAnswerId,  int upvoteCount,  int downvoteCount,  List<String> tags,  List<CommunityAnswer> answers)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String title,  String bodyMd,  int? authorId,  bool solved,  int? acceptedAnswerId,  int upvoteCount,  int downvoteCount,  List<String> tags,  List<CommunityAnswer> answers)  $default,) {final _that = this;
 switch (_that) {
 case _CommunityQuestionDetail():
-return $default(_that.id,_that.title,_that.bodyMd,_that.solved,_that.acceptedAnswerId,_that.upvoteCount,_that.downvoteCount,_that.tags,_that.answers);case _:
+return $default(_that.id,_that.title,_that.bodyMd,_that.authorId,_that.solved,_that.acceptedAnswerId,_that.upvoteCount,_that.downvoteCount,_that.tags,_that.answers);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -764,10 +771,10 @@ return $default(_that.id,_that.title,_that.bodyMd,_that.solved,_that.acceptedAns
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String title,  String bodyMd,  bool solved,  int? acceptedAnswerId,  int upvoteCount,  int downvoteCount,  List<String> tags,  List<CommunityAnswer> answers)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String title,  String bodyMd,  int? authorId,  bool solved,  int? acceptedAnswerId,  int upvoteCount,  int downvoteCount,  List<String> tags,  List<CommunityAnswer> answers)?  $default,) {final _that = this;
 switch (_that) {
 case _CommunityQuestionDetail() when $default != null:
-return $default(_that.id,_that.title,_that.bodyMd,_that.solved,_that.acceptedAnswerId,_that.upvoteCount,_that.downvoteCount,_that.tags,_that.answers);case _:
+return $default(_that.id,_that.title,_that.bodyMd,_that.authorId,_that.solved,_that.acceptedAnswerId,_that.upvoteCount,_that.downvoteCount,_that.tags,_that.answers);case _:
   return null;
 
 }
@@ -779,12 +786,14 @@ return $default(_that.id,_that.title,_that.bodyMd,_that.solved,_that.acceptedAns
 @JsonSerializable()
 
 class _CommunityQuestionDetail implements CommunityQuestionDetail {
-  const _CommunityQuestionDetail({required this.id, required this.title, required this.bodyMd, this.solved = false, this.acceptedAnswerId, this.upvoteCount = 0, this.downvoteCount = 0, final  List<String> tags = const <String>[], final  List<CommunityAnswer> answers = const <CommunityAnswer>[]}): _tags = tags,_answers = answers;
+  const _CommunityQuestionDetail({required this.id, required this.title, required this.bodyMd, this.authorId, this.solved = false, this.acceptedAnswerId, this.upvoteCount = 0, this.downvoteCount = 0, final  List<String> tags = const <String>[], final  List<CommunityAnswer> answers = const <CommunityAnswer>[]}): _tags = tags,_answers = answers;
   factory _CommunityQuestionDetail.fromJson(Map<String, dynamic> json) => _$CommunityQuestionDetailFromJson(json);
 
 @override final  int id;
 @override final  String title;
 @override final  String bodyMd;
+/// 질문 작성자. 프론트가 「내 질문인가」를 판단하는 유일한 근거다(1부 부록에서 추가됨).
+@override final  int? authorId;
 @override@JsonKey() final  bool solved;
 @override final  int? acceptedAnswerId;
 @override@JsonKey() final  int upvoteCount;
@@ -817,16 +826,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _CommunityQuestionDetail&&(identical(other.id, id) || other.id == id)&&(identical(other.title, title) || other.title == title)&&(identical(other.bodyMd, bodyMd) || other.bodyMd == bodyMd)&&(identical(other.solved, solved) || other.solved == solved)&&(identical(other.acceptedAnswerId, acceptedAnswerId) || other.acceptedAnswerId == acceptedAnswerId)&&(identical(other.upvoteCount, upvoteCount) || other.upvoteCount == upvoteCount)&&(identical(other.downvoteCount, downvoteCount) || other.downvoteCount == downvoteCount)&&const DeepCollectionEquality().equals(other._tags, _tags)&&const DeepCollectionEquality().equals(other._answers, _answers));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _CommunityQuestionDetail&&(identical(other.id, id) || other.id == id)&&(identical(other.title, title) || other.title == title)&&(identical(other.bodyMd, bodyMd) || other.bodyMd == bodyMd)&&(identical(other.authorId, authorId) || other.authorId == authorId)&&(identical(other.solved, solved) || other.solved == solved)&&(identical(other.acceptedAnswerId, acceptedAnswerId) || other.acceptedAnswerId == acceptedAnswerId)&&(identical(other.upvoteCount, upvoteCount) || other.upvoteCount == upvoteCount)&&(identical(other.downvoteCount, downvoteCount) || other.downvoteCount == downvoteCount)&&const DeepCollectionEquality().equals(other._tags, _tags)&&const DeepCollectionEquality().equals(other._answers, _answers));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,title,bodyMd,solved,acceptedAnswerId,upvoteCount,downvoteCount,const DeepCollectionEquality().hash(_tags),const DeepCollectionEquality().hash(_answers));
+int get hashCode => Object.hash(runtimeType,id,title,bodyMd,authorId,solved,acceptedAnswerId,upvoteCount,downvoteCount,const DeepCollectionEquality().hash(_tags),const DeepCollectionEquality().hash(_answers));
 
 @override
 String toString() {
-  return 'CommunityQuestionDetail(id: $id, title: $title, bodyMd: $bodyMd, solved: $solved, acceptedAnswerId: $acceptedAnswerId, upvoteCount: $upvoteCount, downvoteCount: $downvoteCount, tags: $tags, answers: $answers)';
+  return 'CommunityQuestionDetail(id: $id, title: $title, bodyMd: $bodyMd, authorId: $authorId, solved: $solved, acceptedAnswerId: $acceptedAnswerId, upvoteCount: $upvoteCount, downvoteCount: $downvoteCount, tags: $tags, answers: $answers)';
 }
 
 
@@ -837,7 +846,7 @@ abstract mixin class _$CommunityQuestionDetailCopyWith<$Res> implements $Communi
   factory _$CommunityQuestionDetailCopyWith(_CommunityQuestionDetail value, $Res Function(_CommunityQuestionDetail) _then) = __$CommunityQuestionDetailCopyWithImpl;
 @override @useResult
 $Res call({
- int id, String title, String bodyMd, bool solved, int? acceptedAnswerId, int upvoteCount, int downvoteCount, List<String> tags, List<CommunityAnswer> answers
+ int id, String title, String bodyMd, int? authorId, bool solved, int? acceptedAnswerId, int upvoteCount, int downvoteCount, List<String> tags, List<CommunityAnswer> answers
 });
 
 
@@ -854,12 +863,13 @@ class __$CommunityQuestionDetailCopyWithImpl<$Res>
 
 /// Create a copy of CommunityQuestionDetail
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? title = null,Object? bodyMd = null,Object? solved = null,Object? acceptedAnswerId = freezed,Object? upvoteCount = null,Object? downvoteCount = null,Object? tags = null,Object? answers = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? title = null,Object? bodyMd = null,Object? authorId = freezed,Object? solved = null,Object? acceptedAnswerId = freezed,Object? upvoteCount = null,Object? downvoteCount = null,Object? tags = null,Object? answers = null,}) {
   return _then(_CommunityQuestionDetail(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,title: null == title ? _self.title : title // ignore: cast_nullable_to_non_nullable
 as String,bodyMd: null == bodyMd ? _self.bodyMd : bodyMd // ignore: cast_nullable_to_non_nullable
-as String,solved: null == solved ? _self.solved : solved // ignore: cast_nullable_to_non_nullable
+as String,authorId: freezed == authorId ? _self.authorId : authorId // ignore: cast_nullable_to_non_nullable
+as int?,solved: null == solved ? _self.solved : solved // ignore: cast_nullable_to_non_nullable
 as bool,acceptedAnswerId: freezed == acceptedAnswerId ? _self.acceptedAnswerId : acceptedAnswerId // ignore: cast_nullable_to_non_nullable
 as int?,upvoteCount: null == upvoteCount ? _self.upvoteCount : upvoteCount // ignore: cast_nullable_to_non_nullable
 as int,downvoteCount: null == downvoteCount ? _self.downvoteCount : downvoteCount // ignore: cast_nullable_to_non_nullable
@@ -1710,7 +1720,8 @@ as List<CommunityComment>,
 /// @nodoc
 mixin _$CommunityComment {
 
- int get id; int? get authorId; String get bodyMd; int get upvoteCount; String get createdAt;
+ int get id; int? get authorId; String get bodyMd; int get upvoteCount; String get createdAt;/// 지워진 댓글. 본문·작성자는 비고 작성 시각만 남아 스레드 순서를 보존한다.
+ bool get deleted;
 /// Create a copy of CommunityComment
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -1723,16 +1734,16 @@ $CommunityCommentCopyWith<CommunityComment> get copyWith => _$CommunityCommentCo
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is CommunityComment&&(identical(other.id, id) || other.id == id)&&(identical(other.authorId, authorId) || other.authorId == authorId)&&(identical(other.bodyMd, bodyMd) || other.bodyMd == bodyMd)&&(identical(other.upvoteCount, upvoteCount) || other.upvoteCount == upvoteCount)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is CommunityComment&&(identical(other.id, id) || other.id == id)&&(identical(other.authorId, authorId) || other.authorId == authorId)&&(identical(other.bodyMd, bodyMd) || other.bodyMd == bodyMd)&&(identical(other.upvoteCount, upvoteCount) || other.upvoteCount == upvoteCount)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.deleted, deleted) || other.deleted == deleted));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,authorId,bodyMd,upvoteCount,createdAt);
+int get hashCode => Object.hash(runtimeType,id,authorId,bodyMd,upvoteCount,createdAt,deleted);
 
 @override
 String toString() {
-  return 'CommunityComment(id: $id, authorId: $authorId, bodyMd: $bodyMd, upvoteCount: $upvoteCount, createdAt: $createdAt)';
+  return 'CommunityComment(id: $id, authorId: $authorId, bodyMd: $bodyMd, upvoteCount: $upvoteCount, createdAt: $createdAt, deleted: $deleted)';
 }
 
 
@@ -1743,7 +1754,7 @@ abstract mixin class $CommunityCommentCopyWith<$Res>  {
   factory $CommunityCommentCopyWith(CommunityComment value, $Res Function(CommunityComment) _then) = _$CommunityCommentCopyWithImpl;
 @useResult
 $Res call({
- int id, int? authorId, String bodyMd, int upvoteCount, String createdAt
+ int id, int? authorId, String bodyMd, int upvoteCount, String createdAt, bool deleted
 });
 
 
@@ -1760,14 +1771,15 @@ class _$CommunityCommentCopyWithImpl<$Res>
 
 /// Create a copy of CommunityComment
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? authorId = freezed,Object? bodyMd = null,Object? upvoteCount = null,Object? createdAt = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? authorId = freezed,Object? bodyMd = null,Object? upvoteCount = null,Object? createdAt = null,Object? deleted = null,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,authorId: freezed == authorId ? _self.authorId : authorId // ignore: cast_nullable_to_non_nullable
 as int?,bodyMd: null == bodyMd ? _self.bodyMd : bodyMd // ignore: cast_nullable_to_non_nullable
 as String,upvoteCount: null == upvoteCount ? _self.upvoteCount : upvoteCount // ignore: cast_nullable_to_non_nullable
 as int,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
-as String,
+as String,deleted: null == deleted ? _self.deleted : deleted // ignore: cast_nullable_to_non_nullable
+as bool,
   ));
 }
 
@@ -1852,10 +1864,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  int? authorId,  String bodyMd,  int upvoteCount,  String createdAt)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  int? authorId,  String bodyMd,  int upvoteCount,  String createdAt,  bool deleted)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _CommunityComment() when $default != null:
-return $default(_that.id,_that.authorId,_that.bodyMd,_that.upvoteCount,_that.createdAt);case _:
+return $default(_that.id,_that.authorId,_that.bodyMd,_that.upvoteCount,_that.createdAt,_that.deleted);case _:
   return orElse();
 
 }
@@ -1873,10 +1885,10 @@ return $default(_that.id,_that.authorId,_that.bodyMd,_that.upvoteCount,_that.cre
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  int? authorId,  String bodyMd,  int upvoteCount,  String createdAt)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  int? authorId,  String bodyMd,  int upvoteCount,  String createdAt,  bool deleted)  $default,) {final _that = this;
 switch (_that) {
 case _CommunityComment():
-return $default(_that.id,_that.authorId,_that.bodyMd,_that.upvoteCount,_that.createdAt);case _:
+return $default(_that.id,_that.authorId,_that.bodyMd,_that.upvoteCount,_that.createdAt,_that.deleted);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -1893,10 +1905,10 @@ return $default(_that.id,_that.authorId,_that.bodyMd,_that.upvoteCount,_that.cre
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  int? authorId,  String bodyMd,  int upvoteCount,  String createdAt)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  int? authorId,  String bodyMd,  int upvoteCount,  String createdAt,  bool deleted)?  $default,) {final _that = this;
 switch (_that) {
 case _CommunityComment() when $default != null:
-return $default(_that.id,_that.authorId,_that.bodyMd,_that.upvoteCount,_that.createdAt);case _:
+return $default(_that.id,_that.authorId,_that.bodyMd,_that.upvoteCount,_that.createdAt,_that.deleted);case _:
   return null;
 
 }
@@ -1908,14 +1920,16 @@ return $default(_that.id,_that.authorId,_that.bodyMd,_that.upvoteCount,_that.cre
 @JsonSerializable()
 
 class _CommunityComment implements CommunityComment {
-  const _CommunityComment({required this.id, this.authorId, required this.bodyMd, this.upvoteCount = 0, required this.createdAt});
+  const _CommunityComment({required this.id, this.authorId, this.bodyMd = '', this.upvoteCount = 0, required this.createdAt, this.deleted = false});
   factory _CommunityComment.fromJson(Map<String, dynamic> json) => _$CommunityCommentFromJson(json);
 
 @override final  int id;
 @override final  int? authorId;
-@override final  String bodyMd;
+@override@JsonKey() final  String bodyMd;
 @override@JsonKey() final  int upvoteCount;
 @override final  String createdAt;
+/// 지워진 댓글. 본문·작성자는 비고 작성 시각만 남아 스레드 순서를 보존한다.
+@override@JsonKey() final  bool deleted;
 
 /// Create a copy of CommunityComment
 /// with the given fields replaced by the non-null parameter values.
@@ -1930,16 +1944,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _CommunityComment&&(identical(other.id, id) || other.id == id)&&(identical(other.authorId, authorId) || other.authorId == authorId)&&(identical(other.bodyMd, bodyMd) || other.bodyMd == bodyMd)&&(identical(other.upvoteCount, upvoteCount) || other.upvoteCount == upvoteCount)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _CommunityComment&&(identical(other.id, id) || other.id == id)&&(identical(other.authorId, authorId) || other.authorId == authorId)&&(identical(other.bodyMd, bodyMd) || other.bodyMd == bodyMd)&&(identical(other.upvoteCount, upvoteCount) || other.upvoteCount == upvoteCount)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.deleted, deleted) || other.deleted == deleted));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,authorId,bodyMd,upvoteCount,createdAt);
+int get hashCode => Object.hash(runtimeType,id,authorId,bodyMd,upvoteCount,createdAt,deleted);
 
 @override
 String toString() {
-  return 'CommunityComment(id: $id, authorId: $authorId, bodyMd: $bodyMd, upvoteCount: $upvoteCount, createdAt: $createdAt)';
+  return 'CommunityComment(id: $id, authorId: $authorId, bodyMd: $bodyMd, upvoteCount: $upvoteCount, createdAt: $createdAt, deleted: $deleted)';
 }
 
 
@@ -1950,7 +1964,7 @@ abstract mixin class _$CommunityCommentCopyWith<$Res> implements $CommunityComme
   factory _$CommunityCommentCopyWith(_CommunityComment value, $Res Function(_CommunityComment) _then) = __$CommunityCommentCopyWithImpl;
 @override @useResult
 $Res call({
- int id, int? authorId, String bodyMd, int upvoteCount, String createdAt
+ int id, int? authorId, String bodyMd, int upvoteCount, String createdAt, bool deleted
 });
 
 
@@ -1967,14 +1981,15 @@ class __$CommunityCommentCopyWithImpl<$Res>
 
 /// Create a copy of CommunityComment
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? authorId = freezed,Object? bodyMd = null,Object? upvoteCount = null,Object? createdAt = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? authorId = freezed,Object? bodyMd = null,Object? upvoteCount = null,Object? createdAt = null,Object? deleted = null,}) {
   return _then(_CommunityComment(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,authorId: freezed == authorId ? _self.authorId : authorId // ignore: cast_nullable_to_non_nullable
 as int?,bodyMd: null == bodyMd ? _self.bodyMd : bodyMd // ignore: cast_nullable_to_non_nullable
 as String,upvoteCount: null == upvoteCount ? _self.upvoteCount : upvoteCount // ignore: cast_nullable_to_non_nullable
 as int,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
-as String,
+as String,deleted: null == deleted ? _self.deleted : deleted // ignore: cast_nullable_to_non_nullable
+as bool,
   ));
 }
 

@@ -32,10 +32,15 @@ abstract class CommunityAnswer with _$CommunityAnswer {
   const factory CommunityAnswer({
     required int id,
     int? authorId,
-    required String bodyMd,
+    // ★required 가 아니라 기본값이다★ — 비석 응답은 bodyMd 를 명시적 null 로 보낸다.
+    // required String 이면 생성 코드가 as String 캐스트라 null 에서 죽는다.
+    // @Default 는 `as String? ?? ''` 를 생성해 null 을 흡수한다.
+    @Default('') String bodyMd,
     @Default(false) bool aiGenerated,
     @Default(false) bool accepted,
     @Default(0) int upvoteCount,
+    /// 작성자·관리자가 지운 답변. true 면 본문과 작성자가 비어 있고 카드는 비석으로 렌더한다.
+    @Default(false) bool deleted,
   }) = _CommunityAnswer;
 
   factory CommunityAnswer.fromJson(Map<String, dynamic> json) =>
@@ -43,14 +48,16 @@ abstract class CommunityAnswer with _$CommunityAnswer {
 }
 
 /// Q&A 상세(`GET /community/questions/{id}` → `QuestionDetailView`).
-/// 질문 + 답변 스레드(인간/AI). 질문 작성자 식별자는 상세 응답에 **없다**(채택 OWNER
-/// 게이팅은 백엔드가 강제, 프론트는 미해결 상태에서 버튼 노출 + 403 우아 처리).
+/// 질문 + 답변 스레드(인간/AI). 채택 OWNER 게이팅은 백엔드가 강제하고 프론트는 미해결
+/// 상태에서 버튼을 노출한 뒤 403 을 우아하게 처리한다. 수정·삭제 메뉴 분기는 [authorId] 로 한다.
 @freezed
 abstract class CommunityQuestionDetail with _$CommunityQuestionDetail {
   const factory CommunityQuestionDetail({
     required int id,
     required String title,
     required String bodyMd,
+    /// 질문 작성자. 프론트가 「내 질문인가」를 판단하는 유일한 근거다(1부 부록에서 추가됨).
+    int? authorId,
     @Default(false) bool solved,
     int? acceptedAnswerId,
     @Default(0) int upvoteCount,
@@ -115,9 +122,11 @@ abstract class CommunityComment with _$CommunityComment {
   const factory CommunityComment({
     required int id,
     int? authorId,
-    required String bodyMd,
+    @Default('') String bodyMd,
     @Default(0) int upvoteCount,
     required String createdAt,
+    /// 지워진 댓글. 본문·작성자는 비고 작성 시각만 남아 스레드 순서를 보존한다.
+    @Default(false) bool deleted,
   }) = _CommunityComment;
 
   factory CommunityComment.fromJson(Map<String, dynamic> json) =>
