@@ -43,6 +43,23 @@ void main() {
     );
   });
 
+  test('내리기: 알 수 없는 대상 종류는 요청을 보내지 않는다 — 파괴적 기본값 금지', () async {
+    // posts 경로만 열어 둔다. 기본값이 posts 로 흐르면 이 픽스처에 걸려 조용히 성공하고
+    // 엉뚱한 글이 내려간다 — 그것이 정확히 막아야 할 동작이므로, 이 픽스처가 있어야
+    // "예외가 났다" 가 판별력을 갖는다.
+    final c = _container({
+      'DELETE /community/admin/posts/5': (204, <String, dynamic>{}),
+    });
+    await expectLater(
+      c.read(contentTakedownProvider)('COMMMENT', 5),
+      throwsA(isA<ArgumentError>()),
+    );
+    await expectLater(
+      c.read(contentTakedownProvider)('post', 5),
+      throwsA(isA<ArgumentError>()),
+    );
+  });
+
   test('리비전 조회: 최신순 목록을 파싱한다', () async {
     final c = _container({
       'GET /community/admin/revisions?targetId=7&targetType=POST': (

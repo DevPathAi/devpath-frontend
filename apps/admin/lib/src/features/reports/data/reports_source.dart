@@ -47,18 +47,28 @@ typedef RevisionsFetch =
     Future<List<AdminRevision>> Function(String targetType, int targetId);
 
 /// 신고 대상 종류를 관리자 경로 세그먼트로 옮긴다.
-String _adminSegment(String targetType) => switch (targetType) {
+/// ★기본값을 두지 않는다★ — 파괴적 요청의 경로를 정하는 자리다. `_ => 'posts'` 로 두면
+/// 알 수 없는 대상 종류(오타·새 유형·대소문자 차이)가 **글 삭제**로 흘러, targetId 가
+/// 우연히 겹치는 무관한 글이 내려간다. 모르면 보내지 않는 쪽이 옳다.
+String? _adminSegment(String targetType) => switch (targetType) {
+  'POST' => 'posts',
   'ANSWER' => 'answers',
   'COMMENT' => 'comments',
-  _ => 'posts',
+  _ => null,
 };
+
+/// 이 종류를 내릴 수 있는가. 화면이 버튼을 감출 때 쓴다 — 눌러 봐야 실패하는 버튼을
+/// 보여 주는 대신 아예 내주지 않는다.
+bool canTakedown(String targetType) => _adminSegment(targetType) != null;
 
 final contentTakedownProvider = Provider<ContentTakedown>((ref) {
   final client = ref.watch(apiClientProvider);
   return (targetType, targetId) async {
-    await client.delete<dynamic>(
-      '/community/admin/${_adminSegment(targetType)}/$targetId',
-    );
+    final segment = _adminSegment(targetType);
+    if (segment == null) {
+      throw ArgumentError.value(targetType, 'targetType', '알 수 없는 대상 종류');
+    }
+    await client.delete<dynamic>('/community/admin/$segment/$targetId');
   };
 });
 

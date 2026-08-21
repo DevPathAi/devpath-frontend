@@ -269,7 +269,9 @@ class _ReportCard extends StatelessWidget {
                       onPressed: onRevisions,
                       child: const Text('수정 이력'),
                     ),
-                    if (!r.isTargetGone)
+                    // 알 수 없는 대상 종류면 내릴 경로가 없다 — 눌러 봐야 실패하는 버튼을
+                    // 보여 주는 대신 감춘다(경로 결정은 canTakedown 한 곳에서만 한다).
+                    if (!r.isTargetGone && canTakedown(r.targetType))
                       TextButton(
                         key: ValueKey('takedown-${r.id}'),
                         onPressed: onTakedown,
