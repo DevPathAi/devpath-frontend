@@ -63,12 +63,19 @@ class QnaDetailController extends Notifier<QnaDetailState> {
   }) async {
     final cur = state;
     if (cur is! QnaLoaded || _id == null) return;
+    // ★어느 질문에서 시작했는지 붙잡아 둔다★ — 이 프로바이더는 family 도 autoDispose 도
+    // 아닌 싱글턴이라 화면을 옮겨도 같은 인스턴스가 산다. await 에서 깨어났을 때 이미
+    // 다른 질문이면, 성공이든 실패든 그 결과는 남의 화면 것이다. 재조회도 걸지 않는다.
+    final target = _id!;
     state = cur.copyWith(submitting: true);
     try {
       await action();
-      final fresh = await ref.read(qnaDetailFetchProvider)(_id!);
+      if (_id != target) return;
+      final fresh = await ref.read(qnaDetailFetchProvider)(target);
+      if (_id != target) return;
       state = QnaLoaded(fresh);
     } on ApiException catch (e) {
+      if (_id != target) return;
       state = cur.copyWith(
         submitting: false,
         actionError: messageFor?.call(e) ?? e.message,
