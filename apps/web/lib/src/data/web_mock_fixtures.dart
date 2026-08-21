@@ -264,6 +264,48 @@ final Map<String, MockFixture> webMockFixtures = {
     },
   ),
   'POST /community/posts/10/vote': (200, <String, dynamic>{}),
+  // 수정·삭제 — 목 모드에서도 골든패스(작성 → 수정 → 삭제)가 끊기지 않게 한다.
+  // ★204 라도 본문은 Object 다★ — MockFixture 는 (int, Object) 라 null 을 넣을 수 없다.
+  'PUT /community/posts/10': (
+    200,
+    {
+      'id': 10,
+      'boardType': 'FREE',
+      'title': '수정된 제목',
+      'bodyMd': '수정된 본문',
+      'authorId': 1,
+      'upvoteCount': 0,
+      'downvoteCount': 0,
+      'tags': <dynamic>[],
+      'comments': <dynamic>[],
+    },
+  ),
+  'DELETE /community/posts/10': (204, <String, dynamic>{}),
+  'PUT /community/answers/11': (
+    200,
+    {
+      'id': 11,
+      'authorId': 2,
+      'bodyMd': '수정된 답변',
+      'aiGenerated': false,
+      'accepted': false,
+      'upvoteCount': 0,
+      'deleted': false,
+    },
+  ),
+  'DELETE /community/answers/11': (204, <String, dynamic>{}),
+  'PUT /community/comments/21': (
+    200,
+    {
+      'id': 21,
+      'authorId': 1,
+      'bodyMd': '수정된 댓글',
+      'upvoteCount': 0,
+      'createdAt': '2026-08-21T00:00:00Z',
+      'deleted': false,
+    },
+  ),
+  'DELETE /community/comments/21': (204, <String, dynamic>{}),
   // 일반 게시글 작성(FREE/FEEDBACK) → PostDetailView.
   'POST /community/posts': (
     201,
