@@ -39,6 +39,7 @@ abstract class CommunityAnswer with _$CommunityAnswer {
     @Default(false) bool aiGenerated,
     @Default(false) bool accepted,
     @Default(0) int upvoteCount,
+
     /// 작성자·관리자가 지운 답변. true 면 본문과 작성자가 비어 있고 카드는 비석으로 렌더한다.
     @Default(false) bool deleted,
   }) = _CommunityAnswer;
@@ -56,6 +57,7 @@ abstract class CommunityQuestionDetail with _$CommunityQuestionDetail {
     required int id,
     required String title,
     required String bodyMd,
+
     /// 질문 작성자. 프론트가 「내 질문인가」를 판단하는 유일한 근거다(1부 부록에서 추가됨).
     int? authorId,
     @Default(false) bool solved,
@@ -125,6 +127,7 @@ abstract class CommunityComment with _$CommunityComment {
     @Default('') String bodyMd,
     @Default(0) int upvoteCount,
     required String createdAt,
+
     /// 지워진 댓글. 본문·작성자는 비고 작성 시각만 남아 스레드 순서를 보존한다.
     @Default(false) bool deleted,
   }) = _CommunityComment;
