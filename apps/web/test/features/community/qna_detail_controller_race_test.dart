@@ -107,7 +107,8 @@ void main() {
     expect(
       (s as QnaLoaded).actionError,
       isNull,
-      reason: 'id 비교만으로는 ABA 를 못 가른다 — 옛 실패의 스냅샷 복원이 '
+      reason:
+          'id 비교만으로는 ABA 를 못 가른다 — 옛 실패의 스냅샷 복원이 '
           '새로 읽은 Q1 을 덮고 남의 오류 문구를 띄운다',
     );
     expect(s.submitting, isFalse);

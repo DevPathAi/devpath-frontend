@@ -86,9 +86,15 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(fake.loads, 1, reason: '성공 후 재조회가 없으면 같은 대상 재확정이 404 를 만든다');
-    expect(fake.lastStatus, 'RESOLVED',
-        reason: '보고 있던 필터를 유지한 재조회여야 한다 — OPEN 으로 리셋되면 화면이 튄다');
-    expect(find.byKey(const ValueKey('takedown-1')), findsNothing,
-        reason: '재조회 결과의 isTargetGone 이 내리기 버튼을 감춘다 — 남아 있으면 재확정 404');
+    expect(
+      fake.lastStatus,
+      'RESOLVED',
+      reason: '보고 있던 필터를 유지한 재조회여야 한다 — OPEN 으로 리셋되면 화면이 튄다',
+    );
+    expect(
+      find.byKey(const ValueKey('takedown-1')),
+      findsNothing,
+      reason: '재조회 결과의 isTargetGone 이 내리기 버튼을 감춘다 — 남아 있으면 재확정 404',
+    );
   });
 }

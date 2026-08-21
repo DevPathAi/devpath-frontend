@@ -82,7 +82,9 @@ void main() {
         ],
       },
     );
-    final client = ApiClient.create(const ApiConfig(baseUrl: 'https://t/api/v1'));
+    final client = ApiClient.create(
+      const ApiConfig(baseUrl: 'https://t/api/v1'),
+    );
     client.dio.httpClientAdapter = adapter;
     final c = ProviderContainer(
       overrides: [
@@ -134,20 +136,32 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('수정하기'));
     await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('post-submit')), findsOneWidget,
-        reason: '편집 화면(작성 화면의 편집 모드)에 도착했다');
-    expect(find.byKey(const ValueKey('post-tags-field')), findsNothing,
-        reason: '편집 모드는 태그를 감춘다');
+    expect(
+      find.byKey(const ValueKey('post-submit')),
+      findsOneWidget,
+      reason: '편집 화면(작성 화면의 편집 모드)에 도착했다',
+    );
+    expect(
+      find.byKey(const ValueKey('post-tags-field')),
+      findsNothing,
+      reason: '편집 모드는 태그를 감춘다',
+    );
 
     // 저장 — 실제 PUT 이 나가고 본문이 실려 있다.
     await tester.tap(find.byKey(const ValueKey('post-submit')));
     await tester.pumpAndSettle();
     final put = adapter.bodies['PUT /community/posts/9']! as Map;
     expect(put['title'], '원제목');
-    expect(put['bodyMd'], contains('원본문'),
-        reason: 'Quill 역·정변환을 거친 본문이 실려 나간다');
-    expect(find.text('새제목'), findsOneWidget,
-        reason: '상세로 복귀해 저장 후 상태(재조회)를 그린다');
+    expect(
+      put['bodyMd'],
+      contains('원본문'),
+      reason: 'Quill 역·정변환을 거친 본문이 실려 나간다',
+    );
+    expect(
+      find.text('새제목'),
+      findsOneWidget,
+      reason: '상세로 복귀해 저장 후 상태(재조회)를 그린다',
+    );
 
     // 삭제 — 실제 확인 다이얼로그와 DELETE, 목록 라우팅.
     await tester.tap(find.byKey(const ValueKey('content-menu')));
@@ -157,9 +171,15 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('content-delete-confirm')));
     await tester.pumpAndSettle();
 
-    expect(adapter.calls, contains('DELETE /community/posts/9'),
-        reason: '삭제 요청이 실제로 나갔다');
-    expect(find.text('커뮤니티 목록 스텁'), findsOneWidget,
-        reason: '삭제 성공 시 목록으로 이동한다');
+    expect(
+      adapter.calls,
+      contains('DELETE /community/posts/9'),
+      reason: '삭제 요청이 실제로 나갔다',
+    );
+    expect(
+      find.text('커뮤니티 목록 스텁'),
+      findsOneWidget,
+      reason: '삭제 성공 시 목록으로 이동한다',
+    );
   });
 }

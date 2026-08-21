@@ -93,7 +93,8 @@ void main() {
     expect(
       field.controller!.text,
       '고친답변',
-      reason: 'late final 컨트롤러가 옛 본문을 쥐고 있으면 여기가 원답변이다 — '
+      reason:
+          'late final 컨트롤러가 옛 본문을 쥐고 있으면 여기가 원답변이다 — '
           '그대로 저장하면 최신을 덮는다',
     );
   });
@@ -144,15 +145,20 @@ void main() {
 
     // ★실패했는데 에디터가 닫히면 입력이 사라진다★ — 재열기는 서버 본문으로 동기화하므로
     // (stale-body 계약) 닫는 순간 사용자가 쓴 것은 되찾을 수 없다.
-    expect(find.byKey(const ValueKey('answer-edit-field')), findsOneWidget,
-        reason: '실패 시 에디터를 유지한다');
+    expect(
+      find.byKey(const ValueKey('answer-edit-field')),
+      findsOneWidget,
+      reason: '실패 시 에디터를 유지한다',
+    );
     final field = tester.widget<TextField>(
       find.byKey(const ValueKey('answer-edit-field')),
     );
-    expect(field.controller!.text, '한참 공들여 쓴 새 본문',
-        reason: '입력이 보존된다');
-    expect(find.text('내가 쓴 글만 수정할 수 있어요'), findsOneWidget,
-        reason: '실패 사유가 표면화된다');
+    expect(field.controller!.text, '한참 공들여 쓴 새 본문', reason: '입력이 보존된다');
+    expect(
+      find.text('내가 쓴 글만 수정할 수 있어요'),
+      findsOneWidget,
+      reason: '실패 사유가 표면화된다',
+    );
   });
 
   testWidgets('빈 본문 저장은 안내를 띄우고 에디터를 유지한다', (tester) async {
@@ -186,15 +192,24 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('수정하기'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const ValueKey('answer-edit-field')), '   ');
+    await tester.enterText(
+      find.byKey(const ValueKey('answer-edit-field')),
+      '   ',
+    );
     await tester.tap(find.byKey(const ValueKey('answer-edit-save')));
     await tester.pump();
 
     // 컨트롤러는 빈 본문을 서버에 안 보낸다(왕복 낭비) — 그 침묵이 사용자에게는
     // "저장했는데 아무 일도 없다" 로 보였다. 스펙의 400 문구로 표면화한다.
-    expect(find.text('내용을 입력해 주세요'), findsOneWidget,
-        reason: '조용히 삼키면 아무 안내도 없다');
-    expect(find.byKey(const ValueKey('answer-edit-field')), findsOneWidget,
-        reason: '실패했는데 에디터가 닫히면 입력이 사라진다');
+    expect(
+      find.text('내용을 입력해 주세요'),
+      findsOneWidget,
+      reason: '조용히 삼키면 아무 안내도 없다',
+    );
+    expect(
+      find.byKey(const ValueKey('answer-edit-field')),
+      findsOneWidget,
+      reason: '실패했는데 에디터가 닫히면 입력이 사라진다',
+    );
   });
 }
