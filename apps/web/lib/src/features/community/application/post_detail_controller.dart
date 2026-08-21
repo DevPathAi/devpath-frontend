@@ -2,6 +2,7 @@ import 'package:dp_core/dp_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/community_source.dart';
+import '../presentation/widgets/content_menu_button.dart';
 import '../state/post_detail_state.dart';
 
 /// 일반 게시글(FREE/FEEDBACK) 상세 + 액션(댓글/추천). 액션은 void/단건이라 성공 후
@@ -37,6 +38,23 @@ class PostDetailController extends Notifier<PostDetailState> {
       state = state.copyWith(detail: detail, submitting: false);
     } on ApiException catch (e) {
       state = state.copyWith(submitting: false, error: e.message);
+    }
+  }
+
+  /// 댓글 수정(인라인). 성공하면 상세를 재조회한다 — 서버가 렌더한 bodyHtml 과 갱신
+  /// 시각이 응답 하나로는 스레드 전체에 반영되지 않는다(addComment 와 같은 방침).
+  ///
+  /// 빈 본문은 서버를 부르지 않고 막는다. 서버도 400 을 내지만 왕복이 낭비다.
+  Future<void> updateComment(int commentId, String bodyMd) async {
+    final body = bodyMd.trim();
+    if (body.isEmpty) return;
+    state = state.copyWith(submitting: true);
+    try {
+      await ref.read(commentUpdateProvider)(commentId, body);
+      final detail = await ref.read(postDetailFetchProvider)(postId);
+      state = state.copyWith(detail: detail, submitting: false);
+    } on ApiException catch (e) {
+      state = state.copyWith(submitting: false, error: contentActionMessage(e));
     }
   }
 

@@ -2,6 +2,7 @@ import 'package:dp_core/dp_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/community_source.dart';
+import '../presentation/widgets/content_menu_button.dart';
 import '../state/qna_detail_state.dart';
 
 /// Q&A 상세 + 액션(답변·채택·투표). 액션은 모두 void/단건이라 성공 후 **상세를 재조회**해
@@ -41,7 +42,25 @@ class QnaDetailController extends Notifier<QnaDetailState> {
         ),
       );
 
-  Future<void> _mutate(Future<void> Function() action) async {
+  /// 답변 수정(인라인). 성공하면 상세를 재조회한다 — 응답 하나로는 스레드 전체가
+  /// 갱신되지 않는다(submitAnswer·accept 와 같은 방침).
+  ///
+  /// 빈 본문은 서버를 부르지 않고 막는다. 서버도 400 을 내지만 왕복이 낭비다.
+  Future<void> updateAnswer(int answerId, String bodyMd) {
+    final body = bodyMd.trim();
+    if (body.isEmpty) return Future.value();
+    return _mutate(
+      () => ref.read(answerUpdateProvider)(answerId, body),
+      messageFor: contentActionMessage,
+    );
+  }
+
+  /// [messageFor] 를 주면 그 함수로 안내 문구를 만든다 — 수정·삭제는 서버 메시지 대신
+  /// 스펙이 정한 전용 문구를 쓴다(기존 액션은 서버 메시지를 그대로 쓴다).
+  Future<void> _mutate(
+    Future<void> Function() action, {
+    String Function(ApiException)? messageFor,
+  }) async {
     final cur = state;
     if (cur is! QnaLoaded || _id == null) return;
     state = cur.copyWith(submitting: true);
@@ -50,7 +69,10 @@ class QnaDetailController extends Notifier<QnaDetailState> {
       final fresh = await ref.read(qnaDetailFetchProvider)(_id!);
       state = QnaLoaded(fresh);
     } on ApiException catch (e) {
-      state = cur.copyWith(submitting: false, actionError: e.message);
+      state = cur.copyWith(
+        submitting: false,
+        actionError: messageFor?.call(e) ?? e.message,
+      );
     }
   }
 }

@@ -161,6 +161,8 @@ class _Loaded extends ConsumerWidget {
               currentUserId: _currentUserId(ref),
               onVote: (v) => notifier.vote(CommunityVoteTarget.answer, a.id, v),
               onAccept: () => notifier.accept(a.id),
+              onSave: (body) => notifier.updateAnswer(a.id, body),
+              onChanged: () => notifier.load(detail.id),
             ),
           const SizedBox(height: DpSpacing.lg),
           _AnswerComposer(
@@ -185,7 +187,9 @@ String? _currentUserId(WidgetRef ref) {
   return auth is AuthAuthenticated ? auth.user.id : null;
 }
 
-class _AnswerCard extends StatelessWidget {
+/// 답변 카드. 수정은 화면 전환 없이 **카드 안에서** 연다 — 짧은 글에 페이지 전환은 과하다.
+/// 리치 에디터가 아니라 TextField 다: 카드마다 툴바를 띄우면 레이아웃이 흔들린다.
+class _AnswerCard extends StatefulWidget {
   const _AnswerCard({
     required this.answer,
     required this.questionSolved,
@@ -193,6 +197,8 @@ class _AnswerCard extends StatelessWidget {
     required this.currentUserId,
     required this.onVote,
     required this.onAccept,
+    required this.onSave,
+    required this.onChanged,
   });
 
   final CommunityAnswer answer;
@@ -202,8 +208,31 @@ class _AnswerCard extends StatelessWidget {
   final ValueChanged<int> onVote;
   final VoidCallback onAccept;
 
+  /// 인라인 편집 저장. 카드는 서버를 직접 부르지 않고 컨트롤러에 위임한다.
+  final ValueChanged<String> onSave;
+
+  /// 삭제 성공 뒤 — 상세 재조회를 호출자가 맡는다.
+  final VoidCallback onChanged;
+
+  @override
+  State<_AnswerCard> createState() => _AnswerCardState();
+}
+
+class _AnswerCardState extends State<_AnswerCard> {
+  bool _editing = false;
+  late final TextEditingController _ctrl = TextEditingController(
+    text: widget.answer.bodyMd,
+  );
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final answer = widget.answer;
     final c = context.dpColors;
     return Card(
       child: Padding(
@@ -247,9 +276,9 @@ class _AnswerCard extends StatelessWidget {
                 ],
                 const Spacer(),
                 // 미해결 + 미채택 답변에만 채택 버튼 노출(OWNER는 백엔드가 강제, 비작성자는 403 SnackBar).
-                if (!questionSolved && !answer.accepted)
+                if (!widget.questionSolved && !answer.accepted)
                   TextButton(
-                    onPressed: submitting ? null : onAccept,
+                    onPressed: widget.submitting ? null : widget.onAccept,
                     child: const Text('채택'),
                   ),
                 // AI 초안은 authorId 가 null 이라 「남의 것」으로 분류돼 신고만 보인다.
@@ -257,17 +286,58 @@ class _AnswerCard extends StatelessWidget {
                   kind: ContentKind.answer,
                   targetId: answer.id,
                   authorId: answer.authorId,
-                  currentUserId: currentUserId,
+                  currentUserId: widget.currentUserId,
+                  onEdit: () => setState(() => _editing = true),
+                  onDeleted: widget.onChanged,
                 ),
               ],
             ),
             const SizedBox(height: DpSpacing.xs),
-            DpMarkdown(data: answer.bodyMd),
+            if (_editing)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    key: const ValueKey('answer-edit-field'),
+                    controller: _ctrl,
+                    minLines: 3,
+                    maxLines: 8,
+                    enabled: !widget.submitting,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: DpSpacing.xs),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        key: const ValueKey('answer-edit-cancel'),
+                        onPressed: () => setState(() {
+                          _editing = false;
+                          _ctrl.text = answer.bodyMd;
+                        }),
+                        child: const Text('취소'),
+                      ),
+                      TextButton(
+                        key: const ValueKey('answer-edit-save'),
+                        onPressed: () {
+                          widget.onSave(_ctrl.text);
+                          setState(() => _editing = false);
+                        },
+                        child: const Text('저장'),
+                      ),
+                    ],
+                  ),
+                ],
+              )
+            else
+              DpMarkdown(data: answer.bodyMd),
             const SizedBox(height: DpSpacing.xs),
             _VoteBar(
               upvotes: answer.upvoteCount,
-              enabled: !submitting,
-              onVote: onVote,
+              enabled: !widget.submitting,
+              onVote: widget.onVote,
             ),
           ],
         ),
