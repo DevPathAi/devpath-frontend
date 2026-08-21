@@ -126,7 +126,7 @@ class _Loaded extends StatelessWidget {
   final VoidCallback onComment;
 
   /// 댓글 인라인 편집 저장 — 카드가 아니라 컨트롤러가 서버를 부른다.
-  final void Function(int commentId, String bodyMd) onEditComment;
+  final Future<bool> Function(int commentId, String bodyMd) onEditComment;
 
   /// 댓글 삭제 뒤 상세 재조회.
   final VoidCallback onReload;
@@ -223,7 +223,8 @@ class _CommentCard extends StatefulWidget {
   final bool submitting;
 
   /// 인라인 편집 저장. 카드는 서버를 직접 부르지 않고 컨트롤러에 위임한다.
-  final ValueChanged<String> onSave;
+  /// 저장 요청. ★성공 여부를 돌려준다★ — 성공했을 때만 에디터를 닫는다.
+  final Future<bool> Function(String) onSave;
 
   /// 삭제 성공 뒤 — 상세 재조회를 호출자가 맡는다.
   final VoidCallback onChanged;
@@ -307,7 +308,7 @@ class _CommentCardState extends State<_CommentCard> {
                       ),
                       TextButton(
                         key: const ValueKey('comment-edit-save'),
-                        onPressed: () {
+                        onPressed: () async {
                           final body = _ctrl.text.trim();
                           if (body.isEmpty) {
                             // 컨트롤러는 빈 본문을 서버에 안 보낸다(왕복 낭비). 그 침묵을
@@ -317,7 +318,10 @@ class _CommentCardState extends State<_CommentCard> {
                             );
                             return;
                           }
-                          widget.onSave(body);
+                          // ★성공했을 때만 닫는다★ — 실패했는데 닫으면 재열기 동기화가
+                          // 서버 본문으로 되돌려 사용자가 쓴 것을 되찾을 수 없다.
+                          final ok = await widget.onSave(body);
+                          if (!mounted || !ok) return;
                           setState(() => _editing = false);
                         },
                         child: const Text('저장'),

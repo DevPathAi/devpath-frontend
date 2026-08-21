@@ -163,7 +163,9 @@ class _Loaded extends ConsumerWidget {
               onVote: (v) => notifier.vote(CommunityVoteTarget.answer, a.id, v),
               onAccept: () => notifier.accept(a.id),
               onSave: (body) => notifier.updateAnswer(a.id, body),
-              onChanged: () => notifier.load(detail.id),
+              // 삭제는 메뉴 버튼(컨트롤러 밖)에서 끝난다 — 완료 시점엔 싱글턴 컨트롤러가
+              // 이미 다른 질문일 수 있으므로, 보고 있을 때만 재조회한다.
+              onChanged: () => notifier.refreshIfShowing(detail.id),
             ),
           const SizedBox(height: DpSpacing.lg),
           _AnswerComposer(
@@ -210,7 +212,8 @@ class _AnswerCard extends StatefulWidget {
   final VoidCallback onAccept;
 
   /// 인라인 편집 저장. 카드는 서버를 직접 부르지 않고 컨트롤러에 위임한다.
-  final ValueChanged<String> onSave;
+  /// 저장 요청. ★성공 여부를 돌려준다★ — 성공했을 때만 에디터를 닫는다.
+  final Future<bool> Function(String) onSave;
 
   /// 삭제 성공 뒤 — 상세 재조회를 호출자가 맡는다.
   final VoidCallback onChanged;
@@ -328,7 +331,7 @@ class _AnswerCardState extends State<_AnswerCard> {
                       ),
                       TextButton(
                         key: const ValueKey('answer-edit-save'),
-                        onPressed: () {
+                        onPressed: () async {
                           final body = _ctrl.text.trim();
                           if (body.isEmpty) {
                             // 컨트롤러는 빈 본문을 서버에 안 보낸다(왕복 낭비). 그 침묵을
@@ -338,7 +341,10 @@ class _AnswerCardState extends State<_AnswerCard> {
                             );
                             return;
                           }
-                          widget.onSave(body);
+                          // ★성공했을 때만 닫는다★ — 실패했는데 닫으면 재열기 동기화가
+                          // 서버 본문으로 되돌려 사용자가 쓴 것을 되찾을 수 없다.
+                          final ok = await widget.onSave(body);
+                          if (!mounted || !ok) return;
                           setState(() => _editing = false);
                         },
                         child: const Text('저장'),

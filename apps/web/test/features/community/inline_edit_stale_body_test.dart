@@ -98,6 +98,63 @@ void main() {
     );
   });
 
+  testWidgets('저장이 실패하면 에디터와 입력이 유지된다', (tester) async {
+    final c = ProviderContainer(
+      overrides: [
+        authControllerProvider.overrideWith(_MineAuthController.new),
+        qnaDetailFetchProvider.overrideWithValue(
+          (id) async => const CommunityQuestionDetail(
+            id: 1,
+            title: 'q',
+            bodyMd: 'b',
+            answers: [CommunityAnswer(id: 11, authorId: 7, bodyMd: '원답변')],
+          ),
+        ),
+        lcsByQuestionProvider.overrideWithValue((qid) async => null),
+        answerUpdateProvider.overrideWithValue((id, bodyMd) async {
+          throw const ApiException(
+            code: ApiErrorCode.forbidden,
+            message: 'nope',
+          );
+        }),
+      ],
+    );
+    addTearDown(c.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: c,
+        child: MaterialApp(
+          theme: DpTheme.light(),
+          home: const QnaDetailPage(postId: '1'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('content-menu')).last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('수정하기'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('answer-edit-field')),
+      '한참 공들여 쓴 새 본문',
+    );
+    await tester.tap(find.byKey(const ValueKey('answer-edit-save')));
+    await tester.pumpAndSettle();
+
+    // ★실패했는데 에디터가 닫히면 입력이 사라진다★ — 재열기는 서버 본문으로 동기화하므로
+    // (stale-body 계약) 닫는 순간 사용자가 쓴 것은 되찾을 수 없다.
+    expect(find.byKey(const ValueKey('answer-edit-field')), findsOneWidget,
+        reason: '실패 시 에디터를 유지한다');
+    final field = tester.widget<TextField>(
+      find.byKey(const ValueKey('answer-edit-field')),
+    );
+    expect(field.controller!.text, '한참 공들여 쓴 새 본문',
+        reason: '입력이 보존된다');
+    expect(find.text('내가 쓴 글만 수정할 수 있어요'), findsOneWidget,
+        reason: '실패 사유가 표면화된다');
+  });
+
   testWidgets('빈 본문 저장은 안내를 띄우고 에디터를 유지한다', (tester) async {
     final c = ProviderContainer(
       overrides: [

@@ -78,6 +78,67 @@ void main() {
     expect((c.read(qnaDetailControllerProvider) as QnaLoaded).detail.id, 2);
   });
 
+  test('ABA(1→2→1) 이동 뒤 옛 실패가 새 상태를 덮지 않는다', () async {
+    final gate = Completer<void>();
+    final c = ProviderContainer(
+      overrides: [
+        qnaDetailFetchProvider.overrideWithValue((id) async => _detail(id)),
+        answerUpdateProvider.overrideWithValue((id, bodyMd) async {
+          await gate.future;
+          throw const ApiException(
+            code: ApiErrorCode.forbidden,
+            message: 'nope',
+          );
+        }),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    final n = c.read(qnaDetailControllerProvider.notifier);
+    await n.load(1);
+    final pending = n.updateAnswer(11, '고친 본문');
+    await n.load(2);
+    await n.load(1); // 같은 id 로 돌아왔다 — 화면은 방금 새로 읽은 Q1 이다
+    gate.complete();
+    await pending;
+
+    final s = c.read(qnaDetailControllerProvider);
+    expect(s, isA<QnaLoaded>());
+    expect(
+      (s as QnaLoaded).actionError,
+      isNull,
+      reason: 'id 비교만으로는 ABA 를 못 가른다 — 옛 실패의 스냅샷 복원이 '
+          '새로 읽은 Q1 을 덮고 남의 오류 문구를 띄운다',
+    );
+    expect(s.submitting, isFalse);
+  });
+
+  test('refreshIfShowing: 보고 있는 질문이 아니면 재조회하지 않는다', () async {
+    var fetches = 0;
+    final c = ProviderContainer(
+      overrides: [
+        qnaDetailFetchProvider.overrideWithValue((id) async {
+          fetches++;
+          return _detail(id);
+        }),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    final n = c.read(qnaDetailControllerProvider.notifier);
+    await n.load(1);
+    await n.load(2);
+    expect(fetches, 2);
+
+    // 삭제 완료 콜백이 늦게 도착한 상황 — Q1 을 지웠지만 화면은 이미 Q2 다.
+    await n.refreshIfShowing(1);
+    expect(fetches, 2, reason: '남의 화면을 옛 질문으로 덮으면 안 된다');
+    expect((c.read(qnaDetailControllerProvider) as QnaLoaded).detail.id, 2);
+
+    await n.refreshIfShowing(2);
+    expect(fetches, 3, reason: '보고 있는 질문이면 평소대로 재조회한다');
+  });
+
   test('이동하지 않았으면 평소대로 재조회한다 — 가드가 정상 경로를 막지 않는다', () async {
     var fetches = 0;
     final c = ProviderContainer(

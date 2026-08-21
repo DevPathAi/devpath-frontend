@@ -45,16 +45,19 @@ class PostDetailController extends Notifier<PostDetailState> {
   /// 시각이 응답 하나로는 스레드 전체에 반영되지 않는다(addComment 와 같은 방침).
   ///
   /// 빈 본문은 서버를 부르지 않고 막는다. 서버도 400 을 내지만 왕복이 낭비다.
-  Future<void> updateComment(int commentId, String bodyMd) async {
+  /// ★성공 여부를 돌려준다★ — 카드가 성공했을 때만 에디터를 닫는다(실패 시 입력 보존).
+  Future<bool> updateComment(int commentId, String bodyMd) async {
     final body = bodyMd.trim();
-    if (body.isEmpty) return;
+    if (body.isEmpty) return false;
     state = state.copyWith(submitting: true);
     try {
       await ref.read(commentUpdateProvider)(commentId, body);
       final detail = await ref.read(postDetailFetchProvider)(postId);
       state = state.copyWith(detail: detail, submitting: false);
+      return true;
     } on ApiException catch (e) {
       state = state.copyWith(submitting: false, error: contentActionMessage(e));
+      return false;
     }
   }
 

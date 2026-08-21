@@ -70,9 +70,10 @@ class QnaDetailController extends Notifier<QnaDetailState> {
   /// 답변 수정(인라인). 성공하면 상세를 재조회한다.
   ///
   /// 빈 본문은 서버를 부르지 않고 막는다. 서버도 400 을 내지만 왕복이 낭비다.
-  Future<void> updateAnswer(int answerId, String bodyMd) {
+  /// ★성공 여부를 돌려준다★ — web 과 같은 계약: 성공했을 때만 에디터를 닫는다.
+  Future<bool> updateAnswer(int answerId, String bodyMd) {
     final body = bodyMd.trim();
-    if (body.isEmpty) return Future.value();
+    if (body.isEmpty) return Future.value(false);
     return _mutate(
       () => ref.read(answerUpdateProvider)(answerId, body),
       messageFor: _actionMessage,
@@ -98,28 +99,31 @@ class QnaDetailController extends Notifier<QnaDetailState> {
 
   /// [messageFor] 를 주면 그 함수로 안내 문구를 만든다 — 수정·삭제는 서버 메시지 대신
   /// 스펙이 정한 전용 문구를 쓴다(기존 액션은 서버 메시지를 그대로 쓴다).
-  Future<void> _mutate(
+  /// @return 서버 뮤테이션의 성공 여부. 이동해서 화면을 안 만졌어도 성공은 성공이다.
+  Future<bool> _mutate(
     Future<void> Function() action, {
     String Function(ApiException)? messageFor,
   }) async {
     final cur = state;
     final id = _id;
-    if (cur is! QnaLoaded || id == null) return;
+    if (cur is! QnaLoaded || id == null) return false;
     final owner = _ownerKey;
     final generation = ++_generation;
     state = cur.copyWith(submitting: true);
     try {
       await action();
-      if (!_isCurrent(owner, id, generation)) return;
+      if (!_isCurrent(owner, id, generation)) return true;
       final fresh = await ref.read(qnaDetailFetchProvider)(id);
-      if (!_isCurrent(owner, id, generation)) return;
+      if (!_isCurrent(owner, id, generation)) return true;
       state = QnaLoaded(fresh);
+      return true;
     } on ApiException catch (e) {
-      if (!_isCurrent(owner, id, generation)) return;
+      if (!_isCurrent(owner, id, generation)) return false;
       state = cur.copyWith(
         submitting: false,
         actionError: messageFor?.call(e) ?? e.message,
       );
+      return false;
     }
   }
 
