@@ -306,7 +306,8 @@ typedef AnswerUpdate = Future<CommunityAnswer> Function(int id, String bodyMd);
 typedef AnswerDelete = Future<void> Function(int id);
 
 /// 댓글 수정 `PUT /community/comments/{id} {bodyMd}` → `CommentView`.
-typedef CommentUpdate = Future<CommunityComment> Function(int id, String bodyMd);
+typedef CommentUpdate =
+    Future<CommunityComment> Function(int id, String bodyMd);
 
 /// 댓글 삭제 `DELETE /community/comments/{id}` → 204.
 typedef CommentDelete = Future<void> Function(int id);
