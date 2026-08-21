@@ -97,4 +97,47 @@ void main() {
           '그대로 저장하면 최신을 덮는다',
     );
   });
+
+  testWidgets('빈 본문 저장은 안내를 띄우고 에디터를 유지한다', (tester) async {
+    final c = ProviderContainer(
+      overrides: [
+        authControllerProvider.overrideWith(_MineAuthController.new),
+        qnaDetailFetchProvider.overrideWithValue(
+          (id) async => const CommunityQuestionDetail(
+            id: 1,
+            title: 'q',
+            bodyMd: 'b',
+            answers: [CommunityAnswer(id: 11, authorId: 7, bodyMd: '원답변')],
+          ),
+        ),
+        lcsByQuestionProvider.overrideWithValue((qid) async => null),
+      ],
+    );
+    addTearDown(c.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: c,
+        child: MaterialApp(
+          theme: DpTheme.light(),
+          home: const QnaDetailPage(postId: '1'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('content-menu')).last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('수정하기'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('answer-edit-field')), '   ');
+    await tester.tap(find.byKey(const ValueKey('answer-edit-save')));
+    await tester.pump();
+
+    // 컨트롤러는 빈 본문을 서버에 안 보낸다(왕복 낭비) — 그 침묵이 사용자에게는
+    // "저장했는데 아무 일도 없다" 로 보였다. 스펙의 400 문구로 표면화한다.
+    expect(find.text('내용을 입력해 주세요'), findsOneWidget,
+        reason: '조용히 삼키면 아무 안내도 없다');
+    expect(find.byKey(const ValueKey('answer-edit-field')), findsOneWidget,
+        reason: '실패했는데 에디터가 닫히면 입력이 사라진다');
+  });
 }

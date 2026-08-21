@@ -329,7 +329,16 @@ class _AnswerCardState extends State<_AnswerCard> {
                       TextButton(
                         key: const ValueKey('answer-edit-save'),
                         onPressed: () {
-                          widget.onSave(_ctrl.text);
+                          final body = _ctrl.text.trim();
+                          if (body.isEmpty) {
+                            // 컨트롤러는 빈 본문을 서버에 안 보낸다(왕복 낭비). 그 침묵을
+                            // 사용자에게는 스펙의 400 문구로 표면화하고 에디터를 유지한다.
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('내용을 입력해 주세요')),
+                            );
+                            return;
+                          }
+                          widget.onSave(body);
                           setState(() => _editing = false);
                         },
                         child: const Text('저장'),
