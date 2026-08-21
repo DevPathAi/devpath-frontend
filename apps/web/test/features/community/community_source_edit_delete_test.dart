@@ -1,28 +1,52 @@
+import 'dart:typed_data';
+
 import 'package:devpath_web/src/features/community/data/community_source.dart';
 import 'package:devpath_web/src/providers/api_providers.dart';
+import 'package:dio/dio.dart';
 import 'package:dp_core/dp_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // community_source_posts_test.dart 패턴 승계: 실제 ApiClient + MockHttpAdapter 로
 // 경로·파싱을 검증한다. 픽스처 키는 '<METHOD> <path>' 이므로 PUT·DELETE 도 그대로 걸린다.
-ApiClient _client(Map<String, MockFixture> fixtures) {
-  final client = ApiClient.create(const ApiConfig(baseUrl: 'https://t/api/v1'));
-  client.dio.httpClientAdapter = MockHttpAdapter(fixtures);
-  return client;
+//
+// ★키만 맞으면 통과하던 구멍을 닫는다★ — 응답은 픽스처가 주는 것이라, 요청 본문의 필드
+// 이름을 바꿔도(bodyMd → body) 키가 같으면 전부 green 이었다. 실제로 나간 본문을 기록해
+// update 계열은 본문까지 단언한다.
+class _CapturingAdapter extends MockHttpAdapter {
+  _CapturingAdapter(super.fixtures);
+  final Map<String, Object?> bodies = {};
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) {
+    bodies['${options.method} ${options.path}'] = options.data;
+    return super.fetch(options, requestStream, cancelFuture);
+  }
 }
 
-ProviderContainer _container(Map<String, MockFixture> fixtures) {
+(_CapturingAdapter, ProviderContainer) _containerWithCapture(
+  Map<String, MockFixture> fixtures,
+) {
+  final adapter = _CapturingAdapter(fixtures);
+  final client = ApiClient.create(const ApiConfig(baseUrl: 'https://t/api/v1'));
+  client.dio.httpClientAdapter = adapter;
   final c = ProviderContainer(
-    overrides: [apiClientProvider.overrideWithValue(_client(fixtures))],
+    overrides: [apiClientProvider.overrideWithValue(client)],
   );
   addTearDown(c.dispose);
-  return c;
+  return (adapter, c);
 }
+
+ProviderContainer _container(Map<String, MockFixture> fixtures) =>
+    _containerWithCapture(fixtures).$2;
 
 void main() {
   test('postUpdate: PUT /community/posts/9 → 상세 반환', () async {
-    final c = _container({
+    final (adapter, c) = _containerWithCapture({
       'PUT /community/posts/9': (
         200,
         {
@@ -46,6 +70,10 @@ void main() {
     );
     expect(view.title, '새제목');
     expect(view.bodyMd, '새본문');
+    expect(adapter.bodies['PUT /community/posts/9'], {
+      'title': '새제목',
+      'bodyMd': '새본문',
+    });
   });
 
   test('postDelete: DELETE /community/posts/9 → 204 를 예외 없이 통과', () async {
@@ -56,7 +84,7 @@ void main() {
   });
 
   test('answerUpdate: PUT /community/answers/11 → 답변 반환', () async {
-    final c = _container({
+    final (adapter, c) = _containerWithCapture({
       'PUT /community/answers/11': (
         200,
         {
@@ -73,6 +101,7 @@ void main() {
 
     final view = await c.read(answerUpdateProvider)(11, '고친답변');
     expect(view.bodyMd, '고친답변');
+    expect(adapter.bodies['PUT /community/answers/11'], {'bodyMd': '고친답변'});
     expect(view.deleted, isFalse);
   });
 
@@ -84,7 +113,7 @@ void main() {
   });
 
   test('commentUpdate: PUT /community/comments/5 → 댓글 반환', () async {
-    final c = _container({
+    final (adapter, c) = _containerWithCapture({
       'PUT /community/comments/5': (
         200,
         {
@@ -100,6 +129,7 @@ void main() {
 
     final view = await c.read(commentUpdateProvider)(5, '고친댓글');
     expect(view.bodyMd, '고친댓글');
+    expect(adapter.bodies['PUT /community/comments/5'], {'bodyMd': '고친댓글'});
   });
 
   test('commentDelete: DELETE /community/comments/5', () async {
