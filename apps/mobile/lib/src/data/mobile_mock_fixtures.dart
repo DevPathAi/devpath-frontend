@@ -201,6 +201,21 @@ final Map<String, MockFixture> mobileMockFixtures = {
     },
   ),
   // 채택/투표 — void(200, 빈 본문).
+  // 답변 수정·삭제 — 목 모드에서도 흐름이 끊기지 않게 한다.
+  // ★204 라도 본문은 Object 다★ — MockFixture 는 (int, Object) 라 null 을 넣을 수 없다.
+  'PUT /community/answers/11': (
+    200,
+    {
+      'id': 11,
+      'authorId': 2,
+      'bodyMd': '수정된 답변',
+      'aiGenerated': false,
+      'accepted': false,
+      'upvoteCount': 0,
+      'deleted': false,
+    },
+  ),
+  'DELETE /community/answers/11': (204, <String, dynamic>{}),
   'POST /community/answers/11/accept': (200, <String, dynamic>{}),
   'POST /community/answers/20/accept': (200, <String, dynamic>{}),
   'POST /community/posts/1/vote': (200, <String, dynamic>{}),

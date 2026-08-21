@@ -1,5 +1,5 @@
 import 'package:devpath_web/src/features/community/data/community_source.dart';
-import 'package:devpath_web/src/features/community/presentation/widgets/report_menu_button.dart';
+import 'package:devpath_web/src/features/community/presentation/widgets/content_menu_button.dart';
 import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
@@ -26,36 +26,39 @@ Widget _host(ProviderContainer c, Widget child) => UncontrolledProviderScope(
 
 /// 다이얼로그를 열기까지의 공통 절차.
 Future<void> _openDialog(WidgetTester tester) async {
-  await tester.tap(find.byKey(const ValueKey('report-menu')));
+  await tester.tap(find.byKey(const ValueKey('content-menu')));
   await tester.pumpAndSettle();
   await tester.tap(find.text('신고하기'));
   await tester.pumpAndSettle();
 }
 
 void main() {
-  testWidgets('자기 콘텐츠에는 메뉴가 보이지 않는다', (tester) async {
+  // ★계약이 바뀌었다★ — 내 콘텐츠에서도 메뉴는 보인다. 항목이 신고 대신 수정·삭제로
+  // 바뀔 뿐이다. 그 분기 자체는 content_menu_test.dart 가 검증한다.
+  testWidgets('자기 콘텐츠에는 신고 항목이 없다', (tester) async {
     await tester.pumpWidget(
       _host(
         _containerWith(),
-        const ReportMenuButton(
-          targetType: 'POST',
+        const ContentMenuButton(
+          kind: ContentKind.post,
           targetId: 1,
           authorId: 7,
           currentUserId: '7',
         ),
       ),
     );
+    await tester.tap(find.byKey(const ValueKey('content-menu')));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('report-menu')), findsNothing);
+    expect(find.text('신고하기'), findsNothing);
   });
 
   testWidgets('남의 콘텐츠에는 메뉴가 보인다', (tester) async {
     await tester.pumpWidget(
       _host(
         _containerWith(),
-        const ReportMenuButton(
-          targetType: 'POST',
+        const ContentMenuButton(
+          kind: ContentKind.post,
           targetId: 1,
           authorId: 7,
           currentUserId: '3',
@@ -64,15 +67,15 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('report-menu')), findsOneWidget);
+    expect(find.byKey(const ValueKey('content-menu')), findsOneWidget);
   });
 
-  testWidgets('작성자를 모르면(QNA 질문) 메뉴를 보여준다', (tester) async {
+  testWidgets('작성자를 모르면 메뉴를 보여준다(신고 가능)', (tester) async {
     await tester.pumpWidget(
       _host(
         _containerWith(),
-        const ReportMenuButton(
-          targetType: 'POST',
+        const ContentMenuButton(
+          kind: ContentKind.post,
           targetId: 1,
           authorId: null,
           currentUserId: '3',
@@ -81,7 +84,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('report-menu')), findsOneWidget);
+    expect(find.byKey(const ValueKey('content-menu')), findsOneWidget);
   });
 
   testWidgets('카테고리를 고르고 신고하면 wire 값과 사유가 전달된다', (tester) async {
@@ -107,8 +110,8 @@ void main() {
     await tester.pumpWidget(
       _host(
         c,
-        const ReportMenuButton(
-          targetType: 'ANSWER',
+        const ContentMenuButton(
+          kind: ContentKind.answer,
           targetId: 11,
           authorId: 7,
           currentUserId: '3',
@@ -150,8 +153,8 @@ void main() {
     await tester.pumpWidget(
       _host(
         c,
-        const ReportMenuButton(
-          targetType: 'POST',
+        const ContentMenuButton(
+          kind: ContentKind.post,
           targetId: 1,
           authorId: 7,
           currentUserId: '3',
@@ -185,8 +188,8 @@ void main() {
     await tester.pumpWidget(
       _host(
         c,
-        const ReportMenuButton(
-          targetType: 'POST',
+        const ContentMenuButton(
+          kind: ContentKind.post,
           targetId: 1,
           authorId: null,
           currentUserId: '3',
@@ -208,8 +211,8 @@ void main() {
     await tester.pumpWidget(
       _host(
         _containerWith(),
-        const ReportMenuButton(
-          targetType: 'POST',
+        const ContentMenuButton(
+          kind: ContentKind.post,
           targetId: 1,
           authorId: 7,
           currentUserId: '3',

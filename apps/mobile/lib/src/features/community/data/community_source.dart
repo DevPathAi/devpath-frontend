@@ -106,3 +106,27 @@ final communityVoteProvider = Provider<CommunityVote>((ref) {
     );
   };
 });
+
+/// 답변 수정 `PUT /community/answers/{id} {bodyMd}` → `AnswerView`.
+typedef AnswerUpdate = Future<CommunityAnswer> Function(int id, String bodyMd);
+
+/// 답변 삭제 `DELETE /community/answers/{id}` → 204. 채택된 답변이면 409.
+typedef AnswerDelete = Future<void> Function(int id);
+
+final answerUpdateProvider = Provider<AnswerUpdate>((ref) {
+  final client = ref.watch(apiClientProvider);
+  return (id, bodyMd) async {
+    final json = await client.put<Map<String, dynamic>>(
+      '/community/answers/$id',
+      body: {'bodyMd': bodyMd},
+    );
+    return CommunityAnswer.fromJson(json);
+  };
+});
+
+final answerDeleteProvider = Provider<AnswerDelete>((ref) {
+  final client = ref.watch(apiClientProvider);
+  return (id) async {
+    await client.delete<dynamic>('/community/answers/$id');
+  };
+});

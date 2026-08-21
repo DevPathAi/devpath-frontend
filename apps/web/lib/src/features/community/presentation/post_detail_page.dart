@@ -2,12 +2,14 @@ import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../auth/application/auth_controller.dart';
 import '../../auth/state/auth_state.dart';
 import '../application/post_detail_controller.dart';
 import '../state/post_detail_state.dart';
-import 'widgets/report_menu_button.dart';
+import 'widgets/content_menu_button.dart';
+import 'widgets/content_tombstone.dart';
 import '../../support/presentation/supportable_error.dart';
 
 /// 일반 게시글(FREE/FEEDBACK) 상세 — 마크다운 본문·태그·추천·댓글 스레드.
@@ -82,6 +84,8 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
               },
               commentCtrl: _commentCtrl,
               onUpvote: notifier.upvote,
+              onEditComment: notifier.updateComment,
+              onReload: notifier.load,
               onComment: () {
                 final body = _commentCtrl.text.trim();
                 if (body.isEmpty) return;
@@ -108,6 +112,8 @@ class _Loaded extends StatelessWidget {
     required this.commentCtrl,
     required this.onUpvote,
     required this.onComment,
+    required this.onEditComment,
+    required this.onReload,
   });
 
   final CommunityPostDetail detail;
@@ -118,6 +124,12 @@ class _Loaded extends StatelessWidget {
   final TextEditingController commentCtrl;
   final VoidCallback onUpvote;
   final VoidCallback onComment;
+
+  /// 댓글 인라인 편집 저장 — 카드가 아니라 컨트롤러가 서버를 부른다.
+  final Future<bool> Function(int commentId, String bodyMd) onEditComment;
+
+  /// 댓글 삭제 뒤 상세 재조회.
+  final VoidCallback onReload;
 
   /// 페이지의 `CustomScrollView`에 직접 실리는 **sliver**를 반환한다 —
   /// 여기서 `ListView`를 쓰면 중첩 스크롤이 되어 헤더가 밀려나지 않는다.
@@ -136,11 +148,13 @@ class _Loaded extends StatelessWidget {
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
               ),
-              ReportMenuButton(
-                targetType: 'POST',
+              ContentMenuButton(
+                kind: ContentKind.post,
                 targetId: detail.id,
                 authorId: detail.authorId,
                 currentUserId: currentUserId,
+                onEdit: () => context.go('/community/post/${detail.id}/edit'),
+                onDeleted: () => context.go('/community'),
               ),
             ],
           ),
@@ -175,7 +189,13 @@ class _Loaded extends StatelessWidget {
           ),
           const SizedBox(height: DpSpacing.sm),
           for (final cm in detail.comments)
-            _CommentCard(comment: cm, currentUserId: currentUserId),
+            _CommentCard(
+              comment: cm,
+              currentUserId: currentUserId,
+              submitting: submitting,
+              onSave: (body) => onEditComment(cm.id, body),
+              onChanged: onReload,
+            ),
           const SizedBox(height: DpSpacing.lg),
           _CommentComposer(
             controller: commentCtrl,
@@ -188,14 +208,47 @@ class _Loaded extends StatelessWidget {
   }
 }
 
-class _CommentCard extends StatelessWidget {
-  const _CommentCard({required this.comment, required this.currentUserId});
+/// 댓글 카드. 답변 카드와 같은 방식으로 카드 안에서 인라인 편집한다.
+class _CommentCard extends StatefulWidget {
+  const _CommentCard({
+    required this.comment,
+    required this.currentUserId,
+    required this.submitting,
+    required this.onSave,
+    required this.onChanged,
+  });
 
   final CommunityComment comment;
   final String? currentUserId;
+  final bool submitting;
+
+  /// 인라인 편집 저장. 카드는 서버를 직접 부르지 않고 컨트롤러에 위임한다.
+  /// 저장 요청. ★성공 여부를 돌려준다★ — 성공했을 때만 에디터를 닫는다.
+  final Future<bool> Function(String) onSave;
+
+  /// 삭제 성공 뒤 — 상세 재조회를 호출자가 맡는다.
+  final VoidCallback onChanged;
+
+  @override
+  State<_CommentCard> createState() => _CommentCardState();
+}
+
+class _CommentCardState extends State<_CommentCard> {
+  bool _editing = false;
+  late final TextEditingController _ctrl = TextEditingController(
+    text: widget.comment.bodyMd,
+  );
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final comment = widget.comment;
+    if (comment.deleted) return const ContentTombstone();
     final c = context.dpColors;
     return Card(
       child: Padding(
@@ -211,16 +264,74 @@ class _CommentCard extends StatelessWidget {
                     style: TextStyle(color: c.textSecondary, fontSize: 12),
                   ),
                 ),
-                ReportMenuButton(
-                  targetType: 'COMMENT',
+                ContentMenuButton(
+                  kind: ContentKind.comment,
                   targetId: comment.id,
                   authorId: comment.authorId,
-                  currentUserId: currentUserId,
+                  currentUserId: widget.currentUserId,
+                  // 재조회로 본문이 바뀌어도 이미 초기화된 컨트롤러는 옛 텍스트를 쥔다 —
+                  // 여는 순간 동기화한다(답변 카드와 같은 계약, inline_edit_stale_body_test).
+                  onEdit: () => setState(() {
+                    _ctrl.text = widget.comment.bodyMd;
+                    _editing = true;
+                  }),
+                  onDeleted: widget.onChanged,
                 ),
               ],
             ),
             const SizedBox(height: DpSpacing.xs),
-            DpMarkdown(data: comment.bodyMd),
+            if (_editing)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    key: const ValueKey('comment-edit-field'),
+                    controller: _ctrl,
+                    minLines: 2,
+                    maxLines: 6,
+                    enabled: !widget.submitting,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: DpSpacing.xs),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        key: const ValueKey('comment-edit-cancel'),
+                        onPressed: () => setState(() {
+                          _editing = false;
+                          _ctrl.text = comment.bodyMd;
+                        }),
+                        child: const Text('취소'),
+                      ),
+                      TextButton(
+                        key: const ValueKey('comment-edit-save'),
+                        onPressed: () async {
+                          final body = _ctrl.text.trim();
+                          if (body.isEmpty) {
+                            // 컨트롤러는 빈 본문을 서버에 안 보낸다(왕복 낭비). 그 침묵을
+                            // 사용자에게는 스펙의 400 문구로 표면화하고 에디터를 유지한다.
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('내용을 입력해 주세요')),
+                            );
+                            return;
+                          }
+                          // ★성공했을 때만 닫는다★ — 실패했는데 닫으면 재열기 동기화가
+                          // 서버 본문으로 되돌려 사용자가 쓴 것을 되찾을 수 없다.
+                          final ok = await widget.onSave(body);
+                          if (!mounted || !ok) return;
+                          setState(() => _editing = false);
+                        },
+                        child: const Text('저장'),
+                      ),
+                    ],
+                  ),
+                ],
+              )
+            else
+              DpMarkdown(data: comment.bodyMd),
             const SizedBox(height: DpSpacing.xs),
             Text(
               comment.createdAt,

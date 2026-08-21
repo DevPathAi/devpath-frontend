@@ -2,6 +2,7 @@ import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../auth/application/auth_controller.dart';
 import '../../auth/state/auth_state.dart';
@@ -9,7 +10,8 @@ import '../application/qna_detail_controller.dart';
 import '../data/community_source.dart';
 import '../state/qna_detail_state.dart';
 import 'lcs_context.dart';
-import 'widgets/report_menu_button.dart';
+import 'widgets/content_menu_button.dart';
+import 'widgets/content_tombstone.dart';
 import '../../support/presentation/supportable_error.dart';
 
 class QnaDetailPage extends ConsumerStatefulWidget {
@@ -114,13 +116,13 @@ class _Loaded extends ConsumerWidget {
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
               ),
-              // QuestionDetailView 에는 작성자 id 가 없다(기존 계약) — 자기 글이어도 메뉴가
-              // 보이며, 그 경우 서버 400 을 전용 문구로 안내한다.
-              ReportMenuButton(
-                targetType: 'POST',
+              ContentMenuButton(
+                kind: ContentKind.post,
                 targetId: detail.id,
-                authorId: null,
+                authorId: detail.authorId,
                 currentUserId: _currentUserId(ref),
+                onEdit: () => context.go('/community/${detail.id}/edit'),
+                onDeleted: () => context.go('/community'),
               ),
             ],
           ),
@@ -160,6 +162,10 @@ class _Loaded extends ConsumerWidget {
               currentUserId: _currentUserId(ref),
               onVote: (v) => notifier.vote(CommunityVoteTarget.answer, a.id, v),
               onAccept: () => notifier.accept(a.id),
+              onSave: (body) => notifier.updateAnswer(a.id, body),
+              // 삭제는 메뉴 버튼(컨트롤러 밖)에서 끝난다 — 완료 시점엔 싱글턴 컨트롤러가
+              // 이미 다른 질문일 수 있으므로, 보고 있을 때만 재조회한다.
+              onChanged: () => notifier.refreshIfShowing(detail.id),
             ),
           const SizedBox(height: DpSpacing.lg),
           _AnswerComposer(
@@ -184,7 +190,9 @@ String? _currentUserId(WidgetRef ref) {
   return auth is AuthAuthenticated ? auth.user.id : null;
 }
 
-class _AnswerCard extends StatelessWidget {
+/// 답변 카드. 수정은 화면 전환 없이 **카드 안에서** 연다 — 짧은 글에 페이지 전환은 과하다.
+/// 리치 에디터가 아니라 TextField 다: 카드마다 툴바를 띄우면 레이아웃이 흔들린다.
+class _AnswerCard extends StatefulWidget {
   const _AnswerCard({
     required this.answer,
     required this.questionSolved,
@@ -192,6 +200,8 @@ class _AnswerCard extends StatelessWidget {
     required this.currentUserId,
     required this.onVote,
     required this.onAccept,
+    required this.onSave,
+    required this.onChanged,
   });
 
   final CommunityAnswer answer;
@@ -201,8 +211,33 @@ class _AnswerCard extends StatelessWidget {
   final ValueChanged<int> onVote;
   final VoidCallback onAccept;
 
+  /// 인라인 편집 저장. 카드는 서버를 직접 부르지 않고 컨트롤러에 위임한다.
+  /// 저장 요청. ★성공 여부를 돌려준다★ — 성공했을 때만 에디터를 닫는다.
+  final Future<bool> Function(String) onSave;
+
+  /// 삭제 성공 뒤 — 상세 재조회를 호출자가 맡는다.
+  final VoidCallback onChanged;
+
+  @override
+  State<_AnswerCard> createState() => _AnswerCardState();
+}
+
+class _AnswerCardState extends State<_AnswerCard> {
+  bool _editing = false;
+  late final TextEditingController _ctrl = TextEditingController(
+    text: widget.answer.bodyMd,
+  );
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final answer = widget.answer;
+    if (answer.deleted) return const ContentTombstone();
     final c = context.dpColors;
     return Card(
       child: Padding(
@@ -246,27 +281,85 @@ class _AnswerCard extends StatelessWidget {
                 ],
                 const Spacer(),
                 // 미해결 + 미채택 답변에만 채택 버튼 노출(OWNER는 백엔드가 강제, 비작성자는 403 SnackBar).
-                if (!questionSolved && !answer.accepted)
+                if (!widget.questionSolved && !answer.accepted)
                   TextButton(
-                    onPressed: submitting ? null : onAccept,
+                    onPressed: widget.submitting ? null : widget.onAccept,
                     child: const Text('채택'),
                   ),
-                // AI 초안은 authorId 가 null 이라 항상 신고할 수 있다(서버도 허용한다).
-                ReportMenuButton(
-                  targetType: 'ANSWER',
+                // AI 초안은 authorId 가 null 이라 「남의 것」으로 분류돼 신고만 보인다.
+                ContentMenuButton(
+                  kind: ContentKind.answer,
                   targetId: answer.id,
                   authorId: answer.authorId,
-                  currentUserId: currentUserId,
+                  currentUserId: widget.currentUserId,
+                  // 재조회로 본문이 바뀌어도 이미 초기화된 컨트롤러는 옛 텍스트를 쥔다 —
+                  // 여는 순간 동기화해 옛 본문으로 최신을 덮는 사고를 막는다.
+                  onEdit: () => setState(() {
+                    _ctrl.text = widget.answer.bodyMd;
+                    _editing = true;
+                  }),
+                  onDeleted: widget.onChanged,
                 ),
               ],
             ),
             const SizedBox(height: DpSpacing.xs),
-            DpMarkdown(data: answer.bodyMd),
+            if (_editing)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    key: const ValueKey('answer-edit-field'),
+                    controller: _ctrl,
+                    minLines: 3,
+                    maxLines: 8,
+                    enabled: !widget.submitting,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: DpSpacing.xs),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        key: const ValueKey('answer-edit-cancel'),
+                        onPressed: () => setState(() {
+                          _editing = false;
+                          _ctrl.text = answer.bodyMd;
+                        }),
+                        child: const Text('취소'),
+                      ),
+                      TextButton(
+                        key: const ValueKey('answer-edit-save'),
+                        onPressed: () async {
+                          final body = _ctrl.text.trim();
+                          if (body.isEmpty) {
+                            // 컨트롤러는 빈 본문을 서버에 안 보낸다(왕복 낭비). 그 침묵을
+                            // 사용자에게는 스펙의 400 문구로 표면화하고 에디터를 유지한다.
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('내용을 입력해 주세요')),
+                            );
+                            return;
+                          }
+                          // ★성공했을 때만 닫는다★ — 실패했는데 닫으면 재열기 동기화가
+                          // 서버 본문으로 되돌려 사용자가 쓴 것을 되찾을 수 없다.
+                          final ok = await widget.onSave(body);
+                          if (!mounted || !ok) return;
+                          setState(() => _editing = false);
+                        },
+                        child: const Text('저장'),
+                      ),
+                    ],
+                  ),
+                ],
+              )
+            else
+              DpMarkdown(data: answer.bodyMd),
             const SizedBox(height: DpSpacing.xs),
             _VoteBar(
               upvotes: answer.upvoteCount,
-              enabled: !submitting,
-              onVote: onVote,
+              enabled: !widget.submitting,
+              onVote: widget.onVote,
             ),
           ],
         ),

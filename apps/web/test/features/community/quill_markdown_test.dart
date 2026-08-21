@@ -126,4 +126,31 @@ void main() {
     addTearDown(c.dispose);
     expect(quillToMarkdown(c).trim(), '```\nconst x = 1;\n```');
   });
+
+  group('markdownToQuillDocument', () {
+    test('평문을 그대로 담는다', () {
+      final doc = markdownToQuillDocument('안녕하세요.');
+      expect(doc.toPlainText().trim(), '안녕하세요.');
+    });
+
+    test('굵게·목록이 왕복해도 마크다운이 보존된다', () {
+      const source = '**굵게** 텍스트\n\n- 첫째\n- 둘째';
+      final doc = markdownToQuillDocument(source);
+      final c = QuillController(
+        document: doc,
+        selection: const TextSelection.collapsed(offset: 0),
+      );
+      addTearDown(c.dispose);
+      final back = quillToMarkdown(c).trim();
+
+      expect(back, contains('**굵게**'));
+      expect(back, contains('첫째'));
+      expect(back, contains('둘째'));
+    });
+
+    test('빈 문자열도 유효한 문서를 낸다 — 편집 화면이 죽지 않는다', () {
+      final doc = markdownToQuillDocument('');
+      expect(doc.toPlainText().trim(), '');
+    });
+  });
 }
