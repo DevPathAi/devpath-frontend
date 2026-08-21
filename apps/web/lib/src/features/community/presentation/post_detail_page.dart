@@ -268,7 +268,12 @@ class _CommentCardState extends State<_CommentCard> {
                   targetId: comment.id,
                   authorId: comment.authorId,
                   currentUserId: widget.currentUserId,
-                  onEdit: () => setState(() => _editing = true),
+                  // 재조회로 본문이 바뀌어도 이미 초기화된 컨트롤러는 옛 텍스트를 쥔다 —
+                  // 여는 순간 동기화한다(답변 카드와 같은 계약, inline_edit_stale_body_test).
+                  onEdit: () => setState(() {
+                    _ctrl.text = widget.comment.bodyMd;
+                    _editing = true;
+                  }),
                   onDeleted: widget.onChanged,
                 ),
               ],

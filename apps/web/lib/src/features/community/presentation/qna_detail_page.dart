@@ -289,7 +289,12 @@ class _AnswerCardState extends State<_AnswerCard> {
                   targetId: answer.id,
                   authorId: answer.authorId,
                   currentUserId: widget.currentUserId,
-                  onEdit: () => setState(() => _editing = true),
+                  // 재조회로 본문이 바뀌어도 이미 초기화된 컨트롤러는 옛 텍스트를 쥔다 —
+                  // 여는 순간 동기화해 옛 본문으로 최신을 덮는 사고를 막는다.
+                  onEdit: () => setState(() {
+                    _ctrl.text = widget.answer.bodyMd;
+                    _editing = true;
+                  }),
                   onDeleted: widget.onChanged,
                 ),
               ],

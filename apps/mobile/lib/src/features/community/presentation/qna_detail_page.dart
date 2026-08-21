@@ -336,9 +336,14 @@ class _AnswerCardState extends State<_AnswerCard> {
                     icon: const Icon(Icons.edit, size: 18),
                     tooltip: '수정',
                     visualDensity: VisualDensity.compact,
+                    // 재조회로 본문이 바뀌어도 이미 초기화된 컨트롤러는 옛 텍스트를 쥔다 —
+                    // 여는 순간 동기화한다(web 답변 카드와 같은 계약).
                     onPressed: widget.submitting
                         ? null
-                        : () => setState(() => _editing = true),
+                        : () => setState(() {
+                            _ctrl.text = widget.answer.bodyMd;
+                            _editing = true;
+                          }),
                   ),
                   IconButton(
                     key: const ValueKey('answer-delete'),
