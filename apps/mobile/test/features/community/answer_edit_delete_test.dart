@@ -68,15 +68,16 @@ void main() {
 
   test('deleteAnswer: 삭제 후 상세를 재조회한다', () async {
     var deletedId = 0;
+    var fetches = 0;
     final c = ProviderContainer(
       overrides: [
         // 컨트롤러가 build 에서 currentOwnerKeyProvider 를 읽는다 — 막지 않으면
         // 실제 인증 스택을 타고 죽는다(mobile 전용 제약).
         currentOwnerKeyProvider.overrideWithValue('owner-test'),
-        qnaDetailFetchProvider.overrideWithValue(
-          (id) async =>
-              const CommunityQuestionDetail(id: 3, title: 'q', bodyMd: 'b'),
-        ),
+        qnaDetailFetchProvider.overrideWithValue((id) async {
+          fetches++;
+          return const CommunityQuestionDetail(id: 3, title: 'q', bodyMd: 'b');
+        }),
         answerDeleteProvider.overrideWithValue((id) async => deletedId = id),
       ],
     );
@@ -87,6 +88,8 @@ void main() {
     await n.deleteAnswer(11);
 
     expect(deletedId, 11);
+    // 이름이 주장하는 그것 — delete 호출만 세면 재조회를 지워도 green 이었다.
+    expect(fetches, 2, reason: 'load 1회 + 삭제 후 재조회 1회');
   });
 
   test('deleteAnswer: 409 는 채택 해제 안내를 담는다 — 웹과 같은 문자열', () async {
