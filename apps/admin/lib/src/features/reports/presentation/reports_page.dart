@@ -121,6 +121,12 @@ class ReportsPage extends ConsumerWidget {
           ref.read(contentTakedownProvider)(report.targetType, report.targetId),
     );
     if (ok != true || !context.mounted) return;
+    // 내린 카드가 계속 '내리기' 를 내밀면 같은 대상 재확정이 404 를 만든다 — 목록을 새로
+    // 읽어 isTargetGone 이 버튼을 감추게 한다. 필터는 지금 보던 것을 유지한다.
+    await ref
+        .read(reportsProvider.notifier)
+        .load(status: ref.read(reportsProvider).status);
+    if (!context.mounted) return;
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('내렸어요')));
