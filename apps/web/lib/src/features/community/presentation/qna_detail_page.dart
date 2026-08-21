@@ -2,6 +2,7 @@ import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../auth/application/auth_controller.dart';
 import '../../auth/state/auth_state.dart';
@@ -119,6 +120,8 @@ class _Loaded extends ConsumerWidget {
                 targetId: detail.id,
                 authorId: detail.authorId,
                 currentUserId: _currentUserId(ref),
+                onEdit: () => context.go('/community/${detail.id}/edit'),
+                onDeleted: () => context.go('/community'),
               ),
             ],
           ),

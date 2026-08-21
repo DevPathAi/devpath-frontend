@@ -14,13 +14,32 @@ import 'package:go_router/go_router.dart';
 import '../data/community_source.dart';
 import '../data/lcs_source.dart';
 import 'lcs_context.dart';
+import 'widgets/content_menu_button.dart';
 import 'widgets/quill_markdown.dart';
 import 'widgets/rich_editor.dart';
 
 /// 질문 작성(FAB). `POST /community/questions {title, bodyMd, tags[]}` → 즉시 게시(AI 시드는 비동기).
 /// 제목 입력 중 유사질문(`GET /community/questions/similar?q=`)을 디바운스로 안내해 중복을 줄인다.
 class QuestionCreatePage extends ConsumerStatefulWidget {
-  const QuestionCreatePage({super.key, @visibleForTesting this.bodyController});
+  const QuestionCreatePage({
+    super.key,
+    this.editPostId,
+    this.initialTitle,
+    this.initialBodyMd,
+    @visibleForTesting this.bodyController,
+  });
+
+  /// null 이 아니면 편집 모드다 — 이 id 의 질문을 고친다.
+  /// 질문은 board_type='QNA' 인 같은 community_posts 행이라 수정도 `/posts/{id}` 를 쓴다.
+  final int? editPostId;
+
+  /// 편집 모드의 초기 제목.
+  final String? initialTitle;
+
+  /// 편집 모드의 초기 본문(마크다운). 에디터 문서로 변환해 채운다.
+  final String? initialBodyMd;
+
+  bool get isEdit => editPostId != null;
 
   /// 테스트에서 본문 문서를 결정적으로 주입하기 위한 선택 파라미터.
   /// null 이면 페이지가 직접 생성·해제한다.
@@ -65,6 +84,11 @@ class _QuestionCreatePageState extends ConsumerState<QuestionCreatePage> {
             ),
           ),
         );
+    if (widget.initialTitle != null) _titleCtrl.text = widget.initialTitle!;
+    if (widget.initialBodyMd != null && injected == null) {
+      // 저장 계약이 마크다운이므로 편집은 반드시 역변환을 거친다.
+      _bodyController.document = markdownToQuillDocument(widget.initialBodyMd!);
+    }
   }
 
   @override
@@ -77,6 +101,9 @@ class _QuestionCreatePageState extends ConsumerState<QuestionCreatePage> {
   }
 
   void _onTitleChanged(String q) {
+    // 유사질문은 중복 질문 방지용이라 수정에는 의미가 없다 — 제목을 고칠 때마다
+    // 불필요한 임베딩 조회가 나가는 것도 막는다.
+    if (widget.isEdit) return;
     _debounce?.cancel();
     final text = q.trim();
     if (text.length < 2) {
@@ -114,6 +141,16 @@ class _QuestionCreatePageState extends ConsumerState<QuestionCreatePage> {
     setState(() => _submitting = true);
     try {
       final body = quillToMarkdown(_bodyController).trim();
+      if (widget.isEdit) {
+        // 질문 전용 수정 엔드포인트가 없다 — 같은 community_posts 행이므로 /posts/{id} 다.
+        final updated = await ref.read(postUpdateProvider)(
+          id: widget.editPostId!,
+          title: title,
+          bodyMd: body,
+        );
+        if (mounted) context.go('/community/${updated.id}');
+        return;
+      }
       final created = await ref.read(questionCreateProvider)(
         title: title,
         bodyMd: body,
@@ -137,9 +174,11 @@ class _QuestionCreatePageState extends ConsumerState<QuestionCreatePage> {
     } on ApiException catch (e) {
       if (mounted) {
         setState(() => _submitting = false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.message)));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(widget.isEdit ? contentActionMessage(e) : e.message),
+          ),
+        );
       }
     } catch (_) {
       if (mounted) {
@@ -163,9 +202,9 @@ class _QuestionCreatePageState extends ConsumerState<QuestionCreatePage> {
     return Scaffold(
       body: CustomScrollView(
         slivers: [
-          const SliverToBoxAdapter(
+          SliverToBoxAdapter(
             child: DpPageHeader(
-              title: '질문하기',
+              title: widget.isEdit ? '질문 수정' : '질문하기',
               description: '무엇을 시도했고 어디서 막혔는지 함께 적어주세요',
             ),
           ),
@@ -179,6 +218,7 @@ class _QuestionCreatePageState extends ConsumerState<QuestionCreatePage> {
             sliver: SliverList.list(
               children: [
                 TextField(
+                  key: const ValueKey('question-title-field'),
                   controller: _titleCtrl,
                   enabled: !_submitting,
                   onChanged: _onTitleChanged,
@@ -256,29 +296,40 @@ class _QuestionCreatePageState extends ConsumerState<QuestionCreatePage> {
             ),
             sliver: SliverList.list(
               children: [
-                TextField(
-                  controller: _tagsCtrl,
-                  enabled: !_submitting,
-                  decoration: const InputDecoration(
-                    labelText: '태그',
-                    hintText: '쉼표 또는 공백으로 구분 (예: dart, async)',
-                    border: OutlineInputBorder(),
+                // 태그와 맥락 첨부는 수정 대상이 아니다 — 서버가 태그를 받지 않고(평판
+                // 귀속이 어긋난다) 맥락 첨부는 새 질문 게시에 딸린 동작이다. 편집 가능한
+                // 것처럼 보이면 저장 후 사라진 것처럼 읽힌다.
+                if (!widget.isEdit) ...[
+                  TextField(
+                    key: const ValueKey('question-tags-field'),
+                    controller: _tagsCtrl,
+                    enabled: !_submitting,
+                    decoration: const InputDecoration(
+                      labelText: '태그',
+                      hintText: '쉼표 또는 공백으로 구분 (예: dart, async)',
+                      border: OutlineInputBorder(),
+                    ),
                   ),
-                ),
-                const SizedBox(height: DpSpacing.md),
-                LcsContextCard(
-                  enabled: !_submitting,
-                  onChanged: (a) => _attach = a,
-                ),
-                const SizedBox(height: DpSpacing.lg),
+                  const SizedBox(height: DpSpacing.md),
+                  LcsContextCard(
+                    enabled: !_submitting,
+                    onChanged: (a) => _attach = a,
+                  ),
+                  const SizedBox(height: DpSpacing.lg),
+                ],
                 // SliverList.list의 직접 자식은 가로로 늘어난다 — 감싸지 않으면
                 // 넓은 화면에서 버튼 하나가 콘텐츠 폭 전체를 차지한다.
                 Align(
                   alignment: Alignment.centerLeft,
                   child: FilledButton.icon(
+                    key: const ValueKey('question-submit'),
                     onPressed: _submitting ? null : _submit,
                     icon: const Icon(DpIcons.send, size: 18),
-                    label: Text(_submitting ? '게시 중…' : '질문 게시'),
+                    label: Text(
+                      _submitting
+                          ? (widget.isEdit ? '저장 중…' : '게시 중…')
+                          : (widget.isEdit ? '저장' : '질문 게시'),
+                    ),
                   ),
                 ),
               ],

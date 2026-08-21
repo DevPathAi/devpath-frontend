@@ -18,6 +18,7 @@ import '../features/community/presentation/post_detail_page.dart';
 import '../features/community/presentation/post_edit_page.dart';
 import '../features/community/presentation/qna_detail_page.dart';
 import '../features/community/presentation/question_create_page.dart';
+import '../features/community/presentation/question_edit_page.dart';
 import '../features/dashboard/presentation/dashboard_page.dart';
 import '../features/mentor/presentation/mentor_page.dart';
 import '../features/mentor/state/mentor_scope_key.dart';
@@ -263,6 +264,12 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/community/post/:id/edit',
             builder: (_, state) =>
                 PostEditPage(postId: int.parse(state.pathParameters['id']!)),
+          ),
+          GoRoute(
+            path: '/community/:id/edit',
+            builder: (_, state) => QuestionEditPage(
+              postId: int.parse(state.pathParameters['id']!),
+            ),
           ),
           GoRoute(
             path: '/community/:id',
