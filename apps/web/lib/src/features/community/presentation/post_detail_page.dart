@@ -9,6 +9,7 @@ import '../../auth/state/auth_state.dart';
 import '../application/post_detail_controller.dart';
 import '../state/post_detail_state.dart';
 import 'widgets/content_menu_button.dart';
+import 'widgets/content_tombstone.dart';
 import '../../support/presentation/supportable_error.dart';
 
 /// 일반 게시글(FREE/FEEDBACK) 상세 — 마크다운 본문·태그·추천·댓글 스레드.
@@ -246,6 +247,7 @@ class _CommentCardState extends State<_CommentCard> {
   @override
   Widget build(BuildContext context) {
     final comment = widget.comment;
+    if (comment.deleted) return const ContentTombstone();
     final c = context.dpColors;
     return Card(
       child: Padding(

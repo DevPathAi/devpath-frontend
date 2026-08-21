@@ -11,6 +11,7 @@ import '../data/community_source.dart';
 import '../state/qna_detail_state.dart';
 import 'lcs_context.dart';
 import 'widgets/content_menu_button.dart';
+import 'widgets/content_tombstone.dart';
 import '../../support/presentation/supportable_error.dart';
 
 class QnaDetailPage extends ConsumerStatefulWidget {
@@ -233,6 +234,7 @@ class _AnswerCardState extends State<_AnswerCard> {
   @override
   Widget build(BuildContext context) {
     final answer = widget.answer;
+    if (answer.deleted) return const ContentTombstone();
     final c = context.dpColors;
     return Card(
       child: Padding(
