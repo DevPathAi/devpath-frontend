@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../data/community_source.dart';
+import 'widgets/content_menu_button.dart';
 import 'widgets/quill_markdown.dart';
 import 'widgets/rich_editor.dart';
 
@@ -19,11 +20,25 @@ class PostCreatePage extends ConsumerStatefulWidget {
   const PostCreatePage({
     super.key,
     required this.board,
+    this.editPostId,
+    this.initialTitle,
+    this.initialBodyMd,
     @visibleForTesting this.bodyController,
   });
 
   /// 보드 프리셋 — 'FREE'(자유) | 'FEEDBACK'(피드백 요청).
   final String board;
+
+  /// null 이 아니면 편집 모드다 — 이 id 의 글을 고친다.
+  final int? editPostId;
+
+  /// 편집 모드의 초기 제목.
+  final String? initialTitle;
+
+  /// 편집 모드의 초기 본문(마크다운). 에디터 문서로 변환해 채운다.
+  final String? initialBodyMd;
+
+  bool get isEdit => editPostId != null;
 
   /// 테스트에서 본문 문서를 결정적으로 주입하기 위한 선택 파라미터.
   /// null 이면 페이지가 직접 생성·해제한다.
@@ -42,7 +57,8 @@ class _PostCreatePageState extends ConsumerState<PostCreatePage> {
   bool _submitting = false;
 
   bool get _isFeedback => widget.board == 'FEEDBACK';
-  String get _pageTitle => _isFeedback ? '피드백 요청' : '자유글 작성';
+  String get _pageTitle =>
+      widget.isEdit ? '글 수정' : (_isFeedback ? '피드백 요청' : '자유글 작성');
 
   @override
   void initState() {
@@ -63,6 +79,11 @@ class _PostCreatePageState extends ConsumerState<PostCreatePage> {
             ),
           ),
         );
+    if (widget.initialTitle != null) _titleCtrl.text = widget.initialTitle!;
+    if (widget.initialBodyMd != null && injected == null) {
+      // 저장 계약이 마크다운이므로 편집은 반드시 역변환을 거친다.
+      _bodyController.document = markdownToQuillDocument(widget.initialBodyMd!);
+    }
   }
 
   @override
@@ -91,19 +112,32 @@ class _PostCreatePageState extends ConsumerState<PostCreatePage> {
     setState(() => _submitting = true);
     try {
       final body = quillToMarkdown(_bodyController).trim();
-      final created = await ref.read(postCreateProvider)(
-        boardType: widget.board,
-        title: title,
-        bodyMd: body,
-        tags: _parseTags(),
-      );
-      if (mounted) context.go('/community/post/${created.id}');
+      final int postId;
+      if (widget.isEdit) {
+        final updated = await ref.read(postUpdateProvider)(
+          id: widget.editPostId!,
+          title: title,
+          bodyMd: body,
+        );
+        postId = updated.id;
+      } else {
+        final created = await ref.read(postCreateProvider)(
+          boardType: widget.board,
+          title: title,
+          bodyMd: body,
+          tags: _parseTags(),
+        );
+        postId = created.id;
+      }
+      if (mounted) context.go('/community/post/$postId');
     } on ApiException catch (e) {
       if (mounted) {
         setState(() => _submitting = false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.message)));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(widget.isEdit ? contentActionMessage(e) : e.message),
+          ),
+        );
       }
     } catch (_) {
       if (mounted) {
@@ -182,24 +216,34 @@ class _PostCreatePageState extends ConsumerState<PostCreatePage> {
             ),
             sliver: SliverList.list(
               children: [
-                TextField(
-                  controller: _tagsCtrl,
-                  enabled: !_submitting,
-                  decoration: const InputDecoration(
-                    labelText: '태그',
-                    hintText: '쉼표 또는 공백으로 구분 (예: dart, flutter)',
-                    border: OutlineInputBorder(),
+                // 태그는 수정 대상이 아니다 — 서버가 받지 않으므로(평판 귀속이 어긋난다)
+                // 편집 가능한 것처럼 보이면 저장 후 사라진 것처럼 읽힌다.
+                if (!widget.isEdit) ...[
+                  TextField(
+                    key: const ValueKey('post-tags-field'),
+                    controller: _tagsCtrl,
+                    enabled: !_submitting,
+                    decoration: const InputDecoration(
+                      labelText: '태그',
+                      hintText: '쉼표 또는 공백으로 구분 (예: dart, flutter)',
+                      border: OutlineInputBorder(),
+                    ),
                   ),
-                ),
-                const SizedBox(height: DpSpacing.lg),
+                  const SizedBox(height: DpSpacing.lg),
+                ],
                 // SliverList.list의 직접 자식은 가로로 늘어난다 — 감싸지 않으면
                 // 넓은 화면에서 버튼 하나가 콘텐츠 폭 전체를 차지한다(실측 1368px).
                 Align(
                   alignment: Alignment.centerLeft,
                   child: FilledButton.icon(
+                    key: const ValueKey('post-submit'),
                     onPressed: _submitting ? null : _submit,
                     icon: const Icon(DpIcons.send, size: 18),
-                    label: Text(_submitting ? '게시 중…' : '게시'),
+                    label: Text(
+                      _submitting
+                          ? (widget.isEdit ? '저장 중…' : '게시 중…')
+                          : (widget.isEdit ? '저장' : '게시'),
+                    ),
                   ),
                 ),
               ],
