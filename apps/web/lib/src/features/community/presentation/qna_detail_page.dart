@@ -9,7 +9,7 @@ import '../application/qna_detail_controller.dart';
 import '../data/community_source.dart';
 import '../state/qna_detail_state.dart';
 import 'lcs_context.dart';
-import 'widgets/report_menu_button.dart';
+import 'widgets/content_menu_button.dart';
 import '../../support/presentation/supportable_error.dart';
 
 class QnaDetailPage extends ConsumerStatefulWidget {
@@ -114,12 +114,10 @@ class _Loaded extends ConsumerWidget {
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
               ),
-              // QuestionDetailView 에는 작성자 id 가 없다(기존 계약) — 자기 글이어도 메뉴가
-              // 보이며, 그 경우 서버 400 을 전용 문구로 안내한다.
-              ReportMenuButton(
-                targetType: 'POST',
+              ContentMenuButton(
+                kind: ContentKind.post,
                 targetId: detail.id,
-                authorId: null,
+                authorId: detail.authorId,
                 currentUserId: _currentUserId(ref),
               ),
             ],
@@ -251,9 +249,9 @@ class _AnswerCard extends StatelessWidget {
                     onPressed: submitting ? null : onAccept,
                     child: const Text('채택'),
                   ),
-                // AI 초안은 authorId 가 null 이라 항상 신고할 수 있다(서버도 허용한다).
-                ReportMenuButton(
-                  targetType: 'ANSWER',
+                // AI 초안은 authorId 가 null 이라 「남의 것」으로 분류돼 신고만 보인다.
+                ContentMenuButton(
+                  kind: ContentKind.answer,
                   targetId: answer.id,
                   authorId: answer.authorId,
                   currentUserId: currentUserId,

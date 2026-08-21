@@ -49,7 +49,9 @@ void main() {
   });
 
   test('postDelete: DELETE /community/posts/9 → 204 를 예외 없이 통과', () async {
-    final c = _container({'DELETE /community/posts/9': (204, <String, dynamic>{})});
+    final c = _container({
+      'DELETE /community/posts/9': (204, <String, dynamic>{}),
+    });
     await c.read(postDeleteProvider)(9);
   });
 
@@ -75,7 +77,9 @@ void main() {
   });
 
   test('answerDelete: DELETE /community/answers/11', () async {
-    final c = _container({'DELETE /community/answers/11': (204, <String, dynamic>{})});
+    final c = _container({
+      'DELETE /community/answers/11': (204, <String, dynamic>{}),
+    });
     await c.read(answerDeleteProvider)(11);
   });
 
@@ -99,12 +103,16 @@ void main() {
   });
 
   test('commentDelete: DELETE /community/comments/5', () async {
-    final c = _container({'DELETE /community/comments/5': (204, <String, dynamic>{})});
+    final c = _container({
+      'DELETE /community/comments/5': (204, <String, dynamic>{}),
+    });
     await c.read(commentDeleteProvider)(5);
   });
 
   test('경로가 틀리면 픽스처가 안 걸려 ApiException 이 난다 — 측정법 유효성', () async {
-    final c = _container({'DELETE /community/posts/9': (204, <String, dynamic>{})});
+    final c = _container({
+      'DELETE /community/posts/9': (204, <String, dynamic>{}),
+    });
     await expectLater(
       c.read(postDeleteProvider)(10),
       throwsA(isA<ApiException>()),

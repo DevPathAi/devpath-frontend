@@ -7,7 +7,7 @@ import '../../auth/application/auth_controller.dart';
 import '../../auth/state/auth_state.dart';
 import '../application/post_detail_controller.dart';
 import '../state/post_detail_state.dart';
-import 'widgets/report_menu_button.dart';
+import 'widgets/content_menu_button.dart';
 import '../../support/presentation/supportable_error.dart';
 
 /// 일반 게시글(FREE/FEEDBACK) 상세 — 마크다운 본문·태그·추천·댓글 스레드.
@@ -136,8 +136,8 @@ class _Loaded extends StatelessWidget {
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
               ),
-              ReportMenuButton(
-                targetType: 'POST',
+              ContentMenuButton(
+                kind: ContentKind.post,
                 targetId: detail.id,
                 authorId: detail.authorId,
                 currentUserId: currentUserId,
@@ -211,8 +211,8 @@ class _CommentCard extends StatelessWidget {
                     style: TextStyle(color: c.textSecondary, fontSize: 12),
                   ),
                 ),
-                ReportMenuButton(
-                  targetType: 'COMMENT',
+                ContentMenuButton(
+                  kind: ContentKind.comment,
                   targetId: comment.id,
                   authorId: comment.authorId,
                   currentUserId: currentUserId,
