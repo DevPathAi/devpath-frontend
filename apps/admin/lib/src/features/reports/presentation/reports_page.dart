@@ -1,3 +1,4 @@
+import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,6 +9,8 @@ import '../../../widgets/admin_danger_dialog.dart';
 import '../../../widgets/admin_status_widgets.dart';
 import '../application/reports_controller.dart';
 import '../data/report.dart';
+import '../data/reports_source.dart';
+import '../data/revision.dart';
 import '../state/reports_state.dart';
 
 /// 신고 처리 화면.
@@ -69,6 +72,8 @@ class ReportsPage extends ConsumerWidget {
                       onResolve: () =>
                           _confirmDecision(context, n, r, 'RESOLVE'),
                       onReject: () => _confirmDecision(context, n, r, 'REJECT'),
+                      onTakedown: () => _confirmTakedown(context, ref, r),
+                      onRevisions: () => _showRevisions(context, ref, r),
                     ),
                 ],
               ),
@@ -97,6 +102,78 @@ class ReportsPage extends ConsumerWidget {
       onConfirm: () => controller.resolve(report.id, action),
     );
   }
+
+  /// 콘텐츠 내리기. 되돌릴 수 없고 평판까지 회수하므로 판정과 같은 무게의 확인을 거친다.
+  Future<void> _confirmTakedown(
+    BuildContext context,
+    WidgetRef ref,
+    AdminReport report,
+  ) async {
+    final ok = await showAdminDangerDialog(
+      context: context,
+      title: '${report.targetTypeLabel} 내리기',
+      impact:
+          '내리면 이용자에게 보이지 않고, 그 콘텐츠로 얻은 평판을 회수합니다. '
+          '작성자 삭제와 달리 규정 위반 판단이며 되돌리는 API 는 아직 없습니다.',
+      confirmLabel: '내리기 확정',
+      confirmationValue: '${report.targetTypeLabel} #${report.targetId}',
+      onConfirm: () =>
+          ref.read(contentTakedownProvider)(report.targetType, report.targetId),
+    );
+    if (ok != true || !context.mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('내렸어요')));
+  }
+
+  /// 수정 이력. 「답변을 받고 질문을 통째로 바꿨는가」를 확인하는 근거다.
+  Future<void> _showRevisions(
+    BuildContext context,
+    WidgetRef ref,
+    AdminReport report,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    List<AdminRevision> list;
+    try {
+      list = await ref.read(revisionsFetchProvider)(
+        report.targetType,
+        report.targetId,
+      );
+    } on ApiException {
+      messenger.showSnackBar(const SnackBar(content: Text('이력을 불러오지 못했어요')));
+      return;
+    }
+    if (!context.mounted) return;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('수정 이력'),
+        content: SizedBox(
+          width: 480,
+          child: list.isEmpty
+              ? const Text('수정된 적이 없어요')
+              : ListView(
+                  shrinkWrap: true,
+                  children: [
+                    for (final v in list)
+                      ListTile(
+                        title: Text(v.title ?? '(제목 없음)'),
+                        subtitle: Text(v.bodyMd ?? ''),
+                        trailing: Text(v.createdAt ?? ''),
+                      ),
+                  ],
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('닫기'),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _ReportCard extends StatelessWidget {
@@ -104,11 +181,19 @@ class _ReportCard extends StatelessWidget {
     required this.report,
     required this.onResolve,
     required this.onReject,
+    required this.onTakedown,
+    required this.onRevisions,
   });
 
   final AdminReport report;
   final VoidCallback onResolve;
   final VoidCallback onReject;
+
+  /// 콘텐츠를 HIDDEN 으로 내린다(평판 회수 포함).
+  final VoidCallback onTakedown;
+
+  /// 수정 이력 조회.
+  final VoidCallback onRevisions;
 
   @override
   Widget build(BuildContext context) {
@@ -164,7 +249,7 @@ class _ReportCard extends StatelessWidget {
               ),
             ],
             const SizedBox(height: DpSpacing.xs),
-            // 조치 기능이 없는 대신 대상 위치를 노출해 수동 대응 경로를 남긴다.
+            // 대상 위치를 노출해 수동 확인 경로도 남긴다(내리기는 아래 버튼).
             if (r.targetPath != null)
               Text(
                 r.targetPath!,
@@ -179,6 +264,17 @@ class _ReportCard extends StatelessWidget {
                 child: Wrap(
                   spacing: DpSpacing.xs,
                   children: [
+                    TextButton(
+                      key: ValueKey('revisions-${r.id}'),
+                      onPressed: onRevisions,
+                      child: const Text('수정 이력'),
+                    ),
+                    if (!r.isTargetGone)
+                      TextButton(
+                        key: ValueKey('takedown-${r.id}'),
+                        onPressed: onTakedown,
+                        child: const Text('내리기'),
+                      ),
                     TextButton(onPressed: onReject, child: const Text('기각')),
                     FilledButton(
                       onPressed: onResolve,
