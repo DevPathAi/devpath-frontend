@@ -51,6 +51,7 @@ dependencies:
   skeletonizer: ^2.1.3
   flutter_quill: ^11.5.1
   markdown_quill: ^4.3.0
+  markdown: ^7.3.1            # MarkdownToDelta 가 md.Document 를 요구한다(지금까지 transitive 였다)
   crypto: ^3.0.6
 
 dev_dependencies:
