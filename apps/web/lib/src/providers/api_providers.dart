@@ -1,6 +1,12 @@
+import 'dart:convert';
+
 import 'package:dp_core/dp_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../analytics/analytics_contract.dart';
+import '../analytics/journey_analytics.dart';
+import '../analytics/journey_handoff.dart';
+import '../analytics/analytics_runtime.dart';
 import '../app/app_config.dart';
 import '../data/web_mock_fixtures.dart';
 import '../features/auth/application/auth_controller.dart';
@@ -9,6 +15,73 @@ import 'onboarding_gate_interceptor.dart';
 final appConfigProvider = Provider<AppConfig>(
   (ref) => AppConfig.fromEnvironment(),
 );
+
+/// Required operational input before analytics is enabled: override this with
+/// an authoritative internal/test-account claim or registry. The current auth
+/// model exposes neither, so the opted-out default stays in force; email,
+/// nickname, provider subject, or a locally invented allowlist must not be used.
+final analyticsInternalUserPolicyProvider =
+    Provider<InternalAnalyticsUserPolicy>(
+      (ref) =>
+          (_) => false,
+    );
+
+final journeyIdStoreProvider = Provider<JourneyIdStore>(
+  (ref) => journeyIdStore(),
+);
+final analyticsSessionIdStoreProvider = Provider<JourneyIdStore>(
+  (ref) => analyticsSessionIdStore(),
+);
+final analyticsIdGeneratorProvider = Provider<String Function()>(
+  (ref) => generateOpaqueJourneyId,
+);
+final analyticsUserAgentProvider = Provider<String>(
+  (ref) => analyticsRuntimeUserAgent(),
+);
+
+/// Vendor-neutral, opt-out default. ET1 deliberately installs no vendor SDK.
+final journeyAnalyticsProvider = Provider<JourneyAnalytics>((ref) {
+  final config = ref.watch(appConfigProvider);
+  if (config.analyticsContractVersion != analyticsContractVersion) {
+    return const OptedOutJourneyAnalytics();
+  }
+  try {
+    final generator = ref.watch(analyticsIdGeneratorProvider);
+    final journeyId = getOrCreateJourneyId(
+      ref.watch(journeyIdStoreProvider),
+      randomBytes: (_) => _decodeGeneratedId(generator()),
+    );
+    final sessionId = getOrCreateJourneyId(
+      ref.watch(analyticsSessionIdStoreProvider),
+      randomBytes: (_) => _decodeGeneratedId(generator()),
+    );
+    return JourneyAnalyticsAdapter(
+      context: JourneyAnalyticsContext(
+        environment: config.analyticsEnvironment,
+        appVersion: config.appVersion,
+        sessionId: sessionId,
+        journeyId: journeyId,
+      ),
+      optedOut: true,
+      excluded: shouldExcludeAnalyticsTraffic(
+        environment: config.analyticsEnvironment,
+        appVersion: config.appVersion,
+        userAgent: ref.watch(analyticsUserAgentProvider),
+      ),
+      isInternalUser: ref.watch(analyticsInternalUserPolicyProvider),
+    );
+  } catch (_) {
+    return const OptedOutJourneyAnalytics();
+  }
+});
+
+List<int> _decodeGeneratedId(String value) {
+  // Provider seam accepts the final ID so tests can model secure-random denial.
+  // getOrCreateJourneyId expects bytes, so decode the validated base64url value.
+  if (!isValidJourneyId(value)) throw StateError('invalid analytics id');
+  final padded = value.padRight(24, '=');
+  return base64Url.decode(padded);
+}
 
 /// 프로토: web 토큰은 메모리(스펙 §3 "web=httpOnly 쿠키/메모리" 중 메모리).
 /// localStorage 영속화는 후속(리스크 참조).
@@ -110,3 +183,11 @@ final apiClientProvider = Provider<ApiClient>((ref) {
   }
   return client;
 });
+
+/// Web의 Riverpod·캐시 정책과 분리된 공용 학습 경로 wire client.
+///
+/// Dashboard/Today와 이후 Path/mobile consumer가 endpoint 문자열이나 JSON을
+/// 다시 해석하지 않고 dp_core의 동일한 typed contract를 사용한다.
+final learningPathApiProvider = Provider<LearningPathApi>(
+  (ref) => LearningPathApi(ref.watch(apiClientProvider)),
+);

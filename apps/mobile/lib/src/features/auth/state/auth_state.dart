@@ -15,7 +15,37 @@ class AuthUnauthenticated extends AuthState {
   final String? error;
 }
 
+/// A stored session exists, but its owner could not be verified because the
+/// transport/service is unavailable. This is retryable and must not be treated
+/// as an explicit logout.
+class AuthSessionUnavailable extends AuthState {
+  const AuthSessionUnavailable(this.message);
+
+  final String message;
+}
+
+/// A previously server-verified session retained through a transport outage.
+/// Reads may use owner-scoped snapshots; mutations remain server-confirmed.
+class AuthOfflineAuthenticated extends AuthState {
+  const AuthOfflineAuthenticated(this.user, this.message);
+
+  final User user;
+  final String message;
+}
+
 class AuthAuthenticated extends AuthState {
   const AuthAuthenticated(this.user);
   final User user;
+}
+
+extension AuthStateOwner on AuthState {
+  User? get verifiedUser => switch (this) {
+    AuthAuthenticated(:final user) ||
+    AuthOfflineAuthenticated(:final user) => user,
+    _ => null,
+  };
+
+  String? get ownerKey => verifiedUser?.id;
+
+  bool get isServerReachable => this is AuthAuthenticated;
 }

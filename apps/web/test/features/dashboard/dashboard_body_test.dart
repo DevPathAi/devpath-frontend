@@ -21,6 +21,17 @@ Widget _host(DashboardSummary s) {
   );
 }
 
+Widget _supportingDashboardHost(DashboardSummary s) => ProviderScope(
+  child: MaterialApp(
+    theme: DpTheme.light(),
+    home: Builder(
+      builder: (context) {
+        return Scaffold(body: DashboardBody.supportingContent(context, s));
+      },
+    ),
+  ),
+);
+
 const _summary = DashboardSummary(
   streakDays: 7,
   progressPercent: 62,
@@ -80,5 +91,21 @@ void main() {
 
     expect(find.byKey(const Key('weekly-activity-card')), findsOneWidget);
     expect(find.byKey(const Key('progress-trend-card')), findsOneWidget);
+  });
+
+  testWidgets('Today 보조 지표는 이번 주 진행을 스트릭보다 먼저 배치한다', (tester) async {
+    tester.view.physicalSize = const Size(1000, 1400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(_supportingDashboardHost(_summary));
+    await tester.pumpAndSettle();
+
+    final weeklyTop = tester.getTopLeft(
+      find.byKey(const Key('weekly-activity-card')),
+    );
+    final streakTop = tester.getTopLeft(find.text('연속 학습'));
+    expect(weeklyTop.dy, lessThan(streakTop.dy));
   });
 }

@@ -1,0 +1,603 @@
+---
+# Immutable pins and authenticated archive commands exceed 80 columns.
+# yamllint disable rule:line-length
+# yamllint disable rule:truthy
+name: Mission Spine Manual AT Evidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_id:
+        description: Immutable release identifier from the canonical candidate
+        required: true
+        type: string
+      candidate_run_id:
+        description: Successful GitOps candidate producer run ID
+        required: true
+        type: string
+      candidate_run_attempt:
+        description: Exact GitOps candidate producer attempt
+        required: true
+        type: string
+      candidate_artifact_id:
+        description: Immutable canonical candidate artifact ID
+        required: true
+        type: string
+      candidate_spec_sha256:
+        description: SHA-256 of the exact raw candidate-spec.json bytes
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: mission-spine-manual-at-${{ inputs.release_id }}-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  authenticate-inputs:
+    name: Authenticate manual AT inputs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment:
+      name: mission-spine-manual-at-auth
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - name: Reject branch, source, and rerun ambiguity
+        shell: bash
+        env:
+          RELEASE_ID: ${{ inputs.release_id }}
+        run: |
+          set -euo pipefail
+          test "${GITHUB_RUN_ATTEMPT}" = 1 || {
+            echo 'protected approvals require attempt 1 and a fresh workflow_dispatch' >&2
+            exit 1
+          }
+          [[ "${RELEASE_ID}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]]
+          test "${GITHUB_REPOSITORY}" = DevPathAi/devpath-frontend
+          test "${GITHUB_EVENT_NAME}" = workflow_dispatch
+          test "${GITHUB_REF}" = refs/heads/main
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Authenticate protected input-reader approval
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          approval_root="${RUNNER_TEMP}/manual-at-auth-approval"
+          test ! -e "${approval_root}"
+          mkdir "${approval_root}"
+          node tools/mission_spine_protected_approval.mjs \
+            --workflow-path=.github/workflows/mission-spine-manual-at-evidence.yml \
+            --environment=mission-spine-manual-at-auth \
+            --job-name='Authenticate manual AT inputs' \
+            --output="${approval_root}/approval.json"
+
+      - name: Mint read-only GitOps candidate token
+        id: gitops-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.MISSION_SPINE_EVIDENCE_READER_APP_ID }}
+          private-key: ${{ secrets.MISSION_SPINE_EVIDENCE_READER_APP_PRIVATE_KEY }}
+          owner: DevPathAi
+          permission-actions: read
+          permission-contents: read
+
+      - name: Verify evidence reader App is GitOps-only
+        shell: bash
+        env:
+          GITOPS_TOKEN: ${{ steps.gitops-token.outputs.token }}
+          APP_SLUG: ${{ steps.gitops-token.outputs.app-slug }}
+          INSTALLATION_ID: ${{ steps.gitops-token.outputs.installation-id }}
+        run: |
+          set -euo pipefail
+          test -n "${GITOPS_TOKEN}"
+          test "${APP_SLUG}" = devpath-evidence-reader
+          [[ "${INSTALLATION_ID}" =~ ^[1-9][0-9]*$ ]]
+          inventory="${RUNNER_TEMP}/evidence-reader-repositories.json"
+          test ! -e "${inventory}"
+          curl --fail --silent --show-error \
+            --proto '=https' \
+            -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer ${GITOPS_TOKEN}" \
+            -H 'X-GitHub-Api-Version: 2026-03-10' \
+            'https://api.github.com/installation/repositories?per_page=100' \
+            --output "${inventory}"
+          jq -e '
+            .total_count == 1 and
+            (.repositories | length) == 1 and
+            .repositories[0].full_name == "DevPathAi/devpath-gitops"
+          ' "${inventory}" >/dev/null
+
+      - name: Authenticate canonical candidate metadata
+        id: candidate-metadata
+        shell: bash
+        env:
+          GITOPS_TOKEN: ${{ steps.gitops-token.outputs.token }}
+          RELEASE_ID: ${{ inputs.release_id }}
+          CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+          CANDIDATE_RUN_ATTEMPT: ${{ inputs.candidate_run_attempt }}
+          CANDIDATE_ARTIFACT_ID: ${{ inputs.candidate_artifact_id }}
+        run: |
+          set -euo pipefail
+          test -n "${GITOPS_TOKEN}"
+          GITHUB_TOKEN="${GITOPS_TOKEN}" node tools/et13/verify_external_artifact.mjs \
+            --kind=candidate \
+            --release-id="${RELEASE_ID}" \
+            --run-id="${CANDIDATE_RUN_ID}" \
+            --run-attempt="${CANDIDATE_RUN_ATTEMPT}" \
+            --artifact-id="${CANDIDATE_ARTIFACT_ID}" \
+            --frontend-sha="${GITHUB_SHA}"
+
+      - name: Checkout exact authenticated GitOps candidate source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          repository: DevPathAi/devpath-gitops
+          ref: ${{ steps.candidate-metadata.outputs.candidate_head_sha }}
+          token: ${{ steps.gitops-token.outputs.token }}
+          fetch-depth: 2
+          persist-credentials: false
+          path: build/mission-spine/manual-at/gitops-checkout
+
+      - name: Independently download and hash canonical candidate archive
+        shell: bash
+        env:
+          GITOPS_TOKEN: ${{ steps.gitops-token.outputs.token }}
+          CANDIDATE_ARTIFACT_ID: ${{ inputs.candidate_artifact_id }}
+          CANDIDATE_ARCHIVE_SHA256: ${{ steps.candidate-metadata.outputs.candidate_artifact_archive_sha256 }}
+        run: |
+          set -euo pipefail
+          [[ "${CANDIDATE_ARTIFACT_ID}" =~ ^[1-9][0-9]*$ ]]
+          [[ "${CANDIDATE_ARCHIVE_SHA256}" =~ ^[0-9a-f]{64}$ ]]
+          root=build/mission-spine/manual-at/external
+          test ! -e "${root}"
+          mkdir -p "${root}/candidate-archive" "${root}/candidate-action"
+          curl --fail --silent --show-error --location \
+            --proto '=https' --proto-redir '=https' \
+            -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer ${GITOPS_TOKEN}" \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "https://api.github.com/repos/DevPathAi/devpath-gitops/actions/artifacts/${CANDIDATE_ARTIFACT_ID}/zip" \
+            --max-filesize 1048576 \
+            --output "${root}/candidate.zip"
+          printf '%s  %s\n' "${CANDIDATE_ARCHIVE_SHA256}" "${root}/candidate.zip" \
+            | sha256sum --check --strict
+          python3 - "${root}/candidate.zip" "${root}/candidate-archive" <<'PYTHON'
+          import os
+          import stat
+          import sys
+          import zipfile
+
+          archive, destination = sys.argv[1:]
+          with zipfile.ZipFile(archive) as source:
+              entries = source.infolist()
+              if not entries:
+                  raise SystemExit('candidate archive is empty')
+              seen = set()
+              files = set()
+              total = 0
+              for entry in entries:
+                  name = entry.filename
+                  normalized = name[:-1] if name.endswith('/') else name
+                  parts = normalized.split('/')
+                  if (
+                      not normalized
+                      or '\\' in name
+                      or '\x00' in name
+                      or (len(parts[0]) == 2 and parts[0][1] == ':')
+                      or any(part in ('', '.', '..') for part in parts)
+                  ):
+                      raise SystemExit(f'unsafe candidate archive entry: {name!r}')
+                  if normalized in seen:
+                      raise SystemExit(f'duplicate candidate archive entry: {name!r}')
+                  seen.add(normalized)
+                  if entry.flag_bits & 1:
+                      raise SystemExit(f'encrypted candidate archive entry: {name!r}')
+                  mode = stat.S_IFMT((entry.external_attr >> 16) & 0xFFFF)
+                  expected = stat.S_IFDIR if entry.is_dir() else stat.S_IFREG
+                  if mode not in (0, expected):
+                      raise SystemExit(f'candidate link/special entry: {name!r}')
+                  if not entry.is_dir():
+                      files.add(normalized)
+                      total += entry.file_size
+              if files != {'candidate-spec.json'} or total > 256 * 1024:
+                  raise SystemExit('candidate archive exact file/size contract mismatch')
+              source.extractall(destination)
+          for current, directories, files in os.walk(destination, followlinks=False):
+              for name in directories + files:
+                  path = os.path.join(current, name)
+                  if os.path.islink(path):
+                      raise SystemExit(f'extracted candidate link: {path!r}')
+          PYTHON
+
+      - name: Download exact canonical candidate through pinned action
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        with:
+          artifact-ids: ${{ inputs.candidate_artifact_id }}
+          repository: DevPathAi/devpath-gitops
+          run-id: ${{ inputs.candidate_run_id }}
+          github-token: ${{ steps.gitops-token.outputs.token }}
+          merge-multiple: true
+          path: build/mission-spine/manual-at/external/candidate-action
+
+      - name: Bind canonical candidate bytes and protected GitOps source
+        shell: bash
+        env:
+          GITOPS_TOKEN: ${{ steps.gitops-token.outputs.token }}
+          RELEASE_ID: ${{ inputs.release_id }}
+          CANDIDATE_SPEC_SHA256: ${{ inputs.candidate_spec_sha256 }}
+          CANDIDATE_HEAD_SHA: ${{ steps.candidate-metadata.outputs.candidate_head_sha }}
+        run: |
+          set -euo pipefail
+          root=build/mission-spine/manual-at/external
+          diff --recursive --brief "${root}/candidate-archive" "${root}/candidate-action"
+          test -z "$(find "${root}/candidate-archive" "${root}/candidate-action" -type l -print -quit)"
+          mapfile -t files < <(find "${root}/candidate-action" -type f -printf '%P\n')
+          test "${#files[@]}" = 1
+          test "${files[0]}" = candidate-spec.json
+          test -z "$(find "${root}/candidate-action" -mindepth 1 -type d -print -quit)"
+          printf '%s  %s\n' "${CANDIDATE_SPEC_SHA256}" \
+            "${root}/candidate-action/candidate-spec.json" | sha256sum --check --strict
+          GITHUB_TOKEN="${GITOPS_TOKEN}" node tools/et13/verify_external_artifact.mjs \
+            --kind=candidate-source \
+            --release-id="${RELEASE_ID}" \
+            --head-sha="${CANDIDATE_HEAD_SHA}" \
+            --candidate-spec-sha256="${CANDIDATE_SPEC_SHA256}" \
+            --checkout-root=build/mission-spine/manual-at/gitops-checkout \
+            --candidate-path="${root}/candidate-action/candidate-spec.json"
+
+      - name: Authenticate exact signed mobile producer and artifact metadata
+        id: signed
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ inputs.release_id }}
+          CANDIDATE_SPEC_SHA256: ${{ inputs.candidate_spec_sha256 }}
+        run: |
+          set -euo pipefail
+          node tools/mission_spine_manual_at_evidence.mjs authenticate-signed-artifact \
+            --repository-root=. \
+            --candidate=build/mission-spine/manual-at/external/candidate-action/candidate-spec.json \
+            --candidate-sha256="${CANDIDATE_SPEC_SHA256}" \
+            --release-id="${RELEASE_ID}" \
+            --source-sha="${GITHUB_SHA}"
+
+      - name: Independently download and hash signed mobile archive
+        shell: bash
+        env:
+          FRONTEND_TOKEN: ${{ github.token }}
+          SIGNED_ARTIFACT_ID: ${{ steps.signed.outputs.signed_artifact_id }}
+          SIGNED_ARCHIVE_SHA256: ${{ steps.signed.outputs.signed_artifact_archive_sha256 }}
+        run: |
+          set -euo pipefail
+          [[ "${SIGNED_ARTIFACT_ID}" =~ ^[1-9][0-9]*$ ]]
+          [[ "${SIGNED_ARCHIVE_SHA256}" =~ ^[0-9a-f]{64}$ ]]
+          root=build/mission-spine/manual-at/external
+          test ! -e "${root}/signed-archive"
+          test ! -e "${root}/signed-action"
+          mkdir "${root}/signed-archive" "${root}/signed-action"
+          curl --fail --silent --show-error --location \
+            --proto '=https' --proto-redir '=https' \
+            -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer ${FRONTEND_TOKEN}" \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "https://api.github.com/repos/DevPathAi/devpath-frontend/actions/artifacts/${SIGNED_ARTIFACT_ID}/zip" \
+            --max-filesize 1153433600 \
+            --output "${root}/signed.zip"
+          printf '%s  %s\n' "${SIGNED_ARCHIVE_SHA256}" "${root}/signed.zip" \
+            | sha256sum --check --strict
+          python3 - "${root}/signed.zip" "${root}/signed-archive" <<'PYTHON'
+          import os
+          import stat
+          import sys
+          import zipfile
+
+          archive, destination = sys.argv[1:]
+          with zipfile.ZipFile(archive) as source:
+              entries = source.infolist()
+              if not entries:
+                  raise SystemExit('signed archive is empty')
+              seen = set()
+              files = set()
+              total = 0
+              for entry in entries:
+                  name = entry.filename
+                  normalized = name[:-1] if name.endswith('/') else name
+                  parts = normalized.split('/')
+                  if (
+                      not normalized
+                      or '\\' in name
+                      or '\x00' in name
+                      or (len(parts[0]) == 2 and parts[0][1] == ':')
+                      or any(part in ('', '.', '..') for part in parts)
+                  ):
+                      raise SystemExit(f'unsafe signed archive entry: {name!r}')
+                  if normalized in seen:
+                      raise SystemExit(f'duplicate signed archive entry: {name!r}')
+                  seen.add(normalized)
+                  if entry.flag_bits & 1:
+                      raise SystemExit(f'encrypted signed archive entry: {name!r}')
+                  mode = stat.S_IFMT((entry.external_attr >> 16) & 0xFFFF)
+                  expected = stat.S_IFDIR if entry.is_dir() else stat.S_IFREG
+                  if mode not in (0, expected):
+                      raise SystemExit(f'signed link/special entry: {name!r}')
+                  if not entry.is_dir():
+                      files.add(normalized)
+                      total += entry.file_size
+                      limit = 256 * 1024 if normalized == 'build-provenance.v1.json' else 500 * 1024 * 1024
+                      if entry.file_size < 1 or entry.file_size > limit:
+                          raise SystemExit(f'signed archive entry size is invalid: {name!r}')
+              expected_files = {
+                  'build-provenance.v1.json',
+                  'mobile/android/leva-release.apk',
+                  'mobile/ios/leva-release.ipa',
+              }
+              if files != expected_files or total > 1100 * 1024 * 1024:
+                  raise SystemExit('signed archive exact file/size contract mismatch')
+              source.extractall(destination)
+          for current, directories, files in os.walk(destination, followlinks=False):
+              for name in directories + files:
+                  path = os.path.join(current, name)
+                  if os.path.islink(path):
+                      raise SystemExit(f'extracted signed link: {path!r}')
+          PYTHON
+
+      - name: Download exact signed bundle through pinned action
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        with:
+          artifact-ids: ${{ steps.signed.outputs.signed_artifact_id }}
+          repository: DevPathAi/devpath-frontend
+          run-id: ${{ steps.signed.outputs.signed_run_id }}
+          github-token: ${{ github.token }}
+          merge-multiple: true
+          path: build/mission-spine/manual-at/external/signed-action
+
+      - name: Validate exact signed bytes and immutable manual catalogs
+        shell: bash
+        env:
+          RELEASE_ID: ${{ inputs.release_id }}
+          CANDIDATE_SPEC_SHA256: ${{ inputs.candidate_spec_sha256 }}
+        run: |
+          set -euo pipefail
+          root=build/mission-spine/manual-at/external
+          diff --recursive --brief "${root}/signed-archive" "${root}/signed-action"
+          test -z "$(find "${root}/signed-archive" "${root}/signed-action" -type l -print -quit)"
+          test -f "${root}/signed-action/build-provenance.v1.json"
+          test -f "${root}/signed-action/mobile/android/leva-release.apk"
+          test -f "${root}/signed-action/mobile/ios/leva-release.ipa"
+          node tools/mission_spine_manual_at_evidence.mjs validate-manual-inputs \
+            --repository-root=. \
+            --candidate="${root}/candidate-action/candidate-spec.json" \
+            --candidate-sha256="${CANDIDATE_SPEC_SHA256}" \
+            --release-id="${RELEASE_ID}" \
+            --source-sha="${GITHUB_SHA}" \
+            --signed-root="${root}/signed-action"
+          stage=build/mission-spine/manual-at/authenticated
+          test ! -e "${stage}"
+          mkdir -p "${stage}/candidate" "${stage}/signed"
+          cp "${root}/candidate-action/candidate-spec.json" "${stage}/candidate/candidate-spec.json"
+          cp -R "${root}/signed-action/." "${stage}/signed/"
+          cp -R tool/release-evidence/catalogs "${stage}/catalogs"
+          cp -R tool/release-evidence/provenance "${stage}/provenance"
+
+      - name: Preserve authenticated unsealable manual review inputs
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ inputs.release_id }}-unsealable-manual-at-review-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: build/mission-spine/manual-at/authenticated
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 14
+
+  approve-nvda:
+    name: Approve manual NVDA evidence
+    needs: authenticate-inputs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment:
+      name: manual-at-nvda
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - name: Authenticate independent protected NVDA reviewer
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          node tools/mission_spine_protected_approval.mjs \
+            --workflow-path=.github/workflows/mission-spine-manual-at-evidence.yml \
+            --environment=manual-at-nvda \
+            --job-name='Approve manual NVDA evidence' \
+            --output="${RUNNER_TEMP}/approval.json"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ inputs.release_id }}-unsealable-manual-nvda-approval-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/approval.json
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 3
+
+  approve-voiceover:
+    name: Approve manual VoiceOver evidence
+    needs: authenticate-inputs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment:
+      name: manual-at-voiceover
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - name: Authenticate independent protected VoiceOver reviewer
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          node tools/mission_spine_protected_approval.mjs \
+            --workflow-path=.github/workflows/mission-spine-manual-at-evidence.yml \
+            --environment=manual-at-voiceover \
+            --job-name='Approve manual VoiceOver evidence' \
+            --output="${RUNNER_TEMP}/approval.json"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ inputs.release_id }}-unsealable-manual-voiceover-approval-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/approval.json
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 3
+
+  approve-talkback:
+    name: Approve manual TalkBack evidence
+    needs: authenticate-inputs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment:
+      name: manual-at-talkback
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - name: Authenticate independent protected TalkBack reviewer
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          node tools/mission_spine_protected_approval.mjs \
+            --workflow-path=.github/workflows/mission-spine-manual-at-evidence.yml \
+            --environment=manual-at-talkback \
+            --job-name='Approve manual TalkBack evidence' \
+            --output="${RUNNER_TEMP}/approval.json"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ inputs.release_id }}-unsealable-manual-talkback-approval-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/approval.json
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 3
+
+  publish-atomic-trio:
+    name: Publish atomic manual AT trio
+    needs: [authenticate-inputs, approve-nvda, approve-voiceover, approve-talkback]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - name: Reject rerun approval reuse and verify exact checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_RUN_ATTEMPT}" = 1 || {
+            echo 'protected approvals require attempt 1 and a fresh workflow_dispatch' >&2
+            exit 1
+          }
+          test "${GITHUB_REPOSITORY}" = DevPathAi/devpath-frontend
+          test "${GITHUB_REF}" = refs/heads/main
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Download authenticated manual review inputs
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        with:
+          name: ${{ inputs.release_id }}-unsealable-manual-at-review-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: build/mission-spine/manual-at/authenticated
+
+      - name: Download protected NVDA approval
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        with:
+          name: ${{ inputs.release_id }}-unsealable-manual-nvda-approval-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: build/mission-spine/manual-at/approvals/nvda
+
+      - name: Download protected VoiceOver approval
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        with:
+          name: ${{ inputs.release_id }}-unsealable-manual-voiceover-approval-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: build/mission-spine/manual-at/approvals/voiceover
+
+      - name: Download protected TalkBack approval
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        with:
+          name: ${{ inputs.release_id }}-unsealable-manual-talkback-approval-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: build/mission-spine/manual-at/approvals/talkback
+
+      - name: Generate and jointly validate sanitized lane packages
+        shell: bash
+        env:
+          RELEASE_ID: ${{ inputs.release_id }}
+          CANDIDATE_SPEC_SHA256: ${{ inputs.candidate_spec_sha256 }}
+        run: |
+          set -euo pipefail
+          authenticated=build/mission-spine/manual-at/authenticated
+          candidate="${authenticated}/candidate/candidate-spec.json"
+          test -f "${candidate}"
+          node tools/mission_spine_manual_at_evidence.mjs validate-manual-inputs \
+            --repository-root=. \
+            --candidate="${candidate}" \
+            --candidate-sha256="${CANDIDATE_SPEC_SHA256}" \
+            --release-id="${RELEASE_ID}" \
+            --source-sha="${GITHUB_SHA}" \
+            --signed-root="${authenticated}/signed"
+          package_root=build/mission-spine/manual-at/packages
+          test ! -e "${package_root}"
+          mkdir -p \
+            "${package_root}/manual-nvda" \
+            "${package_root}/manual-voiceover" \
+            "${package_root}/manual-talkback"
+          for lane in nvda voiceover talkback; do
+            approval="build/mission-spine/manual-at/approvals/${lane}/approval.json"
+            test -f "${approval}"
+            test ! -L "${approval}"
+            test "$(find "$(dirname "${approval}")" -type f | wc -l)" = 1
+            node tools/mission_spine_manual_at_evidence.mjs manual-evidence \
+              --repository-root=. \
+              --candidate="${candidate}" \
+              --candidate-sha256="${CANDIDATE_SPEC_SHA256}" \
+              --release-id="${RELEASE_ID}" \
+              --source-sha="${GITHUB_SHA}" \
+              --producer-run-id="${GITHUB_RUN_ID}" \
+              --producer-run-attempt="${GITHUB_RUN_ATTEMPT}" \
+              --lane="manual-${lane}" \
+              --approval="${approval}" \
+              --output="${package_root}/manual-${lane}/evidence.json"
+          done
+          node tools/mission_spine_manual_at_evidence.mjs validate-manual-packages \
+            --repository-root=. \
+            --candidate="${candidate}" \
+            --candidate-sha256="${CANDIDATE_SPEC_SHA256}" \
+            --release-id="${RELEASE_ID}" \
+            --source-sha="${GITHUB_SHA}" \
+            --producer-run-id="${GITHUB_RUN_ID}" \
+            --producer-run-attempt="${GITHUB_RUN_ATTEMPT}" \
+            --package-root="${package_root}"
+
+      - name: Publish exact NVDA sanitized evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ inputs.release_id }}-manual-nvda-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: build/mission-spine/manual-at/packages/manual-nvda
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 30
+
+      - name: Publish exact VoiceOver sanitized evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ inputs.release_id }}-manual-voiceover-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: build/mission-spine/manual-at/packages/manual-voiceover
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 30
+
+      - name: Publish exact TalkBack sanitized evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ inputs.release_id }}-manual-talkback-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: build/mission-spine/manual-at/packages/manual-talkback
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 30

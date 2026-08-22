@@ -63,6 +63,107 @@ void main() {
         '/path',
       );
     });
+
+    test('저장할 diagnostic continuation이 있으면 완료 user도 preview를 덮지 않는다', () {
+      expect(
+        gateRedirect(
+          AuthAuthenticated(_user(OnboardingStatus.done)),
+          '/diagnostic',
+          missionSpineEnabled: true,
+          hasDiagnosticContinuation: true,
+        ),
+        isNull,
+      );
+      expect(
+        gateRedirect(
+          AuthAuthenticated(_user(OnboardingStatus.done)),
+          '/dashboard',
+          missionSpineEnabled: true,
+          hasDiagnosticContinuation: true,
+        ),
+        '/diagnostic',
+      );
+    });
+
+    test('flag OFF는 continuation으로 legacy route를 hold하지 않는다', () {
+      final auth = AuthAuthenticated(_user(OnboardingStatus.done));
+
+      expect(
+        gateRedirect(
+          auth,
+          '/diagnostic',
+          missionSpineEnabled: false,
+          hasDiagnosticContinuation: true,
+        ),
+        '/path',
+      );
+      expect(
+        gateRedirect(
+          auth,
+          '/dashboard',
+          missionSpineEnabled: false,
+          hasDiagnosticContinuation: true,
+        ),
+        isNull,
+      );
+    });
+
+    test('새 경로 handoff는 명시적 CTA 뒤에만 /path를 허용한다', () {
+      final auth = AuthAuthenticated(_user(OnboardingStatus.done));
+
+      expect(
+        gateRedirect(
+          auth,
+          '/path',
+          missionSpineEnabled: true,
+          hasDiagnosticContinuation: true,
+        ),
+        '/diagnostic',
+      );
+      expect(
+        gateRedirect(
+          auth,
+          '/path',
+          missionSpineEnabled: true,
+          hasDiagnosticContinuation: true,
+          diagnosticPathHandoffRequested: true,
+        ),
+        isNull,
+      );
+    });
+
+    test('OAuth callback 성공은 consent를 먼저 거쳐 같은 preview로 돌아간다', () {
+      expect(
+        gateRedirect(
+          AuthAuthenticated(
+            _user(OnboardingStatus.pending, consent: ConsentStatus.pending),
+          ),
+          '/auth/callback',
+          missionSpineEnabled: true,
+          hasDiagnosticContinuation: true,
+        ),
+        '/consent',
+      );
+      expect(
+        gateRedirect(
+          AuthAuthenticated(_user(OnboardingStatus.pending)),
+          '/auth/callback',
+          missionSpineEnabled: true,
+          hasDiagnosticContinuation: true,
+        ),
+        '/diagnostic',
+      );
+    });
+
+    test('continuation 없는 인증 callback은 spinner에 고착되지 않고 dashboard로 간다', () {
+      expect(
+        gateRedirect(
+          AuthAuthenticated(_user(OnboardingStatus.done)),
+          '/auth/callback',
+        ),
+        '/dashboard',
+      );
+    });
     test('미인증 + /diagnostic → 통과(null) — guest 진단 진입 허용', () {
       expect(gateRedirect(const AuthUnauthenticated(), '/diagnostic'), isNull);
     });
@@ -87,13 +188,13 @@ void main() {
         isNull,
       );
     });
-    test('인증 + /auth/callback → 통과(null)', () {
+    test('인증 + /auth/callback → callback spinner를 벗어나 dashboard', () {
       expect(
         gateRedirect(
           AuthAuthenticated(_user(OnboardingStatus.done)),
           '/auth/callback',
         ),
-        isNull,
+        '/dashboard',
       );
     });
 

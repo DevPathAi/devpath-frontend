@@ -32,25 +32,21 @@ void _expectHeaderVisible(WidgetTester tester) {
 
 void main() {
   testWidgets('운영 대시보드에서 헤더가 스크롤과 함께 사라진다', (tester) async {
-    tester.view.physicalSize = const Size(800, 400);
+    tester.view.physicalSize = const Size(800, 300);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
-    // 기본 목 통계는 4개뿐이라 4열 그리드가 한 줄에 들어가 스크롤이 아예 없다
-    // (실측: metrics=4 -> maxScrollExtent=0.0). 지표를 주입해 조건을 만든다.
-    //
-    // ★지표 수를 줄이지 말 것★ — 필요 조건은 「줄 수」가 아니라
-    // **maxScrollExtent > 헤더 높이(84px)**다. 800×400에서 실측:
-    //   metrics=12(3행) -> max= 83.125  ← 84보다 작아 헤더가 0.875px 남는다
-    //   metrics=16(4행) -> max=209.5    ← 헤더가 실제로 컬링된다
-    // 12로 두면 안드로이드 overscroll stretch 잔상 덕에 단일 pump에서만
-    // 우연히 통과하고(bottom=-8.9), pumpAndSettle이나 stretch 없는 플랫폼에서는
-    // bottom=+0.875로 실패한다 — 즉 조건을 피해 가는 값이 된다.
+    // ET12는 서버의 임의 키를 카드로 만들지 않고 네 개의 canonical KPI만
+    // 렌더한다. 800px는 medium(2열)이므로 네 카드가 2행이 된다. 300px 높이는
+    // maxScrollExtent가 헤더 높이보다 커지게 해 완전 이탈 조건도 성립시킨다.
     final c = ProviderContainer(
       overrides: [
         adminDashProvider.overrideWith(
-          () => _FixedDashController({
-            for (var i = 0; i < 16; i++) 'metric$i': 100 + i,
+          () => _FixedDashController(const {
+            'dau': 100,
+            'newUsers': 20,
+            'openReports': 3,
+            'aiCalls': 400,
           }),
         ),
       ],

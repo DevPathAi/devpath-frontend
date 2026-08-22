@@ -7,6 +7,9 @@ import '../auth/secure_storage_token_store.dart';
 import '../data/key_value_store.dart';
 import '../data/mobile_mock_fixtures.dart';
 import '../data/secure_key_value_store.dart';
+import '../features/auth/application/account_epoch_store.dart';
+import '../features/auth/application/auth_controller.dart';
+import '../features/auth/application/credential_mutation_coordinator.dart';
 
 final appConfigProvider = Provider<AppConfig>(
   (ref) => AppConfig.fromEnvironment(),
@@ -47,6 +50,8 @@ final authFlowClientProvider = Provider<ApiClient>((ref) {
 final apiClientProvider = Provider<ApiClient>((ref) {
   final config = ref.watch(appConfigProvider);
   final store = ref.watch(tokenStoreProvider);
+  final accountEpoch = ref.watch(accountEpochStoreProvider);
+  final credentialMutations = ref.watch(credentialMutationCoordinatorProvider);
   final authFlow = ref.watch(authFlowClientProvider);
   final client = ApiClient.create(
     ApiConfig(baseUrl: config.baseUrl, useMock: config.useMock),
@@ -56,6 +61,14 @@ final apiClientProvider = Provider<ApiClient>((ref) {
     0,
     AuthInterceptor(
       store: store,
+      sessionEpoch: () async => (
+        durable: await accountEpoch.current(),
+        credential: credentialMutations.generation,
+      ),
+      credentialMutation: credentialMutations.run,
+      onSessionInvalidated: (capturedSessionEpoch) => ref
+          .read(authControllerProvider.notifier)
+          .invalidateUnauthorizedIfCurrentSession(capturedSessionEpoch),
       // 모바일: 저장된 refresh 토큰을 바디로 전송(백엔드 토큰-바디 계약, 후속).
       refresh: (refreshToken) async {
         if (refreshToken == null || refreshToken.isEmpty) return null;
@@ -77,3 +90,8 @@ final apiClientProvider = Provider<ApiClient>((ref) {
   }
   return client;
 });
+
+/// Web and mobile share this exact authenticated Mission Spine API boundary.
+final learningPathApiProvider = Provider<LearningPathApi>(
+  (ref) => LearningPathApi(ref.watch(apiClientProvider)),
+);

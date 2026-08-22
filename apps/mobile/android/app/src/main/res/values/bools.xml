@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- pathAdvancedPattern is unavailable before API 31: fail closed. -->
+    <bool name="enable_exact_app_links">false</bool>
+</resources>

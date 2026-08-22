@@ -1,4 +1,5 @@
 import 'package:flutter_quill/flutter_quill.dart';
+import 'package:markdown/markdown.dart' as md;
 import 'package:markdown_quill/markdown_quill.dart';
 
 /// Quill 문서(Delta)를 마크다운 문자열로 변환한다.
@@ -13,3 +14,21 @@ String quillToMarkdown(QuillController controller) => DeltaToMarkdown(
   // 드러나므로, 서식이 실제로 붙은 텍스트만 이스케이프하는 완화 핸들러를 쓴다.
   customContentHandler: DeltaToMarkdown.escapeSpecialCharactersRelaxed,
 ).convert(controller.document.toDelta());
+
+/// 마크다운 문자열을 Quill 문서로 되돌린다 — 편집 모드가 기존 본문을 에디터에 채울 때 쓴다.
+///
+/// 저장 계약이 마크다운이므로 편집은 반드시 이 방향을 거친다. 툴바가 마크다운으로 무손실
+/// 표현 가능한 서식만 노출하므로(`DpRichEditor`) 왕복이 대체로 안정적이지만, **완전한
+/// 무손실을 보장하지는 않는다** — 이용자가 외부에서 붙여넣은 표·각주 같은 확장 문법은
+/// 평문으로 강등될 수 있다.
+///
+/// 빈 문자열이면 빈 문서를 낸다. `Document.fromDelta` 는 개행으로 끝나지 않는 Delta 를
+/// 거부하므로 그 경우를 따로 처리한다.
+Document markdownToQuillDocument(String markdown) {
+  if (markdown.trim().isEmpty) return Document();
+  final delta = MarkdownToDelta(
+    markdownDocument: md.Document(),
+  ).convert(markdown);
+  if (delta.isEmpty) return Document();
+  return Document.fromDelta(delta);
+}

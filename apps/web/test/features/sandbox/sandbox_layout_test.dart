@@ -3,19 +3,21 @@ import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-Widget _host(Size size) => MediaQuery(
-  data: MediaQueryData(size: size),
-  child: MaterialApp(
-    theme: DpTheme.light(),
-    home: const Scaffold(
-      body: SandboxLayout(
-        editor: Text('EDITOR'),
-        log: Text('LOG'),
-        review: Text('REVIEW'),
+Widget _host(Size size, {ValueChanged<bool>? onReviewVisibilityChanged}) =>
+    MediaQuery(
+      data: MediaQueryData(size: size),
+      child: MaterialApp(
+        theme: DpTheme.light(),
+        home: Scaffold(
+          body: SandboxLayout(
+            editor: const Text('EDITOR'),
+            log: const Text('LOG'),
+            review: const Text('REVIEW'),
+            onReviewVisibilityChanged: onReviewVisibilityChanged,
+          ),
+        ),
       ),
-    ),
-  ),
-);
+    );
 
 void main() {
   testWidgets('≥1240: 3페인 동시 표시', (tester) async {
@@ -76,6 +78,44 @@ void main() {
     expect(find.text('LOG'), findsOneWidget);
     expect(find.text('REVIEW'), findsOneWidget);
     expect(find.text('실행 로그 접기'), findsNothing); // 3페인은 접이 없음
+  });
+
+  for (final width in <double>[1024, 1240]) {
+    testWidgets('${width.toInt()}px는 Review visible을 한 번 보고한다', (tester) async {
+      tester.view.physicalSize = Size(width, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      final visibility = <bool>[];
+
+      await tester.pumpWidget(
+        _host(Size(width, 900), onReviewVisibilityChanged: visibility.add),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(visibility, [true]);
+    });
+  }
+
+  testWidgets('<1024 Review visibility는 실제 선택 탭만 보고한다', (tester) async {
+    tester.view.physicalSize = const Size(800, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final visibility = <bool>[];
+
+    await tester.pumpWidget(
+      _host(const Size(800, 900), onReviewVisibilityChanged: visibility.add),
+    );
+    await tester.pump();
+    expect(visibility, [false]);
+
+    await tester.tap(find.text('리뷰'));
+    await tester.pump();
+    expect(visibility, [false, true]);
+
+    await tester.tap(find.text('에디터'));
+    await tester.pump();
+    expect(visibility, [false, true, false]);
   });
 
   // F5-b 반영: <1024 탭 왕복 후 에디터 입력 코드 유지(IndexedStack=전 페인 트리 유지).

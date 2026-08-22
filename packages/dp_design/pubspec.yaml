@@ -1,5 +1,5 @@
 name: dp_design
-description: DevPath AI 디자인 시스템(Material 3). 도메인 모름. 토큰 SSoT=DESIGN.md.
+description: Leva Material 3 design system with code-owned semantic tokens.
 version: 0.0.1
 publish_to: none
 

@@ -1,4 +1,5 @@
 import 'package:devpath_web/src/app/app.dart';
+import 'package:devpath_web/src/app/app_config.dart';
 import 'package:devpath_web/src/data/web_mock_fixtures.dart';
 import 'package:devpath_web/src/features/auth/application/auth_controller.dart';
 import 'package:devpath_web/src/features/auth/state/auth_state.dart';
@@ -41,6 +42,12 @@ class _FastCompleteAssessmentApi implements AssessmentApi {
       const AssessmentResult(diagnosedLevel: 'MID', confidenceWeight: 0.8);
 }
 
+const _missionSpineOn = AppConfig(
+  baseUrl: 'https://mock.devpath.ai',
+  useMock: true,
+  missionSpineEnabled: true,
+);
+
 /// 목 모드 ApiClient(web 픽스처). 페이크의 위임 대상(api_providers와 동일 구성).
 ApiClient _mockInner() {
   final inner = ApiClient.create(const ApiConfig(baseUrl: '', useMock: true));
@@ -48,21 +55,35 @@ ApiClient _mockInner() {
   return inner;
 }
 
-/// D2 신규 사용자: `GET /learning-paths/me`를 **첫 호출엔 404**(경로 없음),
-/// 이후엔 목 inner에 위임(생성된 경로 200). loadOrStart가 첫 404를 받아 start()로
-/// 생성 흐름(SSE 중단→다시 생성)을 타게 한다. 나머지(post/sse/dio)는 inner 위임.
+/// D2 신규 사용자: diagnostic saved-preview의 typed branch probe와 Path의
+/// loadOrStart가 각각 404를 받아야 한다. 이후 생성 결과 조회는 목 inner(200)에
+/// 위임한다. 나머지(post/sse/dio)는 inner 위임.
 class _NewUserFirstApiClient implements ApiClient {
   _NewUserFirstApiClient(this._inner);
   final ApiClient _inner;
   int _meCalls = 0;
+  int _thisWeekCalls = 0;
 
   @override
   Future<T> get<T>(String path, {Map<String, dynamic>? query}) {
-    if (path == '/learning-paths/me' && _meCalls++ == 0) {
+    if (path == '/learning-paths/me' && _meCalls++ < 2) {
       throw const ApiException(
         code: ApiErrorCode.resourceNotFound,
         message: '아직 생성된 학습 경로가 없습니다',
         status: 404,
+      );
+    }
+    if (path == '/learning-paths/me/this-week' && _thisWeekCalls++ == 0) {
+      return Future.value(
+        <String, dynamic>{
+              'outcome': 'NO_ACTIVE_PATH',
+              'pathId': null,
+              'weekNum': null,
+              'tasks': <Object?>[],
+              'nextTask': null,
+              'pathCompleted': false,
+            }
+            as T,
       );
     }
     return _inner.get<T>(path, query: query);
@@ -81,7 +102,8 @@ class _NewUserFirstApiClient implements ApiClient {
     String path, {
     Object? body,
     Map<String, dynamic>? query,
-  }) => _inner.delete<T>(path, body: body, query: query);
+    Map<String, dynamic>? extra,
+  }) => _inner.delete<T>(path, body: body, query: query, extra: extra);
 
   @override
   Stream<SseEvent> sse(String path, {Object? body}) =>
@@ -107,10 +129,39 @@ class _NewUserFirstApiClient implements ApiClient {
 }
 
 void main() {
+  testWidgets('flag OFF 회원 완료는 preview CTA 없이 legacy처럼 PATH로 자동 전환한다', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authControllerProvider.overrideWith(_NoBootstrapAuthController.new),
+          assessmentApiProvider.overrideWithValue(_FastCompleteAssessmentApi()),
+        ],
+        child: const DevPathWebApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('GitHub로 계속하기 (목)'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('diagnostic-track')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('백엔드 (Spring)').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('진단 시작하기'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('진단 결과'), findsNothing);
+    expect(find.byType(DiagnosticPage), findsNothing);
+    expect(find.byType(PathPage), findsOneWidget);
+  });
+
   testWidgets('로그인 → 온보딩 진단 → PATH 생성까지 게이트 흐름', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          appConfigProvider.overrideWithValue(_missionSpineOn),
           authControllerProvider.overrideWith(_NoBootstrapAuthController.new),
           assessmentApiProvider.overrideWithValue(_FastCompleteAssessmentApi()),
         ],
@@ -124,13 +175,16 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(DiagnosticPage), findsOneWidget);
 
-    // 진단 시작 → 즉시 완료(next=null) → DiagnosticResultState → PATH 생성 화면
+    // 진단 시작 → 즉시 완료(next=null) → saved preview. 명시 CTA 뒤 PATH 생성 화면.
     // 트랙을 고르기 전에는 시작 버튼이 비활성이다.
     await tester.tap(find.byKey(const ValueKey('diagnostic-track')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('백엔드 (Spring)').last);
     await tester.pumpAndSettle();
     await tester.tap(find.text('진단 시작하기'));
+    await tester.pumpAndSettle();
+    expect(find.text('진단 결과'), findsOneWidget);
+    await tester.tap(find.text('기존 경로로 계속'));
     await tester.pumpAndSettle();
     expect(find.byType(PathPage), findsOneWidget);
 
@@ -145,6 +199,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          appConfigProvider.overrideWithValue(_missionSpineOn),
           // Task 3.5: bootstrapSession microtask 없이 로그인 화면에서 시작.
           authControllerProvider.overrideWith(_NoBootstrapAuthController.new),
           assessmentApiProvider.overrideWithValue(_FastCompleteAssessmentApi()),
@@ -177,6 +232,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('진단 시작하기'));
     await tester.pumpAndSettle();
+    expect(find.text('진단 결과'), findsOneWidget);
+    await tester.tap(find.text('학습 경로로 계속'));
+    await tester.pumpAndSettle();
 
     // 중단 → 완료 단계 보존 + "다시 생성" 노출
     expect(find.text('다시 생성'), findsOneWidget);
@@ -198,6 +256,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          appConfigProvider.overrideWithValue(_missionSpineOn),
           authControllerProvider.overrideWith(_NoBootstrapAuthController.new),
         ],
         child: const DevPathWebApp(),
@@ -233,6 +292,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          appConfigProvider.overrideWithValue(_missionSpineOn),
           authControllerProvider.overrideWith(_NoBootstrapAuthController.new),
         ],
         child: const DevPathWebApp(),
@@ -260,13 +320,16 @@ void main() {
       reason: '두 번째 문항이 안 나오면 next 가 같은 응답을 반복하는 것이다',
     );
 
-    // 2번 답변 → next 가 null → complete → 진단 화면을 벗어난다.
+    // 2번 답변 → next 가 null → complete → 결과 preview에 머문다.
     await tester.tap(find.text('A'));
     await tester.pumpAndSettle();
     expect(
-      find.byType(DiagnosticPage),
-      findsNothing,
-      reason: '완료 후에도 진단 화면이면 next 가 null 을 돌려주지 못한 것이다',
+      find.text('진단 결과'),
+      findsOneWidget,
+      reason: 'complete 뒤 저장된 결과를 먼저 보여줘야 한다',
     );
+    await tester.tap(find.text('기존 경로로 계속'));
+    await tester.pumpAndSettle();
+    expect(find.byType(DiagnosticPage), findsNothing);
   });
 }

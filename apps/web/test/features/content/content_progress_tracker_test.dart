@@ -47,4 +47,14 @@ void main() {
     expect(tracker.record(scrollPct: 1, dwellSec: 100), isNull);
     expect(tracker.disposeFlush(), isNull);
   });
+
+  test('실패한 동시 flush는 scroll·dwell의 축별 최댓값을 보존한다', () {
+    const scrollHeavy = ContentProgressFlush(scrollPct: 0.9, dwellSec: 10);
+    const dwellHeavy = ContentProgressFlush(scrollPct: 0.2, dwellSec: 46);
+
+    final merged = scrollHeavy.merge(dwellHeavy);
+
+    expect(merged.scrollPct, 0.9);
+    expect(merged.dwellSec, 46);
+  });
 }

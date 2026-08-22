@@ -7,7 +7,9 @@ enum ApiErrorCode {
   validationFailed,
   conflict,
   quotaExceeded,
+  mentorBusy,
   aiKillSwitchActive,
+  sandboxBusy,
   sandboxUnavailable,
   network,
   unknown;
@@ -20,7 +22,9 @@ enum ApiErrorCode {
     'VALIDATION_FAILED' => validationFailed,
     'CONFLICT' => conflict,
     'QUOTA_EXCEEDED' => quotaExceeded,
+    'MENTOR_BUSY' => mentorBusy,
     'AI_KILL_SWITCH_ACTIVE' => aiKillSwitchActive,
+    'SANDBOX_BUSY' => sandboxBusy,
     'SANDBOX_UNAVAILABLE' => sandboxUnavailable,
     _ => unknown,
   };

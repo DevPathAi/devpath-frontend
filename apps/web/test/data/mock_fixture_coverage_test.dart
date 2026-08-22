@@ -14,6 +14,21 @@ void main() {
     expect(webMockFixtures.containsKey('POST /contents/c1/progress'), isTrue);
   });
 
+  test('Today contentId 3의 조회와 진행 저장 alias 픽스처가 있다', () {
+    expect(webMockFixtures.containsKey('GET /contents/3'), isTrue);
+    expect(webMockFixtures.containsKey('POST /contents/3/progress'), isTrue);
+
+    final (getStatus, getBody) = webMockFixtures['GET /contents/3']!;
+    expect(getStatus, inInclusiveRange(200, 299));
+    expect((getBody as Map)['id'], 3);
+    expect(getBody['slug'], 'async-error-handling');
+
+    final (progressStatus, progressBody) =
+        webMockFixtures['POST /contents/3/progress']!;
+    expect(progressStatus, inInclusiveRange(200, 299));
+    expect((progressBody as Map)['completed'], isTrue);
+  });
+
   // 2026-08-03: 회원(로그인) 진단 흐름 — assessment_api.dart의 회원 경로
   // (assessmentId 기반) 전부. 이 중 하나라도 빠지면 온보딩 게이트가 진단
   // 화면으로 보낸 로그인 회원이 그 지점에서 다시 막힌다.
@@ -66,7 +81,7 @@ void main() {
     //  DiagnosticController 는 그때만 complete() 로 넘어간다).
     for (final key in [
       'GET /onboarding/assessments/1/next',
-      'GET /onboarding/assessments/guest/g-mock/next',
+      'GET /onboarding/assessments/guest/123e4567-e89b-42d3-a456-426614174000/next',
     ]) {
       test('$key 는 문항 2개 뒤 null 로 끝난다', () {
         final seq = webMockSequences[key];

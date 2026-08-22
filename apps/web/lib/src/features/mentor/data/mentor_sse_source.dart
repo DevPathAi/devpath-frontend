@@ -20,6 +20,56 @@ typedef MentorSseConnect =
       int fromStep,
     });
 
+/// Canonical Mission Mentor wire. The only supplemental-context value crossing
+/// into ai-svc is the immutable LCS snapshot identifier.
+typedef MentorContextualSseConnect =
+    Stream<SseEvent> Function(
+      String question, {
+      int? contentId,
+      int? contextSnapshotId,
+      int fromStep,
+    });
+
+enum MentorTerminalStatus { done, failed }
+
+final class MentorTerminal {
+  const MentorTerminal({required this.status, this.code, this.message});
+
+  final MentorTerminalStatus status;
+  final String? code;
+  final String? message;
+}
+
+/// Parses the explicit Mentor completion frame. Only `DONE` is successful;
+/// malformed or additive future statuses fail closed without throwing.
+MentorTerminal? parseMentorTerminal(SseEvent event) {
+  if (event.event != 'terminal') return null;
+  try {
+    final decoded = jsonDecode(event.data);
+    if (decoded is! Map) return _malformedTerminal;
+    final data = decoded.cast<String, Object?>();
+    final status = data['status'];
+    if (status == 'DONE') {
+      return const MentorTerminal(status: MentorTerminalStatus.done);
+    }
+    if (status == 'FAILED') {
+      return MentorTerminal(
+        status: MentorTerminalStatus.failed,
+        code: data['code'] is String ? data['code']! as String : null,
+        message: data['message'] is String ? data['message']! as String : null,
+      );
+    }
+  } on Object {
+    return _malformedTerminal;
+  }
+  return _malformedTerminal;
+}
+
+const _malformedTerminal = MentorTerminal(
+  status: MentorTerminalStatus.failed,
+  code: 'MALFORMED_TERMINAL',
+);
+
 const List<String> _kMockAnswer = [
   '비동기는 ',
   '`Future`와 ',
@@ -50,6 +100,7 @@ final mentorSseConnectProvider = Provider<MentorSseConnect>((ref) {
       }
       // 토큰 후 참고자료 1회(실서버 event:references 미러).
       yield SseEvent(event: 'references', data: jsonEncode(_kMockReferences));
+      yield const SseEvent(event: 'terminal', data: '{"status":"DONE"}');
     };
   }
   // ENG-REVIEW D1: `client.dio`를 직접 만지지 않는다 — `SseClient(client.dio)` 직접
@@ -60,3 +111,48 @@ final mentorSseConnectProvider = Provider<MentorSseConnect>((ref) {
     body: {'message': question, 'contentId': contentId},
   );
 });
+
+final mentorContextualSseConnectProvider = Provider<MentorContextualSseConnect>(
+  (ref) {
+    final config = ref.watch(appConfigProvider);
+    if (config.useMock) {
+      return (
+        question, {
+        int? contentId,
+        int? contextSnapshotId,
+        int fromStep = 0,
+      }) async* {
+        for (final t in _kMockAnswer.sublist(
+          fromStep.clamp(0, _kMockAnswer.length),
+        )) {
+          await Future<void>.delayed(const Duration(milliseconds: 120));
+          yield SseEvent(event: 'token', data: t);
+        }
+        yield SseEvent(event: 'references', data: jsonEncode(_kMockReferences));
+        yield const SseEvent(event: 'terminal', data: '{"status":"DONE"}');
+      };
+    }
+    final apiClient = ref.watch(apiClientProvider);
+    return (
+      question, {
+      int? contentId,
+      int? contextSnapshotId,
+      int fromStep = 0,
+    }) {
+      if (contextSnapshotId != null &&
+          (contextSnapshotId <= 0 || contextSnapshotId > 9007199254740991)) {
+        return Stream<SseEvent>.error(
+          const FormatException('Malformed Mentor snapshot ID'),
+        );
+      }
+      return apiClient.sse(
+        '/ai-mentor/sessions',
+        body: {
+          'message': question,
+          'contentId': contentId,
+          'contextSnapshotId': contextSnapshotId,
+        },
+      );
+    };
+  },
+);

@@ -1,24 +1,23 @@
 import '../data/support_request.dart';
 
 sealed class SupportListState {
-  const SupportListState();
-}
+  const SupportListState({this.status = 'OPEN', this.type});
 
-class SupportListLoading extends SupportListState {
-  const SupportListLoading();
-}
-
-class SupportListLoaded extends SupportListState {
-  const SupportListLoaded(this.rows, {this.status = 'OPEN', this.type});
-
-  final List<SupportRequestRow> rows;
-
-  /// 현재 필터. null 이면 전체. 재조회 시 유지한다.
   final String? status;
   final String? type;
 }
 
+class SupportListLoading extends SupportListState {
+  const SupportListLoading({super.status, super.type});
+}
+
+class SupportListLoaded extends SupportListState {
+  const SupportListLoaded(this.rows, {super.status, super.type});
+
+  final List<SupportRequestRow> rows;
+}
+
 class SupportListFailed extends SupportListState {
-  const SupportListFailed(this.message);
+  const SupportListFailed(this.message, {super.status, super.type});
   final String message;
 }

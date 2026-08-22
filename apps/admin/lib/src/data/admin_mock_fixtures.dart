@@ -46,21 +46,21 @@ final Map<String, MockFixture> adminMockFixtures = {
     {
       'data': [
         {
-          'id': 'u1',
+          'id': '1',
           'nickname': '지수',
           'email': 'a@x.com',
           'role': 'LEARNER',
-          'status': 'ACTIVE',
+          'status': 'BETA_PENDING',
         },
         {
-          'id': 'u2',
+          'id': '2',
           'nickname': '민준',
           'email': 'b@x.com',
           'role': 'PRO',
-          'status': 'WARNED',
+          'status': 'ACTIVE',
         },
         {
-          'id': 'u3',
+          'id': '3',
           'nickname': '서연',
           'email': 'c@x.com',
           'role': 'LEARNER',
@@ -71,9 +71,19 @@ final Map<String, MockFixture> adminMockFixtures = {
       'limit': 20,
     },
   ),
-  'POST /admin/users/u1/sanction': (200, {'ok': true}),
+  'POST /admin/users/1/approve': (204, <String, dynamic>{}),
+  'POST /admin/users/2/sanction': (200, {'ok': true}),
   'POST /admin/users/bulk-approve': (204, <String, dynamic>{}),
   'POST /admin/ads/bulk-delete': (204, <String, dynamic>{}),
+  // 콘텐츠 내리기·수정 이력 — 목 모드에서도 모더레이션 흐름이 끊기지 않게 한다.
+  // ★204 라도 본문은 Object 다★ — MockFixture 는 (int, Object) 라 null 을 넣을 수 없다.
+  'DELETE /community/admin/posts/1': (204, <String, dynamic>{}),
+  'DELETE /community/admin/answers/11': (204, <String, dynamic>{}),
+  'DELETE /community/admin/comments/5': (204, <String, dynamic>{}),
+  'GET /community/admin/revisions?targetId=1&targetType=POST': (
+    200,
+    <dynamic>[],
+  ),
   // 신고(A-006). 경로가 /admin/reports 가 아니라 /community/admin/reports 인 이유는
   // 게이트웨이가 /admin/** 를 platform-svc 로 선점하기 때문이다(community-svc 계약).
   'GET /community/admin/reports': (

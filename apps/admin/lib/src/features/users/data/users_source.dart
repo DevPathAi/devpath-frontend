@@ -6,6 +6,9 @@ import 'admin_user_row.dart';
 
 typedef AdminUsersFetch =
     Future<Page<AdminUserRow>> Function({String? cursor, String? status});
+typedef AdminUserSanction = Future<void> Function(String userId, String action);
+typedef AdminUsersApprove = Future<void> Function(String userId);
+typedef AdminUserPreApprove = Future<void> Function(String email);
 
 final adminUsersFetchProvider = Provider<AdminUsersFetch>((ref) {
   final client = ref.watch(apiClientProvider);
@@ -22,6 +25,25 @@ final adminUsersFetchProvider = Provider<AdminUsersFetch>((ref) {
       (o) => AdminUserRow.fromJson((o as Map).cast<String, dynamic>()),
     );
   };
+});
+
+final adminUserSanctionProvider = Provider<AdminUserSanction>((ref) {
+  final client = ref.watch(apiClientProvider);
+  return (userId, action) => client.post<void>(
+    '/admin/users/$userId/sanction',
+    body: {'action': action},
+  );
+});
+
+final adminUsersApproveProvider = Provider<AdminUsersApprove>((ref) {
+  final client = ref.watch(apiClientProvider);
+  return (userId) => client.post<void>('/admin/users/$userId/approve');
+});
+
+final adminUserPreApproveProvider = Provider<AdminUserPreApprove>((ref) {
+  final client = ref.watch(apiClientProvider);
+  return (email) =>
+      client.post<void>('/admin/allowlist', body: {'email': email});
 });
 
 typedef AdminUsersBulkApprove = Future<void> Function(List<int> ids);

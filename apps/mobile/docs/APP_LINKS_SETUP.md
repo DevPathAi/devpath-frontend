@@ -11,8 +11,8 @@
 > **결정 현황(2026-06-27)**: ① 콜백 도메인 **아직 미확보 → 트랙 B 전체 보류 유지**(도메인 확보 시 재개). ② Android 서명 = **Google Play App Signing 사용 예정**(지문은 Play Console에서 확보).
 
 - [ ] **콜백 도메인/호스트** *(미확보 — 현재 보류 사유)*: 두 well-known 파일을 HTTPS로 서빙할 도메인. 후보: `devpath-landing-page`(정적 호스팅) 또는 `devpath-gateway`. 예: `https://devpath.ai/auth/mobile-callback`.
-- [x] **Android 서명 지문 출처 = Google Play App Signing**: 출시 시점에 **Play Console → 앱 무결성 → 앱 서명**의 SHA-256 지문을 `assetlinks.json`에 등록. 내부 테스트/디버그 검증용으로는 debug 키 지문(`~/.android/debug.keystore`)도 함께 등록 가능. (현재 `android/app/build.gradle.kts` release는 debug 키 사용 중 — Play 업로드 키 도입 시 교체.)
-- [ ] **iOS Team ID + Bundle ID**: `<TeamID>.ai.devpath.devpath_mobile`(Apple Developer 계정 필요).
+- [x] **Android 서명 지문 출처 = Google Play App Signing**: 출시 시점에 **Play Console → 앱 무결성 → 앱 서명**의 SHA-256 지문을 `assetlinks.json`에 등록. 내부 테스트/디버그 검증용으로는 debug 키 지문(`~/.android/debug.keystore`)도 함께 등록 가능. 레포의 release 구성에는 서명 키가 없고 CI 산출물도 의도적으로 unsigned다.
+- [ ] **iOS Team ID + Bundle ID**: `<TeamID>.ai.devpath.devpathMobile`(Apple Developer 계정 필요).
 
 ## 1. 호스팅할 well-known 파일 (도메인 측)
 
@@ -37,7 +37,7 @@
   "applinks": {
     "apps": [],
     "details": [{
-      "appID": "<TEAM_ID>.ai.devpath.devpath_mobile",
+      "appID": "<TEAM_ID>.ai.devpath.devpathMobile",
       "paths": ["/auth/mobile-callback"]
     }]
   }

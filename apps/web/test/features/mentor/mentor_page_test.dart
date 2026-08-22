@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:async';
 
+import 'package:devpath_web/src/features/dashboard/application/current_mission_controller.dart';
 import 'package:devpath_web/src/features/mentor/application/mentor_controller.dart';
 import 'package:devpath_web/src/features/mentor/data/mentor_sse_source.dart';
 import 'package:devpath_web/src/features/mentor/presentation/mentor_page.dart';
@@ -14,6 +16,7 @@ Stream<SseEvent> _tokens(List<String> t) async* {
   for (final x in t) {
     yield SseEvent(event: 'token', data: x);
   }
+  yield const SseEvent(event: 'terminal', data: '{"status":"DONE"}');
 }
 
 // 상태를 직접 주입/추가할 수 있는 MentorController 대역(자동 스크롤 결정적 검증용).
@@ -49,10 +52,22 @@ MentorState _manyMessages() => MentorState(
 ListView _listView(WidgetTester tester) =>
     tester.widget<ListView>(find.byType(ListView));
 
+final _pageOwnerProvider = NotifierProvider<_PageOwnerController, String?>(
+  _PageOwnerController.new,
+);
+
+final class _PageOwnerController extends Notifier<String?> {
+  @override
+  String? build() => 'owner-a';
+
+  void switchTo(String owner) => state = owner;
+}
+
 void main() {
   testWidgets('빈 상태 안내 + 질문 전송 시 답변 누적', (tester) async {
     final c = ProviderContainer(
       overrides: [
+        currentMissionOwnerKeyProvider.overrideWithValue('owner-a'),
         mentorSseConnectProvider.overrideWithValue(
           (q, {String? contentId, int fromStep = 0}) => _tokens(['도', '움말']),
         ),
@@ -94,7 +109,10 @@ void main() {
     }
 
     final c = ProviderContainer(
-      overrides: [mentorSseConnectProvider.overrideWithValue(partial)],
+      overrides: [
+        currentMissionOwnerKeyProvider.overrideWithValue('owner-a'),
+        mentorSseConnectProvider.overrideWithValue(partial),
+      ],
     );
     addTearDown(c.dispose);
 
@@ -126,10 +144,14 @@ void main() {
           {'contentId': 9, 'slug': 'streams', 'title': 'Stream 가이드'},
         ]),
       );
+      yield const SseEvent(event: 'terminal', data: '{"status":"DONE"}');
     }
 
     final c = ProviderContainer(
-      overrides: [mentorSseConnectProvider.overrideWithValue(withRefs)],
+      overrides: [
+        currentMissionOwnerKeyProvider.overrideWithValue('owner-a'),
+        mentorSseConnectProvider.overrideWithValue(withRefs),
+      ],
     );
     addTearDown(c.dispose);
 
@@ -149,6 +171,60 @@ void main() {
     expect(find.text('Stream 가이드'), findsOneWidget); // 참고자료 칩(제목)
   });
 
+  testWidgets('global A pending→B는 입력·대화·참고를 지우고 A late token을 무시한다', (
+    tester,
+  ) async {
+    final stream = StreamController<SseEvent>();
+    final c = ProviderContainer(
+      overrides: [
+        currentMissionOwnerKeyProvider.overrideWith(
+          (ref) => ref.watch(_pageOwnerProvider),
+        ),
+        mentorSseConnectProvider.overrideWithValue(
+          (question, {String? contentId, int fromStep = 0}) => stream.stream,
+        ),
+      ],
+    );
+    addTearDown(() async {
+      await stream.close();
+      c.dispose();
+    });
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: c,
+        child: MaterialApp(theme: DpTheme.light(), home: const MentorPage()),
+      ),
+    );
+
+    await tester.enterText(find.byType(TextField), 'A 질문');
+    await tester.tap(find.byTooltip('전송'));
+    await tester.pump();
+    stream.add(const SseEvent(event: 'token', data: 'A 답변'));
+    stream.add(
+      SseEvent(
+        event: 'references',
+        data: jsonEncode(const [
+          {'contentId': 9, 'slug': 'a', 'title': 'A 참고'},
+        ]),
+      ),
+    );
+    await tester.pump();
+    await tester.enterText(find.byType(TextField), 'B에게 보낼 입력');
+
+    c.read(_pageOwnerProvider.notifier).switchTo('owner-b');
+    await tester.pump();
+
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).controller?.text,
+      isEmpty,
+    );
+    expect(find.text('A 답변'), findsNothing);
+    expect(find.text('A 참고'), findsNothing);
+    stream.add(const SseEvent(event: 'token', data: 'A 늦은 토큰'));
+    await tester.pump();
+    expect(find.textContaining('A 늦은 토큰'), findsNothing);
+  });
+
   testWidgets('하단 근처에서 새 메시지 → 자동으로 하단까지 스크롤', (tester) async {
     tester.view.physicalSize = const Size(500, 400);
     tester.view.devicePixelRatio = 1.0;
@@ -156,7 +232,10 @@ void main() {
 
     final fake = _FakeMentor(_manyMessages());
     final c = ProviderContainer(
-      overrides: [mentorControllerProvider.overrideWith(() => fake)],
+      overrides: [
+        currentMissionOwnerKeyProvider.overrideWithValue('owner-a'),
+        mentorControllerProvider.overrideWith(() => fake),
+      ],
     );
     addTearDown(c.dispose);
 
@@ -185,7 +264,10 @@ void main() {
 
     final fake = _FakeMentor(_manyMessages());
     final c = ProviderContainer(
-      overrides: [mentorControllerProvider.overrideWith(() => fake)],
+      overrides: [
+        currentMissionOwnerKeyProvider.overrideWithValue('owner-a'),
+        mentorControllerProvider.overrideWith(() => fake),
+      ],
     );
     addTearDown(c.dispose);
 

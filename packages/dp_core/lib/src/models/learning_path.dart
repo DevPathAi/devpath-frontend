@@ -52,6 +52,7 @@ abstract class PathMilestone with _$PathMilestone {
 @freezed
 abstract class WeeklyTask with _$WeeklyTask {
   const factory WeeklyTask({
+    int? taskId,
     required int orderNum,
     required String taskType,
     required String title,
@@ -59,6 +60,7 @@ abstract class WeeklyTask with _$WeeklyTask {
     int? contentId,
     String? contentSlug,
     @Default(false) bool completed,
+    DateTime? completedAt,
   }) = _WeeklyTask;
 
   factory WeeklyTask.fromJson(Map<String, dynamic> json) =>

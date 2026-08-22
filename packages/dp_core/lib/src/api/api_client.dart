@@ -30,7 +30,7 @@ class ApiClient {
         onError: (e, handler) => handler.reject(
           DioException(
             requestOptions: e.requestOptions,
-            error: ApiException.fromDio(e),
+            error: e.error is ApiException ? e.error : ApiException.fromDio(e),
             response: e.response,
             type: e.type,
           ),
@@ -89,9 +89,15 @@ class ApiClient {
     String path, {
     Object? body,
     Map<String, dynamic>? query,
+    Map<String, dynamic>? extra,
   }) async {
     try {
-      final res = await dio.delete<T>(path, data: body, queryParameters: query);
+      final res = await dio.delete<T>(
+        path,
+        data: body,
+        queryParameters: query,
+        options: extra == null ? null : Options(extra: extra),
+      );
       return res.data as T;
     } on DioException catch (e) {
       throw (e.error is ApiException)
@@ -132,4 +138,23 @@ class ApiClient {
           : ApiException.fromDio(e);
     }
   }
+}
+
+/// Additive SSE variant for protocols that opt into HTTP metadata.
+///
+/// An extension keeps [ApiClient]'s interface source-compatible with existing
+/// fakes while preventing ordinary [ApiClient.sse] consumers from inheriting
+/// Sandbox-specific header behavior.
+extension ApiClientSseMetadata on ApiClient {
+  Stream<SseEvent> sseWithMetadata(
+    String path, {
+    Object? body,
+    Map<String, Object?> requestHeaders = const {},
+    Map<String, String> responseHeaderEvents = const {},
+  }) => SseClient(dio).connect(
+    path,
+    body: body,
+    requestHeaders: requestHeaders,
+    responseHeaderEvents: responseHeaderEvents,
+  );
 }

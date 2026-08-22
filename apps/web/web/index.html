@@ -17,6 +17,7 @@
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="적응형 진단 결과에서 시작하는 맞춤 학습 로드맵과, 학습 맥락을 아는 AI 멘토를 제공하는 Leva 앱입니다.">
 
@@ -45,9 +46,18 @@
   <title>Leva — 학습 로드맵</title>
   <link rel="manifest" href="manifest.json">
 
-  <!-- 구글 애드센스. 퍼블리셔 ID는 공개 값이며 심사 크롤러가 <head>에서 찾아야 한다. -->
-  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2785578834914321"
-          crossorigin="anonymous"></script>
+  <!-- 구글 애드센스. 퍼블리셔 ID는 공개 값이며 심사 크롤러가 <head>에서 찾아야 한다.
+       ET13 fixture routes are a release-build evidence surface and must make no
+       external request, so they fail closed before the script is created. -->
+  <script>
+    if (!new URLSearchParams(window.location.search).has('fixture')) {
+      var adsenseScript = document.createElement('script');
+      adsenseScript.async = true;
+      adsenseScript.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2785578834914321';
+      adsenseScript.crossOrigin = 'anonymous';
+      document.head.appendChild(adsenseScript);
+    }
+  </script>
 </head>
 <body>
   <!--
@@ -59,27 +69,106 @@
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
   <script src="flutter_bootstrap.js" async></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs/loader.min.js"
-          integrity="sha512-ZG31AN9z/CQD1YDDAK4RUAvogwbJHv6bHrumrnMLzdCrVu4HeAqrUX7Jsal/cbUwXGfaMUNmQU04tQ8XXl5Znw=="
-          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <!-- Monaco is vendored and hash-locked by evidence/et13/assets.lock.json.
+       Production and ET13 capture must never depend on a live CDN. -->
   <script>
-    require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs' }});
-    // F5-a/F5-c 반영: { dispose, layout } 핸들 반환 + Esc 포커스 탈출.
+    // The AMD fallback otherwise launches a blob worker with a relative base
+    // URL, which WorkerGlobalScope cannot resolve. Keep the worker on the same
+    // origin so every language module is loaded from the vendored release tree.
+    window.MonacoEnvironment = {
+      getWorkerUrl: function () {
+        return new URL('vendor/monaco/vs/base/worker/workerMain.js', window.location.href).toString();
+      },
+    };
+  </script>
+  <script src="vendor/monaco/vs/loader.js"></script>
+  <script>
+    require.config({ paths: { vs: 'vendor/monaco/vs' }});
+    // F5-a/F5-c 반영: { dispose, layout, update } 핸들 반환 + Esc 포커스 탈출.
     // require가 비동기라 editor가 즉시 없을 수 있으므로 핸들은 클로저로 editor를 지연 참조.
-    window.createDevpathEditor = function (container, code, onChange, onEscape) {
+    window.createDevpathEditor = function (container, code, runtime, onChange, onEscape, onReady) {
       var editor = null;
-      require(['vs/editor/editor.main'], function () {
-        editor = monaco.editor.create(container, {
-          value: code, language: 'dart', theme: 'vs-dark',
-          automaticLayout: true, minimap: { enabled: false }, fontSize: 14,
+      var pendingCode = code;
+      var pendingRuntime = runtime;
+      var monacoReady = false;
+      var disposed = false;
+      var readySent = false;
+      var readyListener = null;
+      function monacoLanguage(value) {
+        if (value === 'JAVA') return 'java';
+        if (value === 'NODE') return 'javascript';
+        if (value === 'PYTHON') return 'python';
+        return null;
+      }
+      function signalReadyAfterPaint() {
+        if (readySent || disposed) return;
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () {
+            if (readySent || disposed) return;
+            readySent = true;
+            onReady();
+          });
         });
-        editor.onDidChangeModelContent(function () { onChange(editor.getValue()); });
-        // F5-c DD7: Esc 시 Monaco 밖(dart sentinel)으로 포커스를 넘긴다.
-        editor.addCommand(monaco.KeyCode.Escape, function () { onEscape(); });
+      }
+      function waitForInitialEditorState() {
+        if (pendingRuntime !== 'NODE') {
+          signalReadyAfterPaint();
+          return;
+        }
+        var modelUri = editor.getModel().uri.toString();
+        readyListener = monaco.editor.onDidChangeMarkers(function (changedResources) {
+          var changed = changedResources.some(function (resource) {
+            return resource.toString() === modelUri;
+          });
+          if (!changed) return;
+          readyListener.dispose();
+          readyListener = null;
+          signalReadyAfterPaint();
+        });
+      }
+      function renderPending() {
+        if (!monacoReady || disposed) return;
+        var language = monacoLanguage(pendingRuntime);
+        if (language === null) {
+          if (editor) { editor.dispose(); editor = null; }
+          container.textContent = '';
+          container.setAttribute('data-runtime-state', 'unsupported');
+          return;
+        }
+        container.removeAttribute('data-runtime-state');
+        if (!editor) {
+          editor = monaco.editor.create(container, {
+            value: pendingCode, language: language, theme: 'vs-dark',
+            automaticLayout: true, minimap: { enabled: false }, fontSize: 14,
+            // Preserve diagnostics without fading executable text below WCAG
+            // contrast when a language worker marks it as unnecessary.
+            showUnused: false,
+          });
+          editor.onDidChangeModelContent(function () { onChange(editor.getValue()); });
+          // F5-c DD7: Esc 시 Monaco 밖(dart sentinel)으로 포커스를 넘긴다.
+          editor.addCommand(monaco.KeyCode.Escape, function () { onEscape(); });
+          waitForInitialEditorState();
+          return;
+        }
+        if (editor.getValue() !== pendingCode) editor.setValue(pendingCode);
+        monaco.editor.setModelLanguage(editor.getModel(), language);
+      }
+      require(['vs/editor/editor.main'], function () {
+        monacoReady = true;
+        renderPending();
       });
       return {
-        dispose: function () { if (editor) editor.dispose(); }, // F5-a
+        dispose: function () {
+          disposed = true;
+          if (readyListener) { readyListener.dispose(); readyListener = null; }
+          if (editor) { editor.dispose(); editor = null; }
+        }, // F5-a
         layout:  function () { if (editor) editor.layout(); },  // F5-b
+        update:  function (nextCode, nextRuntime) {
+          pendingCode = nextCode;
+          pendingRuntime = nextRuntime;
+          renderPending();
+        },
       };
     };
 

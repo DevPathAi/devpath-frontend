@@ -139,6 +139,8 @@ final Map<String, MockFixture> webMockFixtures = {
   ),
   // PATH 생성 완료 후 결과 조회(스펙 §3 비동기 결과 조회 패턴)
   'GET /learning-paths/me': (200, mockLearningPath()),
+  // 서버가 producer order로 판정한 authoritative Today projection.
+  'GET /learning-paths/me/this-week': (200, mockCurrentMission()),
   // 학습 콘텐츠 조회(CNT-001)
   'GET /contents/c1': (200, mockContent('future-async-await')),
   'GET /contents/future-async-await': (200, mockContent('future-async-await')),
@@ -153,6 +155,9 @@ final Map<String, MockFixture> webMockFixtures = {
     200,
     mockContent('async-error-handling'),
   ),
+  // Today authoritative projection은 wire contentId를 사용해 `/content/3`으로
+  // 이동한다. slug 경로와 같은 콘텐츠를 돌려주는 숫자 ID alias다.
+  'GET /contents/3': (200, mockContent('async-error-handling')),
   'GET /contents/missing': (
     404,
     {
@@ -169,6 +174,15 @@ final Map<String, MockFixture> webMockFixtures = {
     },
   ),
   'POST /contents/async-error-handling/progress': (
+    200,
+    {
+      'scrollPct': 0.86,
+      'dwellSec': 46,
+      'completed': true,
+      'completedAt': '2026-06-21T10:00:00Z',
+    },
+  ),
+  'POST /contents/3/progress': (
     200,
     {
       'scrollPct': 0.86,
@@ -250,6 +264,48 @@ final Map<String, MockFixture> webMockFixtures = {
     },
   ),
   'POST /community/posts/10/vote': (200, <String, dynamic>{}),
+  // 수정·삭제 — 목 모드에서도 골든패스(작성 → 수정 → 삭제)가 끊기지 않게 한다.
+  // ★204 라도 본문은 Object 다★ — MockFixture 는 (int, Object) 라 null 을 넣을 수 없다.
+  'PUT /community/posts/10': (
+    200,
+    {
+      'id': 10,
+      'boardType': 'FREE',
+      'title': '수정된 제목',
+      'bodyMd': '수정된 본문',
+      'authorId': 1,
+      'upvoteCount': 0,
+      'downvoteCount': 0,
+      'tags': <dynamic>[],
+      'comments': <dynamic>[],
+    },
+  ),
+  'DELETE /community/posts/10': (204, <String, dynamic>{}),
+  'PUT /community/answers/11': (
+    200,
+    {
+      'id': 11,
+      'authorId': 2,
+      'bodyMd': '수정된 답변',
+      'aiGenerated': false,
+      'accepted': false,
+      'upvoteCount': 0,
+      'deleted': false,
+    },
+  ),
+  'DELETE /community/answers/11': (204, <String, dynamic>{}),
+  'PUT /community/comments/21': (
+    200,
+    {
+      'id': 21,
+      'authorId': 1,
+      'bodyMd': '수정된 댓글',
+      'upvoteCount': 0,
+      'createdAt': '2026-08-21T00:00:00Z',
+      'deleted': false,
+    },
+  ),
+  'DELETE /community/comments/21': (204, <String, dynamic>{}),
   // 일반 게시글 작성(FREE/FEEDBACK) → PostDetailView.
   'POST /community/posts': (
     201,
@@ -470,15 +526,14 @@ final Map<String, MockFixture> webMockFixtures = {
   // 진단 API(비회원 guest 흐름)
   // ⚠️ next 는 고정 픽스처가 아니라 webMockSequences 에 있다 — 같은 문항이 반복되면
   //    완료로 넘어가지 못하기 때문이다(파일 하단 주석 참고).
-  'POST /onboarding/assessments/guest': (200, {'guestAssessmentId': 'g-mock'}),
-  'POST /onboarding/assessments/guest/g-mock/answer': (
+  'POST /onboarding/assessments/guest': (
     200,
-    <String, dynamic>{},
+    {'guestAssessmentId': '123e4567-e89b-42d3-a456-426614174000'},
   ),
-  'POST /onboarding/assessments/guest/g-mock/complete': (
-    200,
-    {'diagnosedLevel': 'MID', 'confidenceWeight': 0.8},
-  ),
+  'POST /onboarding/assessments/guest/123e4567-e89b-42d3-a456-426614174000/answer':
+      (200, <String, dynamic>{}),
+  'POST /onboarding/assessments/guest/123e4567-e89b-42d3-a456-426614174000/complete':
+      (200, {'diagnosedLevel': 'MID', 'confidenceWeight': 0.8}),
   // 진단 API(회원 흐름) — next 는 webMockSequences 참고.
   'POST /onboarding/assessments': (200, {'assessmentId': 1}),
   'POST /onboarding/assessments/1/answer': (200, <String, dynamic>{}),
@@ -512,19 +567,26 @@ final Map<String, MockFixture> webMockFixtures = {
 
 Map<String, dynamic> mockContent(String slug) {
   final isStream = slug == 'stream-subscription';
+  final isAsyncError = slug == 'async-error-handling';
   return {
-    'id': isStream ? 2 : 1,
+    'id': isStream ? 2 : (isAsyncError ? 3 : 1),
     'slug': slug,
-    'title': isStream ? 'Stream 구독 실습' : 'Future/async-await 정리',
+    'title': isStream
+        ? 'Stream 구독 실습'
+        : (isAsyncError ? '에러 처리 패턴 적용' : 'Future/async-await 정리'),
     'track': 'BACKEND',
     'markdown': isStream
         ? '# Stream 구독 실습\n\n`StreamSubscription`을 저장하고 필요할 때 `cancel()` 합니다.\n'
+        : isAsyncError
+        ? '# 에러 처리 패턴 적용\n\n비동기 실패를 `try`/`catch`로 처리하고 호출자에게 의미 있는 오류를 전달합니다.\n'
         : '# 비동기 기초\n\nDart의 `Future`와 `async`/`await`로 비동기 흐름을 다룹니다.\n\n```dart\nFuture<int> answer() async => 42;\n```\n',
-    'estimatedMinutes': isStream ? 10 : 8,
-    'difficulty': isStream ? 0.6 : 0.5,
-    'bloomLevel': isStream ? 'APPLY' : 'UNDERSTAND',
+    'estimatedMinutes': isStream ? 10 : (isAsyncError ? 12 : 8),
+    'difficulty': isStream ? 0.6 : (isAsyncError ? 0.7 : 0.5),
+    'bloomLevel': isStream || isAsyncError ? 'APPLY' : 'UNDERSTAND',
     'conceptTags': isStream
         ? ['stream', 'subscription']
+        : isAsyncError
+        ? ['async-await', 'error-handling']
         : ['future', 'async-await'],
     'progress': {
       'scrollPct': 0.2,
@@ -605,6 +667,52 @@ Map<String, dynamic> mockLearningPath() => {
   ],
 };
 
+Map<String, dynamic> mockCurrentMission() {
+  final tasks = <Map<String, dynamic>>[
+    {
+      'taskId': 1001,
+      'orderNum': 1,
+      'taskType': 'READ',
+      'title': 'Future/async-await 정리',
+      'required': true,
+      'contentId': 1,
+      'contentSlug': 'future-async-await',
+      'completed': true,
+      'completedAt': '2026-07-30T01:00:00.000Z',
+    },
+    {
+      'taskId': 1002,
+      'orderNum': 2,
+      'taskType': 'PRACTICE',
+      'title': 'Stream 구독 실습',
+      'required': true,
+      'contentId': 2,
+      'contentSlug': 'stream-subscription',
+      'completed': true,
+      'completedAt': '2026-07-31T01:00:00.000Z',
+    },
+    {
+      'taskId': 1003,
+      'orderNum': 3,
+      'taskType': 'QUIZ',
+      'title': '에러 처리 패턴 적용',
+      'required': false,
+      'contentId': 3,
+      'contentSlug': 'async-error-handling',
+      'completed': false,
+      'completedAt': null,
+    },
+  ];
+  return {
+    'outcome': 'AVAILABLE',
+    'pathId': 101,
+    'weekNum': 1,
+    'tasks': tasks,
+    'nextTask': Map<String, dynamic>.from(tasks.last),
+    'pathCompleted': false,
+  };
+}
+
 /// 호출 순서에 따라 응답이 달라져야 하는 목 엔드포인트.
 ///
 /// **왜 필요한가.** `AssessmentApi.next` 는 응답 본문이 null 일 때만 null 을 돌려주고,
@@ -617,11 +725,12 @@ Map<String, dynamic> mockLearningPath() => {
 /// 완료 상태가 유지된다.
 final Map<String, MockSequence> webMockSequences = {
   // 게스트: 문항 2개 → 종료
-  'GET /onboarding/assessments/guest/g-mock/next': [
-    (200, _question(1, '비동기 함수의 반환 타입은 무엇인가요?', 1, 2)),
-    (200, _question(2, 'Stream 구독을 해제하지 않으면 어떤 문제가 생기나요?', 2, 2)),
-    (200, null),
-  ],
+  'GET /onboarding/assessments/guest/123e4567-e89b-42d3-a456-426614174000/next':
+      [
+        (200, _question(1, '비동기 함수의 반환 타입은 무엇인가요?', 1, 2)),
+        (200, _question(2, 'Stream 구독을 해제하지 않으면 어떤 문제가 생기나요?', 2, 2)),
+        (200, null),
+      ],
   // 회원: 문항 2개 → 종료
   'GET /onboarding/assessments/1/next': [
     (200, _question(1, '비동기 함수의 반환 타입은 무엇인가요?', 1, 2)),

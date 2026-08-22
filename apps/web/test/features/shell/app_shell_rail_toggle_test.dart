@@ -20,10 +20,10 @@ void main() {
 
     final railRoot = find.byKey(const ValueKey('rail-root'));
 
-    // 접힘 상태에서는 라벨이 안 보인다. '대시보드'는 브레드크럼에도 등장하는
+    // 접힘 상태에서는 라벨이 안 보인다. '오늘'은 브레드크럼에도 등장하는
     // 문자열이라 레일 안으로 범위를 좁힌다.
     expect(
-      find.descendant(of: railRoot, matching: find.text('대시보드')),
+      find.descendant(of: railRoot, matching: find.text('오늘')),
       findsNothing,
     );
 
@@ -31,7 +31,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.descendant(of: railRoot, matching: find.text('대시보드')),
+      find.descendant(of: railRoot, matching: find.text('오늘')),
       findsOneWidget,
     );
   });

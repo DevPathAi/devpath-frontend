@@ -1,0 +1,23 @@
+{
+  "schema_version": "leva.mission-spine.manual-at-test-provenance.v1",
+  "lane": "manual-talkback",
+  "catalog_path": "tool/release-evidence/catalogs/manual-talkback.v1.json",
+  "catalog_sha256": "449088fd119b6c8c4a247f0cf8019580da7aee6351c1e88394a61a318c3d2244",
+  "assistive_technology": "TalkBack+Android",
+  "execution_mode": "manual_human",
+  "required_platform": "android_physical_device",
+  "required_client": "native_flutter_android",
+  "required_artifact": "candidate_signed_apk",
+  "case_ids": [
+    "talkback-android-today-mission-spine",
+    "talkback-android-next-action-navigation",
+    "talkback-android-content-reading",
+    "talkback-android-offline-status"
+  ],
+  "pass_policy": {
+    "all_cases_required": true,
+    "failed_case_count": 0,
+    "synthetic_results_allowed": false,
+    "emulator_allowed": false
+  }
+}

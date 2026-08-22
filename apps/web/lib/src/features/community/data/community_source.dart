@@ -285,3 +285,87 @@ final commentCreateProvider = Provider<CommentCreate>((ref) {
     return CommunityComment.fromJson(json);
   };
 });
+
+/// 글·질문 수정 `PUT /community/posts/{id} {title, bodyMd}` → `PostDetailView`.
+///
+/// ★태그가 없다★ — 평판이 투표 시점 태그로 귀속되어 소급 변경이 어긋나므로 서버가 받지 않는다.
+typedef PostUpdate =
+    Future<CommunityPostDetail> Function({
+      required int id,
+      required String title,
+      required String bodyMd,
+    });
+
+/// 글·질문 삭제 `DELETE /community/posts/{id}` → 204. 이미 삭제된 것을 다시 지우면 404.
+typedef PostDelete = Future<void> Function(int id);
+
+/// 답변 수정 `PUT /community/answers/{id} {bodyMd}` → `AnswerView`.
+typedef AnswerUpdate = Future<CommunityAnswer> Function(int id, String bodyMd);
+
+/// 답변 삭제 `DELETE /community/answers/{id}` → 204. 채택된 답변이면 409.
+typedef AnswerDelete = Future<void> Function(int id);
+
+/// 댓글 수정 `PUT /community/comments/{id} {bodyMd}` → `CommentView`.
+typedef CommentUpdate =
+    Future<CommunityComment> Function(int id, String bodyMd);
+
+/// 댓글 삭제 `DELETE /community/comments/{id}` → 204.
+typedef CommentDelete = Future<void> Function(int id);
+
+final postUpdateProvider = Provider<PostUpdate>((ref) {
+  final client = ref.watch(apiClientProvider);
+  return ({
+    required int id,
+    required String title,
+    required String bodyMd,
+  }) async {
+    final json = await client.put<Map<String, dynamic>>(
+      '/community/posts/$id',
+      body: {'title': title, 'bodyMd': bodyMd},
+    );
+    return CommunityPostDetail.fromJson(json);
+  };
+});
+
+final postDeleteProvider = Provider<PostDelete>((ref) {
+  final client = ref.watch(apiClientProvider);
+  return (id) async {
+    await client.delete<dynamic>('/community/posts/$id');
+  };
+});
+
+final answerUpdateProvider = Provider<AnswerUpdate>((ref) {
+  final client = ref.watch(apiClientProvider);
+  return (id, bodyMd) async {
+    final json = await client.put<Map<String, dynamic>>(
+      '/community/answers/$id',
+      body: {'bodyMd': bodyMd},
+    );
+    return CommunityAnswer.fromJson(json);
+  };
+});
+
+final answerDeleteProvider = Provider<AnswerDelete>((ref) {
+  final client = ref.watch(apiClientProvider);
+  return (id) async {
+    await client.delete<dynamic>('/community/answers/$id');
+  };
+});
+
+final commentUpdateProvider = Provider<CommentUpdate>((ref) {
+  final client = ref.watch(apiClientProvider);
+  return (id, bodyMd) async {
+    final json = await client.put<Map<String, dynamic>>(
+      '/community/comments/$id',
+      body: {'bodyMd': bodyMd},
+    );
+    return CommunityComment.fromJson(json);
+  };
+});
+
+final commentDeleteProvider = Provider<CommentDelete>((ref) {
+  final client = ref.watch(apiClientProvider);
+  return (id) async {
+    await client.delete<dynamic>('/community/comments/$id');
+  };
+});

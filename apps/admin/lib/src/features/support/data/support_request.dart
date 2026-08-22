@@ -31,7 +31,8 @@ class SupportRequestRow {
     'IN_PROGRESS' => '처리중',
     'RESOLVED' => '처리됨',
     'WONTFIX' => '보류',
-    _ => '접수됨',
+    'OPEN' => '접수됨',
+    _ => '알 수 없는 상태',
   };
 
   factory SupportRequestRow.fromJson(Map<String, dynamic> json) =>

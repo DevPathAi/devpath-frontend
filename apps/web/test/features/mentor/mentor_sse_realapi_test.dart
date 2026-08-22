@@ -59,6 +59,7 @@ void main() {
           'data: [{"contentId":101,"slug":"async-await-basics","title":"비동기 기초"}]\n\n',
       'event: token\ndata: 비동기는\n\n',
       'event: token\ndata: 간단합니다\n\n',
+      'event: terminal\ndata: {"status":"DONE"}\n\n',
     ]);
     addTearDown(container.dispose);
 

@@ -6,18 +6,28 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../providers/api_providers.dart';
+import '../../ads/presentation/ad_slot_widget.dart';
+import '../../auth/application/auth_controller.dart';
+import '../../auth/state/auth_state.dart';
 import '../application/content_controller.dart';
 import '../application/content_progress_tracker.dart';
+import '../application/mission_content_controller.dart';
 import '../state/content_state.dart';
-import '../../ads/presentation/ad_slot_widget.dart';
 import '../../dashboard/application/dashboard_controller.dart';
+import '../../dashboard/application/current_mission_controller.dart';
+import '../../mission/state/mission_workspace_key.dart';
 import '../../path/application/path_controller.dart';
-import '../../../providers/api_providers.dart';
 import '../../support/presentation/supportable_error.dart';
 
 class ContentPage extends ConsumerStatefulWidget {
-  const ContentPage({super.key, required this.contentId});
+  const ContentPage({super.key, required this.contentId}) : workspaceKey = null;
+
+  const ContentPage.mission({super.key, required this.workspaceKey})
+    : contentId = '';
+
   final String contentId;
+  final MissionWorkspaceKey? workspaceKey;
 
   @override
   ConsumerState<ContentPage> createState() => _ContentPageState();
@@ -31,14 +41,23 @@ class _ContentPageState extends ConsumerState<ContentPage>
   // 관측한다(Task 10). 이 키로 헤더가 실제로 차지하는 박스 높이를 재서 서버로
   // 보내는 진행률에서 빼낸다.
   final _headerKey = GlobalKey();
-  late final ContentController _contentController;
+  ContentController? _contentController;
+  MissionContentController? _lastMissionContentController;
+  MissionContentRetentionController? _missionRetentionController;
   late final ApiClient _apiClient;
   Timer? _dwellTimer;
   ContentProgressTracker? _tracker;
   String? _trackedContentKey;
-  ContentState? _latestState;
+  ContentState? _latestLegacyState;
+  LearningContent? _latestContent;
   int _dwellSec = 0;
   bool _posting = false;
+  ContentProgressFlush? _failedFlush;
+  bool _missionStartedCaptured = false;
+  bool _missionStartedScheduled = false;
+  bool _contentLoadScheduled = false;
+  String? _pageOwnerKey;
+  var _pageEpoch = 0;
 
   /// 마지막으로 실측에 성공한 스크롤 진행률. dispose 시점에는 스크롤 위치를
   /// 잴 수 없어(자식 먼저 unmount → `hasClients == false`) 이 값이 필요하다.
@@ -47,29 +66,47 @@ class _ContentPageState extends ConsumerState<ContentPage>
   @override
   void initState() {
     super.initState();
-    _contentController = ref.read(contentControllerProvider.notifier);
+    if (widget.workspaceKey != null) {
+      _pageOwnerKey = ref.read(currentMissionOwnerKeyProvider);
+    }
+    _bindController();
     _apiClient = ref.read(apiClientProvider);
     WidgetsBinding.instance.addObserver(this);
     _scrollController.addListener(_maybeFlushProgress);
     _dwellTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      final state = ref.read(contentControllerProvider);
-      if (state is! ContentLoaded || state.content.progress.completed) return;
+      if (!_isCurrentRoute) return;
+      final content = _readContent();
+      if (content == null || content.progress.completed) return;
       _dwellSec++;
       _maybeFlushProgress();
     });
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _contentController.load(widget.contentId),
-    );
+    if (widget.workspaceKey == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadContent());
+    }
   }
 
   @override
   void didUpdateWidget(covariant ContentPage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.contentId == widget.contentId) return;
+    if (oldWidget.contentId == widget.contentId &&
+        oldWidget.workspaceKey == widget.workspaceKey) {
+      return;
+    }
+    if (oldWidget.workspaceKey case final oldKey?) {
+      _missionRetentionController?.deactivate(oldKey);
+    }
+    _pageEpoch += 1;
+    _pageOwnerKey = widget.workspaceKey == null
+        ? null
+        : ref.read(currentMissionOwnerKeyProvider);
     _resetProgressTracker();
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _contentController.load(widget.contentId),
-    );
+    _missionStartedCaptured = false;
+    _missionStartedScheduled = false;
+    _contentLoadScheduled = false;
+    _bindController();
+    if (widget.workspaceKey == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadContent());
+    }
   }
 
   @override
@@ -85,6 +122,10 @@ class _ContentPageState extends ConsumerState<ContentPage>
   @override
   void dispose() {
     _flushCachedProgressOnDispose();
+    if (widget.workspaceKey case final workspaceKey?) {
+      _missionRetentionController?.deactivate(workspaceKey);
+    }
+    _pageEpoch += 1;
     _dwellTimer?.cancel();
     _scrollController.dispose();
     WidgetsBinding.instance.removeObserver(this);
@@ -93,14 +134,79 @@ class _ContentPageState extends ConsumerState<ContentPage>
 
   @override
   Widget build(BuildContext context) {
-    final s = ref.watch(contentControllerProvider);
-    _latestState = s;
-    ref.listen<ContentState>(contentControllerProvider, (_, next) {
-      _latestState = next;
-      if (next case ContentLoaded(:final content)) {
-        _syncTracker(content);
+    final workspaceKey = widget.workspaceKey;
+    final currentMissionState = workspaceKey == null
+        ? null
+        : ref.watch(currentMissionControllerProvider);
+    final currentOwnerKey = workspaceKey == null
+        ? null
+        : ref.watch(currentMissionOwnerKeyProvider);
+    if (workspaceKey != null && currentOwnerKey != _pageOwnerKey) {
+      _synchronizeOwner(currentOwnerKey);
+    }
+    final missionState = workspaceKey == null
+        ? null
+        : ref.watch(missionContentControllerProvider(workspaceKey));
+    final legacyState = workspaceKey == null
+        ? ref.watch(contentControllerProvider)
+        : null;
+    if (legacyState != null) _latestLegacyState = legacyState;
+
+    final missionBound =
+        workspaceKey == null ||
+        _missionController(workspaceKey).isBoundTo(currentOwnerKey);
+    final content = workspaceKey == null
+        ? switch (legacyState) {
+            ContentLoaded(:final content) => content,
+            _ => null,
+          }
+        : missionBound
+        ? missionState?.content
+        : null;
+    final initialFailure = workspaceKey == null
+        ? switch (legacyState) {
+            ContentFailed(:final message) => message,
+            _ => null,
+          }
+        : content == null && missionBound
+        ? missionState?.failureMessage
+        : null;
+    final inlineLoadFailure = workspaceKey != null && content != null
+        ? missionState?.failureMessage
+        : null;
+    final progressFailure = workspaceKey == null
+        ? switch (legacyState) {
+            ContentLoaded(:final progressError) => progressError,
+            _ => null,
+          }
+        : missionState?.progressFailureMessage;
+    final loading =
+        !missionBound ||
+        (content == null && initialFailure == null) ||
+        (workspaceKey == null && legacyState is ContentLoading);
+
+    if (workspaceKey != null &&
+        missionBound &&
+        missionState?.content == null &&
+        missionState?.isLoading == false &&
+        missionState?.failureMessage == null &&
+        !_contentLoadScheduled) {
+      _contentLoadScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _contentLoadScheduled = false;
+        _loadContent();
+      });
+    }
+
+    if (content != null) {
+      _latestContent = content;
+      _syncTracker(content);
+      if (workspaceKey != null && currentMissionState?.mission != null) {
+        _scheduleMissionStarted(workspaceKey);
       }
-    });
+    }
+
     final c = context.dpColors;
     return Scaffold(
       body: CustomScrollView(
@@ -110,45 +216,176 @@ class _ContentPageState extends ConsumerState<ContentPage>
         controller: _scrollController,
         slivers: [
           SliverToBoxAdapter(
-            child: DpPageHeader(
-              key: _headerKey,
-              title: '학습 콘텐츠',
-              description: '읽고 나면 바로 실습으로 이어집니다',
-              actions: [
-                TextButton.icon(
-                  key: const ValueKey('content-practice-action'),
-                  onPressed: () => context.go('/sandbox'),
-                  style: TextButton.styleFrom(
-                    backgroundColor: c.accentSoft,
-                    foregroundColor: c.primaryText,
-                    side: BorderSide(color: c.accentLine),
+            child: workspaceKey == null
+                ? DpPageHeader(
+                    key: _headerKey,
+                    title: '학습 콘텐츠',
+                    description: '읽고 나면 바로 실습으로 이어집니다',
+                    actions: [
+                      TextButton.icon(
+                        key: const ValueKey('content-practice-action'),
+                        onPressed: () => context.go('/sandbox'),
+                        style: TextButton.styleFrom(
+                          backgroundColor: c.accentSoft,
+                          foregroundColor: c.primaryText,
+                          side: BorderSide(color: c.accentLine),
+                        ),
+                        icon: const Icon(DpIcons.code),
+                        label: const Text('실습'),
+                      ),
+                    ],
+                  )
+                : Padding(
+                    key: _headerKey,
+                    padding: const EdgeInsets.fromLTRB(
+                      DpSpacing.lg,
+                      DpSpacing.lg,
+                      DpSpacing.lg,
+                      0,
+                    ),
+                    child: _MissionContentHeader(
+                      workspaceKey: workspaceKey,
+                      mission: currentMissionState?.mission,
+                      content: content,
+                    ),
                   ),
-                  icon: const Icon(DpIcons.code),
-                  label: const Text('실습'),
-                ),
-              ],
-            ),
           ),
-          switch (s) {
-            ContentLoading() => const SliverFillRemaining(
-              hasScrollBody: false,
-              child: DpLoading(),
-            ),
-            ContentFailed(:final message) => SliverFillRemaining(
+          if (loading)
+            const SliverFillRemaining(hasScrollBody: false, child: DpLoading())
+          else if (initialFailure != null)
+            SliverFillRemaining(
               hasScrollBody: false,
               child: SupportableError(
-                message: message,
-                onRetry: () => _contentController.load(widget.contentId),
+                message: initialFailure,
+                onRetry: _loadContent,
+              ),
+            )
+          else if (content != null)
+            SliverPadding(
+              padding: const EdgeInsets.all(DpSpacing.lg),
+              sliver: SliverToBoxAdapter(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (inlineLoadFailure != null) ...[
+                      _InlineContentError(
+                        message: inlineLoadFailure,
+                        actionLabel: '콘텐츠 다시 불러오기',
+                        onRetry: _posting ? null : _loadContent,
+                      ),
+                      const SizedBox(height: DpSpacing.md),
+                    ],
+                    if (progressFailure != null) ...[
+                      _InlineContentError(
+                        message: progressFailure,
+                        actionLabel: '진행률 저장 다시 시도',
+                        onRetry:
+                            _posting ||
+                                (missionState?.progressSubmitting ?? false)
+                            ? null
+                            : _retryFailedProgress,
+                      ),
+                      const SizedBox(height: DpSpacing.md),
+                    ],
+                    WebContentProjection(content: content),
+                    if (workspaceKey != null) ...[
+                      const SizedBox(height: DpSpacing.xl),
+                      DpNextActionBand(
+                        actionId: 'open-contextual-sandbox',
+                        label: '실습 시작',
+                        expectedOutcome: '현재 미션 맥락으로 코드 실습을 시작합니다',
+                        state: DpNextActionState.ready,
+                        onPressed: (_) {
+                          _maybeFlushProgress(force: true);
+                          context.push(workspaceKey.sandboxLocation);
+                        },
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ),
-            ContentLoaded(:final content) => SliverPadding(
-              padding: const EdgeInsets.all(DpSpacing.lg),
-              sliver: SliverToBoxAdapter(child: _ContentBody(content: content)),
-            ),
-          },
         ],
       ),
     );
+  }
+
+  void _bindController() {
+    final workspaceKey = widget.workspaceKey;
+    if (workspaceKey == null) {
+      _contentController = ref.read(contentControllerProvider.notifier);
+      _lastMissionContentController = null;
+      _missionRetentionController = null;
+      return;
+    }
+    _contentController = null;
+    _lastMissionContentController = ref.read(
+      missionContentControllerProvider(workspaceKey).notifier,
+    );
+    _missionRetentionController = ref.read(
+      missionContentRetentionProvider.notifier,
+    );
+  }
+
+  MissionContentController _missionController(MissionWorkspaceKey key) {
+    final controller = ref.read(missionContentControllerProvider(key).notifier);
+    _lastMissionContentController = controller;
+    return controller;
+  }
+
+  void _loadContent() {
+    if (!mounted) return;
+    if (widget.workspaceKey case final workspaceKey?) {
+      _missionRetentionController?.activate(workspaceKey);
+      unawaited(_missionController(workspaceKey).load(force: true));
+      return;
+    }
+    unawaited(_contentController!.load(widget.contentId));
+  }
+
+  LearningContent? _readContent() {
+    final workspaceKey = widget.workspaceKey;
+    if (workspaceKey != null) {
+      final ownerKey = ref.read(currentMissionOwnerKeyProvider);
+      if (!_missionController(workspaceKey).isBoundTo(ownerKey)) {
+        return null;
+      }
+      return ref.read(missionContentControllerProvider(workspaceKey)).content;
+    }
+    return switch (ref.read(contentControllerProvider)) {
+      ContentLoaded(:final content) => content,
+      _ => null,
+    };
+  }
+
+  void _scheduleMissionStarted(MissionWorkspaceKey workspaceKey) {
+    if (_missionStartedCaptured || _missionStartedScheduled) return;
+    final pageEpoch = _pageEpoch;
+    _missionStartedScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (pageEpoch != _pageEpoch) return;
+      _missionStartedScheduled = false;
+      if (!mounted || _missionStartedCaptured || _readContent() == null) return;
+      final mission = ref.read(currentMissionControllerProvider).mission;
+      if (mission?.outcome != CurrentMissionOutcome.available) return;
+      final task = mission!.nextTask;
+      if (task?.taskId != workspaceKey.taskId ||
+          task?.contentId != workspaceKey.contentId ||
+          mission.pathId == null ||
+          mission.weekNum == null) {
+        return;
+      }
+      final auth = ref.read(authControllerProvider);
+      if (auth is! AuthAuthenticated) return;
+      _missionStartedCaptured = true;
+      ref.read(journeyAnalyticsProvider).capture('first_mission_started', {
+        'user_id': auth.user.id,
+        'path_id': mission.pathId!,
+        'week_num': mission.weekNum!,
+        'task_id': workspaceKey.taskId,
+        'first_open': true,
+      });
+    });
   }
 
   void _syncTracker(LearningContent content) {
@@ -169,22 +406,38 @@ class _ContentPageState extends ConsumerState<ContentPage>
   void _resetProgressTracker() {
     _tracker = null;
     _trackedContentKey = null;
+    _latestLegacyState = null;
+    _latestContent = null;
     _dwellSec = 0;
     _posting = false;
+    _failedFlush = null;
     // 다른 콘텐츠로 넘어가면 이전 글의 진행률이 새어나가면 안 된다.
     _lastObservedScrollPct = null;
   }
 
+  void _synchronizeOwner(String? ownerKey) {
+    _pageOwnerKey = ownerKey;
+    _pageEpoch += 1;
+    _resetProgressTracker();
+    _missionStartedCaptured = false;
+    _missionStartedScheduled = false;
+    _contentLoadScheduled = false;
+  }
+
+  bool get _isCurrentRoute =>
+      mounted && (ModalRoute.of(context)?.isCurrent ?? true);
+
   void _maybeFlushProgress({bool force = false}) {
-    if (_posting) return;
-    final state = ref.read(contentControllerProvider);
-    _latestState = state;
-    if (state is! ContentLoaded) return;
-    _syncTracker(state.content);
+    if (!_isCurrentRoute) return;
+    if (_posting && widget.workspaceKey == null) return;
+    final content = _readContent();
+    if (content == null) return;
+    _latestContent = content;
+    _syncTracker(content);
     final tracker = _tracker;
     if (tracker == null) return;
 
-    final scrollPct = _scrollPct(state.content.progress.scrollPct);
+    final scrollPct = _scrollPct(content.progress.scrollPct);
     final recorded = tracker.record(scrollPct: scrollPct, dwellSec: _dwellSec);
     final flush = force ? recorded ?? tracker.disposeFlush() : recorded;
     if (flush != null) unawaited(_postProgress(flush));
@@ -240,51 +493,208 @@ class _ContentPageState extends ConsumerState<ContentPage>
   }
 
   Future<void> _postProgress(ContentProgressFlush flush) async {
+    final pageEpoch = _pageEpoch;
+    final workspaceKey = widget.workspaceKey;
+    final missionController = workspaceKey == null
+        ? null
+        : _missionController(workspaceKey);
     _posting = true;
     try {
-      final response = await ref
-          .read(contentControllerProvider.notifier)
-          .reportProgress(
-            idOrSlug: widget.contentId,
-            scrollPct: flush.scrollPct,
-            dwellSec: flush.dwellSec,
-          );
-      if (response?.completed != true || !mounted) return;
+      final response = missionController != null
+          ? await missionController.reportProgress(
+              scrollPct: flush.scrollPct,
+              dwellSec: flush.dwellSec,
+            )
+          : await _contentController!.reportProgress(
+              idOrSlug: widget.contentId,
+              scrollPct: flush.scrollPct,
+              dwellSec: flush.dwellSec,
+            );
+      if (pageEpoch != _pageEpoch || !mounted) return;
+      if (response == null) {
+        _failedFlush = _failedFlush?.merge(flush) ?? flush;
+        return;
+      }
+      _failedFlush = null;
+      if (!response.completed || !mounted) return;
       _tracker?.markCompleted();
+      if (missionController != null) return;
       await ref.read(pathControllerProvider.notifier).loadOrStart();
       await ref.read(dashboardControllerProvider.notifier).load();
     } finally {
-      _posting = false;
+      if (pageEpoch == _pageEpoch) _posting = false;
     }
   }
 
+  void _retryFailedProgress() {
+    final flush = _failedFlush;
+    if (flush != null) {
+      unawaited(_postProgress(flush));
+      return;
+    }
+    final workspaceKey = widget.workspaceKey;
+    if (workspaceKey != null) {
+      unawaited(_missionController(workspaceKey).retryProgress());
+      return;
+    }
+    _maybeFlushProgress(force: true);
+  }
+
   void _flushCachedProgressOnDispose() {
-    if (_posting) return;
-    final state = _latestState;
-    if (state is! ContentLoaded) return;
-    _syncTracker(state.content);
+    final workspaceKey = widget.workspaceKey;
+    if (_posting && workspaceKey == null) return;
+    final content =
+        _latestContent ??
+        switch (_latestLegacyState) {
+          ContentLoaded(:final content) => content,
+          _ => null,
+        };
+    if (content == null) return;
+    _syncTracker(content);
     final tracker = _tracker;
     if (tracker == null) return;
 
-    final scrollPct = _scrollPct(state.content.progress.scrollPct);
+    final scrollPct = _scrollPct(content.progress.scrollPct);
     final recorded = tracker.record(scrollPct: scrollPct, dwellSec: _dwellSec);
-    final flush = recorded ?? tracker.disposeFlush();
+    var flush = recorded ?? tracker.disposeFlush();
+    final failedFlush = _failedFlush;
+    if (failedFlush != null) {
+      flush = flush?.merge(failedFlush) ?? failedFlush;
+    }
     if (flush == null) return;
+    final flushToSend = flush;
+    if (workspaceKey != null) {
+      final missionController = _lastMissionContentController;
+      if (missionController == null) return;
+      // Provider listeners are still being detached while dispose runs.
+      // Defer the retained controller mutation until tree finalization ends.
+      scheduleMicrotask(() {
+        unawaited(
+          missionController.reportProgress(
+            scrollPct: flushToSend.scrollPct,
+            dwellSec: flushToSend.dwellSec,
+          ),
+        );
+      });
+      return;
+    }
     unawaited(
       _apiClient
           .post<Map<String, dynamic>>(
             '/contents/${widget.contentId}/progress',
-            body: {'scrollPct': flush.scrollPct, 'dwellSec': flush.dwellSec},
+            body: {
+              'scrollPct': flushToSend.scrollPct,
+              'dwellSec': flushToSend.dwellSec,
+            },
           )
           .catchError((_) => <String, dynamic>{}),
     );
   }
 }
 
-class _ContentBody extends StatelessWidget {
-  const _ContentBody({required this.content});
+class _MissionContentHeader extends StatelessWidget {
+  const _MissionContentHeader({
+    required this.workspaceKey,
+    required this.mission,
+    required this.content,
+  });
+
+  final MissionWorkspaceKey workspaceKey;
+  final CurrentMission? mission;
+  final LearningContent? content;
+
+  @override
+  Widget build(BuildContext context) {
+    final matchingTasks = mission?.tasks
+        .where((candidate) => candidate.taskId == workspaceKey.taskId)
+        .toList();
+    final task = matchingTasks?.length == 1 ? matchingTasks!.single : null;
+    final progress =
+        content?.progress.scrollPct ?? (task?.completed == true ? 1 : 0);
+    final completed = content?.progress.completed ?? task?.completed ?? false;
+    final weekNum = mission?.weekNum;
+    return DpMissionHeader(
+      eyebrow: weekNum == null ? '오늘의 미션' : '$weekNum주차 · 오늘의 미션',
+      title: task?.title ?? content?.title ?? '현재 학습 미션',
+      why: weekNum == null
+          ? '맞춤 경로의 현재 학습 맥락을 이어갑니다.'
+          : '맞춤 경로 $weekNum주차의 현재 학습 맥락을 이어갑니다.',
+      completionCriterion: '콘텐츠 학습 진행률을 충족해 완료 상태를 저장합니다',
+      progressValue: progress.clamp(0, 1).toDouble(),
+      progressLabel: '콘텐츠 학습 진행률',
+      status: completed
+          ? DpMissionHeaderStatus.completed
+          : DpMissionHeaderStatus.active,
+    );
+  }
+}
+
+class _InlineContentError extends StatelessWidget {
+  const _InlineContentError({
+    required this.message,
+    required this.actionLabel,
+    required this.onRetry,
+  });
+
+  final String message;
+  final String actionLabel;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.dpColors;
+    return Semantics(
+      liveRegion: true,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colors.surfaceMuted,
+          border: Border.all(color: colors.danger),
+          borderRadius: BorderRadius.circular(context.appTokens.panelRadius),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(DpSpacing.md),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final action = TextButton(
+                onPressed: onRetry,
+                child: Text(actionLabel),
+              );
+              if (constraints.maxWidth < 520) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(message),
+                    const SizedBox(height: DpSpacing.xs),
+                    Align(alignment: Alignment.centerLeft, child: action),
+                  ],
+                );
+              }
+              return Row(
+                children: [
+                  Expanded(child: Text(message)),
+                  const SizedBox(width: DpSpacing.sm),
+                  action,
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Loaded content production projection shared by the live page and the ET13
+/// browser-distribution fixture.
+class WebContentProjection extends StatelessWidget {
+  const WebContentProjection({
+    super.key,
+    required this.content,
+    this.adSlot = const AdSlotWidget(slot: 'CONTENT_PAGE'),
+  });
 
   final LearningContent content;
+  final Widget adSlot;
 
   @override
   Widget build(BuildContext context) {
@@ -339,7 +749,7 @@ class _ContentBody extends StatelessWidget {
             const SizedBox(height: DpSpacing.xl),
             DpMarkdown(data: content.markdown),
             const SizedBox(height: DpSpacing.lg),
-            const AdSlotWidget(slot: 'CONTENT_PAGE'),
+            adSlot,
           ],
         ),
       ),

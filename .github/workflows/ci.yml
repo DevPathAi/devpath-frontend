@@ -7,146 +7,752 @@ on:
 
 jobs:
   analyze-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
-      - uses: subosito/flutter-action@v2
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
+          flutter-version: '3.44.1'
           channel: stable
           cache: true
-      - name: Activate melos
-        run: dart pub global activate melos 7.0.0   # F2: 버전 핀(루트 dev_dependency ^7.0.0와 정렬, melos 8 출시 시 CI 깨짐 방지)
-      - name: Bootstrap workspace
-        run: melos bootstrap
+      - name: Verify Flutter SDK tuple
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter --version --machine | jq -e '
+            .frameworkVersion == "3.44.1" and
+            .frameworkRevision == "924134a44c189315be2148659913dda1671cbe99" and
+            .dartSdkVersion == "3.12.1"
+          ' >/dev/null
+      - name: Resolve and bootstrap locked workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          lock_sha256_before="$(sha256sum pubspec.lock | awk '{print $1}')"
+          dart pub get --enforce-lockfile
+          dart run melos bootstrap --enforce-lockfile
+          test "$(sha256sum pubspec.lock | awk '{print $1}')" = "${lock_sha256_before}"
       - name: Format check
-        run: melos run format
+        run: dart run melos run format
       - name: Analyze
-        run: melos run analyze
+        run: dart run melos run analyze
       - name: Test
-        run: melos run test
+        run: dart run melos run test
+      - name: Validate immutable registry client
+        run: node --test tools/immutable_registry.test.mjs
 
-  web-image:
+  # ET1 contract proof only: build both compiled identities locally in CI.
+  # Publishing, exact-digest promotion, deployment and rollback belong to ET10.
+  web-image-config-contract:
     needs: analyze-test
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        include:
+          - identity: off
+            enabled: 'false'
+          - identity: on
+            enabled: 'true'
     steps:
-      - uses: actions/checkout@v6
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v7
+          version: v0.34.1
+          driver-opts: |
+            image=moby/buildkit:v0.30.0@sha256:0168606be2315b7c807a03b3d8aa79beefdb31c98740cebdffdfeebf31190c9f
+      - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        id: build
         with:
           context: .
           file: apps/web/Dockerfile
-          push: true
+          platforms: linux/amd64
+          push: false
+          outputs: type=oci,dest=${{ runner.temp }}/leva-web-${{ matrix.identity }}.tar
           build-args: |
-            API_BASE_URL=${{ vars.WEB_API_BASE_URL }}
+            API_BASE_URL=https://api.contract.invalid
             USE_MOCK=false
-          tags: |
-            ghcr.io/devpathai/devpath-web:${{ github.sha }}
-            ghcr.io/devpathai/devpath-web:main
+            APP_VERSION=${{ github.sha }}
+            MISSION_SPINE_ENABLED=${{ matrix.enabled }}
+            ANALYTICS_CONTRACT_VERSION=mission-spine.analytics.v1
+            ANALYTICS_ENVIRONMENT=production
+          tags: ghcr.io/devpathai/devpath-web:${{ github.sha }}-mission-${{ matrix.identity }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-  web-deploy:
-    needs: web-image
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/create-github-app-token@v3
-        id: app-token
-        with:
-          app-id: ${{ secrets.GITOPS_APP_ID }}
-          private-key: ${{ secrets.GITOPS_APP_PRIVATE_KEY }}
-          owner: DevPathAi
-          repositories: devpath-gitops
-      - uses: actions/checkout@v6
-        with:
-          repository: DevPathAi/devpath-gitops
-          token: ${{ steps.app-token.outputs.token }}
-          path: gitops
-      - name: Install kustomize
+      - name: Record immutable build identity
+        shell: bash
+        env:
+          ARTIFACT_PATH: ${{ runner.temp }}/leva-web-${{ matrix.identity }}.tar
+          MANIFEST_PATH: ${{ runner.temp }}/leva-web-${{ matrix.identity }}.manifest.json
+          APP_VERSION: ${{ github.sha }}
+          MISSION_SPINE_ENABLED: ${{ matrix.enabled }}
+          ANALYTICS_CONTRACT_VERSION: mission-spine.analytics.v1
+          ANALYTICS_ENVIRONMENT: production
+          IDENTITY: ${{ matrix.identity }}
         run: |
-          curl -sLo kustomize.tar.gz https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.4.3/kustomize_v5.4.3_linux_amd64.tar.gz
-          tar -xzf kustomize.tar.gz && sudo mv kustomize /usr/local/bin/
-      - name: set image to commit SHA
-        working-directory: gitops/apps/devpath-web/base
-        run: kustomize edit set image ghcr.io/devpathai/devpath-web=ghcr.io/devpathai/devpath-web:${{ github.sha }}
-      - name: commit & push
-        working-directory: gitops
-        run: |
-          git config user.name "devpath-gitops-bot[bot]"
-          git config user.email "devpath-gitops-bot[bot]@users.noreply.github.com"
-          git add -A
-          git diff --cached --quiet && echo "no change" && exit 0
-          git commit -m "deploy(web): ${{ github.sha }}"
-          for i in 1 2 3; do git push && break || (git pull --rebase && sleep 2); done
+          set -euo pipefail
+          artifact_sha256="$(sha256sum "${ARTIFACT_PATH}" | awk '{print $1}')"
+          printf '{"artifact":"leva-web-%s.tar","sha256":"%s","app_version":"%s","mission_spine_enabled":%s,"analytics_contract_version":"%s","analytics_environment":"%s"}\n' \
+            "${IDENTITY}" "${artifact_sha256}" "${APP_VERSION}" \
+            "${MISSION_SPINE_ENABLED}" "${ANALYTICS_CONTRACT_VERSION}" \
+            "${ANALYTICS_ENVIRONMENT}" > "${MANIFEST_PATH}"
+      - name: Preserve OFF/ON OCI artifact and manifest
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: leva-web-${{ github.sha }}-mission-${{ matrix.identity }}-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/leva-web-${{ matrix.identity }}.tar
+            ${{ runner.temp }}/leva-web-${{ matrix.identity }}.manifest.json
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
 
-  admin-image:
+  web-image:
     needs: analyze-test
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'push' &&
+      github.repository == 'DevPathAi/devpath-frontend' &&
+      github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       packages: write
+    concurrency:
+      group: web-image-${{ github.sha }}-${{ matrix.identity }}
+      cancel-in-progress: false
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - identity: off
+            enabled: 'false'
+          - identity: on
+            enabled: 'true'
     steps:
-      - uses: actions/checkout@v6
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+        with:
+          version: v0.34.1
+          driver-opts: |
+            image=moby/buildkit:v0.30.0@sha256:0168606be2315b7c807a03b3d8aa79beefdb31c98740cebdffdfeebf31190c9f
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v7
+      - name: Install immutable image resolver
+        shell: bash
+        run: |
+          set -euo pipefail
+          resolver_path="${RUNNER_TEMP}/resolve-web-image-config.sh"
+          cat >"${resolver_path}" <<'RESOLVER'
+          resolve_linux_amd64_config() {
+            local image_repository="$1"
+            local root_digest="$2"
+            local root_manifest_json
+            local child_digest
+            local child_manifest_json
+            local config_digest
+            local unexpected_runnable_count
+            local linux_amd64_count
+
+            if ! [[ "${root_digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+              echo "Invalid root image digest: ${root_digest}" >&2
+              return 1
+            fi
+            if ! root_manifest_json="$(docker buildx imagetools inspect "${image_repository}@${root_digest}" --raw)"; then
+              echo "Unable to inspect exact root image ${image_repository}@${root_digest}" >&2
+              return 1
+            fi
+
+            if jq -e '
+              (.manifests? == null) and
+              ((.config.digest? | type) == "string")
+            ' <<<"${root_manifest_json}" >/dev/null; then
+              child_digest="${root_digest}"
+              child_manifest_json="${root_manifest_json}"
+            elif jq -e '(.manifests | type) == "array"' \
+              <<<"${root_manifest_json}" >/dev/null; then
+              if ! jq -e '
+                (.manifests | length) > 0 and
+                all(.manifests[];
+                  ((.digest | type) == "string") and
+                  (.digest | test("^sha256:[0-9a-f]{64}$")) and
+                  ((.platform | type) == "object") and
+                  ((.platform.os | type) == "string") and
+                  ((.platform.architecture | type) == "string")
+                )
+              ' <<<"${root_manifest_json}" >/dev/null; then
+                echo "Malformed OCI index descriptors" >&2
+                return 1
+              fi
+              if ! jq -e '
+                all(.manifests[];
+                  if (.platform.os == "unknown" and
+                      .platform.architecture == "unknown") then
+                    .annotations["vnd.docker.reference.type"] ==
+                      "attestation-manifest"
+                  else
+                    true
+                  end
+                )
+              ' <<<"${root_manifest_json}" >/dev/null; then
+                echo "Unknown platform descriptor is not an attestation" >&2
+                return 1
+              fi
+
+              unexpected_runnable_count="$(jq -er '[
+                .manifests[]
+                | select(
+                    .platform.os != "unknown" or
+                    .platform.architecture != "unknown"
+                  )
+                | select(
+                    .platform.os != "linux" or
+                    .platform.architecture != "amd64"
+                  )
+              ] | length' <<<"${root_manifest_json}")"
+              if ! test "${unexpected_runnable_count}" = "0"; then
+                echo "OCI index has an unexpected runnable platform" >&2
+                return 1
+              fi
+
+              linux_amd64_count="$(jq -er '[
+                .manifests[]
+                | select(
+                    .platform.os == "linux" and
+                    .platform.architecture == "amd64"
+                  )
+              ] | length' <<<"${root_manifest_json}")"
+              if ! test "${linux_amd64_count}" = "1"; then
+                echo "OCI index must contain exactly one linux/amd64 child" >&2
+                return 1
+              fi
+              child_digest="$(jq -er '
+                .manifests[]
+                | select(
+                    .platform.os == "linux" and
+                    .platform.architecture == "amd64"
+                  )
+                | .digest
+              ' <<<"${root_manifest_json}")"
+              if ! child_manifest_json="$(docker buildx imagetools inspect "${image_repository}@${child_digest}" --raw)"; then
+                echo "Unable to inspect exact linux/amd64 child ${image_repository}@${child_digest}" >&2
+                return 1
+              fi
+            else
+              echo "Exact image is neither a runnable manifest nor an OCI index" >&2
+              return 1
+            fi
+
+            if ! config_digest="$(jq -er '
+              if .manifests? != null then
+                error("nested OCI index is not runnable")
+              elif ((.config.digest? | type) != "string") then
+                error("image config digest missing")
+              elif (.config.digest | test("^sha256:[0-9a-f]{64}$") | not) then
+                error("invalid image config digest")
+              else
+                .config.digest
+              end
+            ' <<<"${child_manifest_json}")"; then
+              echo "Unable to resolve a runnable image config digest" >&2
+              return 1
+            fi
+            printf '%s\n' "${config_digest}"
+          }
+          RESOLVER
+          chmod 0555 "${resolver_path}"
+      - name: Inspect immutable tag before build
+        id: immutable-tag
+        shell: bash
+        env:
+          TAG_REFERENCE: ghcr.io/devpathai/devpath-web:${{ github.sha }}-mission-${{ matrix.identity }}
+          IMAGE_REPOSITORY: ghcr.io/devpathai/devpath-web
+          SOURCE_SHA: ${{ github.sha }}
+          IDENTITY: ${{ matrix.identity }}
+          MISSION_SPINE_ENABLED: ${{ matrix.enabled }}
+          ANALYTICS_CONTRACT_VERSION: mission-spine.analytics.v1
+          ANALYTICS_ENVIRONMENT: production
+          GHCR_ACTOR: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          source "${RUNNER_TEMP}/resolve-web-image-config.sh"
+          source tools/immutable_registry.sh
+          lookup="$(ghcr_manifest_lookup "${IMAGE_REPOSITORY}" "${SOURCE_SHA}-mission-${IDENTITY}")"
+          read -r state tag_digest trailing <<<"${lookup}"
+          test -z "${trailing:-}"
+          case "${state}" in
+          present)
+            [[ "${tag_digest}" =~ ^sha256:[0-9a-f]{64}$ ]]
+            exact_reference="${IMAGE_REPOSITORY}@${tag_digest}"
+            config_digest="$(resolve_linux_amd64_config "${IMAGE_REPOSITORY}" "${tag_digest}")"
+            image_json="$(docker buildx imagetools inspect "${exact_reference}" --format '{{json .Image}}')"
+            normalized_image="$(jq -ec '
+              if (.architecture == "amd64" and .os == "linux") then .
+              elif (.["linux/amd64"].architecture == "amd64" and
+                    .["linux/amd64"].os == "linux") then .["linux/amd64"]
+              else error("linux/amd64 image config missing")
+              end
+            ' <<<"${image_json}")"
+            jq -e \
+              --arg sha "${SOURCE_SHA}" \
+              --arg enabled "${MISSION_SPINE_ENABLED}" \
+              --arg analytics "${ANALYTICS_CONTRACT_VERSION}" \
+              --arg environment "${ANALYTICS_ENVIRONMENT}" '
+                .architecture == "amd64" and
+                .os == "linux" and
+                .config.Labels["org.opencontainers.image.revision"] == $sha and
+                .config.Labels["ai.leva.app_version"] == $sha and
+                .config.Labels["ai.leva.mission_spine_enabled"] == $enabled and
+                .config.Labels["ai.leva.analytics_contract_version"] == $analytics and
+                .config.Labels["ai.leva.analytics_environment"] == $environment
+              ' <<<"${normalized_image}" >/dev/null || {
+                echo "Refusing incompatible immutable tag ${TAG_REFERENCE}" >&2
+                exit 1
+              }
+            {
+              echo "state=present"
+              echo "digest=${tag_digest}"
+              echo "config_digest=${config_digest}"
+            } >>"${GITHUB_OUTPUT}"
+            ;;
+          absent)
+            test -z "${tag_digest:-}"
+            {
+              echo "state=absent"
+              echo "digest="
+              echo "config_digest="
+            } >>"${GITHUB_OUTPUT}"
+            ;;
+          *)
+            echo "Immutable tag preflight returned an invalid state" >&2
+            exit 1
+            ;;
+          esac
+      - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        id: candidate
         with:
           context: .
-          file: apps/admin/Dockerfile
-          push: true
+          file: apps/web/Dockerfile
+          load: true
+          push: false
+          platforms: linux/amd64
+          provenance: false
           build-args: |
             API_BASE_URL=${{ vars.WEB_API_BASE_URL }}
             USE_MOCK=false
-          tags: |
-            ghcr.io/devpathai/devpath-admin:${{ github.sha }}
-            ghcr.io/devpathai/devpath-admin:main
+            APP_VERSION=${{ github.sha }}
+            MISSION_SPINE_ENABLED=${{ matrix.enabled }}
+            ANALYTICS_CONTRACT_VERSION=mission-spine.analytics.v1
+            ANALYTICS_ENVIRONMENT=production
+          tags: leva-web-candidate:${{ github.sha }}-mission-${{ matrix.identity }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            ai.leva.app_version=${{ github.sha }}
+            ai.leva.mission_spine_enabled=${{ matrix.enabled }}
+            ai.leva.analytics_contract_version=mission-spine.analytics.v1
+            ai.leva.analytics_environment=production
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: Inspect candidate config
+        id: candidate-metadata
+        shell: bash
+        env:
+          CANDIDATE_REFERENCE: leva-web-candidate:${{ github.sha }}-mission-${{ matrix.identity }}
+          SOURCE_SHA: ${{ github.sha }}
+          MISSION_SPINE_ENABLED: ${{ matrix.enabled }}
+          ANALYTICS_CONTRACT_VERSION: mission-spine.analytics.v1
+          ANALYTICS_ENVIRONMENT: production
+        run: |
+          set -euo pipefail
+          candidate_json="$(docker image inspect "${CANDIDATE_REFERENCE}" | jq -ec '.[0]')"
+          candidate_config_digest="$(jq -er '.Id' <<<"${candidate_json}")"
+          jq -e \
+            --arg sha "${SOURCE_SHA}" \
+            --arg enabled "${MISSION_SPINE_ENABLED}" \
+            --arg analytics "${ANALYTICS_CONTRACT_VERSION}" \
+            --arg environment "${ANALYTICS_ENVIRONMENT}" '
+              .Architecture == "amd64" and
+              .Os == "linux" and
+              .Config.Labels["org.opencontainers.image.revision"] == $sha and
+              .Config.Labels["ai.leva.app_version"] == $sha and
+              .Config.Labels["ai.leva.mission_spine_enabled"] == $enabled and
+              .Config.Labels["ai.leva.analytics_contract_version"] == $analytics and
+              .Config.Labels["ai.leva.analytics_environment"] == $environment and
+              (.Id | test("^sha256:[0-9a-f]{64}$"))
+            ' <<<"${candidate_json}" >/dev/null
+          echo "config_digest=${candidate_config_digest}" >>"${GITHUB_OUTPUT}"
+      - name: Bind immutable tag once
+        id: bind-tag
+        shell: bash
+        env:
+          TAG_REFERENCE: ghcr.io/devpathai/devpath-web:${{ github.sha }}-mission-${{ matrix.identity }}
+          IMAGE_REPOSITORY: ghcr.io/devpathai/devpath-web
+          CANDIDATE_REFERENCE: leva-web-candidate:${{ github.sha }}-mission-${{ matrix.identity }}
+          CANDIDATE_CONFIG_DIGEST: ${{ steps.candidate-metadata.outputs.config_digest }}
+          PREFLIGHT_STATE: ${{ steps.immutable-tag.outputs.state }}
+          PREFLIGHT_DIGEST: ${{ steps.immutable-tag.outputs.digest }}
+          PREFLIGHT_CONFIG_DIGEST: ${{ steps.immutable-tag.outputs.config_digest }}
+          SOURCE_SHA: ${{ github.sha }}
+          IDENTITY: ${{ matrix.identity }}
+          MISSION_SPINE_ENABLED: ${{ matrix.enabled }}
+          ANALYTICS_CONTRACT_VERSION: mission-spine.analytics.v1
+          ANALYTICS_ENVIRONMENT: production
+          GHCR_ACTOR: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          source "${RUNNER_TEMP}/resolve-web-image-config.sh"
+          source tools/immutable_registry.sh
+          candidate_config_digest="${CANDIDATE_CONFIG_DIGEST}"
+          [[ "${candidate_config_digest}" =~ ^sha256:[0-9a-f]{64}$ ]]
+          case "${PREFLIGHT_STATE}" in
+          present)
+            [[ "${PREFLIGHT_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]]
+            [[ "${PREFLIGHT_CONFIG_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]]
+            ;;
+          absent)
+            test -z "${PREFLIGHT_DIGEST}"
+            test -z "${PREFLIGHT_CONFIG_DIGEST}"
+            ;;
+          *)
+            echo "Invalid immutable tag preflight state" >&2
+            exit 1
+            ;;
+          esac
+          lookup="$(ghcr_manifest_lookup "${IMAGE_REPOSITORY}" "${SOURCE_SHA}-mission-${IDENTITY}")"
+          read -r state observed_digest trailing <<<"${lookup}"
+          test -z "${trailing:-}"
+          case "${state}" in
+          present)
+            [[ "${observed_digest}" =~ ^sha256:[0-9a-f]{64}$ ]]
+            exact_reference="${IMAGE_REPOSITORY}@${observed_digest}"
+            observed_config_digest="$(resolve_linux_amd64_config "${IMAGE_REPOSITORY}" "${observed_digest}")"
+            image_json="$(docker buildx imagetools inspect "${exact_reference}" --format '{{json .Image}}')"
+            normalized_image="$(jq -ec '
+              if (.architecture == "amd64" and .os == "linux") then .
+              elif (.["linux/amd64"].architecture == "amd64" and
+                    .["linux/amd64"].os == "linux") then .["linux/amd64"]
+              else error("linux/amd64 image config missing")
+              end
+            ' <<<"${image_json}")"
+            jq -e \
+              --arg sha "${SOURCE_SHA}" \
+              --arg enabled "${MISSION_SPINE_ENABLED}" \
+              --arg analytics "${ANALYTICS_CONTRACT_VERSION}" \
+              --arg environment "${ANALYTICS_ENVIRONMENT}" '
+                .config.Labels["org.opencontainers.image.revision"] == $sha and
+                .config.Labels["ai.leva.app_version"] == $sha and
+                .config.Labels["ai.leva.mission_spine_enabled"] == $enabled and
+                .config.Labels["ai.leva.analytics_contract_version"] == $analytics and
+                .config.Labels["ai.leva.analytics_environment"] == $environment
+              ' <<<"${normalized_image}" >/dev/null || {
+                echo "Refusing to overwrite immutable tag ${TAG_REFERENCE}: config drift" >&2
+                exit 1
+              }
+            if test "${PREFLIGHT_STATE}" = "present"; then
+              test "${observed_digest}" = "${PREFLIGHT_DIGEST}" || {
+                echo "Refusing to overwrite immutable tag ${TAG_REFERENCE}: digest changed during build" >&2
+                exit 1
+              }
+              test "${observed_config_digest}" = "${PREFLIGHT_CONFIG_DIGEST}" || {
+                echo "Refusing to overwrite immutable tag ${TAG_REFERENCE}: config changed during build" >&2
+                exit 1
+              }
+            fi
+            if ! test "${observed_config_digest}" = "${candidate_config_digest}"; then
+              echo "Refusing to overwrite immutable tag ${TAG_REFERENCE}: candidate digest drift" >&2
+              exit 1
+            fi
+            registry_digest="${observed_digest}"
+            publish_mode="reused"
+            ;;
+          absent)
+            test -z "${observed_digest:-}"
+            test "${PREFLIGHT_STATE}" = "absent" || {
+              echo "Refusing to recreate immutable tag ${TAG_REFERENCE} after it disappeared" >&2
+              exit 1
+            }
+            tag_reference="${TAG_REFERENCE}"
+            docker tag "${CANDIDATE_REFERENCE}" "${tag_reference}"
+            docker push "${tag_reference}"
+            lookup="$(ghcr_manifest_lookup "${IMAGE_REPOSITORY}" "${SOURCE_SHA}-mission-${IDENTITY}")"
+            read -r state registry_digest trailing <<<"${lookup}"
+            test -z "${trailing:-}"
+            test "${state}" = "present"
+            [[ "${registry_digest}" =~ ^sha256:[0-9a-f]{64}$ ]]
+            observed_config_digest="$(resolve_linux_amd64_config "${IMAGE_REPOSITORY}" "${registry_digest}")"
+            test "${observed_config_digest}" = "${candidate_config_digest}"
+            publish_mode="created"
+            ;;
+          *)
+            echo "Immutable tag bind returned an invalid state" >&2
+            exit 1
+            ;;
+          esac
+          test "${registry_digest}" != ""
+          test "${registry_digest}" != "sha256:"
+          {
+            echo "digest=${registry_digest}"
+            echo "mode=${publish_mode}"
+          } >>"${GITHUB_OUTPUT}"
+      - name: Inspect registry image and record safe digest evidence
+        shell: bash
+        env:
+          EVIDENCE_PATH: ${{ runner.temp }}/leva-web-${{ matrix.identity }}.registry.json
+          SOURCE_SHA: ${{ github.sha }}
+          IDENTITY: ${{ matrix.identity }}
+          MISSION_SPINE_ENABLED: ${{ matrix.enabled }}
+          REGISTRY_DIGEST: ${{ steps.bind-tag.outputs.digest }}
+          ANALYTICS_CONTRACT_VERSION: mission-spine.analytics.v1
+          ANALYTICS_ENVIRONMENT: production
+          GHCR_ACTOR: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          source tools/immutable_registry.sh
+          test "${IDENTITY}" = "off" || test "${IDENTITY}" = "on"
+          image_repository="ghcr.io/devpathai/devpath-web"
+          image_tag="${SOURCE_SHA}-mission-${IDENTITY}"
+          registry_digest="${REGISTRY_DIGEST}"
+          lookup="$(ghcr_manifest_lookup "${image_repository}" "${image_tag}")"
+          read -r state tag_digest trailing <<<"${lookup}"
+          test -z "${trailing:-}"
+          test "${state}" = "present"
+          test "${tag_digest}" = "${registry_digest}"
+          exact_reference="${image_repository}@${registry_digest}"
+          manifest_json="$(docker buildx imagetools inspect "${exact_reference}" --format '{{json .Manifest}}')"
+          test "$(jq -er '.digest' <<<"${manifest_json}")" = "${registry_digest}"
+          inspected_image_json="$(docker buildx imagetools inspect "${exact_reference}" --format '{{json .Image}}')"
+          normalized_image="$(jq -ec '
+            if (.architecture == "amd64" and .os == "linux") then .
+            elif (.["linux/amd64"].architecture == "amd64" and
+                  .["linux/amd64"].os == "linux") then .["linux/amd64"]
+            else error("linux/amd64 image config missing")
+            end
+          ' <<<"${inspected_image_json}")"
+          actual_source_sha="$(jq -er '.config.Labels["org.opencontainers.image.revision"]' <<<"${normalized_image}")"
+          actual_app_version="$(jq -er '.config.Labels["ai.leva.app_version"]' <<<"${normalized_image}")"
+          actual_mission_label="$(jq -er '.config.Labels["ai.leva.mission_spine_enabled"]' <<<"${normalized_image}")"
+          actual_analytics_contract="$(jq -er '.config.Labels["ai.leva.analytics_contract_version"]' <<<"${normalized_image}")"
+          actual_analytics_environment="$(jq -er '.config.Labels["ai.leva.analytics_environment"]' <<<"${normalized_image}")"
+          test "${actual_source_sha}" = "${SOURCE_SHA}"
+          test "${actual_app_version}" = "${SOURCE_SHA}"
+          test "${actual_mission_label}" = "${MISSION_SPINE_ENABLED}"
+          test "${actual_analytics_contract}" = "${ANALYTICS_CONTRACT_VERSION}"
+          test "${actual_analytics_environment}" = "${ANALYTICS_ENVIRONMENT}"
+          case "${actual_mission_label}" in
+            true) actual_mission_enabled=true ;;
+            false) actual_mission_enabled=false ;;
+            *) echo "Invalid inspected mission flag" >&2; exit 1 ;;
+          esac
+          jq -n \
+            --arg source_sha "${actual_source_sha}" \
+            --arg image_repository "${image_repository}" \
+            --arg image_tag "${image_tag}" \
+            --arg image_digest "${registry_digest}" \
+            --arg app_version "${actual_app_version}" \
+            --argjson mission_spine_enabled "${actual_mission_enabled}" \
+            --arg analytics_contract_version "${actual_analytics_contract}" \
+            --arg analytics_environment "${actual_analytics_environment}" \
+            '{
+              "schema_version": "mission-spine.web-artifact.v1",
+              "source_sha": $source_sha,
+              "image_repository": $image_repository,
+              "image_tag": $image_tag,
+              "image_digest": $image_digest,
+              "compiled_config": {
+                "app_version": $app_version,
+                "mission_spine_enabled": $mission_spine_enabled,
+                "analytics_contract_version": $analytics_contract_version,
+                "analytics_environment": $analytics_environment
+              },
+              "image_labels": {
+                "org.opencontainers.image.revision": $source_sha,
+                "ai.leva.app_version": $app_version,
+                "ai.leva.mission_spine_enabled": ($mission_spine_enabled | tostring),
+                "ai.leva.analytics_contract_version": $analytics_contract_version,
+                "ai.leva.analytics_environment": $analytics_environment
+              }
+            }' > "${EVIDENCE_PATH}"
+          jq -e '
+            (keys | sort) == [
+              "compiled_config", "image_digest", "image_labels",
+              "image_repository", "image_tag", "schema_version", "source_sha"
+            ] and
+            (.compiled_config | keys | sort) == [
+              "analytics_contract_version", "analytics_environment",
+              "app_version", "mission_spine_enabled"
+            ] and
+            (.image_labels | keys | sort) == [
+              "ai.leva.analytics_contract_version", "ai.leva.analytics_environment",
+              "ai.leva.app_version", "ai.leva.mission_spine_enabled",
+              "org.opencontainers.image.revision"
+            ] and
+            (.image_digest | test("^sha256:[0-9a-f]{64}$"))
+          ' "${EVIDENCE_PATH}" >/dev/null
+      - name: Preserve immutable registry evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: leva-web-${{ github.sha }}-mission-${{ matrix.identity }}-registry-evidence-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/leva-web-${{ matrix.identity }}.registry.json
+          if-no-files-found: error
+          retention-days: 30
 
-  admin-deploy:
-    needs: admin-image
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+  web-image-release-contract:
+    needs: web-image
+    if: >-
+      ${{ !cancelled() && github.event_name == 'push' &&
+      github.repository == 'DevPathAi/devpath-frontend' &&
+      github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     steps:
-      - uses: actions/create-github-app-token@v3
-        id: app-token
+      - name: Require both publication matrix legs
+        shell: bash
+        env:
+          WEB_IMAGE_RESULT: ${{ needs.web-image.result }}
+        run: test "${WEB_IMAGE_RESULT}" = "success"
+      - name: Download OFF/ON registry evidence
+        id: evidence-download
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        continue-on-error: true
         with:
-          app-id: ${{ secrets.GITOPS_APP_ID }}
-          private-key: ${{ secrets.GITOPS_APP_PRIVATE_KEY }}
-          owner: DevPathAi
-          repositories: devpath-gitops
-      - uses: actions/checkout@v6
+          pattern: leva-web-${{ github.sha }}-mission-*-registry-evidence-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: evidence
+          merge-multiple: true
+      - name: Verify distinct immutable compiled identities
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+          DOWNLOAD_OUTCOME: ${{ steps.evidence-download.outcome }}
+        run: |
+          set -euo pipefail
+          test "${DOWNLOAD_OUTCOME}" = "success"
+          off_evidence="evidence/leva-web-off.registry.json"
+          on_evidence="evidence/leva-web-on.registry.json"
+          test -s "${off_evidence}"
+          test -s "${on_evidence}"
+          jq -e --arg sha "${SOURCE_SHA}" '
+            .schema_version == "mission-spine.web-artifact.v1" and
+            .source_sha == $sha and
+            .image_repository == "ghcr.io/devpathai/devpath-web" and
+            .image_tag == ($sha + "-mission-off") and
+            .compiled_config.app_version == $sha and
+            .compiled_config.mission_spine_enabled == false and
+            .compiled_config.analytics_contract_version == "mission-spine.analytics.v1" and
+            .compiled_config.analytics_environment == "production" and
+            .image_labels["org.opencontainers.image.revision"] == $sha and
+            .image_labels["ai.leva.app_version"] == $sha and
+            .image_labels["ai.leva.mission_spine_enabled"] == "false" and
+            .image_labels["ai.leva.analytics_contract_version"] == "mission-spine.analytics.v1" and
+            .image_labels["ai.leva.analytics_environment"] == "production"
+          ' "${off_evidence}" >/dev/null
+          jq -e --arg sha "${SOURCE_SHA}" '
+            .schema_version == "mission-spine.web-artifact.v1" and
+            .source_sha == $sha and
+            .image_repository == "ghcr.io/devpathai/devpath-web" and
+            .image_tag == ($sha + "-mission-on") and
+            .compiled_config.app_version == $sha and
+            .compiled_config.mission_spine_enabled == true and
+            .compiled_config.analytics_contract_version == "mission-spine.analytics.v1" and
+            .compiled_config.analytics_environment == "production" and
+            .image_labels["org.opencontainers.image.revision"] == $sha and
+            .image_labels["ai.leva.app_version"] == $sha and
+            .image_labels["ai.leva.mission_spine_enabled"] == "true" and
+            .image_labels["ai.leva.analytics_contract_version"] == "mission-spine.analytics.v1" and
+            .image_labels["ai.leva.analytics_environment"] == "production"
+          ' "${on_evidence}" >/dev/null
+          off_digest="$(jq -r '.image_digest' "${off_evidence}")"
+          on_digest="$(jq -r '.image_digest' "${on_evidence}")"
+          test "${off_digest}" != "${on_digest}"
+
+  admin-image:
+    needs: analyze-test
+    if: >-
+      github.event_name == 'push' &&
+      github.repository == 'DevPathAi/devpath-frontend' &&
+      github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    concurrency:
+      group: admin-image-${{ github.sha }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
         with:
-          repository: DevPathAi/devpath-gitops
-          token: ${{ steps.app-token.outputs.token }}
-          path: gitops
-      - name: Install kustomize
-        run: |
-          curl -sLo kustomize.tar.gz https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.4.3/kustomize_v5.4.3_linux_amd64.tar.gz
-          tar -xzf kustomize.tar.gz && sudo mv kustomize /usr/local/bin/
-      - name: set image to commit SHA
-        working-directory: gitops/apps/devpath-admin/base
-        run: kustomize edit set image ghcr.io/devpathai/devpath-admin=ghcr.io/devpathai/devpath-admin:${{ github.sha }}
-      - name: commit & push
-        working-directory: gitops
-        run: |
-          git config user.name "devpath-gitops-bot[bot]"
-          git config user.email "devpath-gitops-bot[bot]@users.noreply.github.com"
-          git add -A
-          git diff --cached --quiet && echo "no change" && exit 0
-          git commit -m "deploy(admin): ${{ github.sha }}"
-          for i in 1 2 3; do git push && break || (git pull --rebase && sleep 2); done
+          version: v0.34.1
+          driver-opts: |
+            image=moby/buildkit:v0.30.0@sha256:0168606be2315b7c807a03b3d8aa79beefdb31c98740cebdffdfeebf31190c9f
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Inspect immutable admin tag
+        id: immutable-admin-tag
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+          GHCR_ACTOR: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash tools/admin_immutable_image.sh preflight
+      - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        id: admin-candidate
+        with:
+          context: .
+          file: apps/admin/Dockerfile
+          platforms: linux/amd64
+          load: true
+          push: false
+          provenance: false
+          build-args: |
+            API_BASE_URL=${{ vars.WEB_API_BASE_URL }}
+            USE_MOCK=false
+          tags: leva-admin-candidate:${{ github.sha }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=https://github.com/DevPathAi/devpath-frontend
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Inspect admin candidate config
+        id: admin-candidate-metadata
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+        run: bash tools/admin_immutable_image.sh candidate
+      - name: Bind immutable admin tag once
+        id: bind-admin-tag
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+          PREFLIGHT_STATE: ${{ steps.immutable-admin-tag.outputs.state }}
+          PREFLIGHT_DIGEST: ${{ steps.immutable-admin-tag.outputs.digest }}
+          PREFLIGHT_CONFIG_DIGEST: ${{ steps.immutable-admin-tag.outputs.config_digest }}
+          CANDIDATE_CONFIG_DIGEST: ${{ steps.admin-candidate-metadata.outputs.config_digest }}
+          GHCR_ACTOR: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash tools/admin_immutable_image.sh bind
+      - name: Record immutable admin digest evidence
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+          REGISTRY_DIGEST: ${{ steps.bind-admin-tag.outputs.digest }}
+          PUBLISH_MODE: ${{ steps.bind-admin-tag.outputs.mode }}
+          EVIDENCE_PATH: ${{ runner.temp }}/leva-admin.registry.json
+          GHCR_ACTOR: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash tools/admin_immutable_image.sh evidence
+      - name: Preserve immutable admin registry evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: leva-admin-${{ github.sha }}-registry-evidence-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/leva-admin.registry.json
+          if-no-files-found: error
+          retention-days: 30

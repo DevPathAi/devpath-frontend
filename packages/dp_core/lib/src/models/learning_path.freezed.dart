@@ -903,7 +903,7 @@ as List<WeeklyTask>,
 /// @nodoc
 mixin _$WeeklyTask {
 
- int get orderNum; String get taskType; String get title; bool get required; int? get contentId; String? get contentSlug; bool get completed;
+ int? get taskId; int get orderNum; String get taskType; String get title; bool get required; int? get contentId; String? get contentSlug; bool get completed; DateTime? get completedAt;
 /// Create a copy of WeeklyTask
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -916,16 +916,16 @@ $WeeklyTaskCopyWith<WeeklyTask> get copyWith => _$WeeklyTaskCopyWithImpl<WeeklyT
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is WeeklyTask&&(identical(other.orderNum, orderNum) || other.orderNum == orderNum)&&(identical(other.taskType, taskType) || other.taskType == taskType)&&(identical(other.title, title) || other.title == title)&&(identical(other.required, required) || other.required == required)&&(identical(other.contentId, contentId) || other.contentId == contentId)&&(identical(other.contentSlug, contentSlug) || other.contentSlug == contentSlug)&&(identical(other.completed, completed) || other.completed == completed));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is WeeklyTask&&(identical(other.taskId, taskId) || other.taskId == taskId)&&(identical(other.orderNum, orderNum) || other.orderNum == orderNum)&&(identical(other.taskType, taskType) || other.taskType == taskType)&&(identical(other.title, title) || other.title == title)&&(identical(other.required, required) || other.required == required)&&(identical(other.contentId, contentId) || other.contentId == contentId)&&(identical(other.contentSlug, contentSlug) || other.contentSlug == contentSlug)&&(identical(other.completed, completed) || other.completed == completed)&&(identical(other.completedAt, completedAt) || other.completedAt == completedAt));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,orderNum,taskType,title,required,contentId,contentSlug,completed);
+int get hashCode => Object.hash(runtimeType,taskId,orderNum,taskType,title,required,contentId,contentSlug,completed,completedAt);
 
 @override
 String toString() {
-  return 'WeeklyTask(orderNum: $orderNum, taskType: $taskType, title: $title, required: $required, contentId: $contentId, contentSlug: $contentSlug, completed: $completed)';
+  return 'WeeklyTask(taskId: $taskId, orderNum: $orderNum, taskType: $taskType, title: $title, required: $required, contentId: $contentId, contentSlug: $contentSlug, completed: $completed, completedAt: $completedAt)';
 }
 
 
@@ -936,7 +936,7 @@ abstract mixin class $WeeklyTaskCopyWith<$Res>  {
   factory $WeeklyTaskCopyWith(WeeklyTask value, $Res Function(WeeklyTask) _then) = _$WeeklyTaskCopyWithImpl;
 @useResult
 $Res call({
- int orderNum, String taskType, String title, bool required, int? contentId, String? contentSlug, bool completed
+ int? taskId, int orderNum, String taskType, String title, bool required, int? contentId, String? contentSlug, bool completed, DateTime? completedAt
 });
 
 
@@ -953,16 +953,18 @@ class _$WeeklyTaskCopyWithImpl<$Res>
 
 /// Create a copy of WeeklyTask
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? orderNum = null,Object? taskType = null,Object? title = null,Object? required = null,Object? contentId = freezed,Object? contentSlug = freezed,Object? completed = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? taskId = freezed,Object? orderNum = null,Object? taskType = null,Object? title = null,Object? required = null,Object? contentId = freezed,Object? contentSlug = freezed,Object? completed = null,Object? completedAt = freezed,}) {
   return _then(_self.copyWith(
-orderNum: null == orderNum ? _self.orderNum : orderNum // ignore: cast_nullable_to_non_nullable
+taskId: freezed == taskId ? _self.taskId : taskId // ignore: cast_nullable_to_non_nullable
+as int?,orderNum: null == orderNum ? _self.orderNum : orderNum // ignore: cast_nullable_to_non_nullable
 as int,taskType: null == taskType ? _self.taskType : taskType // ignore: cast_nullable_to_non_nullable
 as String,title: null == title ? _self.title : title // ignore: cast_nullable_to_non_nullable
 as String,required: null == required ? _self.required : required // ignore: cast_nullable_to_non_nullable
 as bool,contentId: freezed == contentId ? _self.contentId : contentId // ignore: cast_nullable_to_non_nullable
 as int?,contentSlug: freezed == contentSlug ? _self.contentSlug : contentSlug // ignore: cast_nullable_to_non_nullable
 as String?,completed: null == completed ? _self.completed : completed // ignore: cast_nullable_to_non_nullable
-as bool,
+as bool,completedAt: freezed == completedAt ? _self.completedAt : completedAt // ignore: cast_nullable_to_non_nullable
+as DateTime?,
   ));
 }
 
@@ -1047,10 +1049,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int orderNum,  String taskType,  String title,  bool required,  int? contentId,  String? contentSlug,  bool completed)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int? taskId,  int orderNum,  String taskType,  String title,  bool required,  int? contentId,  String? contentSlug,  bool completed,  DateTime? completedAt)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _WeeklyTask() when $default != null:
-return $default(_that.orderNum,_that.taskType,_that.title,_that.required,_that.contentId,_that.contentSlug,_that.completed);case _:
+return $default(_that.taskId,_that.orderNum,_that.taskType,_that.title,_that.required,_that.contentId,_that.contentSlug,_that.completed,_that.completedAt);case _:
   return orElse();
 
 }
@@ -1068,10 +1070,10 @@ return $default(_that.orderNum,_that.taskType,_that.title,_that.required,_that.c
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int orderNum,  String taskType,  String title,  bool required,  int? contentId,  String? contentSlug,  bool completed)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int? taskId,  int orderNum,  String taskType,  String title,  bool required,  int? contentId,  String? contentSlug,  bool completed,  DateTime? completedAt)  $default,) {final _that = this;
 switch (_that) {
 case _WeeklyTask():
-return $default(_that.orderNum,_that.taskType,_that.title,_that.required,_that.contentId,_that.contentSlug,_that.completed);case _:
+return $default(_that.taskId,_that.orderNum,_that.taskType,_that.title,_that.required,_that.contentId,_that.contentSlug,_that.completed,_that.completedAt);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -1088,10 +1090,10 @@ return $default(_that.orderNum,_that.taskType,_that.title,_that.required,_that.c
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int orderNum,  String taskType,  String title,  bool required,  int? contentId,  String? contentSlug,  bool completed)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int? taskId,  int orderNum,  String taskType,  String title,  bool required,  int? contentId,  String? contentSlug,  bool completed,  DateTime? completedAt)?  $default,) {final _that = this;
 switch (_that) {
 case _WeeklyTask() when $default != null:
-return $default(_that.orderNum,_that.taskType,_that.title,_that.required,_that.contentId,_that.contentSlug,_that.completed);case _:
+return $default(_that.taskId,_that.orderNum,_that.taskType,_that.title,_that.required,_that.contentId,_that.contentSlug,_that.completed,_that.completedAt);case _:
   return null;
 
 }
@@ -1103,9 +1105,10 @@ return $default(_that.orderNum,_that.taskType,_that.title,_that.required,_that.c
 @JsonSerializable()
 
 class _WeeklyTask implements WeeklyTask {
-  const _WeeklyTask({required this.orderNum, required this.taskType, required this.title, this.required = false, this.contentId, this.contentSlug, this.completed = false});
+  const _WeeklyTask({this.taskId, required this.orderNum, required this.taskType, required this.title, this.required = false, this.contentId, this.contentSlug, this.completed = false, this.completedAt});
   factory _WeeklyTask.fromJson(Map<String, dynamic> json) => _$WeeklyTaskFromJson(json);
 
+@override final  int? taskId;
 @override final  int orderNum;
 @override final  String taskType;
 @override final  String title;
@@ -1113,6 +1116,7 @@ class _WeeklyTask implements WeeklyTask {
 @override final  int? contentId;
 @override final  String? contentSlug;
 @override@JsonKey() final  bool completed;
+@override final  DateTime? completedAt;
 
 /// Create a copy of WeeklyTask
 /// with the given fields replaced by the non-null parameter values.
@@ -1127,16 +1131,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _WeeklyTask&&(identical(other.orderNum, orderNum) || other.orderNum == orderNum)&&(identical(other.taskType, taskType) || other.taskType == taskType)&&(identical(other.title, title) || other.title == title)&&(identical(other.required, required) || other.required == required)&&(identical(other.contentId, contentId) || other.contentId == contentId)&&(identical(other.contentSlug, contentSlug) || other.contentSlug == contentSlug)&&(identical(other.completed, completed) || other.completed == completed));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _WeeklyTask&&(identical(other.taskId, taskId) || other.taskId == taskId)&&(identical(other.orderNum, orderNum) || other.orderNum == orderNum)&&(identical(other.taskType, taskType) || other.taskType == taskType)&&(identical(other.title, title) || other.title == title)&&(identical(other.required, required) || other.required == required)&&(identical(other.contentId, contentId) || other.contentId == contentId)&&(identical(other.contentSlug, contentSlug) || other.contentSlug == contentSlug)&&(identical(other.completed, completed) || other.completed == completed)&&(identical(other.completedAt, completedAt) || other.completedAt == completedAt));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,orderNum,taskType,title,required,contentId,contentSlug,completed);
+int get hashCode => Object.hash(runtimeType,taskId,orderNum,taskType,title,required,contentId,contentSlug,completed,completedAt);
 
 @override
 String toString() {
-  return 'WeeklyTask(orderNum: $orderNum, taskType: $taskType, title: $title, required: $required, contentId: $contentId, contentSlug: $contentSlug, completed: $completed)';
+  return 'WeeklyTask(taskId: $taskId, orderNum: $orderNum, taskType: $taskType, title: $title, required: $required, contentId: $contentId, contentSlug: $contentSlug, completed: $completed, completedAt: $completedAt)';
 }
 
 
@@ -1147,7 +1151,7 @@ abstract mixin class _$WeeklyTaskCopyWith<$Res> implements $WeeklyTaskCopyWith<$
   factory _$WeeklyTaskCopyWith(_WeeklyTask value, $Res Function(_WeeklyTask) _then) = __$WeeklyTaskCopyWithImpl;
 @override @useResult
 $Res call({
- int orderNum, String taskType, String title, bool required, int? contentId, String? contentSlug, bool completed
+ int? taskId, int orderNum, String taskType, String title, bool required, int? contentId, String? contentSlug, bool completed, DateTime? completedAt
 });
 
 
@@ -1164,16 +1168,18 @@ class __$WeeklyTaskCopyWithImpl<$Res>
 
 /// Create a copy of WeeklyTask
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? orderNum = null,Object? taskType = null,Object? title = null,Object? required = null,Object? contentId = freezed,Object? contentSlug = freezed,Object? completed = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? taskId = freezed,Object? orderNum = null,Object? taskType = null,Object? title = null,Object? required = null,Object? contentId = freezed,Object? contentSlug = freezed,Object? completed = null,Object? completedAt = freezed,}) {
   return _then(_WeeklyTask(
-orderNum: null == orderNum ? _self.orderNum : orderNum // ignore: cast_nullable_to_non_nullable
+taskId: freezed == taskId ? _self.taskId : taskId // ignore: cast_nullable_to_non_nullable
+as int?,orderNum: null == orderNum ? _self.orderNum : orderNum // ignore: cast_nullable_to_non_nullable
 as int,taskType: null == taskType ? _self.taskType : taskType // ignore: cast_nullable_to_non_nullable
 as String,title: null == title ? _self.title : title // ignore: cast_nullable_to_non_nullable
 as String,required: null == required ? _self.required : required // ignore: cast_nullable_to_non_nullable
 as bool,contentId: freezed == contentId ? _self.contentId : contentId // ignore: cast_nullable_to_non_nullable
 as int?,contentSlug: freezed == contentSlug ? _self.contentSlug : contentSlug // ignore: cast_nullable_to_non_nullable
 as String?,completed: null == completed ? _self.completed : completed // ignore: cast_nullable_to_non_nullable
-as bool,
+as bool,completedAt: freezed == completedAt ? _self.completedAt : completedAt // ignore: cast_nullable_to_non_nullable
+as DateTime?,
   ));
 }
 

@@ -48,4 +48,86 @@ void main() {
     expect(response.completed, isTrue);
     expect(response.completedAt, '2026-06-21T10:00:00Z');
   });
+
+  test('content progress parsing rejects unsafe server values', () {
+    final invalid = <Map<String, dynamic>>[
+      {
+        'scrollPct': 2.0,
+        'dwellSec': 1,
+        'completed': false,
+        'completedAt': null,
+      },
+      {
+        'scrollPct': -0.01,
+        'dwellSec': 1,
+        'completed': false,
+        'completedAt': null,
+      },
+      {
+        'scrollPct': double.nan,
+        'dwellSec': 1,
+        'completed': false,
+        'completedAt': null,
+      },
+      {
+        'scrollPct': 0.5,
+        'dwellSec': -1,
+        'completed': false,
+        'completedAt': null,
+      },
+      {
+        'scrollPct': 1.0,
+        'dwellSec': 60,
+        'completed': true,
+        'completedAt': null,
+      },
+      {
+        'scrollPct': 0.5,
+        'dwellSec': 60,
+        'completed': false,
+        'completedAt': '2026-08-16T00:00:00Z',
+      },
+      {
+        'scrollPct': 1.0,
+        'dwellSec': 60,
+        'completed': true,
+        'completedAt': 'not-a-timestamp',
+      },
+    ];
+
+    for (final json in invalid) {
+      expect(
+        () => ContentProgress.fromJson(json),
+        throwsFormatException,
+        reason: json.toString(),
+      );
+      expect(
+        () => ContentProgressUpdateResponse.fromJson(json),
+        throwsFormatException,
+        reason: json.toString(),
+      );
+    }
+  });
+
+  test(
+    'LearningContent applies the same validation to cached nested progress',
+    () {
+      expect(
+        () => LearningContent.fromJson({
+          'id': 1,
+          'slug': 'unsafe',
+          'title': 'Unsafe',
+          'track': 'BACKEND',
+          'markdown': '# Unsafe',
+          'progress': {
+            'scrollPct': 1.5,
+            'dwellSec': -1,
+            'completed': false,
+            'completedAt': null,
+          },
+        }),
+        throwsFormatException,
+      );
+    },
+  );
 }

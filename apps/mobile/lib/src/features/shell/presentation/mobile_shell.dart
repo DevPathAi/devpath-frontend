@@ -9,7 +9,7 @@ import '../../notifications/application/notification_controller.dart';
 typedef MobileTab = ({IconData icon, String label});
 
 const List<MobileTab> kMobileTabs = [
-  (icon: DpIcons.home, label: '홈'),
+  (icon: DpIcons.home, label: '오늘'),
   (icon: DpIcons.content, label: '학습'),
   (icon: DpIcons.community, label: '커뮤니티'),
   (icon: DpIcons.notifications, label: '알림'),

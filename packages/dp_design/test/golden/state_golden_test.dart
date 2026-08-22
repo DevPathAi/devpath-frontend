@@ -19,8 +19,8 @@ Future<void> _loadFonts() async {
   // P3-D: 위젯테스트는 번들 폰트를 자동 로드하지 않으므로 명시 로드.
   // 실제 배치 파일은 Pretendard=.otf, D2Coding=.ttf.
   for (final entry in {
-    'Pretendard': 'fonts/Pretendard-Regular.otf',
-    'D2Coding': 'fonts/D2Coding.ttf',
+    'packages/dp_design/Pretendard': 'fonts/Pretendard-Regular.otf',
+    'packages/dp_design/D2Coding': 'fonts/D2Coding.ttf',
   }.entries) {
     final file = File(entry.value);
     if (!file.existsSync()) continue; // 미배치 시 fallback로 baseline

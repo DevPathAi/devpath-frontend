@@ -1,338 +1,452 @@
+import 'package:devpath_web/src/app/app_config.dart';
 import 'package:devpath_web/src/features/auth/application/auth_controller.dart';
 import 'package:devpath_web/src/features/auth/state/auth_state.dart';
 import 'package:devpath_web/src/features/diagnostic/application/diagnostic_controller.dart';
 import 'package:devpath_web/src/features/diagnostic/presentation/diagnostic_page.dart';
+import 'package:devpath_web/src/features/diagnostic/state/diagnostic_continuation.dart';
 import 'package:devpath_web/src/features/diagnostic/state/diagnostic_state.dart';
+import 'package:devpath_web/src/providers/api_providers.dart';
 import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 
-/// 미인증 상태로 고정(bootstrapSession microtask 없음)해 render만 검증.
+const _preview = AssessmentResult(diagnosedLevel: 'MID', confidenceWeight: 0.8);
+
 class _UnauthController extends AuthController {
   @override
   AuthState build() => const AuthUnauthenticated();
 }
 
-/// DiagnosticState를 고정하는 컨트롤러. build()가 부여된 상태를 그대로 반환.
-class _FixedController extends DiagnosticController {
-  _FixedController(this._initial);
-  final DiagnosticState _initial;
+class _FixedDiagnosticController extends DiagnosticController {
+  _FixedDiagnosticController(this.initial);
+
+  final DiagnosticState initial;
+  int saveCalls = 0;
+  int handoffCalls = 0;
+  int retryPathCalls = 0;
+  int retryAnswerCalls = 0;
+  int resumeCalls = 0;
+  int retryAdvanceCalls = 0;
+  int restartCalls = 0;
+  final selectedTracks = <String>[];
+  final guestStarts = <String>[];
 
   @override
-  DiagnosticState build() => _initial;
-}
-
-Widget _host() => ProviderScope(
-  overrides: [authControllerProvider.overrideWith(_UnauthController.new)],
-  child: MaterialApp(theme: DpTheme.light(), home: const DiagnosticPage()),
-);
-
-/// 시작 호출을 기록하는 컨트롤러. 실제 API 를 부르지 않는다.
-class _RecordingController extends DiagnosticController {
-  final List<String> memberStarts = <String>[];
-  final List<String> guestStarts = <String>[];
+  DiagnosticState build() => initial;
 
   @override
-  DiagnosticState build() => const DiagnosticIdle();
+  Future<void> resume() async => resumeCalls++;
 
   @override
-  Future<void> startAsMember(String track) async => memberStarts.add(track);
+  Future<void> retryAdvance() async => retryAdvanceCalls++;
+
+  @override
+  void selectTrack(String track) {
+    selectedTracks.add(track);
+    state = state.copyWith(track: track);
+  }
 
   @override
   Future<void> startAsGuest(String track) async => guestStarts.add(track);
+
+  @override
+  Future<void> saveAndContinue() async => saveCalls++;
+
+  @override
+  void completePathHandoff() => handoffCalls++;
+
+  @override
+  Future<void> retryPathProbe() async => retryPathCalls++;
+
+  @override
+  Future<void> retryLastAnswer() async => retryAnswerCalls++;
+
+  @override
+  void restart() => restartCalls++;
 }
 
-/// 인증 상태로 고정.
-class _AuthedController extends AuthController {
-  @override
-  AuthState build() => AuthAuthenticated(
-    const User(
-      id: 'u',
-      email: 'e@x.com',
-      nickname: 'n',
-      role: UserRole.learner,
-      onboardingStatus: OnboardingStatus.pending,
-      consentStatus: ConsentStatus.done,
-    ),
+Widget _host(
+  _FixedDiagnosticController controller, {
+  bool router = false,
+  bool missionSpineEnabled = true,
+  TextScaler? textScaler,
+}) {
+  Widget scaledBuilder(BuildContext context, Widget? child) => MediaQuery(
+    data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+    child: child!,
+  );
+  final child = router
+      ? MaterialApp.router(
+          theme: DpTheme.light(),
+          builder: textScaler == null ? null : scaledBuilder,
+          routerConfig: GoRouter(
+            initialLocation: '/diagnostic',
+            routes: [
+              GoRoute(
+                path: '/diagnostic',
+                builder: (_, _) => const DiagnosticPage(),
+              ),
+              GoRoute(path: '/path', builder: (_, _) => const Text('PATH')),
+            ],
+          ),
+        )
+      : MaterialApp(
+          theme: DpTheme.light(),
+          builder: textScaler == null ? null : scaledBuilder,
+          home: const DiagnosticPage(),
+        );
+  return ProviderScope(
+    overrides: [
+      appConfigProvider.overrideWithValue(
+        AppConfig(
+          baseUrl: 'https://test.devpath.ai',
+          useMock: true,
+          missionSpineEnabled: missionSpineEnabled,
+        ),
+      ),
+      authControllerProvider.overrideWith(_UnauthController.new),
+      diagnosticControllerProvider.overrideWith(() => controller),
+    ],
+    child: child,
   );
 }
 
+DiagnosticState _previewState({
+  DiagnosticContinuationPhase phase = DiagnosticContinuationPhase.preview,
+  bool saved = false,
+  DiagnosticPathBranch branch = DiagnosticPathBranch.unknown,
+  DiagnosticFailure? failure,
+  bool busy = false,
+}) => DiagnosticState(
+  phase: phase,
+  track: 'BACKEND_SPRING',
+  guestId: '123e4567-e89b-42d3-a456-426614174000',
+  preview: _preview,
+  saved: saved,
+  pathBranch: branch,
+  failure: failure,
+  busy: busy,
+);
+
 void main() {
-  testWidgets('DiagnosticIdle: 시작 안내 + 진단 시작하기 CTA 렌더', (tester) async {
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          authControllerProvider.overrideWith(_UnauthController.new),
-          diagnosticControllerProvider.overrideWith(
-            () => _FixedController(const DiagnosticIdle()),
-          ),
-        ],
-        child: MaterialApp(
-          theme: DpTheme.light(),
-          home: const DiagnosticPage(),
-        ),
-      ),
-    );
-    await tester.pump();
-
-    expect(find.text('실력 진단'), findsOneWidget); // 페이지 헤더
-    expect(find.text('실력 진단 15문항'), findsOneWidget);
-    expect(find.text('진단 시작하기'), findsOneWidget);
-  });
-
-  testWidgets('셸 밖 화면도 헤더와 본문이 같은 좌측 축에 선다', (tester) async {
-    // 넓은 폭에서만 드러난다 — 좁으면 readableMaxWidth가 화면을 꽉 채워
-    // 「중앙 정렬」과 「좌측 정렬」의 차이가 사라진다.
-    tester.view.physicalSize = const Size(1000, 900);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
-
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          authControllerProvider.overrideWith(_UnauthController.new),
-          diagnosticControllerProvider.overrideWith(
-            () => _FixedController(const DiagnosticIdle()),
-          ),
-        ],
-        child: MaterialApp(
-          theme: DpTheme.light(),
-          home: const DiagnosticPage(),
-        ),
-      ),
-    );
-    await tester.pump();
-
-    final headerLeft = tester.getTopLeft(find.text('실력 진단')).dx;
-    final bodyLeft = tester.getTopLeft(find.text('실력 진단 15문항')).dx;
-
-    // 헤더는 DpSpacing.lg(16), 본문 Padding은 DpSpacing.xl(24)이라 8px 차이는
-    // 정상이다. 본문이 중앙 정렬이면 그보다 훨씬 크게 벌어진다.
-    expect(
-      bodyLeft - headerLeft,
-      lessThan(16.0),
-      reason: '헤더는 좌측인데 본문만 중앙이면 시각 축이 둘로 갈린다',
-    );
-  });
-
-  testWidgets('AppBar 없이 헤더로 대체 + readableMaxWidth 사용', (tester) async {
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          authControllerProvider.overrideWith(_UnauthController.new),
-          diagnosticControllerProvider.overrideWith(
-            () => _FixedController(const DiagnosticIdle()),
-          ),
-        ],
-        child: MaterialApp(
-          theme: DpTheme.light(),
-          home: const DiagnosticPage(),
-        ),
-      ),
-    );
-    await tester.pump();
-
-    expect(find.byType(AppBar), findsNothing);
-    final header = tester.widget<DpPageHeader>(find.byType(DpPageHeader));
-    expect(header.title, '실력 진단');
-    expect(header.description, '몇 문항으로 현재 수준을 파악합니다');
-    final constrainedBox = tester.widget<ConstrainedBox>(
-      find
-          .ancestor(
-            of: find.byType(DpPageHeader),
-            matching: find.byType(ConstrainedBox),
-          )
-          .first,
-    );
-    expect(constrainedBox.constraints.maxWidth, 880);
-    // F4 회귀 가드: brandRow(context) 호출을 지워도 위 단언들은 깨지지
-    // 않는다 — 셸 밖 화면의 유일한 제품 정체성 표시이므로 존재를 직접
-    // 단언한다(brand_row.dart의 key로, find.text보다 견고하다).
-    expect(find.byKey(const ValueKey('brand-row')), findsOneWidget);
-  });
-
-  testWidgets('DiagnosticQuestion: 진행 표시 + 문항 + 답안 제출 렌더', (tester) async {
-    const q = DiagnosticQuestion(
-      NextQuestion(
-        question: AssessmentQuestion(
-          id: 1,
-          type: 'MCQ',
-          content: 'Spring Bean의 기본 스코프는?',
-          options: null,
-          bloomLevel: 'REMEMBER',
-          difficulty: 0.3,
-        ),
-        index: 3,
-        total: 15,
-      ),
-    );
-
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          authControllerProvider.overrideWith(_UnauthController.new),
-          diagnosticControllerProvider.overrideWith(() => _FixedController(q)),
-        ],
-        child: MaterialApp(
-          theme: DpTheme.light(),
-          home: const DiagnosticPage(),
-        ),
-      ),
-    );
-    await tester.pump();
-
-    expect(find.textContaining('3 / 15'), findsOneWidget); // 진행 표시
-    expect(find.text('Spring Bean의 기본 스코프는?'), findsOneWidget); // 문항
-    expect(find.text('답안 제출'), findsOneWidget); // options 없음 → 단일 제출
-    expect(find.text('잘 모르겠어요'), findsOneWidget); // skip
-  });
-
-  testWidgets('DiagnosticGateSignup: 로그인 안내 + GitHub 로그인 렌더', (tester) async {
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          authControllerProvider.overrideWith(_UnauthController.new),
-          diagnosticControllerProvider.overrideWith(
-            () => _FixedController(const DiagnosticGateSignup()),
-          ),
-        ],
-        child: MaterialApp(
-          theme: DpTheme.light(),
-          home: const DiagnosticPage(),
-        ),
-      ),
-    );
+  testWidgets('flag OFF guest 완료는 결과를 숨기고 legacy 로그인 gate를 보인다', (
+    tester,
+  ) async {
+    final controller = _FixedDiagnosticController(_previewState());
+    await tester.pumpWidget(_host(controller, missionSpineEnabled: false));
     await tester.pump();
 
     expect(find.text('결과를 보려면 로그인하세요'), findsOneWidget);
     expect(find.text('GitHub로 로그인'), findsOneWidget);
+    expect(find.text('진단 결과'), findsNothing);
+    expect(find.textContaining('현재 레벨 MID'), findsNothing);
+    expect(find.text('저장하고 계속'), findsNothing);
   });
 
-  testWidgets('DiagnosticError: 에러 메시지 렌더(dpColors 접근)', (tester) async {
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          authControllerProvider.overrideWith(_UnauthController.new),
-          diagnosticControllerProvider.overrideWith(
-            () => _FixedController(const DiagnosticError('진단을 시작할 수 없습니다')),
+  testWidgets('track 단계는 15문항·비회원 시작·산출물을 명시한다', (tester) async {
+    final controller = _FixedDiagnosticController(const DiagnosticState());
+    await tester.pumpWidget(_host(controller));
+    await tester.pump();
+
+    expect(find.text('실력 진단 15문항'), findsOneWidget);
+    expect(find.textContaining('로그인 없이'), findsOneWidget);
+    expect(find.textContaining('레벨과 신뢰도'), findsOneWidget);
+    expect(find.byKey(const ValueKey('brand-row')), findsOneWidget);
+  });
+
+  testWidgets('선택한 트랙으로만 guest 진단을 시작한다', (tester) async {
+    final controller = _FixedDiagnosticController(const DiagnosticState());
+    await tester.pumpWidget(_host(controller));
+
+    await tester.tap(find.byKey(const ValueKey('diagnostic-track')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('DevOps').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('진단 시작하기'));
+
+    expect(controller.selectedTracks, ['DEVOPS']);
+    expect(controller.guestStarts, ['DEVOPS']);
+  });
+
+  testWidgets('questions 단계는 텍스트와 bar로 진행률을 함께 보인다', (tester) async {
+    final controller = _FixedDiagnosticController(
+      const DiagnosticState(
+        phase: DiagnosticContinuationPhase.questions,
+        track: 'BACKEND_SPRING',
+        nextQuestion: NextQuestion(
+          question: AssessmentQuestion(
+            id: 1,
+            type: 'MCQ',
+            content: 'Spring Bean의 기본 스코프는?',
+            bloomLevel: 'REMEMBER',
+            difficulty: 0.3,
           ),
-        ],
-        child: MaterialApp(
-          theme: DpTheme.light(),
-          home: const DiagnosticPage(),
+          index: 3,
+          total: 15,
         ),
       ),
     );
+    await tester.pumpWidget(_host(controller));
     await tester.pump();
 
-    expect(find.text('진단을 시작할 수 없습니다'), findsOneWidget);
+    expect(find.textContaining('3 / 15'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    expect(find.text('Spring Bean의 기본 스코프는?'), findsOneWidget);
   });
 
-  testWidgets('기본 Idle 호스트 렌더 스모크', (tester) async {
-    await tester.pumpWidget(_host());
+  testWidgets('guest preview는 로그인 전에 보이고 저장 CTA 전에는 이동하지 않는다', (tester) async {
+    final controller = _FixedDiagnosticController(_previewState());
+    await tester.pumpWidget(_host(controller, router: true));
+    await tester.pumpAndSettle();
+
+    expect(find.text('진단 결과'), findsOneWidget);
+    expect(find.textContaining('MID'), findsOneWidget);
+    expect(find.textContaining('80%'), findsOneWidget);
+    expect(find.text('저장하고 계속'), findsOneWidget);
+    expect(find.text('PATH'), findsNothing);
+
+    await tester.tap(find.text('저장하고 계속'));
     await tester.pump();
-    expect(find.byType(DiagnosticPage), findsOneWidget);
+    expect(controller.saveCalls, 1);
+    expect(find.text('PATH'), findsNothing);
   });
 
-  testWidgets('트랙 미선택이면 시작할 수 없고 이유가 화면에 보인다', (tester) async {
-    final rec = _RecordingController();
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          authControllerProvider.overrideWith(_UnauthController.new),
-          diagnosticControllerProvider.overrideWith(() => rec),
-        ],
-        child: MaterialApp(
-          theme: DpTheme.light(),
-          home: const DiagnosticPage(),
+  testWidgets('saved preview도 동일한 결과를 보이며 explicit CTA 뒤에만 /path로 간다', (
+    tester,
+  ) async {
+    final controller = _FixedDiagnosticController(
+      _previewState(
+        phase: DiagnosticContinuationPhase.saved,
+        saved: true,
+        branch: DiagnosticPathBranch.newPath,
+      ),
+    );
+    await tester.pumpWidget(_host(controller, router: true));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('MID'), findsOneWidget);
+    expect(find.textContaining('80%'), findsOneWidget);
+    expect(find.text('학습 경로로 계속'), findsOneWidget);
+    expect(find.text('진단 다시 시작'), findsNothing);
+    expect(find.text('PATH'), findsNothing);
+
+    await tester.tap(find.text('학습 경로로 계속'));
+    await tester.pumpAndSettle();
+    expect(controller.handoffCalls, 1);
+    expect(find.text('PATH'), findsOneWidget);
+  });
+
+  testWidgets('existing path branch는 진단을 병합했다고 말하지 않는다', (tester) async {
+    final controller = _FixedDiagnosticController(
+      _previewState(
+        phase: DiagnosticContinuationPhase.saved,
+        saved: true,
+        branch: DiagnosticPathBranch.existingActivePath,
+      ),
+    );
+    await tester.pumpWidget(_host(controller));
+    await tester.pump();
+
+    expect(find.textContaining('기존 학습 경로는 바꾸지 않았어요'), findsOneWidget);
+    expect(find.text('기존 경로로 계속'), findsOneWidget);
+    expect(find.textContaining('병합'), findsNothing);
+  });
+
+  testWidgets('claim/path 오류는 preview를 가리지 않고 해당 단계 retry만 제공한다', (
+    tester,
+  ) async {
+    final controller = _FixedDiagnosticController(
+      _previewState(
+        phase: DiagnosticContinuationPhase.saved,
+        saved: true,
+        failure: const DiagnosticFailure(
+          DiagnosticFailureKind.pathGeneration,
+          '결과는 저장됐지만 학습 경로 상태를 불러오지 못했어요.',
         ),
       ),
     );
+    await tester.pumpWidget(_host(controller));
+    await tester.pump();
 
-    // 조용한 비활성 버튼 금지 — 왜 못 누르는지 화면에 있어야 한다.
-    expect(find.byKey(const ValueKey('diagnostic-track-hint')), findsOneWidget);
+    expect(find.textContaining('MID'), findsOneWidget);
+    expect(find.textContaining('결과는 저장됐지만'), findsOneWidget);
+    expect(find.text('경로 상태 다시 확인'), findsOneWidget);
+    await tester.tap(find.text('경로 상태 다시 확인'));
+    expect(controller.retryPathCalls, 1);
+  });
 
-    final button = tester.widget<FilledButton>(find.byType(FilledButton));
+  testWidgets('claim 오류는 preview를 유지하고 저장 재시도라고 명확히 표시한다', (tester) async {
+    final controller = _FixedDiagnosticController(
+      _previewState(
+        phase: DiagnosticContinuationPhase.claim,
+        failure: const DiagnosticFailure(
+          DiagnosticFailureKind.claim,
+          '결과를 아직 저장하지 못했어요.',
+        ),
+      ),
+    );
+    await tester.pumpWidget(_host(controller));
+    await tester.pump();
+
+    expect(find.textContaining('MID'), findsOneWidget);
+    expect(find.text('저장 다시 시도'), findsOneWidget);
+    expect(find.text('결과 저장 중'), findsNothing);
+
+    await tester.tap(find.text('저장 다시 시도'));
+    expect(controller.saveCalls, 1);
+  });
+
+  testWidgets('답변 저장 뒤 next 오류는 답변 대신 다음 문항 불러오기만 재시도한다', (tester) async {
+    final controller = _FixedDiagnosticController(
+      const DiagnosticState(
+        phase: DiagnosticContinuationPhase.questions,
+        track: 'BACKEND_SPRING',
+        guestId: '123e4567-e89b-42d3-a456-426614174000',
+        nextQuestion: NextQuestion(
+          question: AssessmentQuestion(
+            id: 9,
+            type: 'MCQ',
+            content: '현재 문항',
+            bloomLevel: 'REMEMBER',
+            difficulty: 0.2,
+          ),
+          index: 8,
+          total: 15,
+        ),
+        failure: DiagnosticFailure(
+          DiagnosticFailureKind.initialLoad,
+          '다음 문항을 불러오지 못했어요.',
+        ),
+      ),
+    );
+    await tester.pumpWidget(_host(controller));
+    await tester.pump();
+    expect(find.text('다음 문항 다시 불러오기'), findsOneWidget);
+    expect(find.text('같은 답변 다시 저장'), findsNothing);
+    expect(find.text('잘 모르겠어요'), findsNothing);
+
+    await tester.tap(find.text('다음 문항 다시 불러오기'));
+    expect(controller.retryAdvanceCalls, 1);
+  });
+
+  testWidgets('guest start 뒤 첫 next 오류는 새 진단 시작 대신 기존 진단을 재개한다', (
+    tester,
+  ) async {
+    final controller = _FixedDiagnosticController(
+      const DiagnosticState(
+        phase: DiagnosticContinuationPhase.questions,
+        track: 'BACKEND_SPRING',
+        guestId: '123e4567-e89b-42d3-a456-426614174000',
+        failure: DiagnosticFailure(
+          DiagnosticFailureKind.initialLoad,
+          '첫 문항을 불러오지 못했어요.',
+        ),
+      ),
+    );
+    await tester.pumpWidget(_host(controller));
+    await tester.pump();
+
+    expect(find.text('다음 문항 다시 불러오기'), findsOneWidget);
+    expect(find.text('진단 시작하기'), findsNothing);
+
+    await tester.tap(find.text('다음 문항 다시 불러오기'));
+    expect(controller.retryAdvanceCalls, 1);
+    expect(controller.guestStarts, isEmpty);
+  });
+
+  testWidgets('answer 실패는 선택지와 실패한 선택을 보존하고 같은 payload retry를 제공한다', (
+    tester,
+  ) async {
+    final controller = _FixedDiagnosticController(
+      const DiagnosticState(
+        phase: DiagnosticContinuationPhase.questions,
+        track: 'BACKEND_SPRING',
+        guestId: '123e4567-e89b-42d3-a456-426614174000',
+        nextQuestion: NextQuestion(
+          question: AssessmentQuestion(
+            id: 9,
+            type: 'MCQ',
+            content: '현재 문항',
+            options: '["첫 답","둘째 답"]',
+            bloomLevel: 'REMEMBER',
+            difficulty: 0.2,
+          ),
+          index: 8,
+          total: 15,
+        ),
+        pendingAnswer: '{"correct":1}',
+        failure: DiagnosticFailure(
+          DiagnosticFailureKind.answer,
+          '답변을 저장하지 못했어요.',
+        ),
+      ),
+    );
+    await tester.pumpWidget(_host(controller));
+    await tester.pump();
+
+    expect(find.text('첫 답'), findsOneWidget);
+    expect(find.text('✓ 둘째 답'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('diagnostic-option-selected-1')),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('같은 답변 다시 저장'));
+    expect(controller.retryAnswerCalls, 1);
+  });
+
+  testWidgets('saved path probe busy 동안에는 known branch handoff CTA도 비활성이다', (
+    tester,
+  ) async {
+    final controller = _FixedDiagnosticController(
+      _previewState(
+        phase: DiagnosticContinuationPhase.saved,
+        saved: true,
+        branch: DiagnosticPathBranch.newPath,
+        busy: true,
+      ),
+    );
+    await tester.pumpWidget(_host(controller, router: true));
+    await tester.pump();
+
+    final button = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, '학습 경로로 계속'),
+    );
     expect(button.onPressed, isNull);
+    expect(find.text('PATH'), findsNothing);
   });
 
-  testWidgets('게스트: 고른 트랙으로 시작한다', (tester) async {
-    final rec = _RecordingController();
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          authControllerProvider.overrideWith(_UnauthController.new),
-          diagnosticControllerProvider.overrideWith(() => rec),
-        ],
-        child: MaterialApp(
-          theme: DpTheme.light(),
-          home: const DiagnosticPage(),
-        ),
-      ),
-    );
+  testWidgets(
+    '만료/ownership은 320px·200%에서도 overflow 없이 restart semantic action 하나만 둔다',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final semantics = tester.ensureSemantics();
 
-    // 기본값(BACKEND_SPRING)이 아닌 트랙을 고른다 — 다시 하드코딩되면 red 가 된다.
-    await tester.tap(find.byKey(const ValueKey('diagnostic-track')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('DevOps').last);
-    await tester.pumpAndSettle();
+      for (final kind in <DiagnosticFailureKind>[
+        DiagnosticFailureKind.guestExpired,
+        DiagnosticFailureKind.ownership,
+      ]) {
+        final controller = _FixedDiagnosticController(
+          _previewState(
+            failure: DiagnosticFailure(kind, '이 결과는 안전하게 이어갈 수 없어요.'),
+          ),
+        );
+        await tester.pumpWidget(
+          _host(controller, textScaler: const TextScaler.linear(2)),
+        );
+        await tester.pump();
 
-    await tester.tap(find.byType(FilledButton));
-    await tester.pump();
-
-    expect(rec.guestStarts, ['DEVOPS']);
-    expect(rec.memberStarts, isEmpty);
-  });
-
-  testWidgets('회원: 고른 트랙으로 시작한다', (tester) async {
-    final rec = _RecordingController();
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          authControllerProvider.overrideWith(_AuthedController.new),
-          diagnosticControllerProvider.overrideWith(() => rec),
-        ],
-        child: MaterialApp(
-          theme: DpTheme.light(),
-          home: const DiagnosticPage(),
-        ),
-      ),
-    );
-
-    await tester.tap(find.byKey(const ValueKey('diagnostic-track')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('DevOps').last);
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byType(FilledButton));
-    await tester.pump();
-
-    expect(rec.memberStarts, ['DEVOPS']);
-    expect(rec.guestStarts, isEmpty);
-  });
-
-  testWidgets('선택 후에는 안내 문구가 사라진다', (tester) async {
-    final rec = _RecordingController();
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          authControllerProvider.overrideWith(_UnauthController.new),
-          diagnosticControllerProvider.overrideWith(() => rec),
-        ],
-        child: MaterialApp(
-          theme: DpTheme.light(),
-          home: const DiagnosticPage(),
-        ),
-      ),
-    );
-
-    await tester.tap(find.byKey(const ValueKey('diagnostic-track')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('DevOps').last);
-    await tester.pumpAndSettle();
-
-    expect(find.byKey(const ValueKey('diagnostic-track-hint')), findsNothing);
-  });
+        expect(tester.takeException(), isNull);
+        expect(find.text('새 진단 시작'), findsOneWidget);
+        expect(find.text('진단 다시 시작'), findsNothing);
+        expect(find.bySemanticsLabel('새 진단 시작'), findsOneWidget);
+      }
+      semantics.dispose();
+    },
+  );
 }

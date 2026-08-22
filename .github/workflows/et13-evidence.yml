@@ -1,0 +1,1187 @@
+---
+# Immutable action and image digests intentionally exceed 80 columns.
+# yamllint disable rule:line-length
+name: ET13 Frontend Evidence
+
+'on':
+  workflow_dispatch:
+    inputs:
+      release_id:
+        description: Release identifier bound by the external candidate spec
+        required: true
+        type: string
+      candidate_run_id:
+        description: Successful GitOps candidate producer run ID
+        required: true
+        type: string
+      candidate_run_attempt:
+        description: Exact successful GitOps candidate producer attempt
+        required: true
+        type: string
+      candidate_artifact_id:
+        description: Immutable canonical candidate artifact ID
+        required: true
+        type: string
+      candidate_spec_sha256:
+        description: SHA-256 of the exact raw canonical candidate-spec bytes
+        required: true
+        type: string
+      baseline_run_id:
+        description: Successful protected baseline approval run ID
+        required: true
+        type: string
+      baseline_run_attempt:
+        description: Exact successful protected baseline approval attempt
+        required: true
+        type: string
+      baseline_artifact_id:
+        description: Immutable approved baseline artifact ID
+        required: true
+        type: string
+  pull_request:
+    paths:
+      - 'apps/web/**'
+      - 'apps/admin/**'
+      - 'apps/mobile/**'
+      - 'packages/dp_core/**'
+      - 'packages/dp_design/**'
+      - 'evidence/et13/**'
+      - 'tools/et13/**'
+      - 'tools/et13_evidence.dart'
+      - 'tools/et13_baseline_updater.dart'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - '.gitattributes'
+      - '.github/workflows/et13-evidence.yml'
+      - '.github/workflows/et13-baseline-approval.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/**'
+      - 'apps/admin/**'
+      - 'apps/mobile/**'
+      - 'packages/dp_core/**'
+      - 'packages/dp_design/**'
+      - 'evidence/et13/**'
+      - 'tools/et13/**'
+      - 'tools/et13_evidence.dart'
+      - 'tools/et13_baseline_updater.dart'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - '.gitattributes'
+      - '.github/workflows/et13-evidence.yml'
+      - '.github/workflows/et13-baseline-approval.yml'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: et13-evidence-${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && inputs.release_id || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
+
+env:
+  RENDERER_IMAGE: mcr.microsoft.com/playwright:v1.55.0-noble@sha256:ffc33305f7b4b04057ae4a0caa70aad4fde87454fb403a1a22e7f931707dfcf9
+  ET13_ROOT: build/et13
+  EVIDENCE_MODE: ${{ github.event_name == 'workflow_dispatch' && 'release_ready' || 'diagnostic' }}
+
+jobs:
+  authenticate-release-inputs:
+    name: Authenticate ET13 release inputs
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment:
+      name: mission-spine-et13-release-auth
+    outputs:
+      artifact_id: ${{ steps.upload-release-auth.outputs.artifact-id }}
+      artifact_digest: ${{ steps.upload-release-auth.outputs.artifact-digest }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6.1.0
+        with:
+          persist-credentials: false
+
+      - name: Reject release authentication ambiguity
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ inputs.release_id }}
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REPOSITORY}" = DevPathAi/devpath-frontend
+          test "${GITHUB_EVENT_NAME}" = workflow_dispatch
+          test "${GITHUB_REF}" = refs/heads/main
+          test "${GITHUB_REF_NAME}" = main
+          test "${GITHUB_RUN_ATTEMPT}" = 1
+          test "${GITHUB_WORKFLOW_REF}" = \
+            'DevPathAi/devpath-frontend/.github/workflows/et13-evidence.yml@refs/heads/main'
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          [[ "${RELEASE_ID}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]]
+          branch="${RUNNER_TEMP}/et13-release-auth-main.json"
+          test ! -e "${branch}"
+          curl --fail --silent --show-error \
+            --proto '=https' \
+            -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H 'X-GitHub-Api-Version: 2026-03-10' \
+            'https://api.github.com/repos/DevPathAi/devpath-frontend/branches/main' \
+            --output "${branch}"
+          jq -e --arg sha "${GITHUB_SHA}" \
+            '.name == "main" and .protected == true and .commit.sha == $sha' \
+            "${branch}" >/dev/null
+
+      - name: Authenticate protected release-reader approval
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          approval_root="${RUNNER_TEMP}/et13-release-auth-approval"
+          test ! -e "${approval_root}"
+          mkdir "${approval_root}"
+          node tools/mission_spine_protected_approval.mjs \
+            --workflow-path=.github/workflows/et13-evidence.yml \
+            --environment=mission-spine-et13-release-auth \
+            --job-name='Authenticate ET13 release inputs' \
+            --output="${approval_root}/approval.json"
+
+      - name: Mint read-only GitOps candidate token
+        id: gitops-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3.2.0
+        with:
+          app-id: ${{ secrets.MISSION_SPINE_EVIDENCE_READER_APP_ID }}
+          private-key: ${{ secrets.MISSION_SPINE_EVIDENCE_READER_APP_PRIVATE_KEY }}
+          owner: DevPathAi
+          permission-actions: read
+          permission-contents: read
+
+      - name: Verify evidence reader App is GitOps-only
+        shell: bash
+        env:
+          GITOPS_TOKEN: ${{ steps.gitops-token.outputs.token }}
+          APP_SLUG: ${{ steps.gitops-token.outputs.app-slug }}
+          INSTALLATION_ID: ${{ steps.gitops-token.outputs.installation-id }}
+        run: |
+          set -euo pipefail
+          test -n "${GITOPS_TOKEN}"
+          test "${APP_SLUG}" = devpath-evidence-reader
+          [[ "${INSTALLATION_ID}" =~ ^[1-9][0-9]*$ ]]
+          inventory="${RUNNER_TEMP}/et13-evidence-reader-repositories.json"
+          test ! -e "${inventory}"
+          curl --fail --silent --show-error \
+            --proto '=https' \
+            -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer ${GITOPS_TOKEN}" \
+            -H 'X-GitHub-Api-Version: 2026-03-10' \
+            'https://api.github.com/installation/repositories?per_page=100' \
+            --output "${inventory}"
+          jq -e '
+            .total_count == 1 and
+            (.repositories | length) == 1 and
+            .repositories[0].full_name == "DevPathAi/devpath-gitops"
+          ' "${inventory}" >/dev/null
+
+      - name: Authenticate exact external release artifact metadata
+        if: github.event_name == 'workflow_dispatch'
+        id: external-metadata
+        shell: bash
+        env:
+          GITOPS_TOKEN: ${{ steps.gitops-token.outputs.token }}
+          FRONTEND_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ inputs.release_id }}
+          CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+          CANDIDATE_RUN_ATTEMPT: ${{ inputs.candidate_run_attempt }}
+          CANDIDATE_ARTIFACT_ID: ${{ inputs.candidate_artifact_id }}
+          BASELINE_RUN_ID: ${{ inputs.baseline_run_id }}
+          BASELINE_RUN_ATTEMPT: ${{ inputs.baseline_run_attempt }}
+          BASELINE_ARTIFACT_ID: ${{ inputs.baseline_artifact_id }}
+        run: |
+          set -euo pipefail
+          test -n "${GITOPS_TOKEN}"
+          test -n "${FRONTEND_TOKEN}"
+          GITHUB_TOKEN="${GITOPS_TOKEN}" node tools/et13/verify_external_artifact.mjs \
+            --kind=candidate \
+            --release-id="${RELEASE_ID}" \
+            --run-id="${CANDIDATE_RUN_ID}" \
+            --run-attempt="${CANDIDATE_RUN_ATTEMPT}" \
+            --artifact-id="${CANDIDATE_ARTIFACT_ID}" \
+            --frontend-sha="${GITHUB_SHA}"
+          baseline_workflow_sha256="$(
+            sha256sum .github/workflows/et13-baseline-approval.yml \
+              | awk '{print $1}'
+          )"
+          GITHUB_TOKEN="${FRONTEND_TOKEN}" node tools/et13/verify_external_artifact.mjs \
+            --kind=baseline \
+            --release-id="${RELEASE_ID}" \
+            --run-id="${BASELINE_RUN_ID}" \
+            --run-attempt="${BASELINE_RUN_ATTEMPT}" \
+            --artifact-id="${BASELINE_ARTIFACT_ID}" \
+            --workflow-sha256="${baseline_workflow_sha256}" \
+            --frontend-sha="${GITHUB_SHA}"
+
+      - name: Checkout exact authenticated GitOps candidate source
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6.1.0
+        with:
+          repository: DevPathAi/devpath-gitops
+          ref: ${{ steps.external-metadata.outputs.candidate_head_sha }}
+          token: ${{ steps.gitops-token.outputs.token }}
+          fetch-depth: 2
+          persist-credentials: false
+          path: build/et13/external/gitops-checkout
+
+      - name: Hard-verify exact external artifact archives
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          GITOPS_TOKEN: ${{ steps.gitops-token.outputs.token }}
+          FRONTEND_TOKEN: ${{ github.token }}
+          CANDIDATE_ARTIFACT_ID: ${{ inputs.candidate_artifact_id }}
+          BASELINE_ARTIFACT_ID: ${{ inputs.baseline_artifact_id }}
+          CANDIDATE_ARCHIVE_SHA256: ${{ steps.external-metadata.outputs.candidate_artifact_archive_sha256 }}
+          BASELINE_ARCHIVE_SHA256: ${{ steps.external-metadata.outputs.baseline_artifact_archive_sha256 }}
+        run: |
+          set -euo pipefail
+          test -n "${GITOPS_TOKEN}"
+          test -n "${FRONTEND_TOKEN}"
+          [[ "${CANDIDATE_ARTIFACT_ID}" =~ ^[1-9][0-9]*$ ]]
+          [[ "${BASELINE_ARTIFACT_ID}" =~ ^[1-9][0-9]*$ ]]
+          [[ "${CANDIDATE_ARCHIVE_SHA256}" =~ ^[0-9a-f]{64}$ ]]
+          [[ "${BASELINE_ARCHIVE_SHA256}" =~ ^[0-9a-f]{64}$ ]]
+          external_root="${ET13_ROOT}/external"
+          test -d "${external_root}"
+          test ! -L "${external_root}"
+          for directory in candidate baseline candidate-archive baseline-archive; do
+            test ! -e "${external_root}/${directory}"
+            test ! -L "${external_root}/${directory}"
+            mkdir -- "${external_root}/${directory}"
+            test -d "${external_root}/${directory}"
+            test ! -L "${external_root}/${directory}"
+          done
+          curl --fail --silent --show-error --location \
+            --proto '=https' --proto-redir '=https' \
+            -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer ${GITOPS_TOKEN}" \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "https://api.github.com/repos/DevPathAi/devpath-gitops/actions/artifacts/${CANDIDATE_ARTIFACT_ID}/zip" \
+            --output "${external_root}/candidate.zip"
+          curl --fail --silent --show-error --location \
+            --proto '=https' --proto-redir '=https' \
+            -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer ${FRONTEND_TOKEN}" \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "https://api.github.com/repos/DevPathAi/devpath-frontend/actions/artifacts/${BASELINE_ARTIFACT_ID}/zip" \
+            --output "${external_root}/baseline.zip"
+          printf '%s  %s\n' \
+            "${CANDIDATE_ARCHIVE_SHA256}" \
+            "${external_root}/candidate.zip" | sha256sum --check --strict
+          printf '%s  %s\n' \
+            "${BASELINE_ARCHIVE_SHA256}" \
+            "${external_root}/baseline.zip" | sha256sum --check --strict
+
+          python3 - \
+            "${external_root}/candidate.zip" \
+            "${external_root}/baseline.zip" <<'PYTHON'
+          import stat
+          import sys
+          import zipfile
+
+          for archive in sys.argv[1:]:
+              try:
+                  with zipfile.ZipFile(archive) as artifact_zip:
+                      entries = artifact_zip.infolist()
+              except (OSError, zipfile.BadZipFile) as error:
+                  raise SystemExit(
+                      f'invalid external artifact archive {archive}: {error}'
+                  ) from error
+              if not entries:
+                  raise SystemExit(
+                      f'external artifact archive is empty: {archive}'
+                  )
+              seen = set()
+              for entry in entries:
+                  name = entry.filename
+                  normalized = name[:-1] if name.endswith('/') else name
+                  parts = normalized.split('/')
+                  if (
+                      not normalized
+                      or '\\' in name
+                      or any(part in ('', '.', '..') for part in parts)
+                  ):
+                      raise SystemExit(
+                          f'unsafe external archive entry: {name!r}'
+                      )
+                  if normalized in seen:
+                      raise SystemExit(
+                          f'duplicate external archive entry: {name!r}'
+                      )
+                  seen.add(normalized)
+                  if entry.flag_bits & 0x1:
+                      raise SystemExit(
+                          f'encrypted external archive entry: {name!r}'
+                      )
+                  file_type = stat.S_IFMT(
+                      (entry.external_attr >> 16) & 0xFFFF
+                  )
+                  if file_type == stat.S_IFLNK:
+                      raise SystemExit(
+                          f'external archive link is forbidden: {name!r}'
+                      )
+                  expected = stat.S_IFDIR if entry.is_dir() else stat.S_IFREG
+                  if file_type not in (0, expected):
+                      raise SystemExit(
+                          f'external archive special entry is forbidden: {name!r}'
+                      )
+          PYTHON
+
+      - name: Download exact canonical candidate
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53  # v6.0.0
+        with:
+          artifact-ids: ${{ inputs.candidate_artifact_id }}
+          repository: DevPathAi/devpath-gitops
+          run-id: ${{ inputs.candidate_run_id }}
+          github-token: ${{ steps.gitops-token.outputs.token }}
+          merge-multiple: true
+          path: build/et13/external/candidate
+
+      - name: Download exact approved visual baseline
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53  # v6.0.0
+        with:
+          artifact-ids: ${{ inputs.baseline_artifact_id }}
+          repository: DevPathAi/devpath-frontend
+          run-id: ${{ inputs.baseline_run_id }}
+          github-token: ${{ github.token }}
+          merge-multiple: true
+          path: build/et13/external/baseline
+
+      - name: Reject external artifact links, extras, and raw-byte drift
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          CANDIDATE_SPEC_SHA256: ${{ inputs.candidate_spec_sha256 }}
+        run: |
+          set -euo pipefail
+          [[ "${CANDIDATE_SPEC_SHA256}" =~ ^[0-9a-f]{64}$ ]]
+          external_root="${ET13_ROOT}/external"
+          candidate_root="${ET13_ROOT}/external/candidate"
+          baseline_root="${ET13_ROOT}/external/baseline"
+          for directory in candidate baseline candidate-archive baseline-archive; do
+            test -d "${external_root}/${directory}"
+            test ! -L "${external_root}/${directory}"
+          done
+          test -z "$(find "${external_root}/candidate-archive" -mindepth 1 -print -quit)"
+          test -z "$(find "${external_root}/baseline-archive" -mindepth 1 -print -quit)"
+          unzip -q \
+            "${external_root}/candidate.zip" \
+            -d "${external_root}/candidate-archive"
+          unzip -q \
+            "${external_root}/baseline.zip" \
+            -d "${external_root}/baseline-archive"
+          test -z "$(find "${external_root}/candidate-archive" "${external_root}/baseline-archive" -type l -print -quit)"
+          test -z "$(find "${external_root}/candidate-archive" "${external_root}/baseline-archive" -mindepth 1 ! -type f ! -type d -print -quit)"
+          diff --recursive --brief \
+            "${external_root}/candidate-archive" "${candidate_root}"
+          diff --recursive --brief \
+            "${external_root}/baseline-archive" "${baseline_root}"
+          test -z "$(find "${candidate_root}" "${baseline_root}" -type l -print -quit)"
+          mapfile -t candidate_files < <(
+            find "${candidate_root}" -type f -printf '%P\n' | LC_ALL=C sort
+          )
+          test "${#candidate_files[@]}" -eq 1
+          test "${candidate_files[0]}" = candidate-spec.json
+          test -z "$(find "${candidate_root}" -mindepth 1 -type d -print -quit)"
+          printf '%s  %s\n' \
+            "${CANDIDATE_SPEC_SHA256}" \
+            "${candidate_root}/candidate-spec.json" | sha256sum --check --strict
+          {
+            printf '%s\n' baseline-approval.v1.json review-candidate.v1.json
+            jq -er '.cases[].artifact_path' \
+              evidence/et13/generated/visual-cases.v1.json
+          } | LC_ALL=C sort > "${RUNNER_TEMP}/expected-baseline-files.txt"
+          find "${baseline_root}" -type f -printf '%P\n' | LC_ALL=C sort \
+            > "${RUNNER_TEMP}/actual-baseline-files.txt"
+          diff -u \
+            "${RUNNER_TEMP}/expected-baseline-files.txt" \
+            "${RUNNER_TEMP}/actual-baseline-files.txt"
+          while IFS= read -r path; do
+            directory="$(dirname "${path}")"
+            while [[ "${directory}" != . ]]; do
+              printf '%s\n' "${directory}"
+              directory="$(dirname "${directory}")"
+            done
+          done < "${RUNNER_TEMP}/expected-baseline-files.txt" \
+            | LC_ALL=C sort -u \
+            > "${RUNNER_TEMP}/expected-baseline-directories.txt"
+          find "${baseline_root}" -mindepth 1 -type d -printf '%P\n' \
+            | LC_ALL=C sort \
+            > "${RUNNER_TEMP}/actual-baseline-directories.txt"
+          diff -u \
+            "${RUNNER_TEMP}/expected-baseline-directories.txt" \
+            "${RUNNER_TEMP}/actual-baseline-directories.txt"
+
+      - name: Authenticate candidate-only child of current protected GitOps main
+        if: github.event_name == 'workflow_dispatch'
+        id: candidate-source
+        shell: bash
+        env:
+          GITOPS_TOKEN: ${{ steps.gitops-token.outputs.token }}
+          RELEASE_ID: ${{ inputs.release_id }}
+          CANDIDATE_SPEC_SHA256: ${{ inputs.candidate_spec_sha256 }}
+          CANDIDATE_HEAD_SHA: ${{ steps.external-metadata.outputs.candidate_head_sha }}
+        run: |
+          set -euo pipefail
+          test -n "${GITOPS_TOKEN}"
+          GITHUB_TOKEN="${GITOPS_TOKEN}" node tools/et13/verify_external_artifact.mjs \
+            --kind=candidate-source \
+            --release-id="${RELEASE_ID}" \
+            --head-sha="${CANDIDATE_HEAD_SHA}" \
+            --candidate-spec-sha256="${CANDIDATE_SPEC_SHA256}" \
+            --checkout-root="${ET13_ROOT}/external/gitops-checkout" \
+            --candidate-path="${ET13_ROOT}/external/candidate/candidate-spec.json"
+
+      - name: Stage canonical authenticated release inputs
+        shell: bash
+        env:
+          RELEASE_ID: ${{ inputs.release_id }}
+          CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+          CANDIDATE_RUN_ATTEMPT: ${{ inputs.candidate_run_attempt }}
+          CANDIDATE_ARTIFACT_ID: ${{ inputs.candidate_artifact_id }}
+          CANDIDATE_SPEC_SHA256: ${{ inputs.candidate_spec_sha256 }}
+          CANDIDATE_HEAD_SHA: ${{ steps.external-metadata.outputs.candidate_head_sha }}
+          CANDIDATE_HEAD_BRANCH: ${{ steps.external-metadata.outputs.candidate_head_branch }}
+          CANDIDATE_ARTIFACT_NAME: ${{ steps.external-metadata.outputs.candidate_artifact_name }}
+          CANDIDATE_ARCHIVE_SHA256: ${{ steps.external-metadata.outputs.candidate_artifact_archive_sha256 }}
+          CANDIDATE_METADATA_WORKFLOW_SHA256: ${{ steps.external-metadata.outputs.candidate_workflow_sha256 }}
+          CANDIDATE_BASE_SHA: ${{ steps.candidate-source.outputs.candidate_base_sha }}
+          CANDIDATE_SOURCE_PATH: ${{ steps.candidate-source.outputs.candidate_source_path }}
+          CANDIDATE_SOURCE_WORKFLOW_SHA256: ${{ steps.candidate-source.outputs.candidate_workflow_sha256 }}
+          BASELINE_RUN_ID: ${{ inputs.baseline_run_id }}
+          BASELINE_RUN_ATTEMPT: ${{ inputs.baseline_run_attempt }}
+          BASELINE_ARTIFACT_ID: ${{ inputs.baseline_artifact_id }}
+          BASELINE_HEAD_SHA: ${{ steps.external-metadata.outputs.baseline_head_sha }}
+          BASELINE_HEAD_BRANCH: ${{ steps.external-metadata.outputs.baseline_head_branch }}
+          BASELINE_ARTIFACT_NAME: ${{ steps.external-metadata.outputs.baseline_artifact_name }}
+          BASELINE_ARCHIVE_SHA256: ${{ steps.external-metadata.outputs.baseline_artifact_archive_sha256 }}
+          BASELINE_WORKFLOW_SHA256: ${{ steps.external-metadata.outputs.baseline_workflow_sha256 }}
+        run: |
+          set -euo pipefail
+          for value in \
+            "${GITHUB_RUN_ID}" \
+            "${CANDIDATE_RUN_ID}" \
+            "${CANDIDATE_ARTIFACT_ID}" \
+            "${BASELINE_RUN_ID}" \
+            "${BASELINE_ARTIFACT_ID}"; do
+            [[ "${value}" =~ ^[1-9][0-9]*$ ]]
+          done
+          test "${GITHUB_RUN_ATTEMPT}" = 1
+          test "${CANDIDATE_RUN_ATTEMPT}" = 1
+          test "${BASELINE_RUN_ATTEMPT}" = 1
+          for value in \
+            "${CANDIDATE_SPEC_SHA256}" \
+            "${CANDIDATE_ARCHIVE_SHA256}" \
+            "${CANDIDATE_METADATA_WORKFLOW_SHA256}" \
+            "${CANDIDATE_SOURCE_WORKFLOW_SHA256}" \
+            "${BASELINE_ARCHIVE_SHA256}" \
+            "${BASELINE_WORKFLOW_SHA256}"; do
+            [[ "${value}" =~ ^[0-9a-f]{64}$ ]]
+          done
+          test "${CANDIDATE_METADATA_WORKFLOW_SHA256}" = \
+            "${CANDIDATE_SOURCE_WORKFLOW_SHA256}"
+          for value in \
+            "${GITHUB_SHA}" \
+            "${CANDIDATE_HEAD_SHA}" \
+            "${CANDIDATE_BASE_SHA}" \
+            "${BASELINE_HEAD_SHA}"; do
+            [[ "${value}" =~ ^[0-9a-f]{40}$ ]]
+          done
+          [[ "${CANDIDATE_ARTIFACT_NAME}" =~ ^[A-Za-z0-9._-]{1,256}$ ]]
+          [[ "${BASELINE_ARTIFACT_NAME}" =~ ^[A-Za-z0-9._-]{1,256}$ ]]
+          stage="${ET13_ROOT}/release-auth"
+          test ! -e "${stage}"
+          mkdir -p "${stage}/candidate" "${stage}/baseline"
+          cp "${ET13_ROOT}/external/candidate/candidate-spec.json" \
+            "${stage}/candidate/candidate-spec.json"
+          cp -R "${ET13_ROOT}/external/baseline/." "${stage}/baseline/"
+          umask 077
+          jq -S -c -n \
+            --arg schema_version leva.et13.release-auth.v1 \
+            --arg release_id "${RELEASE_ID}" \
+            --arg frontend_source_sha "${GITHUB_SHA}" \
+            --argjson producer_run_id "${GITHUB_RUN_ID}" \
+            --argjson producer_run_attempt "${GITHUB_RUN_ATTEMPT}" \
+            --argjson candidate_run_id "${CANDIDATE_RUN_ID}" \
+            --argjson candidate_run_attempt "${CANDIDATE_RUN_ATTEMPT}" \
+            --argjson candidate_artifact_id "${CANDIDATE_ARTIFACT_ID}" \
+            --arg candidate_spec_sha256 "${CANDIDATE_SPEC_SHA256}" \
+            --arg candidate_head_sha "${CANDIDATE_HEAD_SHA}" \
+            --arg candidate_head_branch "${CANDIDATE_HEAD_BRANCH}" \
+            --arg candidate_artifact_name "${CANDIDATE_ARTIFACT_NAME}" \
+            --arg candidate_archive_sha256 "${CANDIDATE_ARCHIVE_SHA256}" \
+            --arg candidate_base_sha "${CANDIDATE_BASE_SHA}" \
+            --arg candidate_source_path "${CANDIDATE_SOURCE_PATH}" \
+            --arg candidate_workflow_sha256 "${CANDIDATE_SOURCE_WORKFLOW_SHA256}" \
+            --argjson baseline_run_id "${BASELINE_RUN_ID}" \
+            --argjson baseline_run_attempt "${BASELINE_RUN_ATTEMPT}" \
+            --argjson baseline_artifact_id "${BASELINE_ARTIFACT_ID}" \
+            --arg baseline_head_sha "${BASELINE_HEAD_SHA}" \
+            --arg baseline_head_branch "${BASELINE_HEAD_BRANCH}" \
+            --arg baseline_artifact_name "${BASELINE_ARTIFACT_NAME}" \
+            --arg baseline_archive_sha256 "${BASELINE_ARCHIVE_SHA256}" \
+            --arg baseline_workflow_sha256 "${BASELINE_WORKFLOW_SHA256}" \
+            '{
+              schema_version: $schema_version,
+              release_id: $release_id,
+              frontend_source_sha: $frontend_source_sha,
+              producer_run_id: $producer_run_id,
+              producer_run_attempt: $producer_run_attempt,
+              candidate: {
+                run_id: $candidate_run_id,
+                run_attempt: $candidate_run_attempt,
+                artifact_id: $candidate_artifact_id,
+                spec_sha256: $candidate_spec_sha256,
+                head_sha: $candidate_head_sha,
+                head_branch: $candidate_head_branch,
+                artifact_name: $candidate_artifact_name,
+                artifact_archive_sha256: $candidate_archive_sha256,
+                base_sha: $candidate_base_sha,
+                source_path: $candidate_source_path,
+                workflow_sha256: $candidate_workflow_sha256
+              },
+              baseline: {
+                run_id: $baseline_run_id,
+                run_attempt: $baseline_run_attempt,
+                artifact_id: $baseline_artifact_id,
+                head_sha: $baseline_head_sha,
+                head_branch: $baseline_head_branch,
+                artifact_name: $baseline_artifact_name,
+                artifact_archive_sha256: $baseline_archive_sha256,
+                workflow_sha256: $baseline_workflow_sha256
+              }
+            }' > "${stage}/auth.json"
+          test -s "${stage}/auth.json"
+
+      - name: Upload authenticated release inputs
+        id: upload-release-auth
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: et13-release-auth-${{ inputs.release_id }}-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: build/et13/release-auth/
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 1
+
+  produce-atomic-pair:
+    needs: authenticate-release-inputs
+    if: ${{ always() && !cancelled() && (github.event_name != 'workflow_dispatch' || needs.authenticate-release-inputs.result == 'success') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6.1.0
+        with:
+          persist-credentials: false
+
+      - name: Authenticate release input bridge metadata
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ inputs.release_id }}
+          ARTIFACT_ID: ${{ needs.authenticate-release-inputs.outputs.artifact_id }}
+          ARTIFACT_DIGEST: ${{ needs.authenticate-release-inputs.outputs.artifact_digest }}
+        run: |
+          set -euo pipefail
+          [[ "${ARTIFACT_ID}" =~ ^[1-9][0-9]*$ ]]
+          [[ "${ARTIFACT_DIGEST}" =~ ^[0-9a-f]{64}$ ]]
+          expected_name="et13-release-auth-${RELEASE_ID}-run-${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}"
+          metadata="${RUNNER_TEMP}/et13-release-auth-artifact.json"
+          archive="${RUNNER_TEMP}/et13-release-auth.zip"
+          test ! -e "${metadata}"
+          test ! -e "${archive}"
+          curl --fail --silent --show-error \
+            --proto '=https' \
+            -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H 'X-GitHub-Api-Version: 2026-03-10' \
+            "https://api.github.com/repos/DevPathAi/devpath-frontend/actions/artifacts/${ARTIFACT_ID}" \
+            --output "${metadata}"
+          jq -e \
+            --argjson id "${ARTIFACT_ID}" \
+            --arg name "${expected_name}" \
+            --arg digest "sha256:${ARTIFACT_DIGEST}" \
+            --argjson run_id "${GITHUB_RUN_ID}" \
+            --arg sha "${GITHUB_SHA}" '
+              .id == $id and
+              .name == $name and
+              .digest == $digest and
+              .expired == false and
+              .workflow_run.id == $run_id and
+              .workflow_run.head_sha == $sha and
+              .workflow_run.head_branch == "main"
+            ' "${metadata}" >/dev/null
+          curl --fail --silent --show-error --location \
+            --proto '=https' --proto-redir '=https' \
+            -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H 'X-GitHub-Api-Version: 2026-03-10' \
+            "https://api.github.com/repos/DevPathAi/devpath-frontend/actions/artifacts/${ARTIFACT_ID}/zip" \
+            --max-filesize 536870912 \
+            --output "${archive}"
+          printf '%s  %s\n' "${ARTIFACT_DIGEST}" "${archive}" \
+            | sha256sum --check --strict
+
+      - name: Download authenticated release inputs
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53  # v6.0.0
+        with:
+          artifact-ids: ${{ needs.authenticate-release-inputs.outputs.artifact_id }}
+          run-id: ${{ github.run_id }}
+          github-token: ${{ github.token }}
+          merge-multiple: true
+          path: build/et13/release-auth-action
+
+      - name: Execute authenticated release bridge verifier
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          RELEASE_ID: ${{ inputs.release_id }}
+          ARTIFACT_ID: ${{ needs.authenticate-release-inputs.outputs.artifact_id }}
+          ARTIFACT_DIGEST: ${{ needs.authenticate-release-inputs.outputs.artifact_digest }}
+          CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+          CANDIDATE_RUN_ATTEMPT: ${{ inputs.candidate_run_attempt }}
+          CANDIDATE_ARTIFACT_ID: ${{ inputs.candidate_artifact_id }}
+          CANDIDATE_SPEC_SHA256: ${{ inputs.candidate_spec_sha256 }}
+          BASELINE_RUN_ID: ${{ inputs.baseline_run_id }}
+          BASELINE_RUN_ATTEMPT: ${{ inputs.baseline_run_attempt }}
+          BASELINE_ARTIFACT_ID: ${{ inputs.baseline_artifact_id }}
+        run: |
+          set -euo pipefail
+          python3 tools/et13/verify_release_auth_bridge.py \
+            --archive="${RUNNER_TEMP}/et13-release-auth.zip" \
+            --scratch-root="${ET13_ROOT}/release-auth-verified-archive" \
+            --action-root="${ET13_ROOT}/release-auth-action" \
+            --metadata="${RUNNER_TEMP}/et13-release-auth-artifact.json" \
+            --catalog=evidence/et13/generated/visual-cases.v1.json \
+            --artifact-id="${ARTIFACT_ID}" \
+            --artifact-name="et13-release-auth-${RELEASE_ID}-run-${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}" \
+            --artifact-digest="${ARTIFACT_DIGEST}" \
+            --release-id="${RELEASE_ID}" \
+            --source-sha="${GITHUB_SHA}" \
+            --producer-run-id="${GITHUB_RUN_ID}" \
+            --candidate-run-id="${CANDIDATE_RUN_ID}" \
+            --candidate-run-attempt="${CANDIDATE_RUN_ATTEMPT}" \
+            --candidate-artifact-id="${CANDIDATE_ARTIFACT_ID}" \
+            --candidate-spec-sha256="${CANDIDATE_SPEC_SHA256}" \
+            --baseline-run-id="${BASELINE_RUN_ID}" \
+            --baseline-run-attempt="${BASELINE_RUN_ATTEMPT}" \
+            --baseline-artifact-id="${BASELINE_ARTIFACT_ID}"
+
+      - name: Validate and install authenticated release inputs
+        if: github.event_name == 'workflow_dispatch'
+        id: release-auth
+        shell: bash
+        env:
+          RELEASE_ID: ${{ inputs.release_id }}
+          CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+          CANDIDATE_RUN_ATTEMPT: ${{ inputs.candidate_run_attempt }}
+          CANDIDATE_ARTIFACT_ID: ${{ inputs.candidate_artifact_id }}
+          CANDIDATE_SPEC_SHA256: ${{ inputs.candidate_spec_sha256 }}
+          BASELINE_RUN_ID: ${{ inputs.baseline_run_id }}
+          BASELINE_RUN_ATTEMPT: ${{ inputs.baseline_run_attempt }}
+          BASELINE_ARTIFACT_ID: ${{ inputs.baseline_artifact_id }}
+        run: |
+          set -euo pipefail
+          archive="${RUNNER_TEMP}/et13-release-auth.zip"
+          archive_root="${ET13_ROOT}/release-auth-archive"
+          action_root="${ET13_ROOT}/release-auth-action"
+          test -f "${archive}"
+          test -d "${action_root}"
+          test ! -L "${action_root}"
+          test ! -e "${archive_root}"
+          mkdir "${archive_root}"
+          python3 - "${archive}" "${archive_root}" <<'PYTHON'
+          import os
+          import stat
+          import sys
+          import zipfile
+
+          archive, destination = sys.argv[1:]
+          with zipfile.ZipFile(archive) as source:
+              entries = source.infolist()
+              if not entries:
+                  raise SystemExit('release auth archive is empty')
+              seen = set()
+              total = 0
+              for entry in entries:
+                  name = entry.filename
+                  normalized = name[:-1] if name.endswith('/') else name
+                  parts = normalized.split('/')
+                  if (
+                      not normalized
+                      or '\\' in name
+                      or '\x00' in name
+                      or any(part in ('', '.', '..') for part in parts)
+                  ):
+                      raise SystemExit(f'unsafe release auth entry: {name!r}')
+                  if normalized in seen:
+                      raise SystemExit(f'duplicate release auth entry: {name!r}')
+                  seen.add(normalized)
+                  if entry.flag_bits & 1:
+                      raise SystemExit(f'encrypted release auth entry: {name!r}')
+                  mode = stat.S_IFMT((entry.external_attr >> 16) & 0xFFFF)
+                  expected = stat.S_IFDIR if entry.is_dir() else stat.S_IFREG
+                  if mode not in (0, expected):
+                      raise SystemExit(f'release auth link/special entry: {name!r}')
+                  if not entry.is_dir():
+                      if entry.file_size < 1 or entry.file_size > 16 * 1024 * 1024:
+                          raise SystemExit(f'release auth entry size invalid: {name!r}')
+                      total += entry.file_size
+                      if total > 512 * 1024 * 1024:
+                          raise SystemExit('release auth archive is oversized')
+              source.extractall(destination)
+          for current, directories, files in os.walk(destination, followlinks=False):
+              for name in directories + files:
+                  if os.path.islink(os.path.join(current, name)):
+                      raise SystemExit('extracted release auth link is forbidden')
+          PYTHON
+          diff --recursive --brief "${archive_root}" "${action_root}"
+          test -z "$(find "${archive_root}" "${action_root}" -type l -print -quit)"
+          test -z "$(find "${archive_root}" "${action_root}" -mindepth 1 ! -type f ! -type d -print -quit)"
+          auth="${action_root}/auth.json"
+          test -f "${auth}"
+          canonical="${RUNNER_TEMP}/et13-release-auth-canonical.json"
+          test ! -e "${canonical}"
+          jq -S -c . "${auth}" > "${canonical}"
+          cmp "${canonical}" "${auth}"
+          jq -e \
+            --arg release_id "${RELEASE_ID}" \
+            --arg sha "${GITHUB_SHA}" \
+            --argjson producer_run_id "${GITHUB_RUN_ID}" \
+            --argjson candidate_run_id "${CANDIDATE_RUN_ID}" \
+            --argjson candidate_run_attempt "${CANDIDATE_RUN_ATTEMPT}" \
+            --argjson candidate_artifact_id "${CANDIDATE_ARTIFACT_ID}" \
+            --arg candidate_spec_sha256 "${CANDIDATE_SPEC_SHA256}" \
+            --argjson baseline_run_id "${BASELINE_RUN_ID}" \
+            --argjson baseline_run_attempt "${BASELINE_RUN_ATTEMPT}" \
+            --argjson baseline_artifact_id "${BASELINE_ARTIFACT_ID}" '
+              keys == [
+                "baseline", "candidate", "frontend_source_sha",
+                "producer_run_attempt", "producer_run_id", "release_id",
+                "schema_version"
+              ] and
+              .schema_version == "leva.et13.release-auth.v1" and
+              .release_id == $release_id and
+              .frontend_source_sha == $sha and
+              .producer_run_id == $producer_run_id and
+              .producer_run_attempt == 1 and
+              (.candidate | keys) == [
+                "artifact_archive_sha256", "artifact_id", "artifact_name",
+                "base_sha", "head_branch", "head_sha", "run_attempt",
+                "run_id", "source_path", "spec_sha256", "workflow_sha256"
+              ] and
+              .candidate.run_id == $candidate_run_id and
+              .candidate.run_attempt == $candidate_run_attempt and
+              .candidate.run_attempt == 1 and
+              .candidate.artifact_id == $candidate_artifact_id and
+              .candidate.spec_sha256 == $candidate_spec_sha256 and
+              (.candidate.artifact_archive_sha256 | test("^[0-9a-f]{64}$")) and
+              (.candidate.workflow_sha256 | test("^[0-9a-f]{64}$")) and
+              (.candidate.head_sha | test("^[0-9a-f]{40}$")) and
+              (.candidate.base_sha | test("^[0-9a-f]{40}$")) and
+              (.baseline | keys) == [
+                "artifact_archive_sha256", "artifact_id", "artifact_name",
+                "head_branch", "head_sha", "run_attempt", "run_id",
+                "workflow_sha256"
+              ] and
+              .baseline.run_id == $baseline_run_id and
+              .baseline.run_attempt == $baseline_run_attempt and
+              .baseline.run_attempt == 1 and
+              .baseline.artifact_id == $baseline_artifact_id and
+              (.baseline.artifact_archive_sha256 | test("^[0-9a-f]{64}$")) and
+              (.baseline.workflow_sha256 | test("^[0-9a-f]{64}$")) and
+              (.baseline.head_sha | test("^[0-9a-f]{40}$"))
+            ' "${auth}" >/dev/null
+          mapfile -t candidate_files < <(
+            find "${action_root}/candidate" -type f -printf '%P\n' | LC_ALL=C sort
+          )
+          test "${#candidate_files[@]}" -eq 1
+          test "${candidate_files[0]}" = candidate-spec.json
+          printf '%s  %s\n' \
+            "${CANDIDATE_SPEC_SHA256}" \
+            "${action_root}/candidate/candidate-spec.json" \
+            | sha256sum --check --strict
+          {
+            printf '%s\n' auth.json candidate/candidate-spec.json
+            {
+              printf '%s\n' baseline-approval.v1.json review-candidate.v1.json
+              jq -er '.cases[].artifact_path' \
+                evidence/et13/generated/visual-cases.v1.json
+            } | sed 's#^#baseline/#'
+          } | LC_ALL=C sort > "${RUNNER_TEMP}/expected-release-auth-files.txt"
+          find "${action_root}" -type f -printf '%P\n' | LC_ALL=C sort \
+            > "${RUNNER_TEMP}/actual-release-auth-files.txt"
+          diff -u \
+            "${RUNNER_TEMP}/expected-release-auth-files.txt" \
+            "${RUNNER_TEMP}/actual-release-auth-files.txt"
+          external="${ET13_ROOT}/external"
+          test ! -e "${external}"
+          mkdir -p "${external}/candidate" "${external}/baseline"
+          cp "${action_root}/candidate/candidate-spec.json" \
+            "${external}/candidate/candidate-spec.json"
+          cp -R "${action_root}/baseline/." "${external}/baseline/"
+          baseline_name="$(jq -er '.baseline.artifact_name' "${auth}")"
+          baseline_archive="$(jq -er '.baseline.artifact_archive_sha256' "${auth}")"
+          baseline_workflow="$(jq -er '.baseline.workflow_sha256' "${auth}")"
+          [[ "${baseline_name}" =~ ^[A-Za-z0-9._-]{1,256}$ ]]
+          [[ "${baseline_archive}" =~ ^[0-9a-f]{64}$ ]]
+          [[ "${baseline_workflow}" =~ ^[0-9a-f]{64}$ ]]
+          {
+            printf 'baseline_artifact_name=%s\n' "${baseline_name}"
+            printf 'baseline_artifact_archive_sha256=%s\n' "${baseline_archive}"
+            printf 'baseline_workflow_sha256=%s\n' "${baseline_workflow}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2  # v2.23.0
+        with:
+          flutter-version: '3.44.1'
+          cache: true
+
+      - name: Verify exact checkout and toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          flutter --version --machine | grep -q '"frameworkVersion": "3.44.1"'
+          flutter --version --machine | grep -q \
+            '"frameworkRevision": "924134a44c189315be2148659913dda1671cbe99"'
+          flutter --version --machine | grep -q '"dartSdkVersion": "3.12.1"'
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Resolve locked workspace
+        run: flutter pub get --enforce-lockfile
+
+      - name: Validate immutable producer inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          dart run tools/et13_evidence.dart validate
+          dart run tools/mobile_source_guard.dart
+          dart analyze \
+            tools/et13_evidence.dart \
+            tools/et13_baseline_updater.dart
+          node --check tools/et13/capture.mjs
+          node --check tools/et13/verify_external_artifact.mjs
+          node --test tools/et13/verify_external_artifact.test.mjs
+          python3 -B -m unittest tools/et13/test_verify_release_auth_bridge.py -v
+          dart format --output=none --set-exit-if-changed \
+            tools/et13_evidence.dart \
+            tools/et13_baseline_updater.dart \
+            packages/dp_design/lib/dp_design.dart \
+            packages/dp_design/lib/src/evidence \
+            packages/dp_design/lib/src/theme/dp_typography.dart \
+            packages/dp_design/test/evidence \
+            packages/dp_design/test/theme/dp_typography_test.dart \
+            apps/web/lib/src/evidence \
+            apps/web/test/evidence \
+            apps/web/test/app/et13_baseline_approval_workflow_contract_test.dart \
+            apps/web/test/app/et13_evidence_catalog_contract_test.dart \
+            apps/web/test/app/et13_evidence_producer_contract_test.dart \
+            apps/admin/lib/src/evidence \
+            apps/admin/test/evidence \
+            apps/mobile/lib/src/evidence \
+            apps/mobile/test/evidence
+
+      - name: Analyze all production evidence distributions
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd packages/dp_design && flutter analyze --no-pub)
+          (cd apps/web && flutter analyze --no-pub)
+          (cd apps/admin && flutter analyze --no-pub)
+          (cd apps/mobile && flutter analyze --no-pub)
+
+      - name: Run production evidence contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd packages/dp_design && flutter test --no-pub \
+            test/evidence/et13_evidence_frame_contract_test.dart \
+            test/evidence/et13_evidence_fixtures_test.dart \
+            test/theme/dp_typography_test.dart)
+          (cd apps/web && flutter test --no-pub \
+            test/app/et13_baseline_approval_workflow_contract_test.dart \
+            test/app/et13_evidence_catalog_contract_test.dart \
+            test/app/et13_evidence_producer_contract_test.dart \
+            test/evidence/et13_web_evidence_app_test.dart)
+          (cd apps/admin && flutter test --no-pub \
+            test/evidence/et13_admin_evidence_app_test.dart)
+          (cd apps/mobile && flutter test --no-pub \
+            test/evidence/et13_mobile_evidence_app_test.dart \
+            test/features/evidence/mobile_evidence_projection_test.dart)
+
+      - name: Build web evidence distribution
+        working-directory: apps/web
+        run: >-
+          flutter build web --release --no-pub
+          --no-web-resources-cdn --no-tree-shake-icons
+          --target lib/et13_evidence_main.dart
+          --dart-define=ET13_SOURCE_SHA=${{ github.sha }}
+          --output ${{ github.workspace }}/build/et13/build/web
+
+      - name: Build admin evidence distribution
+        working-directory: apps/admin
+        run: >-
+          flutter build web --release --no-pub
+          --no-web-resources-cdn --no-tree-shake-icons
+          --target lib/et13_evidence_main.dart
+          --dart-define=ET13_SOURCE_SHA=${{ github.sha }}
+          --output ${{ github.workspace }}/build/et13/build/admin
+
+      - name: Build mobile evidence distribution
+        working-directory: apps/mobile
+        run: >-
+          flutter build web --release --no-pub
+          --no-web-resources-cdn --no-tree-shake-icons
+          --target lib/et13_evidence_main.dart
+          --dart-define=ET13_SOURCE_SHA=${{ github.sha }}
+          --output ${{ github.workspace }}/build/et13/build/mobile
+
+      - name: Bind release builds and lane input provenance
+        shell: bash
+        env:
+          RELEASE_ID: ${{ inputs.release_id }}
+          BASELINE_RUN_ID: ${{ inputs.baseline_run_id }}
+          BASELINE_RUN_ATTEMPT: ${{ inputs.baseline_run_attempt }}
+          BASELINE_ARTIFACT_ID: ${{ inputs.baseline_artifact_id }}
+          BASELINE_ARTIFACT_NAME: ${{ steps.release-auth.outputs.baseline_artifact_name }}
+          BASELINE_ARTIFACT_ARCHIVE_SHA256: ${{ steps.release-auth.outputs.baseline_artifact_archive_sha256 }}
+          BASELINE_WORKFLOW_SHA256: ${{ steps.release-auth.outputs.baseline_workflow_sha256 }}
+        run: |
+          set -euo pipefail
+          mkdir -p "${ET13_ROOT}/producer/visual" "${ET13_ROOT}/producer/a11y"
+          dart run tools/et13_evidence.dart build-marker \
+            --source-sha="${GITHUB_SHA}" \
+            --output="${ET13_ROOT}/build-marker.v1.json" \
+            --web-root="${ET13_ROOT}/build/web" \
+            --admin-root="${ET13_ROOT}/build/admin" \
+            --mobile-root="${ET13_ROOT}/build/mobile"
+          provenance_auth=(--mode="${EVIDENCE_MODE}")
+          if [[ "${EVIDENCE_MODE}" == release_ready ]]; then
+            provenance_auth+=(
+              --release-id="${RELEASE_ID}"
+              --baseline-root="${ET13_ROOT}/external/baseline"
+              --baseline-approval="${ET13_ROOT}/external/baseline/baseline-approval.v1.json"
+              --baseline-run-id="${BASELINE_RUN_ID}"
+              --baseline-run-attempt="${BASELINE_RUN_ATTEMPT}"
+              --baseline-artifact-id="${BASELINE_ARTIFACT_ID}"
+              --baseline-artifact-name="${BASELINE_ARTIFACT_NAME}"
+              --baseline-artifact-archive-sha256="${BASELINE_ARTIFACT_ARCHIVE_SHA256}"
+              --baseline-workflow-sha256="${BASELINE_WORKFLOW_SHA256}"
+            )
+          fi
+          for lane in visual a11y; do
+            dart run tools/et13_evidence.dart provenance \
+              --kind="${lane}" \
+              --source-sha="${GITHUB_SHA}" \
+              --build-marker="${ET13_ROOT}/build-marker.v1.json" \
+              --output="${ET13_ROOT}/producer/${lane}/provenance.v1.json" \
+              "${provenance_auth[@]}"
+          done
+
+      - name: Write diagnostic review candidates
+        if: github.event_name != 'workflow_dispatch'
+        shell: bash
+        run: |
+          set -euo pipefail
+          for lane in visual a11y; do
+            dart run tools/et13_evidence.dart candidate \
+              --kind="${lane}" \
+              --source-sha="${GITHUB_SHA}" \
+              --build-marker="${ET13_ROOT}/build-marker.v1.json" \
+              --provenance="${ET13_ROOT}/producer/${lane}/provenance.v1.json" \
+              --mode=diagnostic \
+              --producer-run-id="${GITHUB_RUN_ID}" \
+              --producer-run-attempt="${GITHUB_RUN_ATTEMPT}" \
+              --repository="${GITHUB_REPOSITORY}" \
+              --output="${ET13_ROOT}/producer/${lane}/review-candidate.v1.json"
+          done
+
+      - name: Bind release lanes to canonical candidate and approved baseline
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          RELEASE_ID: ${{ inputs.release_id }}
+          CANDIDATE_SPEC_SHA256: ${{ inputs.candidate_spec_sha256 }}
+        run: |
+          set -euo pipefail
+          baseline_root="${ET13_ROOT}/external/baseline"
+          dart run tools/et13_evidence.dart candidate \
+            --kind=visual \
+            --source-sha="${GITHUB_SHA}" \
+            --build-marker="${ET13_ROOT}/build-marker.v1.json" \
+            --provenance="${ET13_ROOT}/producer/visual/provenance.v1.json" \
+            --mode=release_ready \
+            --producer-run-id="${GITHUB_RUN_ID}" \
+            --producer-run-attempt="${GITHUB_RUN_ATTEMPT}" \
+            --repository="${GITHUB_REPOSITORY}" \
+            --baseline-root="${baseline_root}" \
+            --baseline-approval="${baseline_root}/baseline-approval.v1.json" \
+            --output="${ET13_ROOT}/producer/visual/release-binding.v1.json"
+          dart run tools/et13_evidence.dart candidate \
+            --kind=a11y \
+            --source-sha="${GITHUB_SHA}" \
+            --build-marker="${ET13_ROOT}/build-marker.v1.json" \
+            --provenance="${ET13_ROOT}/producer/a11y/provenance.v1.json" \
+            --mode=release_ready \
+            --producer-run-id="${GITHUB_RUN_ID}" \
+            --producer-run-attempt="${GITHUB_RUN_ATTEMPT}" \
+            --repository="${GITHUB_REPOSITORY}" \
+            --output="${ET13_ROOT}/producer/a11y/release-binding.v1.json"
+          dart run tools/et13_evidence.dart validate-release-inputs \
+            --canonical-candidate="${ET13_ROOT}/external/candidate/candidate-spec.json" \
+            --canonical-candidate-sha256="${CANDIDATE_SPEC_SHA256}" \
+            --release-id="${RELEASE_ID}" \
+            --visual-candidate="${ET13_ROOT}/producer/visual/release-binding.v1.json" \
+            --visual-provenance="${ET13_ROOT}/producer/visual/provenance.v1.json" \
+            --a11y-candidate="${ET13_ROOT}/producer/a11y/release-binding.v1.json" \
+            --a11y-provenance="${ET13_ROOT}/producer/a11y/provenance.v1.json"
+
+      - name: Install pinned capture dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull --platform linux/amd64 "${RENDERER_IMAGE}"
+          docker run --rm --platform linux/amd64 \
+            -v "${GITHUB_WORKSPACE}:/work" \
+            -w /work/tools/et13 \
+            "${RENDERER_IMAGE}" \
+            npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Capture production distributions without network
+        shell: bash
+        run: |
+          set -euo pipefail
+          baseline=()
+          if [[ "${EVIDENCE_MODE}" == release_ready ]]; then
+            baseline+=(--baseline-root="${ET13_ROOT}/external/baseline")
+          fi
+          docker run --rm --platform linux/amd64 --network none --ipc=host \
+            -v "${GITHUB_WORKSPACE}:/work" \
+            -w /work \
+            "${RENDERER_IMAGE}" \
+            node tools/et13/capture.mjs \
+              --source-sha="${GITHUB_SHA}" \
+              --catalog=evidence/et13/catalog.v1.json \
+              --build-marker="${ET13_ROOT}/build-marker.v1.json" \
+              --output-root="${ET13_ROOT}/capture" \
+              --mode="${EVIDENCE_MODE}" \
+              --web-root="${ET13_ROOT}/build/web" \
+              --admin-root="${ET13_ROOT}/build/admin" \
+              --mobile-root="${ET13_ROOT}/build/mobile" \
+              "${baseline[@]}"
+
+      - name: Assemble and jointly validate both lanes
+        shell: bash
+        env:
+          RELEASE_ID: ${{ inputs.release_id }}
+          CANDIDATE_SPEC_SHA256: ${{ inputs.candidate_spec_sha256 }}
+        run: |
+          set -euo pipefail
+          baseline=()
+          if [[ "${EVIDENCE_MODE}" == release_ready ]]; then
+            baseline+=(
+              --baseline-root="${ET13_ROOT}/external/baseline"
+              --baseline-approval="${ET13_ROOT}/external/baseline/baseline-approval.v1.json"
+            )
+          fi
+          for lane in visual a11y; do
+            lane_baseline=()
+            if [[ "${lane}" == visual ]]; then lane_baseline=("${baseline[@]}"); fi
+            binding="${ET13_ROOT}/producer/${lane}/review-candidate.v1.json"
+            canonical=()
+            if [[ "${EVIDENCE_MODE}" == release_ready ]]; then
+              binding="${ET13_ROOT}/producer/${lane}/release-binding.v1.json"
+              canonical+=(
+                --canonical-candidate="${ET13_ROOT}/external/candidate/candidate-spec.json"
+                --canonical-candidate-sha256="${CANDIDATE_SPEC_SHA256}"
+                --release-id="${RELEASE_ID}"
+              )
+            fi
+            dart run tools/et13_evidence.dart manifest \
+              --kind="${lane}" \
+              --source-sha="${GITHUB_SHA}" \
+              --build-marker="${ET13_ROOT}/build-marker.v1.json" \
+              --provenance="${ET13_ROOT}/producer/${lane}/provenance.v1.json" \
+              --artifact-root="${ET13_ROOT}/capture" \
+              --capture-summary="${ET13_ROOT}/capture/artifacts/et13/capture-summary.v1.json" \
+              --mode="${EVIDENCE_MODE}" \
+              --output="${ET13_ROOT}/producer/${lane}/${lane}-manifest.v1.json" \
+              "${lane_baseline[@]}"
+            dart run tools/et13_evidence.dart evidence \
+              --kind="${lane}" \
+              --candidate="${binding}" \
+              --provenance="${ET13_ROOT}/producer/${lane}/provenance.v1.json" \
+              --manifest="${ET13_ROOT}/producer/${lane}/${lane}-manifest.v1.json" \
+              --output="${ET13_ROOT}/producer/${lane}/evidence.json" \
+              "${canonical[@]}"
+            install -D -m 0644 \
+              "${ET13_ROOT}/producer/${lane}/evidence.json" \
+              "${ET13_ROOT}/stage/${lane}/evidence.json"
+            install -D -m 0644 \
+              "evidence/et13/generated/${lane}-cases.v1.json" \
+              "${ET13_ROOT}/stage/${lane}/evidence/et13/generated/${lane}-cases.v1.json"
+            install -D -m 0644 \
+              "${ET13_ROOT}/producer/${lane}/provenance.v1.json" \
+              "${ET13_ROOT}/stage/${lane}/artifacts/et13/provenance.v1.json"
+            install -D -m 0644 \
+              "${ET13_ROOT}/producer/${lane}/${lane}-manifest.v1.json" \
+              "${ET13_ROOT}/stage/${lane}/artifacts/et13/${lane}-manifest.v1.json"
+          done
+          for lane in visual a11y; do
+            binding="${ET13_ROOT}/producer/${lane}/review-candidate.v1.json"
+            canonical=()
+            if [[ "${EVIDENCE_MODE}" == release_ready ]]; then
+              binding="${ET13_ROOT}/producer/${lane}/release-binding.v1.json"
+              canonical+=(
+                --canonical-candidate="${ET13_ROOT}/external/candidate/candidate-spec.json"
+                --canonical-candidate-sha256="${CANDIDATE_SPEC_SHA256}"
+                --release-id="${RELEASE_ID}"
+              )
+            fi
+            dart run tools/et13_evidence.dart validate-package \
+              --kind="${lane}" \
+              --package-root="${ET13_ROOT}/stage/${lane}" \
+              --candidate="${binding}" \
+              "${canonical[@]}"
+          done
+
+      - name: Upload unsealable raw review evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: et13-unsealed-raw-review-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            build/et13/build-marker.v1.json
+            build/et13/capture
+            build/et13/producer
+
+      - name: Upload sealable visual lane
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: ${{ inputs.release_id }}-frontend-visual-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          if-no-files-found: error
+          retention-days: 30
+          path: build/et13/stage/visual/
+
+      - name: Upload sealable automated accessibility lane
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: ${{ inputs.release_id }}-frontend-automated-a11y-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          if-no-files-found: error
+          retention-days: 30
+          path: build/et13/stage/a11y/
