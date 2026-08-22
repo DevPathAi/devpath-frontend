@@ -388,3 +388,39 @@ test('rejects manifest byte, digest, and content-type drift', async () => {
     /not an image manifest/,
   );
 });
+
+test('accepts real GHCR base64 scoped tokens and richer publisher secrets', async () => {
+  const base64ScopedToken =
+    'djE6ZGV2cGF0aGFpL2RldnBhdGgtYWRtaW46MTc1NTgyMzMwNDU0MDA0NA==';
+  const fixture = fetchFixture({
+    tokenBody: JSON.stringify({ token: base64ScopedToken }),
+  });
+  const result = await lookupGhcrManifest({
+    imageRepository: repository,
+    imageTag: tag,
+    actor,
+    token: 'ghs_Token.With+Base64=Chars',
+    fetchImpl: fixture.fetchImpl,
+  });
+  assert.deepEqual(result, { state: 'present', digest: fixture.digest });
+  assert.equal(
+    fixture.calls[1].options.headers.authorization,
+    `Bearer ${base64ScopedToken}`,
+  );
+});
+
+test('still rejects empty, oversized, whitespace, and control-character tokens', async () => {
+  for (const bad of ['', 'bad token', 'bad\ntoken', 'bad\rtoken', 'a'.repeat(513)]) {
+    const fixture = fetchFixture();
+    await assert.rejects(
+      lookupGhcrManifest({
+        imageRepository: repository,
+        imageTag: tag,
+        actor,
+        token: bad,
+        fetchImpl: fixture.fetchImpl,
+      }),
+      /GHCR_TOKEN is invalid/,
+    );
+  }
+});
