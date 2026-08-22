@@ -1,0 +1,66 @@
+# evidence-reader App 자격 배선 스모크 — 릴리스 없이 검증한다.
+#
+# 잡 구조가 곧 상태 보고다:
+#   mint-and-read  — 환경 비밀의 App id/PEM 으로 토큰 민팅(actions/contents read
+#                    스코프 강제 포함) + 설치 신원 + gitops 후보 경로 read 실사용.
+#   gitops-only    — et13-evidence.yml 의 하드 게이트와 동일한 「설치 = devpath-gitops
+#                    단독」 단언. 설치 범위가 all 인 동안은 이 잡만 붉다 —
+#                    UI 에서 Only select repositories → devpath-gitops 로 좁히면 green.
+name: mission-spine-evidence-auth-smoke
+on:
+  workflow_dispatch:
+permissions: {}
+jobs:
+  mint-and-read:
+    runs-on: ubuntu-latest
+    environment: mission-spine-et13-release-auth
+    outputs:
+      token-ok: ${{ steps.verify.outputs.token-ok }}
+    steps:
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        id: app_token
+        with:
+          app-id: ${{ secrets.MISSION_SPINE_EVIDENCE_READER_APP_ID }}
+          private-key: ${{ secrets.MISSION_SPINE_EVIDENCE_READER_APP_PRIVATE_KEY }}
+          owner: DevPathAi
+          permission-actions: read
+          permission-contents: read
+      - name: Verify installation identity and read access
+        id: verify
+        env:
+          GH_TOKEN: ${{ steps.app_token.outputs.token }}
+          APP_SLUG: ${{ steps.app_token.outputs.app-slug }}
+          INSTALLATION_ID: ${{ steps.app_token.outputs.installation-id }}
+        run: |
+          set -euo pipefail
+          test "$APP_SLUG" = "devpath-evidence-reader"
+          [[ "$INSTALLATION_ID" =~ ^[1-9][0-9]*$ ]]
+          # Contents read 실사용: 봉인 후보 디렉터리를 읽을 수 있어야 한다.
+          gh api repos/DevPathAi/devpath-gitops/contents/release-manifests --jq '.[].name'
+          echo "token-ok=true" >> "$GITHUB_OUTPUT"
+          echo "evidence auth smoke passed: app=$APP_SLUG installation=$INSTALLATION_ID"
+  gitops-only:
+    needs: mint-and-read
+    runs-on: ubuntu-latest
+    environment: mission-spine-et13-release-auth
+    steps:
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        id: app_token
+        with:
+          app-id: ${{ secrets.MISSION_SPINE_EVIDENCE_READER_APP_ID }}
+          private-key: ${{ secrets.MISSION_SPINE_EVIDENCE_READER_APP_PRIVATE_KEY }}
+          owner: DevPathAi
+          permission-contents: read
+      - name: Assert installation is exactly DevPathAi/devpath-gitops
+        env:
+          GH_TOKEN: ${{ steps.app_token.outputs.token }}
+        run: |
+          set -euo pipefail
+          gh api '/installation/repositories?per_page=100' > inventory.json
+          jq -e '
+            .total_count == 1 and
+            (.repositories | length) == 1 and
+            .repositories[0].full_name == "DevPathAi/devpath-gitops"
+          ' inventory.json >/dev/null \
+            || { echo "::error::installation must be narrowed to devpath-gitops only (현재: $(jq -r '.total_count' inventory.json)개 레포)"; exit 1; }
+          echo "installation is gitops-only"
