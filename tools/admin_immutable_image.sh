@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-readonly IMAGE_REPOSITORY='ghcr.io/devpathai/devpath-admin'
+# ghcr_manifest_lookup 이 IMAGE_REPOSITORY 를 인라인 env 로 재할당하므로
+# readonly 전역과 같은 이름을 쓰면 bash 가 할당을 거부해 node 에 빈 값이 간다(실측).
+readonly ADMIN_IMAGE_REPOSITORY='ghcr.io/devpathai/devpath-admin'
 readonly SOURCE_URL='https://github.com/DevPathAi/devpath-frontend'
 
 if ! declare -F ghcr_manifest_lookup >/dev/null; then
@@ -37,7 +39,7 @@ resolve_linux_amd64_config() {
   require_sha256 "${root_digest}" 'root image digest'
   if ! root_manifest_json="$(
     docker buildx imagetools inspect \
-      "${IMAGE_REPOSITORY}@${root_digest}" --raw
+      "${ADMIN_IMAGE_REPOSITORY}@${root_digest}" --raw
   )"; then
     fail "unable to inspect exact root image ${root_digest}"
   fi
@@ -106,7 +108,7 @@ resolve_linux_amd64_config() {
     ' <<<"${root_manifest_json}")"
     if ! child_manifest_json="$(
       docker buildx imagetools inspect \
-        "${IMAGE_REPOSITORY}@${child_digest}" --raw
+        "${ADMIN_IMAGE_REPOSITORY}@${child_digest}" --raw
     )"; then
       fail "unable to inspect linux/amd64 child ${child_digest}"
     fi
@@ -135,7 +137,7 @@ remote_image() {
   require_sha256 "${digest}" 'remote image digest'
   image_json="$(
     docker buildx imagetools inspect \
-      "${IMAGE_REPOSITORY}@${digest}" --format '{{json .Image}}'
+      "${ADMIN_IMAGE_REPOSITORY}@${digest}" --format '{{json .Image}}'
   )" || fail "unable to inspect exact image ${digest}"
   jq -ec '
     if (.architecture == "amd64" and .os == "linux") then .
@@ -172,7 +174,7 @@ preflight() {
   local tag_digest
   local config_digest
   local trailing
-  lookup="$(ghcr_manifest_lookup "${IMAGE_REPOSITORY}" "${SOURCE_SHA}")" || \
+  lookup="$(ghcr_manifest_lookup "${ADMIN_IMAGE_REPOSITORY}" "${SOURCE_SHA}")" || \
     fail 'immutable admin tag preflight failed closed'
   read -r state tag_digest trailing <<<"${lookup}"
   test -z "${trailing:-}" || fail 'immutable admin lookup has extra fields'
@@ -245,7 +247,7 @@ bind() {
   esac
   require_sha256 "${CANDIDATE_CONFIG_DIGEST}" 'candidate config digest'
 
-  lookup="$(ghcr_manifest_lookup "${IMAGE_REPOSITORY}" "${SOURCE_SHA}")" || \
+  lookup="$(ghcr_manifest_lookup "${ADMIN_IMAGE_REPOSITORY}" "${SOURCE_SHA}")" || \
     fail 'immutable admin tag bind failed closed'
   read -r state observed_digest trailing <<<"${lookup}"
   test -z "${trailing:-}" || fail 'immutable admin lookup has extra fields'
@@ -274,7 +276,7 @@ bind() {
       docker tag "${CANDIDATE_REFERENCE}" "${TAG_REFERENCE}"
       docker push "${TAG_REFERENCE}"
       lookup="$(
-        ghcr_manifest_lookup "${IMAGE_REPOSITORY}" "${SOURCE_SHA}"
+        ghcr_manifest_lookup "${ADMIN_IMAGE_REPOSITORY}" "${SOURCE_SHA}"
       )" || fail 'unable to inspect newly created immutable admin tag'
       read -r state registry_digest trailing <<<"${lookup}"
       test -z "${trailing:-}" || fail 'immutable admin lookup has extra fields'
@@ -311,7 +313,7 @@ evidence() {
     *) fail 'invalid immutable admin publish mode' ;;
   esac
   require_sha256 "${REGISTRY_DIGEST}" 'registry digest'
-  lookup="$(ghcr_manifest_lookup "${IMAGE_REPOSITORY}" "${SOURCE_SHA}")" || \
+  lookup="$(ghcr_manifest_lookup "${ADMIN_IMAGE_REPOSITORY}" "${SOURCE_SHA}")" || \
     fail 'unable to re-inspect immutable admin tag'
   read -r state tag_digest trailing <<<"${lookup}"
   test -z "${trailing:-}" || fail 'immutable admin lookup has extra fields'
@@ -333,7 +335,7 @@ evidence() {
   test "${actual_source_url}" = "${SOURCE_URL}"
   jq -n \
     --arg source_sha "${actual_source_sha}" \
-    --arg image_repository "${IMAGE_REPOSITORY}" \
+    --arg image_repository "${ADMIN_IMAGE_REPOSITORY}" \
     --arg image_tag "${SOURCE_SHA}" \
     --arg image_digest "${tag_digest}" \
     --arg image_config_digest "${config_digest}" \
@@ -369,7 +371,7 @@ evidence() {
 main() {
   : "${SOURCE_SHA:?SOURCE_SHA is required}"
   require_source_sha "${SOURCE_SHA}"
-  readonly TAG_REFERENCE="${IMAGE_REPOSITORY}:${SOURCE_SHA}"
+  readonly TAG_REFERENCE="${ADMIN_IMAGE_REPOSITORY}:${SOURCE_SHA}"
   readonly CANDIDATE_REFERENCE="leva-admin-candidate:${SOURCE_SHA}"
   case "${1:-}" in
     preflight) preflight ;;
