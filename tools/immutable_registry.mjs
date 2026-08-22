@@ -92,7 +92,9 @@ async function fetchScopedToken(repositoryPath, actor, token, fetchImpl) {
   if (!/^[A-Za-z0-9][A-Za-z0-9-]{0,38}$/.test(actor)) {
     fail('GHCR_ACTOR is invalid');
   }
-  if (!/^[A-Za-z0-9_]+$/.test(token) || token.length > 512) {
+  // 공백·제어문자만 거부한다(헤더 주입 차단). GITHUB_TOKEN(ghs_…)·classic PAT 외에
+  // JWT류('.')·base64류('+','=')도 게시 자격으로 올 수 있어 charset 을 좁히지 않는다.
+  if (!/^[\x21-\x7e]+$/.test(token) || token.length > 512) {
     fail('GHCR_TOKEN is invalid');
   }
   const tokenUrl = new URL('https://ghcr.io/token');
@@ -128,7 +130,8 @@ async function fetchScopedToken(repositoryPath, actor, token, fetchImpl) {
   const scopedToken = payload.token ?? payload.access_token;
   if (typeof scopedToken !== 'string' ||
       scopedToken.length < 16 || scopedToken.length > 16 * 1024 ||
-      !/^[A-Za-z0-9._~-]+$/.test(scopedToken)) {
+      !/^[A-Za-z0-9+/=._~-]+$/.test(scopedToken)) {
+    // 실측: ghcr.io/token 이 주는 스코프 토큰은 base64 계열로 '=' 패딩을 포함한다.
     fail('GHCR scoped token is invalid');
   }
   if (payload.token !== undefined && payload.access_token !== undefined &&
