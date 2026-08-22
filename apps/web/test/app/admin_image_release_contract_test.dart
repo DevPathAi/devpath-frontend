@@ -147,7 +147,9 @@ cat "${github_output}"
     expect(admin, contains('push: false'));
     expect(
       publisher,
-      contains("readonly IMAGE_REPOSITORY='ghcr.io/devpathai/devpath-admin'"),
+      contains(
+        "readonly ADMIN_IMAGE_REPOSITORY='ghcr.io/devpathai/devpath-admin'",
+      ),
     );
     expect(admin, isNot(contains('ghcr.io/devpathai/devpath-admin:main')));
     expect(
