@@ -289,7 +289,7 @@ jobs:
             -H "Authorization: Bearer ${FRONTEND_TOKEN}" \
             -H 'X-GitHub-Api-Version: 2022-11-28' \
             "https://api.github.com/repos/DevPathAi/devpath-frontend/actions/artifacts/${SIGNED_ARTIFACT_ID}/zip" \
-            --max-filesize 1153433600 \
+            --max-filesize 576716800 \
             --output "${root}/signed.zip"
           printf '%s  %s\n' "${SIGNED_ARCHIVE_SHA256}" "${root}/signed.zip" \
             | sha256sum --check --strict
@@ -331,15 +331,14 @@ jobs:
                   if not entry.is_dir():
                       files.add(normalized)
                       total += entry.file_size
-                      limit = 256 * 1024 if normalized == 'build-provenance.v1.json' else 500 * 1024 * 1024
+                      limit = 256 * 1024 if normalized == 'build-provenance.v2.json' else 500 * 1024 * 1024
                       if entry.file_size < 1 or entry.file_size > limit:
                           raise SystemExit(f'signed archive entry size is invalid: {name!r}')
               expected_files = {
-                  'build-provenance.v1.json',
+                  'build-provenance.v2.json',
                   'mobile/android/leva-release.apk',
-                  'mobile/ios/leva-release.ipa',
               }
-              if files != expected_files or total > 1100 * 1024 * 1024:
+              if files != expected_files or total > 550 * 1024 * 1024:
                   raise SystemExit('signed archive exact file/size contract mismatch')
               source.extractall(destination)
           for current, directories, files in os.walk(destination, followlinks=False):
@@ -369,9 +368,8 @@ jobs:
           root=build/mission-spine/manual-at/external
           diff --recursive --brief "${root}/signed-archive" "${root}/signed-action"
           test -z "$(find "${root}/signed-archive" "${root}/signed-action" -type l -print -quit)"
-          test -f "${root}/signed-action/build-provenance.v1.json"
+          test -f "${root}/signed-action/build-provenance.v2.json"
           test -f "${root}/signed-action/mobile/android/leva-release.apk"
-          test -f "${root}/signed-action/mobile/ios/leva-release.ipa"
           node tools/mission_spine_manual_at_evidence.mjs validate-manual-inputs \
             --repository-root=. \
             --candidate="${root}/candidate-action/candidate-spec.json" \
@@ -424,34 +422,6 @@ jobs:
           overwrite: false
           retention-days: 3
 
-  approve-voiceover:
-    name: Approve manual VoiceOver evidence
-    needs: authenticate-inputs
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    environment:
-      name: manual-at-voiceover
-    steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
-      - name: Authenticate independent protected VoiceOver reviewer
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          node tools/mission_spine_protected_approval.mjs \
-            --workflow-path=.github/workflows/mission-spine-manual-at-evidence.yml \
-            --environment=manual-at-voiceover \
-            --job-name='Approve manual VoiceOver evidence' \
-            --output="${RUNNER_TEMP}/approval.json"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: ${{ inputs.release_id }}-unsealable-manual-voiceover-approval-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/approval.json
-          if-no-files-found: error
-          overwrite: false
-          retention-days: 3
-
   approve-talkback:
     name: Approve manual TalkBack evidence
     needs: authenticate-inputs
@@ -480,9 +450,9 @@ jobs:
           overwrite: false
           retention-days: 3
 
-  publish-atomic-trio:
-    name: Publish atomic manual AT trio
-    needs: [authenticate-inputs, approve-nvda, approve-voiceover, approve-talkback]
+  publish-atomic-pair:
+    name: Publish atomic manual AT pair
+    needs: [authenticate-inputs, approve-nvda, approve-talkback]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -513,12 +483,6 @@ jobs:
           name: ${{ inputs.release_id }}-unsealable-manual-nvda-approval-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
           path: build/mission-spine/manual-at/approvals/nvda
 
-      - name: Download protected VoiceOver approval
-        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
-        with:
-          name: ${{ inputs.release_id }}-unsealable-manual-voiceover-approval-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
-          path: build/mission-spine/manual-at/approvals/voiceover
-
       - name: Download protected TalkBack approval
         uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
         with:
@@ -546,9 +510,8 @@ jobs:
           test ! -e "${package_root}"
           mkdir -p \
             "${package_root}/manual-nvda" \
-            "${package_root}/manual-voiceover" \
             "${package_root}/manual-talkback"
-          for lane in nvda voiceover talkback; do
+          for lane in nvda talkback; do
             approval="build/mission-spine/manual-at/approvals/${lane}/approval.json"
             test -f "${approval}"
             test ! -L "${approval}"
@@ -580,15 +543,6 @@ jobs:
         with:
           name: ${{ inputs.release_id }}-manual-nvda-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
           path: build/mission-spine/manual-at/packages/manual-nvda
-          if-no-files-found: error
-          overwrite: false
-          retention-days: 30
-
-      - name: Publish exact VoiceOver sanitized evidence
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: ${{ inputs.release_id }}-manual-voiceover-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
-          path: build/mission-spine/manual-at/packages/manual-voiceover
           if-no-files-found: error
           overwrite: false
           retention-days: 30

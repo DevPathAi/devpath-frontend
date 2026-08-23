@@ -11,6 +11,7 @@ apps/web/lib/src/analytics/mission-spine.analytics.v1.json text eol=lf
 # Raw SHA-256 inputs must have checkout-independent bytes.
 pubspec.lock text eol=lf
 evidence/et13/**/*.json text eol=lf
+tool/release-evidence/**/*.json text eol=lf
 
 # Monaco is vendored byte-for-byte from the pinned npm archive. Treat upstream
 # minified assets/notices as binary so Git does not normalize or whitespace-check

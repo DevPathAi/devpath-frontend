@@ -25,12 +25,6 @@ const expectedCases = {
     'nvda-web-today-mission-spine',
     'nvda-web-next-action-navigation',
   ],
-  'manual-voiceover': [
-    'voiceover-ios-today-mission-spine',
-    'voiceover-ios-next-action-navigation',
-    'voiceover-ios-content-reading',
-    'voiceover-ios-offline-status',
-  ],
   'manual-talkback': [
     'talkback-android-today-mission-spine',
     'talkback-android-next-action-navigation',
@@ -43,7 +37,6 @@ function approval(lane) {
   const suffix = lane.slice('manual-'.length);
   const title = {
     nvda: 'NVDA',
-    voiceover: 'VoiceOver',
     talkback: 'TalkBack',
   }[suffix];
   return {
@@ -58,7 +51,12 @@ function approval(lane) {
 }
 
 function candidateFromCatalogs(catalogs) {
-  const bindings = {};
+  const bindings = {
+    'frontend-visual': {},
+    'home-visual': {},
+    'frontend-automated-a11y': {},
+    'home-axe-browser-a11y': {},
+  };
   for (const [lane, value] of Object.entries(catalogs)) {
     bindings[lane] = {
       repository: 'DevPathAi/devpath-frontend',
@@ -91,7 +89,7 @@ function candidateFromCatalogs(catalogs) {
       catalogs: bindings,
       frontend_projection_contract: {},
       mobile_test_artifacts: {
-        schema_version: 'leva.mission-spine.signed-mobile-build-binding.v1',
+        schema_version: 'leva.mission-spine.signed-android-build-binding.v2',
         repository: 'DevPathAi/devpath-frontend',
         source_sha: sourceSha,
         event: 'workflow_dispatch',
@@ -102,14 +100,12 @@ function candidateFromCatalogs(catalogs) {
         run_attempt: 1,
         artifact_id: 801,
         artifact_name:
-          'release-2026-08-17-signed-mobile-build-run-701-attempt-1',
+          'release-2026-08-17-signed-android-build-run-701-attempt-1',
         artifact_archive_sha256: '4'.repeat(64),
-        build_provenance_file: 'build-provenance.v1.json',
+        build_provenance_file: 'build-provenance.v2.json',
         build_provenance_sha256: '5'.repeat(64),
         signed_apk_file: 'mobile/android/leva-release.apk',
         signed_apk_sha256: '6'.repeat(64),
-        signed_ipa_file: 'mobile/ios/leva-release.ipa',
-        signed_ipa_sha256: '7'.repeat(64),
       },
     },
     rollout: {},
@@ -180,9 +176,7 @@ test('manual evidence uses exact lane keys and protected approval identity', () 
       assert.deepEqual(Object.keys(evidence), [
         ...commonKeys,
         'build_provenance_sha256',
-        lane === 'manual-voiceover'
-          ? 'signed_ipa_sha256'
-          : 'signed_apk_sha256',
+        'signed_apk_sha256',
         ...approvalKeys,
       ]);
     }
@@ -243,9 +237,29 @@ test('manual evidence rejects attempt reuse, catalog drift, and unsafe review da
       }),
     /approved_by/,
   );
+
+  const legacyVoiceOver = structuredClone(candidate);
+  legacyVoiceOver.quality_evidence_inputs.catalogs['manual-voiceover'] = {
+    repository: 'DevPathAi/devpath-frontend',
+  };
+  assert.throws(
+    () =>
+      createManualEvidence({
+        lane: 'manual-nvda',
+        candidate: legacyVoiceOver,
+        candidateSpecSha256: candidateSha256,
+        releaseId: 'release-2026-08-17',
+        sourceSha,
+        producerRunId: 901,
+        producerRunAttempt: 1,
+        approval: approval('manual-nvda'),
+        repositoryRoot: root,
+      }),
+    /candidate catalog bindings/,
+  );
 });
 
-test('three manual packages are jointly exact and reject extras', () => {
+test('two manual packages are jointly exact and reject extras', () => {
   const catalogs = validateAllManualCatalogs(root);
   const candidate = candidateFromCatalogs(catalogs);
   const packageRoot = mkdtempSync(join(tmpdir(), 'manual-at-packages-'));
@@ -327,7 +341,7 @@ test('signed bundle metadata is attempt-specific, protected, and byte-bound', ()
     branch: { name: 'main', commit: { sha: sourceSha }, protected: true },
     artifact: {
       id: 801,
-      name: 'release-2026-08-17-signed-mobile-build-run-701-attempt-1',
+      name: 'release-2026-08-17-signed-android-build-run-701-attempt-1',
       expired: false,
       size_in_bytes: 1024,
       digest: `sha256:${'4'.repeat(64)}`,

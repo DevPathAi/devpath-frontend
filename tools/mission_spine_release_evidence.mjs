@@ -14,14 +14,12 @@ export const frontendRepository = 'DevPathAi/devpath-frontend';
 export const signedMobileWorkflow =
   '.github/workflows/mission-spine-signed-mobile-build.yml';
 export const signedMobileSchemaVersion =
-  'leva.mission-spine.signed-mobile-build.v1';
+  'leva.mission-spine.signed-android-build.v2';
 
 const sha1Pattern = /^(?!0{40}$)[0-9a-f]{40}$/;
 const sha256Pattern = /^(?!0{64}$)[0-9a-f]{64}$/;
 const releaseIdPattern = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const utcPattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/;
-const uuidPattern = /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/;
-
 const toolchain = Object.freeze({
   flutter_version: '3.44.1',
   flutter_revision: '924134a44c189315be2148659913dda1671cbe99',
@@ -30,11 +28,6 @@ const toolchain = Object.freeze({
     java_runtime:
       'OpenJDK Runtime Environment Temurin-17.0.20+8 (build 17.0.20+8)',
     compile_sdk: 36,
-  }),
-  ios: Object.freeze({
-    xcode_version: '26.4.1',
-    xcode_build: '17E202',
-    iphoneos_sdk: '26.4',
   }),
 });
 
@@ -163,7 +156,7 @@ function validateApproval(value, platform) {
   );
   exact(
     value.approval_job_name,
-    platform === 'android' ? 'Sign Android release' : 'Sign iOS release',
+    'Sign Android release',
     `${name}.approval_job_name`,
   );
   positiveInteger(value.approval_environment_id, `${name}.approval_environment_id`);
@@ -176,7 +169,7 @@ function validateApproval(value, platform) {
 function validateToolchain(value) {
   exactKeys(
     value,
-    ['flutter_version', 'flutter_revision', 'dart_sdk_version', 'android', 'ios'],
+    ['flutter_version', 'flutter_revision', 'dart_sdk_version', 'android'],
     'toolchain',
   );
   exact(value.flutter_version, toolchain.flutter_version, 'toolchain.flutter_version');
@@ -185,14 +178,6 @@ function validateToolchain(value) {
   exactKeys(value.android, ['java_runtime', 'compile_sdk'], 'toolchain.android');
   exact(value.android.java_runtime, toolchain.android.java_runtime, 'toolchain.android.java_runtime');
   exact(value.android.compile_sdk, toolchain.android.compile_sdk, 'toolchain.android.compile_sdk');
-  exactKeys(
-    value.ios,
-    ['xcode_version', 'xcode_build', 'iphoneos_sdk'],
-    'toolchain.ios',
-  );
-  exact(value.ios.xcode_version, toolchain.ios.xcode_version, 'toolchain.ios.xcode_version');
-  exact(value.ios.xcode_build, toolchain.ios.xcode_build, 'toolchain.ios.xcode_build');
-  exact(value.ios.iphoneos_sdk, toolchain.ios.iphoneos_sdk, 'toolchain.ios.iphoneos_sdk');
 }
 
 function validateBuildConfiguration(value) {
@@ -238,67 +223,6 @@ function validateAndroid(value, apkPath) {
   exact(value.bytes, actual.bytes, 'android.bytes');
 }
 
-function validateIos(value, ipaPath, approval) {
-  exactKeys(
-    value,
-    [
-      'artifact_path',
-      'sha256',
-      'bytes',
-      'bundle_id',
-      'short_version',
-      'bundle_version',
-      'signature_verified',
-      'signing_classification',
-      'export_method',
-      'distribution_scope',
-      'team_id',
-      'signing_certificate_sha256',
-      'provisioning_profile_uuid',
-      'provisioning_profile_expires_at',
-    ],
-    'ios',
-  );
-  exact(value.artifact_path, 'mobile/ios/leva-release.ipa', 'ios.artifact_path');
-  sha256(value.sha256, 'ios.sha256');
-  positiveInteger(value.bytes, 'ios.bytes');
-  exact(value.bundle_id, 'ai.devpath.devpathMobile', 'ios.bundle_id');
-  nonemptyString(value.short_version, 'ios.short_version');
-  nonemptyString(value.bundle_version, 'ios.bundle_version');
-  exact(value.signature_verified, true, 'ios.signature_verified');
-  exact(
-    value.signing_classification,
-    'organization_distribution',
-    'ios.signing_classification',
-  );
-  exact(value.export_method, 'ad-hoc', 'ios.export_method');
-  exact(
-    value.distribution_scope,
-    'protected_manual_at_test_devices',
-    'ios.distribution_scope',
-  );
-  if (typeof value.team_id !== 'string' || !/^[A-Z0-9]{10}$/.test(value.team_id)) {
-    fail('ios.team_id must be a 10-character Apple team identifier');
-  }
-  sha256(value.signing_certificate_sha256, 'ios.signing_certificate_sha256');
-  if (
-    typeof value.provisioning_profile_uuid !== 'string' ||
-    !uuidPattern.test(value.provisioning_profile_uuid)
-  ) {
-    fail('ios.provisioning_profile_uuid must be an uppercase UUID');
-  }
-  const expiresAt = utc(
-    value.provisioning_profile_expires_at,
-    'ios.provisioning_profile_expires_at',
-  );
-  if (Date.parse(expiresAt) <= Date.parse(approval.approval_effective_at)) {
-    fail('iOS provisioning profile must outlive approval_effective_at');
-  }
-  const actual = fileEvidence(ipaPath, 'signed iOS IPA');
-  exact(value.sha256, actual.sha256, 'ios.sha256');
-  exact(value.bytes, actual.bytes, 'ios.bytes');
-}
-
 export function createSignedMobileBuildProvenance({
   releaseId,
   repository = frontendRepository,
@@ -308,12 +232,9 @@ export function createSignedMobileBuildProvenance({
   producerRunAttempt,
   pubspecLockSha256,
   apkPath,
-  ipaPath,
   android,
-  ios,
 }) {
   const apk = fileEvidence(apkPath, 'signed Android APK');
-  const ipa = fileEvidence(ipaPath, 'signed iOS IPA');
   const document = {
     schema_version: signedMobileSchemaVersion,
     release_id: releaseId,
@@ -339,25 +260,8 @@ export function createSignedMobileBuildProvenance({
       play_app_signing: false,
       signing_certificate_sha256: android.signingCertificateSha256,
     },
-    ios: {
-      artifact_path: 'mobile/ios/leva-release.ipa',
-      sha256: ipa.sha256,
-      bytes: ipa.bytes,
-      bundle_id: ios.bundleId,
-      short_version: ios.shortVersion,
-      bundle_version: ios.bundleVersion,
-      signature_verified: ios.signatureVerified,
-      signing_classification: 'organization_distribution',
-      export_method: 'ad-hoc',
-      distribution_scope: 'protected_manual_at_test_devices',
-      team_id: ios.teamId,
-      signing_certificate_sha256: ios.signingCertificateSha256,
-      provisioning_profile_uuid: ios.provisioningProfileUuid,
-      provisioning_profile_expires_at: ios.provisioningProfileExpiresAt,
-    },
     approvals: {
       android: android.approval,
-      ios: ios.approval,
     },
   };
   validateSignedMobileBuildProvenance(document, {
@@ -368,7 +272,6 @@ export function createSignedMobileBuildProvenance({
     producerRunAttempt,
     pubspecLockSha256,
     apkPath,
-    ipaPath,
   });
   return document;
 }
@@ -383,7 +286,6 @@ export function validateSignedMobileBuildProvenance(
     producerRunAttempt,
     pubspecLockSha256,
     apkPath,
-    ipaPath,
   },
 ) {
   exactKeys(
@@ -402,7 +304,6 @@ export function validateSignedMobileBuildProvenance(
       'toolchain',
       'build_configuration',
       'android',
-      'ios',
       'approvals',
     ],
     'build provenance',
@@ -430,14 +331,9 @@ export function validateSignedMobileBuildProvenance(
   );
   validateToolchain(value.toolchain);
   validateBuildConfiguration(value.build_configuration);
-  exactKeys(value.approvals, ['android', 'ios'], 'approvals');
-  const androidApproval = validateApproval(value.approvals.android, 'android');
-  const iosApproval = validateApproval(value.approvals.ios, 'ios');
+  exactKeys(value.approvals, ['android'], 'approvals');
+  validateApproval(value.approvals.android, 'android');
   validateAndroid(value.android, apkPath);
-  validateIos(value.ios, ipaPath, iosApproval);
-  if (androidApproval.approved_by_id === iosApproval.approved_by_id) {
-    // The approved policy allows the exact configured reviewer to approve both lanes.
-  }
   return value;
 }
 
@@ -468,21 +364,19 @@ export function validateExactSignedMobileBundle(root, expectations) {
   }
   exact(realpathSync(resolvedRoot), resolvedRoot, 'signed mobile bundle root');
   const expected = [
-    'build-provenance.v1.json',
+    'build-provenance.v2.json',
     'mobile/',
     'mobile/android/',
     'mobile/android/leva-release.apk',
-    'mobile/ios/',
-    'mobile/ios/leva-release.ipa',
   ];
   const actual = walk(resolvedRoot).sort();
   if (
     actual.length !== expected.length ||
     actual.some((entry, index) => entry !== [...expected].sort()[index])
   ) {
-    fail('signed mobile bundle must contain exactly three regular files and canonical directories');
+    fail('signed Android bundle must contain exactly two regular files and canonical directories');
   }
-  const provenancePath = join(resolvedRoot, 'build-provenance.v1.json');
+  const provenancePath = join(resolvedRoot, 'build-provenance.v2.json');
   const provenanceInfo = regularFile(provenancePath, 'build provenance');
   if (provenanceInfo.size > 256 * 1024) fail('build provenance exceeds 256 KiB');
   const bytes = readFileSync(provenancePath);
@@ -498,13 +392,11 @@ export function validateExactSignedMobileBundle(root, expectations) {
   validateSignedMobileBuildProvenance(provenance, {
     ...expectations,
     apkPath: join(resolvedRoot, 'mobile', 'android', 'leva-release.apk'),
-    ipaPath: join(resolvedRoot, 'mobile', 'ios', 'leva-release.ipa'),
   });
   return {
     provenance,
     buildProvenanceSha256: rawSha256(bytes),
     signedApkSha256: provenance.android.sha256,
-    signedIpaSha256: provenance.ios.sha256,
   };
 }
 
@@ -544,6 +436,7 @@ function loadJson(path, name) {
 }
 
 function platformInput(value, platform, workflowSha256) {
+  exact(platform, 'android', 'platform');
   const approvalValue = value.approval;
   validateApproval(approvalValue, platform);
   exact(
@@ -551,68 +444,25 @@ function platformInput(value, platform, workflowSha256) {
     workflowSha256,
     `${platform} metadata.workflow_sha256`,
   );
-  if (platform === 'android') {
-    exactKeys(
-      value,
-      [
-        'workflow_sha256',
-        'application_id',
-        'version_name',
-        'version_code',
-        'signature_verified',
-        'signing_certificate_sha256',
-        'approval',
-      ],
-      'Android metadata',
-    );
-    return {
-      applicationId: value.application_id,
-      versionName: value.version_name,
-      versionCode: value.version_code,
-      signatureVerified: value.signature_verified,
-      signingCertificateSha256: value.signing_certificate_sha256,
-      approval: approvalValue,
-    };
-  }
   exactKeys(
     value,
     [
       'workflow_sha256',
-      'bundle_id',
-      'short_version',
-      'bundle_version',
+      'application_id',
+      'version_name',
+      'version_code',
       'signature_verified',
-      'signing_classification',
-      'export_method',
-      'distribution_scope',
-      'team_id',
       'signing_certificate_sha256',
-      'provisioning_profile_uuid',
-      'provisioning_profile_expires_at',
       'approval',
     ],
-    'iOS metadata',
-  );
-  exact(
-    value.signing_classification,
-    'organization_distribution',
-    'iOS metadata.signing_classification',
-  );
-  exact(value.export_method, 'ad-hoc', 'iOS metadata.export_method');
-  exact(
-    value.distribution_scope,
-    'protected_manual_at_test_devices',
-    'iOS metadata.distribution_scope',
+    'Android metadata',
   );
   return {
-    bundleId: value.bundle_id,
-    shortVersion: value.short_version,
-    bundleVersion: value.bundle_version,
+    applicationId: value.application_id,
+    versionName: value.version_name,
+    versionCode: value.version_code,
     signatureVerified: value.signature_verified,
-    teamId: value.team_id,
     signingCertificateSha256: value.signing_certificate_sha256,
-    provisioningProfileUuid: value.provisioning_profile_uuid,
-    provisioningProfileExpiresAt: value.provisioning_profile_expires_at,
     approval: approvalValue,
   };
 }
@@ -632,15 +482,9 @@ function main() {
         readFileSync(required(options, 'pubspec-lock')),
       ),
       apkPath: required(options, 'apk'),
-      ipaPath: required(options, 'ipa'),
       android: platformInput(
         loadJson(required(options, 'android-metadata'), 'Android metadata'),
         'android',
-        workflowSha256,
-      ),
-      ios: platformInput(
-        loadJson(required(options, 'ios-metadata'), 'iOS metadata'),
-        'ios',
         workflowSha256,
       ),
     });

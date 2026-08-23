@@ -82,7 +82,6 @@ const approvalFacts = {
       user: { id: 77432570, login: 'VelkaressiaBlutkrone', type: 'User' },
       environments: [
         { id: 91, name: 'mission-spine-mobile-signing-android' },
-        { id: 92, name: 'mission-spine-mobile-signing-ios' },
       ],
     },
   ],
@@ -93,12 +92,6 @@ const approvalFacts = {
         run_id: 501,
         head_sha: sha,
         started_at: '2025-08-17T01:02:03Z',
-      },
-      {
-        name: 'Sign iOS release',
-        run_id: 501,
-        head_sha: sha,
-        started_at: null,
       },
     ],
   },

@@ -30,10 +30,6 @@ const allowedBindings = new Map([
         'mission-spine-mobile-signing-android',
         protectedBinding('Sign Android release'),
       ],
-      [
-        'mission-spine-mobile-signing-ios',
-        protectedBinding('Sign iOS release'),
-      ],
     ]),
   ],
   [
@@ -44,10 +40,6 @@ const allowedBindings = new Map([
         protectedBinding('Authenticate manual AT inputs'),
       ],
       ['manual-at-nvda', protectedBinding('Approve manual NVDA evidence')],
-      [
-        'manual-at-voiceover',
-        protectedBinding('Approve manual VoiceOver evidence'),
-      ],
       [
         'manual-at-talkback',
         protectedBinding('Approve manual TalkBack evidence'),
