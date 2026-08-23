@@ -23,7 +23,7 @@ const catalogSchema = 'leva.mission-spine.manual-at-catalog.v1';
 const provenanceSchema =
   'leva.mission-spine.manual-at-test-provenance.v1';
 const signedBindingSchema =
-  'leva.mission-spine.signed-mobile-build-binding.v1';
+  'leva.mission-spine.signed-android-build-binding.v2';
 const sha1Pattern = /^(?!0{40}$)[0-9a-f]{40}$/;
 const sha256Pattern = /^(?!0{64}$)[0-9a-f]{64}$/;
 const releaseIdPattern = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
@@ -47,25 +47,6 @@ const laneDefinitions = Object.freeze({
       }),
     ]),
   }),
-  'manual-voiceover': Object.freeze({
-    artifactLane: 'voiceover',
-    assistiveTechnology: 'VoiceOver+Safari+iOS',
-    surface: 'ios',
-    environment: 'manual-at-voiceover',
-    jobName: 'Approve manual VoiceOver evidence',
-    requiredPlatform: 'ios_physical_device',
-    requiredClient: 'native_flutter_ios',
-    requiredArtifact: 'candidate_signed_ipa',
-    cases: Object.freeze([
-      Object.freeze({ id: 'voiceover-ios-today-mission-spine', entry: 'today' }),
-      Object.freeze({
-        id: 'voiceover-ios-next-action-navigation',
-        entry: 'next_action',
-      }),
-      Object.freeze({ id: 'voiceover-ios-content-reading', entry: 'content' }),
-      Object.freeze({ id: 'voiceover-ios-offline-status', entry: 'offline_status' }),
-    ]),
-  }),
   'manual-talkback': Object.freeze({
     artifactLane: 'talkback',
     assistiveTechnology: 'TalkBack+Android',
@@ -86,6 +67,14 @@ const laneDefinitions = Object.freeze({
     ]),
   }),
 });
+
+const candidateCatalogKeys = Object.freeze([
+  'frontend-visual',
+  'home-visual',
+  'frontend-automated-a11y',
+  'home-axe-browser-a11y',
+  ...Object.keys(laneDefinitions),
+]);
 
 function fail(message) {
   throw new Error(`Mission Spine manual AT evidence failed: ${message}`);
@@ -388,8 +377,6 @@ const signedBindingKeys = [
   'build_provenance_sha256',
   'signed_apk_file',
   'signed_apk_sha256',
-  'signed_ipa_file',
-  'signed_ipa_sha256',
 ];
 
 function validateCandidate(candidate, {
@@ -405,6 +392,7 @@ function validateCandidate(candidate, {
   exact(sha1(frontend.source_sha, 'candidate.frontend.source_sha'), sourceSha, 'candidate.frontend.source_sha');
   const quality = object(candidate.quality_evidence_inputs, 'candidate.quality_evidence_inputs');
   const bindings = object(quality.catalogs, 'candidate catalog bindings');
+  exactKeys(bindings, candidateCatalogKeys, 'candidate catalog bindings');
   for (const [lane, local] of Object.entries(catalogs)) {
     const binding = object(bindings[lane], `${lane} candidate binding`);
     exactKeys(binding, manualBindingKeys, `${lane} candidate binding`);
@@ -432,17 +420,15 @@ function validateCandidate(candidate, {
   positiveInteger(mobile.artifact_id, 'mobile_test_artifacts.artifact_id');
   exact(
     mobile.artifact_name,
-    `${releaseId}-signed-mobile-build-run-${mobile.workflow_run_id}-attempt-1`,
+    `${releaseId}-signed-android-build-run-${mobile.workflow_run_id}-attempt-1`,
     'mobile_test_artifacts.artifact_name',
   );
   sha256(mobile.artifact_archive_sha256, 'mobile_test_artifacts.artifact_archive_sha256');
-  exact(mobile.build_provenance_file, 'build-provenance.v1.json', 'mobile_test_artifacts.build_provenance_file');
+  exact(mobile.build_provenance_file, 'build-provenance.v2.json', 'mobile_test_artifacts.build_provenance_file');
   exact(mobile.signed_apk_file, 'mobile/android/leva-release.apk', 'mobile_test_artifacts.signed_apk_file');
-  exact(mobile.signed_ipa_file, 'mobile/ios/leva-release.ipa', 'mobile_test_artifacts.signed_ipa_file');
   const distinct = [
     sha256(mobile.build_provenance_sha256, 'mobile_test_artifacts.build_provenance_sha256'),
     sha256(mobile.signed_apk_sha256, 'mobile_test_artifacts.signed_apk_sha256'),
-    sha256(mobile.signed_ipa_sha256, 'mobile_test_artifacts.signed_ipa_sha256'),
   ];
   if (new Set(distinct).size !== distinct.length) {
     fail('mobile_test_artifacts hashes must be distinct');
@@ -506,7 +492,7 @@ function evidenceKeys(lane) {
   return [
     ...commonEvidenceKeys.slice(0, 12),
     'build_provenance_sha256',
-    lane === 'manual-voiceover' ? 'signed_ipa_sha256' : 'signed_apk_sha256',
+    'signed_apk_sha256',
     ...commonEvidenceKeys.slice(12),
   ];
 }
@@ -550,11 +536,7 @@ export function createManualEvidence({
   };
   if (lane !== 'manual-nvda') {
     evidence.build_provenance_sha256 = mobile.build_provenance_sha256;
-    if (lane === 'manual-voiceover') {
-      evidence.signed_ipa_sha256 = mobile.signed_ipa_sha256;
-    } else {
-      evidence.signed_apk_sha256 = mobile.signed_apk_sha256;
-    }
+    evidence.signed_apk_sha256 = mobile.signed_apk_sha256;
   }
   Object.assign(evidence, {
     approval_environment: checkedApproval.approval_environment,
@@ -605,11 +587,7 @@ function validateEvidence(value, lane, expected) {
   );
   if (lane !== 'manual-nvda') {
     exact(value.build_provenance_sha256, expected.mobile.build_provenance_sha256, `${lane}.build_provenance_sha256`);
-    if (lane === 'manual-voiceover') {
-      exact(value.signed_ipa_sha256, expected.mobile.signed_ipa_sha256, `${lane}.signed_ipa_sha256`);
-    } else {
-      exact(value.signed_apk_sha256, expected.mobile.signed_apk_sha256, `${lane}.signed_apk_sha256`);
-    }
+    exact(value.signed_apk_sha256, expected.mobile.signed_apk_sha256, `${lane}.signed_apk_sha256`);
   }
 }
 
@@ -644,7 +622,7 @@ export function validateManualEvidencePackages({
     rootEntries.length !== lanes.length ||
     rootEntries.some((entry) => !entry.isDirectory() || !lanes.includes(entry.name))
   ) {
-    fail('manual package root must contain exactly the three lane directories');
+    fail('manual package root must contain exactly the two lane directories');
   }
   const catalogs = validateAllManualCatalogs(repositoryRoot);
   const mobile = validateCandidate(candidate, { catalogs, releaseId, sourceSha });
@@ -686,7 +664,6 @@ export function validateManualInputs({
   });
   exact(signed.buildProvenanceSha256, mobile.build_provenance_sha256, 'signed build provenance SHA');
   exact(signed.signedApkSha256, mobile.signed_apk_sha256, 'signed APK SHA');
-  exact(signed.signedIpaSha256, mobile.signed_ipa_sha256, 'signed IPA SHA');
   return { catalogs, mobile, candidateSpecSha256: candidateBytesSha };
 }
 
@@ -726,13 +703,13 @@ export function validateSignedMobileArtifactFacts({
   exact(artifact.id, binding.artifact_id, 'signed artifact.id');
   exact(
     artifact.name,
-    `${releaseId}-signed-mobile-build-run-${binding.workflow_run_id}-attempt-1`,
+    `${releaseId}-signed-android-build-run-${binding.workflow_run_id}-attempt-1`,
     'signed artifact.name',
   );
   exact(artifact.expired, false, 'signed artifact.expired');
   positiveInteger(artifact.size_in_bytes, 'signed artifact.size_in_bytes');
-  if (artifact.size_in_bytes > 1100 * 1024 * 1024) {
-    fail('signed artifact exceeds the 1100 MiB archive limit');
+  if (artifact.size_in_bytes > 550 * 1024 * 1024) {
+    fail('signed artifact exceeds the 550 MiB archive limit');
   }
   exact(artifact.workflow_run?.id, binding.workflow_run_id, 'signed artifact.workflow_run.id');
   exact(artifact.workflow_run?.head_sha, sourceSha, 'signed artifact.workflow_run.head_sha');

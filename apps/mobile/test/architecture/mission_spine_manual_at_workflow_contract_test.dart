@@ -32,7 +32,6 @@ void main() {
       final source = workflow.readAsStringSync().replaceAll('\r\n', '\n');
       for (final binding in {
         'manual-at-nvda': 'Approve manual NVDA evidence',
-        'manual-at-voiceover': 'Approve manual VoiceOver evidence',
         'manual-at-talkback': 'Approve manual TalkBack evidence',
       }.entries) {
         expect(source, contains('name: ${binding.key}'));
@@ -43,12 +42,14 @@ void main() {
       expect(source, contains('candidate-source'));
       expect(source, contains('validate-manual-inputs'));
       expect(source, contains('validate-manual-packages'));
-      expect(source, contains('build-provenance.v1.json'));
+      expect(source, contains('build-provenance.v2.json'));
       expect(source, contains('mobile/android/leva-release.apk'));
-      expect(source, contains('mobile/ios/leva-release.ipa'));
+      expect(source, isNot(contains('manual-at-voiceover')));
+      expect(source, isNot(contains('mobile/ios')));
+      expect(source, isNot(contains('signed_ipa')));
       expect(source, contains('unsealable-manual-at-review'));
       const releaseInput = r'${{ inputs.release_id }}';
-      for (final lane in ['nvda', 'voiceover', 'talkback']) {
+      for (final lane in ['nvda', 'talkback']) {
         expect(source, contains('$releaseInput-manual-$lane-run-'));
       }
       expect(source, contains('overwrite: false'));
