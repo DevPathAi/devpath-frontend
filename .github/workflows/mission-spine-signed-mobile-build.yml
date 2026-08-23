@@ -131,12 +131,14 @@ jobs:
           mkdir -p "${stage}/mobile/android"
           signed="${stage}/mobile/android/leva-release.apk"
           "${apksigner}" sign \
+            --v4-signing-enabled false \
             --ks "${keystore}" \
             --ks-key-alias "${ANDROID_RELEASE_KEY_ALIAS}" \
             --ks-pass env:ANDROID_RELEASE_KEYSTORE_PASSWORD \
             --key-pass env:ANDROID_RELEASE_KEY_PASSWORD \
             --out "${signed}" \
             "${unsigned}"
+          test ! -e "${signed}.idsig"
           verify_output="$(${apksigner} verify --verbose --print-certs "${signed}")"
           printf '%s\n' "${verify_output}"
           cert_sha="$(printf '%s\n' "${verify_output}" \
