@@ -116,6 +116,19 @@ jobs:
             }
           }
 
+          function githubUserIdentity(value, name) {
+            const id = positiveInteger(value?.id, `${name}.id`);
+            const login = value?.login;
+            if (
+              value?.type !== 'User' ||
+              typeof login !== 'string' ||
+              !/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/.test(login)
+            ) {
+              fail(`${name} must be a human GitHub user`);
+            }
+            return { id, login };
+          }
+
           async function main() {
             const repository = process.env.GITHUB_REPOSITORY;
             const sourceSha = process.env.GITHUB_SHA;
@@ -166,6 +179,8 @@ jobs:
             exact(currentRun.head_branch, 'main', 'currentRun.head_branch');
             exact(currentRun.repository?.full_name, repository, 'currentRun.repository');
             exactWorkflow(currentRun, approvalWorkflow, 'currentRun');
+            githubUserIdentity(currentRun.actor, 'currentRun.actor');
+            githubUserIdentity(currentRun.triggering_actor, 'currentRun.triggering_actor');
 
             const environment = await github(
               `/repos/${repository}/environments/${encodeURIComponent(environmentName)}`,
@@ -233,14 +248,6 @@ jobs:
               review.user.id < 1
             ) {
               fail('approved reviewer identity is invalid');
-            }
-            if (
-              approvedBy === currentRun.actor?.login ||
-              approvedBy === currentRun.triggering_actor?.login ||
-              review.user.id === currentRun.actor?.id ||
-              review.user.id === currentRun.triggering_actor?.id
-            ) {
-              fail('the workflow initiator cannot approve this baseline');
             }
             const configuredUserMatch = requiredRule.reviewers.some(
               (entry) => entry.type === 'User' && entry.reviewer?.id === review.user.id,
