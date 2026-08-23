@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../tools/apksigner_certificate_parser.dart' as certificate_parser;
+
 void main() {
   final workflow = File(
     '../../.github/workflows/mission-spine-signed-mobile-build.yml',
@@ -53,6 +55,15 @@ void main() {
 
     expect(source, contains(r'"${apksigner}" sign'));
     expect(source, contains('verify --verbose --print-certs'));
+    expect(
+      source,
+      contains('dart run apps/mobile/tools/apksigner_certificate_parser.dart'),
+    );
+    expect(
+      source,
+      isNot(contains('Signer #1 certificate SHA-256 digest')),
+      reason: 'current apksigner labels the certificate as V3.0 Signer',
+    );
     expect(source, contains('signing_certificate_sha256'));
     expect(source, contains("'method': 'ad-hoc'"));
     expect(source, contains('CODE_SIGN_STYLE = Manual'));
@@ -96,5 +107,34 @@ void main() {
       expect(use.group(2), matches(RegExp(r'^[0-9a-f]{40}$')));
       expect(use.group(3), matches(RegExp(r'^v\d+(?:\.\d+){0,2}$')));
     }
+  });
+
+  test('live apksigner V3 output yields the single signing certificate', () {
+    const output = '''
+Verifies
+Verified using v2 scheme (APK Signature Scheme v2): true
+Verified using v3 scheme (APK Signature Scheme v3): true
+Number of signers: 1
+V3.0 Signer: certificate DN: CN=DevPathAi Release Test
+V3.0 Signer: certificate SHA-256 digest: F767C648E8439785B9058A3EF70C72006AE06174CE4A56FF601B59CCAA9D5347
+''';
+
+    expect(
+      certificate_parser.parseSingleCertificateSha256(output),
+      'f767c648e8439785b9058a3ef70c72006ae06174ce4a56ff601b59ccaa9d5347',
+    );
+  });
+
+  test('certificate parser rejects multiple distinct signers', () {
+    const output = '''
+Number of signers: 2
+Signer #1 certificate SHA-256 digest: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+Signer #2 certificate SHA-256 digest: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+''';
+
+    expect(
+      () => certificate_parser.parseSingleCertificateSha256(output),
+      throwsFormatException,
+    );
   });
 }
