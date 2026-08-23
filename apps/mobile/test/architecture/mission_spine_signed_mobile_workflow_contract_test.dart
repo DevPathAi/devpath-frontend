@@ -29,6 +29,8 @@ void main() {
     expect(source, contains('WEB_APP_URL=https://app.leva.ai.kr'));
 
     expect(source, contains(r'"${apksigner}" sign'));
+    expect(source, contains('--v4-signing-enabled false'));
+    expect(source, contains(r'test ! -e "${signed}.idsig"'));
     expect(source, contains('verify --verbose --print-certs'));
     expect(
       source,
