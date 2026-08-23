@@ -61,10 +61,20 @@ ARG APP_VERSION
 ARG MISSION_SPINE_ENABLED
 ARG ANALYTICS_CONTRACT_VERSION
 ARG ANALYTICS_ENVIRONMENT
+ENV NGINX_ENVSUBST_FILTER="^MISSION_" \
+    MISSION_RELEASE_READY=false \
+    MISSION_RELEASE_ID=unreleased \
+    MISSION_CANDIDATE_SPEC_SHA256=0000000000000000000000000000000000000000000000000000000000000000 \
+    MISSION_IMAGE_DIGEST=sha256:0000000000000000000000000000000000000000000000000000000000000000 \
+    MISSION_SYNTHETIC_PROBE_TOKEN=disabled
 LABEL ai.leva.app_version="${APP_VERSION}" \
       ai.leva.mission_spine_enabled="${MISSION_SPINE_ENABLED}" \
       ai.leva.analytics_contract_version="${ANALYTICS_CONTRACT_VERSION}" \
       ai.leva.analytics_environment="${ANALYTICS_ENVIRONMENT}"
 COPY --from=build /src/apps/web/build/web /usr/share/nginx/html
-COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
+COPY apps/web/nginx.conf /etc/nginx/templates/default.conf.template
+COPY apps/web/release-entrypoint.sh /usr/local/bin/devpath-release-entrypoint
+RUN chmod 0555 /usr/local/bin/devpath-release-entrypoint
+ENTRYPOINT ["/usr/local/bin/devpath-release-entrypoint"]
+CMD ["nginx", "-g", "daemon off;"]
 EXPOSE 8080
