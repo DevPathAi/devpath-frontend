@@ -98,6 +98,19 @@ function validateWorkflowPath(run, workflowPath) {
   exact(run.path, workflowPath, 'run.path');
 }
 
+function githubUserIdentity(value, name) {
+  const id = positiveInteger(value?.id, `${name}.id`);
+  const login = value?.login;
+  if (
+    value?.type !== 'User' ||
+    typeof login !== 'string' ||
+    !/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/.test(login)
+  ) {
+    fail(`${name} must be a human GitHub user`);
+  }
+  return { id, login };
+}
+
 function validateBinding(workflowPath, environmentName, jobName) {
   const environments = allowedBindings.get(workflowPath);
   const binding = environments?.get(environmentName);
@@ -135,6 +148,8 @@ export function validateProtectedApprovalFacts(facts) {
     'run.head_repository',
   );
   validateWorkflowPath(facts.run, facts.workflowPath);
+  githubUserIdentity(facts.run.actor, 'run.actor');
+  githubUserIdentity(facts.run.triggering_actor, 'run.triggering_actor');
 
   exact(facts.branch.name, 'main', 'protected branch name');
   exact(facts.branch.commit?.sha, facts.sourceSha, 'protected branch commit SHA');
@@ -255,14 +270,6 @@ export function validateProtectedApprovalFacts(facts) {
     fail('approved reviewer login is absent or non-human');
   }
   const reviewerId = positiveInteger(review.user.id, 'approved reviewer id');
-  if (
-    login === facts.run.actor?.login ||
-    login === facts.run.triggering_actor?.login ||
-    reviewerId === facts.run.actor?.id ||
-    reviewerId === facts.run.triggering_actor?.id
-  ) {
-    fail('the workflow initiator cannot approve this environment');
-  }
   const configuredUser = expectedReviewers.some(
     (entry) => entry.id === reviewerId && entry.login === login,
   );

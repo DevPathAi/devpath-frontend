@@ -36,8 +36,8 @@ const approvalFacts = {
     path: '.github/workflows/mission-spine-signed-mobile-build.yml',
     repository: { full_name: 'DevPathAi/devpath-frontend' },
     head_repository: { full_name: 'DevPathAi/devpath-frontend' },
-    actor: { id: 11, login: 'initiator' },
-    triggering_actor: { id: 11, login: 'initiator' },
+    actor: { id: 11, login: 'initiator', type: 'User' },
+    triggering_actor: { id: 11, login: 'initiator', type: 'User' },
     created_at: '2025-08-17T01:00:00Z',
   },
   branch: {
@@ -118,15 +118,36 @@ test('protected approval binds exact environment, job, workflow, and reviewer', 
   });
 });
 
-test('protected approval rejects self-review and missing branch protection', () => {
-  const selfReview = structuredClone(approvalFacts);
-  selfReview.approvals[0].user = { id: 11, login: 'initiator', type: 'User' };
+test('protected approval permits the configured reviewer to initiate and approve', () => {
+  const aiOperated = structuredClone(approvalFacts);
+  aiOperated.workflowBytes = Buffer.from(approvalFacts.workflowBytes);
+  aiOperated.run.actor = {
+    id: 77432570,
+    login: 'VelkaressiaBlutkrone',
+    type: 'User',
+  };
+  aiOperated.run.triggering_actor = {
+    id: 77432570,
+    login: 'VelkaressiaBlutkrone',
+    type: 'User',
+  };
+  assert.equal(
+    validateProtectedApprovalFacts(aiOperated).approved_by,
+    'VelkaressiaBlutkrone',
+  );
+});
+
+test('protected approval rejects missing initiator identity and branch protection', () => {
+  const missingActor = structuredClone(approvalFacts);
+  missingActor.workflowBytes = Buffer.from(approvalFacts.workflowBytes);
+  missingActor.run.actor = null;
   assert.throws(
-    () => validateProtectedApprovalFacts(selfReview),
-    /initiator cannot approve/,
+    () => validateProtectedApprovalFacts(missingActor),
+    /run\.actor/,
   );
 
   const unprotected = structuredClone(approvalFacts);
+  unprotected.workflowBytes = Buffer.from(approvalFacts.workflowBytes);
   unprotected.branch.protected = false;
   assert.throws(
     () => validateProtectedApprovalFacts(unprotected),

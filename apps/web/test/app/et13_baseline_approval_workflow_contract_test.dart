@@ -45,16 +45,17 @@ void main() {
         workflow,
         contains('review.environments[0]?.name === environmentName'),
       );
-      expect(workflow, contains('approvedBy === currentRun.actor?.login'));
       expect(
         workflow,
-        contains('approvedBy === currentRun.triggering_actor?.login'),
+        contains("githubUserIdentity(currentRun.actor, 'currentRun.actor')"),
       );
-      expect(workflow, contains('review.user.id === currentRun.actor?.id'));
       expect(
         workflow,
-        contains('review.user.id === currentRun.triggering_actor?.id'),
+        contains(
+          "githubUserIdentity(currentRun.triggering_actor, 'currentRun.triggering_actor')",
+        ),
       );
+      expect(workflow, isNot(contains('workflow initiator cannot approve')));
       expect(workflow, contains("currentRun.run_attempt, 1"));
       expect(workflow, isNot(contains('/pending_deployments')));
       expect(workflow, isNot(contains("method: 'POST'")));

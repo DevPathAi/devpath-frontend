@@ -436,7 +436,7 @@ export function validateSignedMobileBuildProvenance(
   validateAndroid(value.android, apkPath);
   validateIos(value.ios, ipaPath, iosApproval);
   if (androidApproval.approved_by_id === iosApproval.approved_by_id) {
-    // The approved policy allows one non-initiating reviewer to approve both lanes.
+    // The approved policy allows the exact configured reviewer to approve both lanes.
   }
   return value;
 }
