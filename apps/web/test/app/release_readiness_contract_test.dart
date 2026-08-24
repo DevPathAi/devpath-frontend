@@ -36,6 +36,7 @@ void main() {
     );
 
     expect(entrypoint, contains("case \"\${MISSION_RELEASE_READY:-}\" in"));
+    expect(entrypoint, contains("*'\n'*) return 1 ;;"));
     expect(entrypoint, contains("'^ms-[0-9]{8}-[a-z0-9][a-z0-9-]{2,40}\$'"));
     expect(entrypoint, contains("'^[0-9a-f]{64}\$'"));
     expect(entrypoint, contains("'^sha256:[0-9a-f]{64}\$'"));
