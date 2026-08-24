@@ -68,7 +68,9 @@ jobs:
           file: apps/web/Dockerfile
           platforms: linux/amd64
           push: false
-          outputs: type=oci,dest=${{ runner.temp }}/leva-web-${{ matrix.identity }}.tar
+          outputs: |
+            type=oci,dest=${{ runner.temp }}/leva-web-${{ matrix.identity }}.tar
+            type=docker
           build-args: |
             API_BASE_URL=https://api.contract.invalid
             USE_MOCK=false
@@ -96,11 +98,6 @@ jobs:
             "${IDENTITY}" "${artifact_sha256}" "${APP_VERSION}" \
             "${MISSION_SPINE_ENABLED}" "${ANALYTICS_CONTRACT_VERSION}" \
             "${ANALYTICS_ENVIRONMENT}" > "${MANIFEST_PATH}"
-      - name: Load OCI image for runtime contract
-        shell: bash
-        env:
-          ARTIFACT_PATH: ${{ runner.temp }}/leva-web-${{ matrix.identity }}.tar
-        run: docker load --input "${ARTIFACT_PATH}"
       - name: Smoke authenticated release readiness
         shell: bash
         env:

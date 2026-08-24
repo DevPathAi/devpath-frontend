@@ -49,7 +49,7 @@ void main() {
     expect(entrypoint, contains("exec /docker-entrypoint.sh \"\$@\""));
 
     expect(workflow, contains('Smoke authenticated release readiness'));
-    expect(workflow, contains('docker load --input "\${ARTIFACT_PATH}"'));
+    expect(workflow, contains('type=docker'));
     expect(
       RegExp(
         r'bash tools/web_release_readiness_smoke\.sh',
