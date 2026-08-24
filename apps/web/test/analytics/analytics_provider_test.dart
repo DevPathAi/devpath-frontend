@@ -1,5 +1,6 @@
 import 'package:devpath_web/src/analytics/journey_analytics.dart';
 import 'package:devpath_web/src/analytics/journey_handoff.dart';
+import 'package:devpath_web/src/analytics/release_analytics.dart';
 import 'package:devpath_web/src/app/app_config.dart';
 import 'package:devpath_web/src/providers/api_providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -127,6 +128,48 @@ void main() {
       AnalyticsCaptureStatus.excluded,
     );
   });
+
+  test(
+    'valid release marker bypasses only the automated browser exclusion',
+    () {
+      final journeyStore = MemoryJourneyIdStore()
+        ..write('AQIDBAUGBwgJCgsMDQ4PEA');
+      final sessionStore = MemoryJourneyIdStore()
+        ..write('EREREREREREREREREREREQ');
+      final marker = parseReleaseAnalyticsMarker('''{
+      "schema_version":"mission-spine.release-analytics.v1",
+      "permission_url":"https://api.leva.ai.kr/v1/release/browser/analytics-permission",
+      "capture_url":"https://analytics-spy.staging.leva.ai.kr/v1/release/browser/analytics-events"
+    }''');
+      final container = ProviderContainer(
+        overrides: [
+          appConfigProvider.overrideWithValue(
+            const AppConfig(
+              baseUrl: 'https://api.leva.ai.kr',
+              useMock: false,
+              appVersion: 'abc123',
+              analyticsEnvironment: 'production',
+            ),
+          ),
+          journeyIdStoreProvider.overrideWithValue(journeyStore),
+          analyticsSessionIdStoreProvider.overrideWithValue(sessionStore),
+          analyticsUserAgentProvider.overrideWithValue(
+            'Mozilla/5.0 HeadlessChrome Playwright',
+          ),
+          releaseAnalyticsMarkerProvider.overrideWithValue(marker),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      expect(
+        container.read(journeyAnalyticsProvider).capture(
+          'landing_viewed',
+          const {'page_view_id': 'ISEhISEhISEhISEhISEhIQ'},
+        ),
+        AnalyticsCaptureStatus.accepted,
+      );
+    },
+  );
 
   test(
     'production provider exposes an authoritative internal-account seam',

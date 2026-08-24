@@ -1,12 +1,15 @@
 import 'dart:convert';
 
 import 'package:dp_core/dp_core.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../analytics/analytics_contract.dart';
 import '../analytics/journey_analytics.dart';
 import '../analytics/journey_handoff.dart';
 import '../analytics/analytics_runtime.dart';
+import '../analytics/release_analytics.dart';
+import '../analytics/release_analytics_runtime.dart';
 import '../app/app_config.dart';
 import '../data/web_mock_fixtures.dart';
 import '../features/auth/application/auth_controller.dart';
@@ -38,6 +41,10 @@ final analyticsIdGeneratorProvider = Provider<String Function()>(
 final analyticsUserAgentProvider = Provider<String>(
   (ref) => analyticsRuntimeUserAgent(),
 );
+final releaseAnalyticsMarkerProvider = Provider<ReleaseAnalyticsMarker?>(
+  (ref) => parseReleaseAnalyticsMarker(readReleaseAnalyticsMarkerValue()),
+);
+final releaseAnalyticsDioProvider = Provider<Dio>((ref) => Dio());
 
 /// Vendor-neutral, opt-out default. ET1 deliberately installs no vendor SDK.
 final journeyAnalyticsProvider = Provider<JourneyAnalytics>((ref) {
@@ -46,6 +53,11 @@ final journeyAnalyticsProvider = Provider<JourneyAnalytics>((ref) {
     return const OptedOutJourneyAnalytics();
   }
   try {
+    final marker = ref.watch(releaseAnalyticsMarkerProvider);
+    final releaseMode =
+        marker != null &&
+        config.analyticsEnvironment == 'production' &&
+        config.appVersion != 'dev';
     final generator = ref.watch(analyticsIdGeneratorProvider);
     final journeyId = getOrCreateJourneyId(
       ref.watch(journeyIdStoreProvider),
@@ -56,18 +68,26 @@ final journeyAnalyticsProvider = Provider<JourneyAnalytics>((ref) {
       randomBytes: (_) => _decodeGeneratedId(generator()),
     );
     return JourneyAnalyticsAdapter(
+      sdk: releaseMode
+          ? ReleaseJourneyAnalyticsSdk(
+              marker,
+              ref.watch(releaseAnalyticsDioProvider),
+            )
+          : const NoopJourneyAnalyticsSdk(),
       context: JourneyAnalyticsContext(
         environment: config.analyticsEnvironment,
         appVersion: config.appVersion,
         sessionId: sessionId,
         journeyId: journeyId,
       ),
-      optedOut: true,
-      excluded: shouldExcludeAnalyticsTraffic(
-        environment: config.analyticsEnvironment,
-        appVersion: config.appVersion,
-        userAgent: ref.watch(analyticsUserAgentProvider),
-      ),
+      optedOut: !releaseMode,
+      excluded:
+          !releaseMode &&
+          shouldExcludeAnalyticsTraffic(
+            environment: config.analyticsEnvironment,
+            appVersion: config.appVersion,
+            userAgent: ref.watch(analyticsUserAgentProvider),
+          ),
       isInternalUser: ref.watch(analyticsInternalUserPolicyProvider),
     );
   } catch (_) {
