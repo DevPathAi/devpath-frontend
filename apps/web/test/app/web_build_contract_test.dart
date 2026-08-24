@@ -47,9 +47,10 @@ void main() {
       expect(
         contractJob,
         contains(
-          'outputs: type=oci,dest=\${{ runner.temp }}/leva-web-\${{ matrix.identity }}.tar',
+          'type=oci,dest=\${{ runner.temp }}/leva-web-\${{ matrix.identity }}.tar',
         ),
       );
+      expect(contractJob, contains('type=docker'));
       expect(contractJob, contains('sha256sum "\${ARTIFACT_PATH}"'));
       expect(contractJob, contains('"app_version":"%s"'));
       expect(contractJob, contains('"mission_spine_enabled":%s'));
