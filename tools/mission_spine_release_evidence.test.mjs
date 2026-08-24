@@ -28,30 +28,26 @@ function sha256(bytes) {
   return createHash('sha256').update(bytes).digest('hex');
 }
 
-function approval(platform) {
+function approval() {
   return {
-    approval_environment: `mission-spine-mobile-signing-${platform}`,
-    approval_environment_id: platform === 'android' ? 101 : 102,
-    approval_job_name:
-      platform === 'android' ? 'Sign Android release' : 'Sign iOS release',
-    approved_by: `reviewer-${platform}`,
-    approved_by_id: platform === 'android' ? 201 : 202,
+    approval_environment: 'mission-spine-mobile-signing-android',
+    approval_environment_id: 101,
+    approval_job_name: 'Sign Android release',
+    approved_by: 'reviewer-android',
+    approved_by_id: 201,
     approval_effective_at: '2026-08-17T01:02:03Z',
   };
 }
 
 function fixtureRoot() {
-  const root = mkdtempSync(join(tmpdir(), 'signed-mobile-contract-'));
+  const root = mkdtempSync(join(tmpdir(), 'signed-android-contract-'));
   const apkPath = join(root, 'mobile', 'android', 'leva-release.apk');
-  const ipaPath = join(root, 'mobile', 'ios', 'leva-release.ipa');
   mkdirSync(join(root, 'mobile', 'android'), { recursive: true });
-  mkdirSync(join(root, 'mobile', 'ios'), { recursive: true });
   writeFileSync(apkPath, Buffer.from('signed release-test apk'));
-  writeFileSync(ipaPath, Buffer.from('signed distribution ipa'));
-  return { root, apkPath, ipaPath };
+  return { root, apkPath };
 }
 
-function createFixture(root, apkPath, ipaPath) {
+function createFixture(apkPath) {
   return createSignedMobileBuildProvenance({
     releaseId: 'release-2026-08-17',
     repository: 'DevPathAi/devpath-frontend',
@@ -61,42 +57,42 @@ function createFixture(root, apkPath, ipaPath) {
     producerRunAttempt: 1,
     pubspecLockSha256,
     apkPath,
-    ipaPath,
     android: {
       applicationId: 'ai.devpath.devpath_mobile',
       versionName: '1.0.0',
       versionCode: 1,
       signatureVerified: true,
       signingCertificateSha256: '3'.repeat(64),
-      approval: approval('android'),
-    },
-    ios: {
-      bundleId: 'ai.devpath.devpathMobile',
-      shortVersion: '1.0.0',
-      bundleVersion: '1',
-      signatureVerified: true,
-      teamId: 'ABCDE12345',
-      signingCertificateSha256: '4'.repeat(64),
-      provisioningProfileUuid: '12345678-1234-1234-1234-1234567890AB',
-      provisioningProfileExpiresAt: '2027-08-17T01:02:03Z',
-      approval: approval('ios'),
+      approval: approval(),
     },
   });
 }
 
-test('signed mobile provenance is exact and binds packaged binary bytes', () => {
+function expectations(apkPath) {
+  return {
+    releaseId: 'release-2026-08-17',
+    sourceSha,
+    workflowSha256,
+    producerRunId: 901,
+    producerRunAttempt: 1,
+    pubspecLockSha256,
+    ...(apkPath ? { apkPath } : {}),
+  };
+}
+
+test('signed Android provenance v2 is exact and binds packaged APK bytes', () => {
   const fixture = fixtureRoot();
   try {
-    const provenance = createFixture(
-      fixture.root,
-      fixture.apkPath,
-      fixture.ipaPath,
-    );
+    const provenance = createFixture(fixture.apkPath);
     writeFileSync(
-      join(fixture.root, 'build-provenance.v1.json'),
+      join(fixture.root, 'build-provenance.v2.json'),
       `${JSON.stringify(provenance, null, 2)}\n`,
     );
 
+    assert.equal(
+      provenance.schema_version,
+      'leva.mission-spine.signed-android-build.v2',
+    );
     assert.deepEqual(Object.keys(provenance), [
       'schema_version',
       'release_id',
@@ -111,110 +107,54 @@ test('signed mobile provenance is exact and binds packaged binary bytes', () => 
       'toolchain',
       'build_configuration',
       'android',
-      'ios',
       'approvals',
     ]);
+    assert.deepEqual(Object.keys(provenance.toolchain), [
+      'flutter_version',
+      'flutter_revision',
+      'dart_sdk_version',
+      'android',
+    ]);
+    assert.deepEqual(Object.keys(provenance.approvals), ['android']);
     assert.equal(
       provenance.android.sha256,
       sha256(readFileSync(fixture.apkPath)),
     );
     assert.equal(
-      provenance.ios.sha256,
-      sha256(readFileSync(fixture.ipaPath)),
-    );
-    assert.deepEqual(Object.keys(provenance.android), [
-      'artifact_path',
-      'sha256',
-      'bytes',
-      'application_id',
-      'version_name',
-      'version_code',
-      'signature_verified',
-      'signing_classification',
-      'play_app_signing',
-      'signing_certificate_sha256',
-    ]);
-    assert.equal(
       provenance.android.signing_classification,
       'org_keystore_release_test_distribution',
     );
     assert.equal(provenance.android.play_app_signing, false);
-    assert.deepEqual(Object.keys(provenance.ios), [
-      'artifact_path',
-      'sha256',
-      'bytes',
-      'bundle_id',
-      'short_version',
-      'bundle_version',
-      'signature_verified',
-      'signing_classification',
-      'export_method',
-      'distribution_scope',
-      'team_id',
-      'signing_certificate_sha256',
-      'provisioning_profile_uuid',
-      'provisioning_profile_expires_at',
-    ]);
-    assert.equal(provenance.ios.signing_classification, 'organization_distribution');
-    assert.equal(provenance.ios.export_method, 'ad-hoc');
-    assert.equal(
-      provenance.ios.distribution_scope,
-      'protected_manual_at_test_devices',
-    );
 
     assert.doesNotThrow(() =>
-      validateExactSignedMobileBundle(fixture.root, {
-        releaseId: 'release-2026-08-17',
-        sourceSha,
-        workflowSha256,
-        producerRunId: 901,
-        producerRunAttempt: 1,
-        pubspecLockSha256,
-      }),
+      validateExactSignedMobileBundle(fixture.root, expectations()),
     );
   } finally {
     rmSync(fixture.root, { recursive: true, force: true });
   }
 });
 
-test('signed mobile provenance rejects byte drift and non-exact documents', () => {
+test('signed Android provenance rejects byte drift, legacy schema, and iOS fields', () => {
   const fixture = fixtureRoot();
   try {
-    const provenance = createFixture(
-      fixture.root,
-      fixture.apkPath,
-      fixture.ipaPath,
-    );
+    const provenance = createFixture(fixture.apkPath);
     writeFileSync(fixture.apkPath, Buffer.from('substituted apk'));
     assert.throws(
-      () =>
-        validateSignedMobileBuildProvenance(provenance, {
-          releaseId: 'release-2026-08-17',
-          sourceSha,
-          workflowSha256,
-          producerRunId: 901,
-          producerRunAttempt: 1,
-          pubspecLockSha256,
-          apkPath: fixture.apkPath,
-          ipaPath: fixture.ipaPath,
-        }),
+      () => validateSignedMobileBuildProvenance(provenance, expectations(fixture.apkPath)),
       /android\.sha256 mismatch/,
     );
 
-    const withExtra = structuredClone(provenance);
-    withExtra.play_store_signed = true;
+    const legacySchema = structuredClone(provenance);
+    legacySchema.schema_version = 'leva.mission-spine.signed-mobile-build.v1';
     assert.throws(
-      () =>
-        validateSignedMobileBuildProvenance(withExtra, {
-          releaseId: 'release-2026-08-17',
-          sourceSha,
-          workflowSha256,
-          producerRunId: 901,
-          producerRunAttempt: 1,
-          pubspecLockSha256,
-          apkPath: fixture.apkPath,
-          ipaPath: fixture.ipaPath,
-        }),
+      () => validateSignedMobileBuildProvenance(legacySchema, expectations(fixture.apkPath)),
+      /schema_version mismatch/,
+    );
+
+    const withIos = structuredClone(provenance);
+    withIos.ios = { artifact_path: 'mobile/ios/leva-release.ipa' };
+    assert.throws(
+      () => validateSignedMobileBuildProvenance(withIos, expectations(fixture.apkPath)),
       /key set/,
     );
   } finally {
@@ -222,32 +162,29 @@ test('signed mobile provenance rejects byte drift and non-exact documents', () =
   }
 });
 
-test('signed mobile bundle rejects extras and links', () => {
+test('signed Android bundle rejects extras, legacy IPA, and links', () => {
   const fixture = fixtureRoot();
   try {
-    const provenance = createFixture(
-      fixture.root,
-      fixture.apkPath,
-      fixture.ipaPath,
-    );
+    const provenance = createFixture(fixture.apkPath);
     writeFileSync(
-      join(fixture.root, 'build-provenance.v1.json'),
+      join(fixture.root, 'build-provenance.v2.json'),
       `${JSON.stringify(provenance, null, 2)}\n`,
     );
     writeFileSync(join(fixture.root, 'unexpected.txt'), 'not allowed');
     assert.throws(
-      () =>
-        validateExactSignedMobileBundle(fixture.root, {
-          releaseId: 'release-2026-08-17',
-          sourceSha,
-          workflowSha256,
-          producerRunId: 901,
-          producerRunAttempt: 1,
-          pubspecLockSha256,
-        }),
-      /exactly three regular files/,
+      () => validateExactSignedMobileBundle(fixture.root, expectations()),
+      /exactly two regular files/,
     );
     rmSync(join(fixture.root, 'unexpected.txt'));
+
+    const legacyIos = join(fixture.root, 'mobile', 'ios');
+    mkdirSync(legacyIos);
+    writeFileSync(join(legacyIos, 'leva-release.ipa'), 'legacy IPA');
+    assert.throws(
+      () => validateExactSignedMobileBundle(fixture.root, expectations()),
+      /exactly two regular files/,
+    );
+    rmSync(legacyIos, { recursive: true });
 
     const linked = join(fixture.root, 'mobile', 'android', 'linked.apk');
     try {
@@ -257,23 +194,15 @@ test('signed mobile bundle rejects extras and links', () => {
       throw error;
     }
     assert.throws(
-      () =>
-        validateExactSignedMobileBundle(fixture.root, {
-          releaseId: 'release-2026-08-17',
-          sourceSha,
-          workflowSha256,
-          producerRunId: 901,
-          producerRunAttempt: 1,
-          pubspecLockSha256,
-        }),
-      /link|exactly three regular files/,
+      () => validateExactSignedMobileBundle(fixture.root, expectations()),
+      /link|exactly two regular files/,
     );
   } finally {
     rmSync(fixture.root, { recursive: true, force: true });
   }
 });
 
-test('signed provenance CLI assembles exact platform metadata and revalidates', () => {
+test('signed provenance CLI assembles exact Android metadata and revalidates', () => {
   const fixture = fixtureRoot();
   try {
     const androidMetadata = {
@@ -283,29 +212,12 @@ test('signed provenance CLI assembles exact platform metadata and revalidates', 
       version_code: 1,
       signature_verified: true,
       signing_certificate_sha256: '3'.repeat(64),
-      approval: approval('android'),
-    };
-    const iosMetadata = {
-      workflow_sha256: workflowSha256,
-      bundle_id: 'ai.devpath.devpathMobile',
-      short_version: '1.0.0',
-      bundle_version: '1',
-      signature_verified: true,
-      signing_classification: 'organization_distribution',
-      export_method: 'ad-hoc',
-      distribution_scope: 'protected_manual_at_test_devices',
-      team_id: 'ABCDE12345',
-      signing_certificate_sha256: '4'.repeat(64),
-      provisioning_profile_uuid: '12345678-1234-1234-1234-1234567890AB',
-      provisioning_profile_expires_at: '2027-08-17T01:02:03Z',
-      approval: approval('ios'),
+      approval: approval(),
     };
     const androidMetadataPath = join(fixture.root, 'android-metadata.json');
-    const iosMetadataPath = join(fixture.root, 'ios-metadata.json');
     const lockPath = join(fixture.root, 'pubspec.lock');
-    const outputPath = join(fixture.root, 'build-provenance.v1.json');
+    const outputPath = join(fixture.root, 'build-provenance.v2.json');
     writeFileSync(androidMetadataPath, JSON.stringify(androidMetadata));
-    writeFileSync(iosMetadataPath, JSON.stringify(iosMetadata));
     writeFileSync(lockPath, 'locked workspace\n');
 
     const result = spawnSync(
@@ -322,17 +234,15 @@ test('signed provenance CLI assembles exact platform metadata and revalidates', 
         '--producer-run-attempt=1',
         `--pubspec-lock=${lockPath}`,
         `--apk=${fixture.apkPath}`,
-        `--ipa=${fixture.ipaPath}`,
         `--android-metadata=${androidMetadataPath}`,
-        `--ios-metadata=${iosMetadataPath}`,
         `--output=${outputPath}`,
       ],
       { encoding: 'utf8', windowsHide: true },
     );
     assert.equal(result.status, 0, result.stderr);
-    assert.equal(
-      JSON.parse(readFileSync(outputPath, 'utf8')).ios.export_method,
-      'ad-hoc',
+    assert.deepEqual(
+      Object.keys(JSON.parse(readFileSync(outputPath, 'utf8')).approvals),
+      ['android'],
     );
   } finally {
     rmSync(fixture.root, { recursive: true, force: true });

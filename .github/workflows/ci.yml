@@ -384,6 +384,69 @@ jobs:
               (.Id | test("^sha256:[0-9a-f]{64}$"))
             ' <<<"${candidate_json}" >/dev/null
           echo "config_digest=${candidate_config_digest}" >>"${GITHUB_OUTPUT}"
+      - name: Smoke authenticated release readiness
+        shell: bash
+        env:
+          CANDIDATE_REFERENCE: leva-web-candidate:${{ github.sha }}-mission-${{ matrix.identity }}
+          RELEASE_ID: ms-20990101-runtime-smoke
+          CANDIDATE_SHA: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+          IMAGE_DIGEST: sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+          PROBE_TOKEN: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        run: |
+          set -euo pipefail
+          container="mission-readiness-${GITHUB_RUN_ID}-${{ matrix.identity }}"
+          body="${RUNNER_TEMP}/${container}.body"
+          headers="${RUNNER_TEMP}/${container}.headers"
+          cleanup() {
+            docker rm -f "${container}" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          wait_for_web() {
+            for _ in $(seq 1 30); do
+              if curl --fail --silent --show-error http://127.0.0.1:18080/ >/dev/null; then
+                return 0
+              fi
+              sleep 1
+            done
+            docker logs "${container}" >&2
+            return 1
+          }
+
+          docker run --detach --name "${container}" \
+            --publish 127.0.0.1:18080:8080 "${CANDIDATE_REFERENCE}" >/dev/null
+          wait_for_web
+          test "$(curl --silent --show-error --output "${body}" --write-out '%{http_code}' \
+            http://127.0.0.1:18080/internal/release/ready)" = "401"
+          test "$(curl --silent --show-error --output "${body}" --write-out '%{http_code}' \
+            --header 'Authorization: Bearer disabled' \
+            http://127.0.0.1:18080/internal/release/ready)" = "503"
+          cleanup
+
+          if docker run --rm --env MISSION_RELEASE_READY=true \
+            "${CANDIDATE_REFERENCE}" >/dev/null 2>&1; then
+            echo "Incomplete release identity unexpectedly started" >&2
+            exit 1
+          fi
+
+          docker run --detach --name "${container}" \
+            --publish 127.0.0.1:18080:8080 \
+            --env MISSION_RELEASE_READY=true \
+            --env MISSION_RELEASE_ID="${RELEASE_ID}" \
+            --env MISSION_CANDIDATE_SPEC_SHA256="${CANDIDATE_SHA}" \
+            --env MISSION_IMAGE_DIGEST="${IMAGE_DIGEST}" \
+            --env MISSION_SYNTHETIC_PROBE_TOKEN="${PROBE_TOKEN}" \
+            "${CANDIDATE_REFERENCE}" >/dev/null
+          wait_for_web
+          test "$(curl --silent --show-error --output "${body}" --write-out '%{http_code}' \
+            http://127.0.0.1:18080/internal/release/ready)" = "401"
+          curl --silent --show-error --fail-with-body \
+            --dump-header "${headers}" --output "${body}" \
+            --header "Authorization: Bearer ${PROBE_TOKEN}" \
+            http://127.0.0.1:18080/internal/release/ready
+          expected="{\"release_id\":\"${RELEASE_ID}\",\"candidate_spec_sha256\":\"${CANDIDATE_SHA}\",\"image_digest\":\"${IMAGE_DIGEST}\",\"status\":\"ready\"}"
+          test "$(cat "${body}")" = "${expected}"
+          grep -Eiq '^Cache-Control: no-store\r?$' "${headers}"
+          grep -Eiq '^X-Content-Type-Options: nosniff\r?$' "${headers}"
       - name: Bind immutable tag once
         id: bind-tag
         shell: bash

@@ -1,4 +1,4 @@
-name: Mission Spine Signed Mobile Build
+name: Mission Spine Signed Android Build
 
 on:
   workflow_dispatch:
@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: mission-spine-signed-mobile-${{ inputs.release_id }}-${{ github.run_id }}
+  group: mission-spine-signed-android-${{ inputs.release_id }}-${{ github.run_id }}
   cancel-in-progress: false
 
 jobs:
@@ -131,12 +131,14 @@ jobs:
           mkdir -p "${stage}/mobile/android"
           signed="${stage}/mobile/android/leva-release.apk"
           "${apksigner}" sign \
+            --v4-signing-enabled false \
             --ks "${keystore}" \
             --ks-key-alias "${ANDROID_RELEASE_KEY_ALIAS}" \
             --ks-pass env:ANDROID_RELEASE_KEYSTORE_PASSWORD \
             --key-pass env:ANDROID_RELEASE_KEY_PASSWORD \
             --out "${signed}" \
             "${unsigned}"
+          test ! -e "${signed}.idsig"
           verify_output="$(${apksigner} verify --verbose --print-certs "${signed}")"
           printf '%s\n' "${verify_output}"
           cert_sha="$(printf '%s\n' "${verify_output}" \
@@ -182,7 +184,7 @@ jobs:
       - name: Preserve unsealable Android signing input
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: ${{ inputs.release_id }}-signed-mobile-android-input-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          name: ${{ inputs.release_id }}-signed-android-input-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
           path: ${{ runner.temp }}/signed-mobile-android
           if-no-files-found: error
           overwrite: false
@@ -195,397 +197,9 @@ jobs:
           set -euo pipefail
           rm -f -- "${RUNNER_TEMP}/mission-spine-release-test.keystore"
 
-  sign-ios:
-    name: Sign iOS release
-    runs-on: macos-26
-    timeout-minutes: 75
-    environment:
-      name: mission-spine-mobile-signing-ios
-    steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
-
-      - name: Authenticate protected iOS approval
-        id: approval
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          test "${GITHUB_RUN_ATTEMPT}" = 1 || {
-            echo 'protected approvals require attempt 1 and a fresh workflow_dispatch' >&2
-            exit 1
-          }
-          node tools/mission_spine_protected_approval.mjs \
-            --workflow-path=.github/workflows/mission-spine-signed-mobile-build.yml \
-            --environment=mission-spine-mobile-signing-ios \
-            --job-name='Sign iOS release' \
-            --output="${RUNNER_TEMP}/ios-approval.json"
-
-      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
-        with:
-          flutter-version: '3.44.1'
-          cache: true
-
-      - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
-        with:
-          xcode-version: '26.4.1'
-
-      - name: Verify exact iOS source and toolchain
-        shell: bash
-        env:
-          RELEASE_ID: ${{ inputs.release_id }}
-        run: |
-          set -euo pipefail
-          [[ "${RELEASE_ID}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]]
-          test "${GITHUB_REPOSITORY}" = DevPathAi/devpath-frontend
-          test "${GITHUB_REF}" = refs/heads/main
-          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
-          test -z "$(git status --porcelain=v1 --untracked-files=all)"
-          flutter_toolchain="$(flutter --version --machine)"
-          grep -Fq '"frameworkVersion": "3.44.1"' <<< "${flutter_toolchain}"
-          grep -Fq '"frameworkRevision": "924134a44c189315be2148659913dda1671cbe99"' \
-            <<< "${flutter_toolchain}"
-          grep -Fq '"dartSdkVersion": "3.12.1"' <<< "${flutter_toolchain}"
-          apple_toolchain="$(xcodebuild -version)"
-          test "${apple_toolchain}" = $'Xcode 26.4.1\nBuild version 17E202'
-          iphoneos_sdk="$(xcrun --sdk iphoneos --show-sdk-version)"
-          test "${iphoneos_sdk}" = '26.4'
-          printf '%s  %s\n' \
-            '${{ steps.approval.outputs.workflow_sha256 }}' \
-            .github/workflows/mission-spine-signed-mobile-build.yml \
-            | shasum -a 256 --check
-
-      - name: Use CocoaPods for iOS plugins
-        run: flutter config --no-enable-swift-package-manager
-
-      - name: Resolve exact locked workspace
-        run: flutter pub get --enforce-lockfile
-
-      - name: Install protected organization distribution identity and profile
-        id: signing
-        shell: bash
-        env:
-          IOS_DISTRIBUTION_CERTIFICATE_P12_BASE64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_P12_BASE64 }}
-          IOS_DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
-          IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
-        run: |
-          set -euo pipefail
-          umask 077
-          for value in \
-            IOS_DISTRIBUTION_CERTIFICATE_P12_BASE64 \
-            IOS_DISTRIBUTION_CERTIFICATE_PASSWORD \
-            IOS_PROVISIONING_PROFILE_BASE64; do
-            test -n "${!value:-}" || {
-              echo "required protected signing secret ${value} is absent" >&2
-              exit 1
-            }
-          done
-          p12="${RUNNER_TEMP}/distribution.p12"
-          profile="${RUNNER_TEMP}/manual-at.mobileprovision"
-          profile_plist="${RUNNER_TEMP}/profile.plist"
-          keychain="${RUNNER_TEMP}/mission-spine-signing.keychain-db"
-          keychain_password="$(openssl rand -hex 32)"
-          security list-keychains -d user \
-            > "${RUNNER_TEMP}/original-keychains.txt"
-          printf '%s' "${IOS_DISTRIBUTION_CERTIFICATE_P12_BASE64}" \
-            | base64 --decode > "${p12}"
-          printf '%s' "${IOS_PROVISIONING_PROFILE_BASE64}" \
-            | base64 --decode > "${profile}"
-          test -s "${p12}"
-          test -s "${profile}"
-          security cms -D -i "${profile}" > "${profile_plist}"
-
-          profile_metadata="${RUNNER_TEMP}/profile-metadata.json"
-          python3 - "${profile_plist}" "${profile_metadata}" <<'PY'
-          from datetime import datetime, timezone
-          import json
-          import plistlib
-          import sys
-
-          with open(sys.argv[1], 'rb') as source:
-              profile = plistlib.load(source)
-          expires = profile.get('ExpirationDate')
-          if not isinstance(expires, datetime):
-              raise SystemExit('profile expiration is absent')
-          if expires.tzinfo is None:
-              expires = expires.replace(tzinfo=timezone.utc)
-          expires = expires.astimezone(timezone.utc)
-          if expires <= datetime.now(timezone.utc):
-              raise SystemExit('provisioning profile is expired')
-          payload = {
-              'uuid': profile.get('UUID'),
-              'name': profile.get('Name'),
-              'team_id': (profile.get('TeamIdentifier') or [None])[0],
-              'expires_at': expires.strftime('%Y-%m-%dT%H:%M:%SZ'),
-              'application_identifier':
-                  (profile.get('Entitlements') or {}).get('application-identifier'),
-              'get_task_allow':
-                  (profile.get('Entitlements') or {}).get('get-task-allow'),
-              'provisions_all_devices': profile.get('ProvisionsAllDevices', False),
-              'provisioned_device_count': len(profile.get('ProvisionedDevices') or []),
-              'developer_certificate_count': len(profile.get('DeveloperCertificates') or []),
-          }
-          with open(sys.argv[2], 'x', encoding='utf-8', newline='\n') as output:
-              json.dump(payload, output, separators=(',', ':'))
-              output.write('\n')
-          PY
-          uuid="$(jq -er '.uuid' "${profile_metadata}")"
-          profile_name="$(jq -er '.name' "${profile_metadata}")"
-          team_id="$(jq -er '.team_id' "${profile_metadata}")"
-          expires_at="$(jq -er '.expires_at' "${profile_metadata}")"
-          app_identifier="$(jq -er '.application_identifier' "${profile_metadata}")"
-          get_task_allow="$(jq -r '.get_task_allow' "${profile_metadata}")"
-          provisions_all_devices="$(jq -r '.provisions_all_devices' "${profile_metadata}")"
-          provisioned_count="$(jq -er '.provisioned_device_count' "${profile_metadata}")"
-          developer_certificate_count="$(jq -er '.developer_certificate_count' "${profile_metadata}")"
-          [[ "${uuid}" =~ ^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$ ]]
-          [[ "${team_id}" =~ ^[A-Z0-9]{10}$ ]]
-          test "${app_identifier}" = "${team_id}.ai.devpath.devpathMobile"
-          test "${get_task_allow}" = false
-          test "${provisions_all_devices}" = false
-          test "${provisioned_count}" -ge 1
-          test "${developer_certificate_count}" -ge 1
-
-          {
-            echo "profile_uuid=${uuid}"
-            echo "profile_expires_at=${expires_at}"
-            echo "team_id=${team_id}"
-            echo "keychain=${keychain}"
-          } >> "${GITHUB_OUTPUT}"
-          security create-keychain -p "${keychain_password}" "${keychain}"
-          security set-keychain-settings -lut 21600 "${keychain}"
-          security unlock-keychain -p "${keychain_password}" "${keychain}"
-          security import "${p12}" -k "${keychain}" \
-            -P "${IOS_DISTRIBUTION_CERTIFICATE_PASSWORD}" -A -t cert -f pkcs12
-          security set-key-partition-list -S apple-tool:,apple: \
-            -s -k "${keychain_password}" "${keychain}"
-          security list-keychains -d user -s "${keychain}"
-          identities="$(security find-identity -v -p codesigning "${keychain}" \
-            | grep -c 'Apple Distribution')"
-          test "${identities}" = 1
-          mkdir -p "${HOME}/Library/MobileDevice/Provisioning Profiles"
-          cp "${profile}" "${HOME}/Library/MobileDevice/Provisioning Profiles/${uuid}.mobileprovision"
-
-          export_options="${RUNNER_TEMP}/ExportOptions.plist"
-          TEAM_ID="${team_id}" PROFILE_NAME="${profile_name}" \
-            python3 - "${export_options}" <<'PY'
-          import os
-          import plistlib
-          import sys
-          payload = {
-              'method': 'ad-hoc',
-              'signingStyle': 'manual',
-              'teamID': os.environ['TEAM_ID'],
-              'signingCertificate': 'Apple Distribution',
-              'provisioningProfiles': {
-                  'ai.devpath.devpathMobile': os.environ['PROFILE_NAME'],
-              },
-              'stripSwiftSymbols': True,
-              'compileBitcode': False,
-          }
-          with open(sys.argv[1], 'xb') as output:
-              plistlib.dump(payload, output, fmt=plistlib.FMT_XML, sort_keys=False)
-          PY
-          plutil -lint "${export_options}"
-          echo "export_options=${export_options}" >> "${GITHUB_OUTPUT}"
-
-          release_config=apps/mobile/ios/Flutter/Release.xcconfig
-          cp "${release_config}" "${RUNNER_TEMP}/Release.xcconfig.original"
-          {
-            printf '\nDEVELOPMENT_TEAM = %s\n' "${team_id}"
-            printf 'CODE_SIGN_STYLE = Manual\n'
-            printf 'PROVISIONING_PROFILE_SPECIFIER = %s\n' "${uuid}"
-            printf 'CODE_SIGN_IDENTITY = Apple Distribution\n'
-          } >> "${release_config}"
-          build_settings="${RUNNER_TEMP}/release-build-settings.txt"
-          xcodebuild -showBuildSettings \
-            -workspace apps/mobile/ios/Runner.xcworkspace \
-            -scheme Runner \
-            -configuration Release \
-            -sdk iphoneos > "${build_settings}"
-          grep -Fqx "    DEVELOPMENT_TEAM = ${team_id}" "${build_settings}"
-          grep -Fqx '    CODE_SIGN_STYLE = Manual' "${build_settings}"
-          grep -Fqx \
-            "    PROVISIONING_PROFILE_SPECIFIER = ${uuid}" \
-            "${build_settings}"
-          grep -Fqx \
-            '    CODE_SIGN_IDENTITY = Apple Distribution' \
-            "${build_settings}"
-
-      - name: Build ad-hoc iOS release for protected manual-AT devices
-        working-directory: apps/mobile
-        run: >-
-          flutter build ipa --release --no-pub
-          --export-options-plist=${{ steps.signing.outputs.export_options }}
-          --dart-define=USE_MOCK=false
-          --dart-define=API_BASE_URL=https://api.leva.ai.kr
-          --dart-define=WEB_APP_URL=https://app.leva.ai.kr
-
-      - name: Verify and inspect signed iOS distribution IPA
-        shell: bash
-        env:
-          EXPECTED_PROFILE_UUID: ${{ steps.signing.outputs.profile_uuid }}
-          EXPECTED_PROFILE_EXPIRES_AT: ${{ steps.signing.outputs.profile_expires_at }}
-          EXPECTED_TEAM_ID: ${{ steps.signing.outputs.team_id }}
-          WORKFLOW_SHA256: ${{ steps.approval.outputs.workflow_sha256 }}
-        run: |
-          set -euo pipefail
-          shopt -s nullglob
-          ipas=(apps/mobile/build/ios/ipa/*.ipa)
-          test "${#ipas[@]}" = 1
-          stage="${RUNNER_TEMP}/signed-mobile-ios"
-          inspect="${RUNNER_TEMP}/signed-ipa-inspect"
-          test ! -e "${stage}"
-          test ! -e "${inspect}"
-          mkdir -p "${stage}/mobile/ios" "${inspect}"
-          ipa="${stage}/mobile/ios/leva-release.ipa"
-          cp "${ipas[0]}" "${ipa}"
-          ditto -x -k "${ipa}" "${inspect}"
-          apps=("${inspect}"/Payload/*.app)
-          test "${#apps[@]}" = 1
-          app="${apps[0]}"
-          codesign --verify --deep --strict --verbose=2 "${app}"
-          security cms -D -i "${app}/embedded.mobileprovision" \
-            > "${RUNNER_TEMP}/embedded-profile.plist"
-          actual_uuid="$(/usr/libexec/PlistBuddy -c 'Print :UUID' "${RUNNER_TEMP}/embedded-profile.plist")"
-          actual_expires="$(python3 - "${RUNNER_TEMP}/embedded-profile.plist" <<'PY'
-          from datetime import timezone
-          import plistlib
-          import sys
-          with open(sys.argv[1], 'rb') as source:
-              expires = plistlib.load(source)['ExpirationDate']
-          if expires.tzinfo is None:
-              expires = expires.replace(tzinfo=timezone.utc)
-          print(expires.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))
-          PY
-          )"
-          actual_team="$(/usr/libexec/PlistBuddy -c 'Print :TeamIdentifier:0' "${RUNNER_TEMP}/embedded-profile.plist")"
-          bundle_id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "${app}/Info.plist")"
-          short_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "${app}/Info.plist")"
-          bundle_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "${app}/Info.plist")"
-          source_version="$(sed -n 's/^version: //p' apps/mobile/pubspec.yaml)"
-          expected_short_version="${source_version%%+*}"
-          expected_bundle_version="${source_version##*+}"
-          test "${actual_uuid}" = "${EXPECTED_PROFILE_UUID}"
-          test "${actual_expires}" = "${EXPECTED_PROFILE_EXPIRES_AT}"
-          test "${actual_team}" = "${EXPECTED_TEAM_ID}"
-          test "${bundle_id}" = ai.devpath.devpathMobile
-          test "${short_version}" = "${expected_short_version}"
-          test "${bundle_version}" = "${expected_bundle_version}"
-          cert_prefix="${RUNNER_TEMP}/codesign-cert"
-          codesign -d --extract-certificates "${cert_prefix}" "${app}"
-          test -s "${cert_prefix}0"
-          openssl x509 -inform der -in "${cert_prefix}0" -noout -subject \
-            | grep -Fq 'Apple Distribution:'
-          python3 - \
-            "${RUNNER_TEMP}/embedded-profile.plist" \
-            "${cert_prefix}0" <<'PY'
-          import plistlib
-          import sys
-          with open(sys.argv[1], 'rb') as source:
-              profile = plistlib.load(source)
-          with open(sys.argv[2], 'rb') as source:
-              signing_certificate = source.read()
-          entitlements = profile.get('Entitlements') or {}
-          if entitlements.get('get-task-allow') is not False:
-              raise SystemExit('embedded profile is not distribution-only')
-          if profile.get('ProvisionsAllDevices') is True:
-              raise SystemExit('enterprise profile is forbidden')
-          if not profile.get('ProvisionedDevices'):
-              raise SystemExit('ad-hoc profile has no provisioned device')
-          if signing_certificate not in (profile.get('DeveloperCertificates') or []):
-              raise SystemExit('codesign certificate is absent from embedded profile')
-          PY
-          cert_sha="$(shasum -a 256 "${cert_prefix}0" | awk '{print $1}')"
-          [[ "${cert_sha}" =~ ^[0-9a-f]{64}$ ]]
-
-          jq -n \
-            --arg workflow_sha256 "${WORKFLOW_SHA256}" \
-            --arg bundle_id "${bundle_id}" \
-            --arg short_version "${short_version}" \
-            --arg bundle_version "${bundle_version}" \
-            --arg team_id "${actual_team}" \
-            --arg signing_certificate_sha256 "${cert_sha}" \
-            --arg provisioning_profile_uuid "${actual_uuid}" \
-            --arg provisioning_profile_expires_at "${actual_expires}" \
-            --slurpfile approval "${RUNNER_TEMP}/ios-approval.json" \
-            '{
-              workflow_sha256: $workflow_sha256,
-              bundle_id: $bundle_id,
-              short_version: $short_version,
-              bundle_version: $bundle_version,
-              signature_verified: true,
-              signing_classification: "organization_distribution",
-              export_method: "ad-hoc",
-              distribution_scope: "protected_manual_at_test_devices",
-              team_id: $team_id,
-              signing_certificate_sha256: $signing_certificate_sha256,
-              provisioning_profile_uuid: $provisioning_profile_uuid,
-              provisioning_profile_expires_at: $provisioning_profile_expires_at,
-              approval: {
-                approval_environment: $approval[0].approval_environment,
-                approval_environment_id: $approval[0].approval_environment_id,
-                approval_job_name: $approval[0].approval_job_name,
-                approved_by: $approval[0].approved_by,
-                approved_by_id: $approval[0].approved_by_id,
-                approval_effective_at: $approval[0].approval_effective_at
-              }
-            }' > "${stage}/ios-metadata.json"
-
-      - name: Preserve unsealable iOS signing input
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: ${{ inputs.release_id }}-signed-mobile-ios-input-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/signed-mobile-ios
-          if-no-files-found: error
-          overwrite: false
-          retention-days: 3
-
-      - name: Remove ephemeral Apple signing material
-        if: always()
-        shell: bash
-        run: |
-          set -euo pipefail
-          keychain="${RUNNER_TEMP}/mission-spine-signing.keychain-db"
-          if test -e "${RUNNER_TEMP}/original-keychains.txt"; then
-            original_keychains=()
-            while IFS= read -r item; do
-              item="${item#\"}"
-              item="${item%\"}"
-              test -n "${item}" && original_keychains+=("${item}")
-            done < "${RUNNER_TEMP}/original-keychains.txt"
-            if test "${#original_keychains[@]}" -gt 0; then
-              security list-keychains -d user -s "${original_keychains[@]}"
-            fi
-          fi
-          if test -e "${keychain}"; then
-            security delete-keychain "${keychain}"
-          fi
-          profile_metadata="${RUNNER_TEMP}/profile-metadata.json"
-          if test -f "${profile_metadata}"; then
-            profile_uuid="$(jq -er '.uuid' "${profile_metadata}")"
-            rm -f -- \
-              "${HOME}/Library/MobileDevice/Provisioning Profiles/${profile_uuid}.mobileprovision"
-          fi
-          if test -f "${RUNNER_TEMP}/Release.xcconfig.original"; then
-            cp "${RUNNER_TEMP}/Release.xcconfig.original" \
-              apps/mobile/ios/Flutter/Release.xcconfig
-          fi
-          rm -f -- \
-            "${RUNNER_TEMP}/distribution.p12" \
-            "${RUNNER_TEMP}/manual-at.mobileprovision" \
-            "${RUNNER_TEMP}/profile.plist" \
-            "${RUNNER_TEMP}/profile-metadata.json" \
-            "${RUNNER_TEMP}/original-keychains.txt" \
-            "${RUNNER_TEMP}/Release.xcconfig.original" \
-            "${RUNNER_TEMP}/release-build-settings.txt" \
-            "${RUNNER_TEMP}/ExportOptions.plist" \
-            "${RUNNER_TEMP}/embedded-profile.plist" \
-            "${RUNNER_TEMP}/codesign-cert0"
-
   publish-bundle:
-    name: Publish signed mobile bundle
-    needs: [sign-android, sign-ios]
+    name: Publish signed Android bundle
+    needs: sign-android
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -610,72 +224,56 @@ jobs:
       - name: Download exact Android signing input
         uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
         with:
-          name: ${{ inputs.release_id }}-signed-mobile-android-input-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          name: ${{ inputs.release_id }}-signed-android-input-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
           path: build/mission-spine/signed-input/android
 
-      - name: Download exact iOS signing input
-        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
-        with:
-          name: ${{ inputs.release_id }}-signed-mobile-ios-input-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
-          path: build/mission-spine/signed-input/ios
-
-      - name: Assemble and validate exact three-file signed bundle
+      - name: Assemble and validate exact two-file signed Android bundle
         shell: bash
         env:
           RELEASE_ID: ${{ inputs.release_id }}
         run: |
           set -euo pipefail
           android_root=build/mission-spine/signed-input/android
-          ios_root=build/mission-spine/signed-input/ios
-          test -z "$(find "${android_root}" "${ios_root}" -type l -print -quit)"
-          test -z "$(find "${android_root}" "${ios_root}" -mindepth 1 ! -type f ! -type d -print -quit)"
+          test -z "$(find "${android_root}" -type l -print -quit)"
+          test -z "$(find "${android_root}" -mindepth 1 ! -type f ! -type d -print -quit)"
           test "$(find "${android_root}" -type f | wc -l)" = 2
-          test "$(find "${ios_root}" -type f | wc -l)" = 2
           test -f "${android_root}/mobile/android/leva-release.apk"
           test -f "${android_root}/android-metadata.json"
-          test -f "${ios_root}/mobile/ios/leva-release.ipa"
-          test -f "${ios_root}/ios-metadata.json"
-          android_workflow_sha="$(jq -er '.workflow_sha256' "${android_root}/android-metadata.json")"
-          ios_workflow_sha="$(jq -er '.workflow_sha256' "${ios_root}/ios-metadata.json")"
-          test "${android_workflow_sha}" = "${ios_workflow_sha}"
+          workflow_sha="$(jq -er '.workflow_sha256' "${android_root}/android-metadata.json")"
           printf '%s  %s\n' \
-            "${android_workflow_sha}" \
+            "${workflow_sha}" \
             .github/workflows/mission-spine-signed-mobile-build.yml \
             | sha256sum --check --strict
 
           stage=build/mission-spine/signed-bundle
           test ! -e "${stage}"
-          mkdir -p "${stage}/mobile/android" "${stage}/mobile/ios"
+          mkdir -p "${stage}/mobile/android"
           cp "${android_root}/mobile/android/leva-release.apk" \
             "${stage}/mobile/android/leva-release.apk"
-          cp "${ios_root}/mobile/ios/leva-release.ipa" \
-            "${stage}/mobile/ios/leva-release.ipa"
           node tools/mission_spine_release_evidence.mjs signed-provenance \
             --release-id="${RELEASE_ID}" \
             --source-sha="${GITHUB_SHA}" \
-            --workflow-sha256="${android_workflow_sha}" \
+            --workflow-sha256="${workflow_sha}" \
             --producer-run-id="${GITHUB_RUN_ID}" \
             --producer-run-attempt="${GITHUB_RUN_ATTEMPT}" \
             --pubspec-lock=pubspec.lock \
             --apk="${stage}/mobile/android/leva-release.apk" \
-            --ipa="${stage}/mobile/ios/leva-release.ipa" \
             --android-metadata="${android_root}/android-metadata.json" \
-            --ios-metadata="${ios_root}/ios-metadata.json" \
-            --output="${stage}/build-provenance.v1.json"
+            --output="${stage}/build-provenance.v2.json"
           lock_sha="$(sha256sum pubspec.lock | cut -d' ' -f1)"
           node tools/mission_spine_release_evidence.mjs validate-signed-bundle \
             --root="${stage}" \
             --release-id="${RELEASE_ID}" \
             --source-sha="${GITHUB_SHA}" \
-            --workflow-sha256="${android_workflow_sha}" \
+            --workflow-sha256="${workflow_sha}" \
             --producer-run-id="${GITHUB_RUN_ID}" \
             --producer-run-attempt="${GITHUB_RUN_ATTEMPT}" \
             --pubspec-lock-sha256="${lock_sha}"
 
-      - name: Publish exact signed mobile bundle
+      - name: Publish exact signed Android bundle
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: ${{ inputs.release_id }}-signed-mobile-build-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          name: ${{ inputs.release_id }}-signed-android-build-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
           path: build/mission-spine/signed-bundle
           if-no-files-found: error
           overwrite: false
