@@ -10,6 +10,9 @@ void main() {
       'release-entrypoint.sh',
     ).readAsStringSync().replaceAll('\r\n', '\n');
     final workflow = File('../../.github/workflows/ci.yml').readAsStringSync();
+    final smoke = File(
+      '../../tools/web_release_readiness_smoke.sh',
+    ).readAsStringSync().replaceAll('\r\n', '\n');
 
     expect(
       dockerfile,
@@ -46,34 +49,46 @@ void main() {
     expect(entrypoint, contains("exec /docker-entrypoint.sh \"\$@\""));
 
     expect(workflow, contains('Smoke authenticated release readiness'));
-    expect(workflow, contains('--env MISSION_RELEASE_READY=true'));
-    expect(workflow, contains("--write-out '%{http_code}'"));
-    expect(workflow, contains("= \"401\""));
-    expect(workflow, contains("= \"503\""));
-    expect(workflow, contains('Authorization: Bearer \${PROBE_TOKEN}'));
-    expect(workflow, contains('^Cache-Control: no-store\\r?\$'));
+    expect(workflow, contains('docker load --input "\${ARTIFACT_PATH}"'));
     expect(
-      workflow,
+      RegExp(
+        r'bash tools/web_release_readiness_smoke\.sh',
+      ).allMatches(workflow).length,
+      2,
+    );
+
+    expect(smoke, contains('--env MISSION_RELEASE_READY=true'));
+    expect(smoke, contains("--write-out '%{http_code}'"));
+    expect(smoke, contains('assert_status disabled_unauth_status 401'));
+    expect(smoke, contains('assert_status disabled_auth_status 503'));
+    expect(smoke, contains('assert_status ready_unauth_status 401'));
+    expect(smoke, contains('assert_status ready_auth_status 200'));
+    expect(smoke, contains('Authorization: Bearer \${PROBE_TOKEN}'));
+    expect(smoke, contains("tr -d '\\r'"));
+    expect(smoke, contains('Cache-Control: no-store'));
+    expect(smoke, contains('X-Content-Type-Options: nosniff'));
+    expect(
+      smoke,
       contains(
         'disabled_container="mission-readiness-\${GITHUB_RUN_ID}-'
-        '\${{ matrix.identity }}-disabled"',
+        '\${identity}-disabled"',
       ),
     );
     expect(
-      workflow,
+      smoke,
       contains(
         'ready_container="mission-readiness-\${GITHUB_RUN_ID}-'
-        '\${{ matrix.identity }}-ready"',
+        '\${identity}-ready"',
       ),
     );
-    expect(workflow, contains('disabled_port=18080'));
-    expect(workflow, contains('ready_port=18081'));
+    expect(smoke, contains('disabled_port=18080'));
+    expect(smoke, contains('ready_port=18081'));
     expect(
-      workflow,
+      smoke,
       contains('wait_for_web "\${disabled_container}" "\${disabled_port}"'),
     );
     expect(
-      workflow,
+      smoke,
       contains('wait_for_web "\${ready_container}" "\${ready_port}"'),
     );
   });

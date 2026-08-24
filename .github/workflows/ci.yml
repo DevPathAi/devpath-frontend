@@ -41,7 +41,7 @@ jobs:
       - name: Validate immutable registry client
         run: node --test tools/immutable_registry.test.mjs
 
-  # ET1 contract proof only: build both compiled identities locally in CI.
+  # ET1 contract proof: build and run both compiled identities locally in CI.
   # Publishing, exact-digest promotion, deployment and rollback belong to ET10.
   web-image-config-contract:
     needs: analyze-test
@@ -96,6 +96,17 @@ jobs:
             "${IDENTITY}" "${artifact_sha256}" "${APP_VERSION}" \
             "${MISSION_SPINE_ENABLED}" "${ANALYTICS_CONTRACT_VERSION}" \
             "${ANALYTICS_ENVIRONMENT}" > "${MANIFEST_PATH}"
+      - name: Load OCI image for runtime contract
+        shell: bash
+        env:
+          ARTIFACT_PATH: ${{ runner.temp }}/leva-web-${{ matrix.identity }}.tar
+        run: docker load --input "${ARTIFACT_PATH}"
+      - name: Smoke authenticated release readiness
+        shell: bash
+        env:
+          CANDIDATE_REFERENCE: ghcr.io/devpathai/devpath-web:${{ github.sha }}-mission-${{ matrix.identity }}
+          IDENTITY: ${{ matrix.identity }}
+        run: bash tools/web_release_readiness_smoke.sh "${CANDIDATE_REFERENCE}" "${IDENTITY}"
       - name: Preserve OFF/ON OCI artifact and manifest
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -388,71 +399,8 @@ jobs:
         shell: bash
         env:
           CANDIDATE_REFERENCE: leva-web-candidate:${{ github.sha }}-mission-${{ matrix.identity }}
-          RELEASE_ID: ms-20990101-runtime-smoke
-          CANDIDATE_SHA: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-          IMAGE_DIGEST: sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-          PROBE_TOKEN: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-        run: |
-          set -euo pipefail
-          disabled_container="mission-readiness-${GITHUB_RUN_ID}-${{ matrix.identity }}-disabled"
-          ready_container="mission-readiness-${GITHUB_RUN_ID}-${{ matrix.identity }}-ready"
-          disabled_port=18080
-          ready_port=18081
-          body="${RUNNER_TEMP}/${ready_container}.body"
-          headers="${RUNNER_TEMP}/${ready_container}.headers"
-          cleanup() {
-            docker rm -f "${disabled_container}" >/dev/null 2>&1 || true
-            docker rm -f "${ready_container}" >/dev/null 2>&1 || true
-          }
-          trap cleanup EXIT
-          wait_for_web() {
-            local container="$1"
-            local port="$2"
-            for _ in $(seq 1 30); do
-              if curl --fail --silent --show-error "http://127.0.0.1:${port}/" >/dev/null; then
-                return 0
-              fi
-              sleep 1
-            done
-            docker logs "${container}" >&2
-            return 1
-          }
-
-          docker run --detach --name "${disabled_container}" \
-            --publish "127.0.0.1:${disabled_port}:8080" "${CANDIDATE_REFERENCE}" >/dev/null
-          wait_for_web "${disabled_container}" "${disabled_port}"
-          test "$(curl --silent --show-error --output "${body}" --write-out '%{http_code}' \
-            "http://127.0.0.1:${disabled_port}/internal/release/ready")" = "401"
-          test "$(curl --silent --show-error --output "${body}" --write-out '%{http_code}' \
-            --header 'Authorization: Bearer disabled' \
-            "http://127.0.0.1:${disabled_port}/internal/release/ready")" = "503"
-          cleanup
-
-          if docker run --rm --env MISSION_RELEASE_READY=true \
-            "${CANDIDATE_REFERENCE}" >/dev/null 2>&1; then
-            echo "Incomplete release identity unexpectedly started" >&2
-            exit 1
-          fi
-
-          docker run --detach --name "${ready_container}" \
-            --publish "127.0.0.1:${ready_port}:8080" \
-            --env MISSION_RELEASE_READY=true \
-            --env MISSION_RELEASE_ID="${RELEASE_ID}" \
-            --env MISSION_CANDIDATE_SPEC_SHA256="${CANDIDATE_SHA}" \
-            --env MISSION_IMAGE_DIGEST="${IMAGE_DIGEST}" \
-            --env MISSION_SYNTHETIC_PROBE_TOKEN="${PROBE_TOKEN}" \
-            "${CANDIDATE_REFERENCE}" >/dev/null
-          wait_for_web "${ready_container}" "${ready_port}"
-          test "$(curl --silent --show-error --output "${body}" --write-out '%{http_code}' \
-            "http://127.0.0.1:${ready_port}/internal/release/ready")" = "401"
-          curl --silent --show-error --fail-with-body \
-            --dump-header "${headers}" --output "${body}" \
-            --header "Authorization: Bearer ${PROBE_TOKEN}" \
-            "http://127.0.0.1:${ready_port}/internal/release/ready"
-          expected="{\"release_id\":\"${RELEASE_ID}\",\"candidate_spec_sha256\":\"${CANDIDATE_SHA}\",\"image_digest\":\"${IMAGE_DIGEST}\",\"status\":\"ready\"}"
-          test "$(cat "${body}")" = "${expected}"
-          grep -Eiq '^Cache-Control: no-store\r?$' "${headers}"
-          grep -Eiq '^X-Content-Type-Options: nosniff\r?$' "${headers}"
+          IDENTITY: ${{ matrix.identity }}
+        run: bash tools/web_release_readiness_smoke.sh "${CANDIDATE_REFERENCE}" "${IDENTITY}"
       - name: Bind immutable tag once
         id: bind-tag
         shell: bash
