@@ -21,6 +21,7 @@ void main() {
     );
     expect(dockerfile, contains('NGINX_ENVSUBST_FILTER="^MISSION_"'));
 
+    expect(nginx, contains('map_hash_bucket_size 128;'));
     expect(nginx, contains('location = /internal/release/ready'));
     expect(nginx, contains('"Bearer \${MISSION_SYNTHETIC_PROBE_TOKEN}" 1;'));
     expect(nginx, contains('if (\$mission_release_ready != "true")'));
