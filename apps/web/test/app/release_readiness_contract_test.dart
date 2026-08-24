@@ -6,7 +6,9 @@ void main() {
   test('web runtime exposes only an authenticated sealed release identity', () {
     final dockerfile = File('Dockerfile').readAsStringSync();
     final nginx = File('nginx.conf').readAsStringSync();
-    final entrypoint = File('release-entrypoint.sh').readAsStringSync();
+    final entrypoint = File(
+      'release-entrypoint.sh',
+    ).readAsStringSync().replaceAll('\r\n', '\n');
     final workflow = File('../../.github/workflows/ci.yml').readAsStringSync();
 
     expect(
@@ -50,5 +52,29 @@ void main() {
     expect(workflow, contains("= \"503\""));
     expect(workflow, contains('Authorization: Bearer \${PROBE_TOKEN}'));
     expect(workflow, contains('^Cache-Control: no-store\\r?\$'));
+    expect(
+      workflow,
+      contains(
+        'disabled_container="mission-readiness-\${GITHUB_RUN_ID}-'
+        '\${{ matrix.identity }}-disabled"',
+      ),
+    );
+    expect(
+      workflow,
+      contains(
+        'ready_container="mission-readiness-\${GITHUB_RUN_ID}-'
+        '\${{ matrix.identity }}-ready"',
+      ),
+    );
+    expect(workflow, contains('disabled_port=18080'));
+    expect(workflow, contains('ready_port=18081'));
+    expect(
+      workflow,
+      contains('wait_for_web "\${disabled_container}" "\${disabled_port}"'),
+    );
+    expect(
+      workflow,
+      contains('wait_for_web "\${ready_container}" "\${ready_port}"'),
+    );
   });
 }
