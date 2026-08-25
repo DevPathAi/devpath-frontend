@@ -178,12 +178,11 @@ export function validateMetadataResponse({
     fail('artifact is expired or has no valid expiration timestamp');
   }
 
-  let workflowSha256 = null;
+  if (!Buffer.isBuffer(workflowBytes) || workflowBytes.length < 1) {
+    fail('workflow raw bytes are absent');
+  }
+  const workflowSha256 = rawSha256(workflowBytes);
   if (kind === 'baseline') {
-    if (!Buffer.isBuffer(workflowBytes) || workflowBytes.length < 1) {
-      fail('workflow raw bytes are absent');
-    }
-    workflowSha256 = rawSha256(workflowBytes);
     exact(
       workflowSha256,
       sha256(expectedWorkflowSha256, 'workflow-sha256'),
@@ -295,31 +294,31 @@ export async function authenticateMetadata(
     fetchImpl,
   );
 
-  let workflowBytes = null;
+  let workflowBytes;
   let expectedWorkflowSha256 = null;
   if (kind === 'baseline') {
     expectedWorkflowSha256 = sha256(
       required(parsed, 'workflow-sha256'),
       'workflow-sha256',
     );
-    const headSha = sha1(run.head_sha, 'run.head_sha');
-    const encoded = config.workflow
-      .split('/')
-      .map((part) => encodeURIComponent(part))
-      .join('/');
-    const workflow = await github(
-      `/repos/${config.repository}/contents/${encoded}?ref=${headSha}`,
-      token,
-      fetchImpl,
-    );
-    exact(workflow.type, 'file', 'workflow.type');
-    exact(workflow.path, config.workflow, 'workflow.path');
-    exact(workflow.encoding, 'base64', 'workflow.encoding');
-    workflowBytes = Buffer.from(
-      (workflow.content ?? '').replace(/\s/g, ''),
-      'base64',
-    );
   }
+  const headSha = sha1(run.head_sha, 'run.head_sha');
+  const encoded = config.workflow
+    .split('/')
+    .map((part) => encodeURIComponent(part))
+    .join('/');
+  const workflow = await github(
+    `/repos/${config.repository}/contents/${encoded}?ref=${headSha}`,
+    token,
+    fetchImpl,
+  );
+  exact(workflow.type, 'file', 'workflow.type');
+  exact(workflow.path, config.workflow, 'workflow.path');
+  exact(workflow.encoding, 'base64', 'workflow.encoding');
+  workflowBytes = Buffer.from(
+    (workflow.content ?? '').replace(/\s/g, ''),
+    'base64',
+  );
 
   return validateMetadataResponse({
     kind,
