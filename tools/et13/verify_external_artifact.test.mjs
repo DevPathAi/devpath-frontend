@@ -25,6 +25,10 @@ const candidateHead = 'abcdef1234567890abcdef1234567890abcdef12';
 const baseSha = 'fedcba0987654321fedcba0987654321fedcba09';
 const workflow =
   '.github/workflows/mission-spine-candidate.yml';
+const candidateWorkflowBytes = Buffer.from('trusted candidate workflow\n');
+const candidateWorkflowSha256 = createHash('sha256')
+  .update(candidateWorkflowBytes)
+  .digest('hex');
 const candidatePath =
   `release-manifests/candidates/${releaseId}.candidate-spec.json`;
 
@@ -78,11 +82,46 @@ test('candidate metadata derives immutable head from the successful attempt', ()
     frontendSha,
     run: candidateRun(),
     artifact: candidateArtifact(),
+    workflowBytes: candidateWorkflowBytes,
   });
   assert.equal(result.headSha, candidateHead);
+  assert.equal(result.workflowSha256, candidateWorkflowSha256);
   assert.equal(
     result.artifactArchiveSha256,
     'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  );
+});
+
+test('candidate API authentication hashes the exact producer workflow bytes', async () => {
+  const parsed = new Map([
+    ['kind', 'candidate'],
+    ['release-id', releaseId],
+    ['run-id', '101'],
+    ['run-attempt', '2'],
+    ['artifact-id', '202'],
+    ['frontend-sha', frontendSha],
+  ]);
+  const fetchImpl = async (url) => {
+    if (url.includes('/actions/runs/101/attempts/2')) {
+      return jsonResponse(candidateRun());
+    }
+    if (url.includes('/actions/artifacts/202')) {
+      return jsonResponse(candidateArtifact());
+    }
+    if (url.includes('/contents/')) {
+      return jsonResponse({
+        type: 'file',
+        path: workflow,
+        encoding: 'base64',
+        content: candidateWorkflowBytes.toString('base64'),
+      });
+    }
+    throw new Error(`unexpected test URL: ${url}`);
+  };
+  assert.equal(
+    (await authenticateMetadata(parsed, 'test-token', fetchImpl))
+      .workflowSha256,
+    candidateWorkflowSha256,
   );
 });
 
