@@ -84,17 +84,27 @@ void main() {
     },
   );
 
-  test('web startup cleans the handoff before Flutter router startup', () {
-    final main = File('lib/main.dart').readAsStringSync();
-    final webHandoff = File(
-      'lib/src/analytics/journey_handoff_web.dart',
-    ).readAsStringSync();
+  test(
+    'web startup enables canonical paths before handoff and router startup',
+    () {
+      final main = File('lib/main.dart').readAsStringSync();
+      final pubspec = File('pubspec.yaml').readAsStringSync();
+      final webHandoff = File(
+        'lib/src/analytics/journey_handoff_web.dart',
+      ).readAsStringSync();
 
-    expect(
-      main.indexOf('captureJourneyHandoffFromVisibleUrl()'),
-      lessThan(main.indexOf('runApp(')),
-    );
-    expect(webHandoff, contains('window.sessionStorage'));
-    expect(webHandoff, contains('history.replaceState'));
-  });
+      expect(main, contains("package:flutter_web_plugins/url_strategy.dart"));
+      expect(pubspec, contains('flutter_web_plugins:'));
+      expect(
+        main.indexOf('usePathUrlStrategy()'),
+        lessThan(main.indexOf('captureJourneyHandoffFromVisibleUrl()')),
+      );
+      expect(
+        main.indexOf('captureJourneyHandoffFromVisibleUrl()'),
+        lessThan(main.indexOf('runApp(')),
+      );
+      expect(webHandoff, contains('window.sessionStorage'));
+      expect(webHandoff, contains('history.replaceState'));
+    },
+  );
 }
