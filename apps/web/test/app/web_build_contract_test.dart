@@ -94,9 +94,16 @@ void main() {
       ).readAsStringSync();
 
       expect(main, contains("package:flutter_web_plugins/url_strategy.dart"));
+      expect(main, contains("package:go_router/go_router.dart"));
       expect(pubspec, contains('flutter_web_plugins:'));
       expect(
         main.indexOf('usePathUrlStrategy()'),
+        lessThan(
+          main.indexOf('GoRouter.optionURLReflectsImperativeAPIs = true'),
+        ),
+      );
+      expect(
+        main.indexOf('GoRouter.optionURLReflectsImperativeAPIs = true'),
         lessThan(main.indexOf('captureJourneyHandoffFromVisibleUrl()')),
       );
       expect(
