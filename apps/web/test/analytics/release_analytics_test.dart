@@ -98,6 +98,17 @@ void main() {
     expect(adapter.requests.single.extra['withCredentials'], isFalse);
   });
 
+  test('permission preflight starts before the first capture', () async {
+    final adapter = _ReleaseAdapter(granted: true);
+    final dio = Dio()..httpClientAdapter = adapter;
+
+    ReleaseJourneyAnalyticsSdk(parseReleaseAnalyticsMarker(_markerJson)!, dio);
+    await pumpEventQueue();
+
+    expect(adapter.requests, hasLength(1));
+    expect(adapter.requests.single.uri.host, 'api.leva.ai.kr');
+  });
+
   test('permission grant sends exact ordered event payloads to spy', () async {
     final adapter = _ReleaseAdapter(granted: true);
     final dio = Dio()..httpClientAdapter = adapter;

@@ -20,6 +20,7 @@ DiagnosticContinuation _continuation({
     DiagnosticContinuationPhase.questions => null,
     _ => _preview,
   },
+  diagnosticStartedAt: phase == DiagnosticContinuationPhase.track ? null : _now,
   expiresAt: expiresAt ?? _now.add(diagnosticContinuationTtl),
   returnStage: phase,
   journeyId: _journeyId,
@@ -27,7 +28,7 @@ DiagnosticContinuation _continuation({
 
 void main() {
   group('DiagnosticContinuation codec', () {
-    test('v1 round-trip은 허용된 pointer/preview 필드만 기록한다', () {
+    test('v2 round-trip은 허용된 pointer/preview/시작 시각만 기록한다', () {
       final encoded = encodeDiagnosticContinuation(_continuation());
       final json = (jsonDecode(encoded) as Map).cast<String, dynamic>();
 
@@ -36,6 +37,7 @@ void main() {
         'guestId',
         'track',
         'preview',
+        'diagnosticStartedAt',
         'expiresAt',
         'returnStage',
         'journeyId',
@@ -104,7 +106,7 @@ void main() {
               as Map<String, dynamic>;
       for (final mutation
           in <Map<String, dynamic> Function(Map<String, dynamic>)>[
-            (json) => {...json, 'version': 2},
+            (json) => {...json, 'version': 3},
             (json) => {...json, 'version': 1.0},
             (json) => {...json, 'answers': <String>[]},
             (json) => {...json}..remove('journeyId'),
