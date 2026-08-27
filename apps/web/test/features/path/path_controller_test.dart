@@ -1,8 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:devpath_web/src/analytics/journey_analytics.dart';
+import 'package:devpath_web/src/analytics/path_analytics.dart';
 import 'package:devpath_web/src/app/app_config.dart';
 import 'package:devpath_web/src/data/web_mock_fixtures.dart';
+import 'package:devpath_web/src/features/auth/application/auth_controller.dart';
+import 'package:devpath_web/src/features/auth/state/auth_state.dart';
 import 'package:devpath_web/src/features/path/application/path_controller.dart';
 import 'package:devpath_web/src/features/path/data/path_sse_source.dart';
 import 'package:devpath_web/src/providers/api_providers.dart';
@@ -77,6 +81,42 @@ class _StubLearningPathApi extends LearningPathApi {
   }
 }
 
+class _AuthedAuthController extends AuthController {
+  @override
+  AuthState build() => const AuthAuthenticated(
+    User(
+      id: '73',
+      email: 'release@staging.invalid',
+      nickname: 'Release',
+      role: UserRole.learner,
+      onboardingStatus: OnboardingStatus.done,
+      consentStatus: ConsentStatus.done,
+    ),
+  );
+}
+
+class _SpyAnalytics implements JourneyAnalytics {
+  final events = <(String, Map<String, Object?>)>[];
+
+  @override
+  AnalyticsCaptureStatus capture(
+    String event,
+    Map<String, Object?> properties,
+  ) {
+    events.add((event, properties));
+    return AnalyticsCaptureStatus.accepted;
+  }
+
+  @override
+  bool identify(String userId) => true;
+
+  @override
+  void reset() {}
+
+  @override
+  void setOptedOut(bool optedOut) {}
+}
+
 Future<void> _flushUntil(bool Function() condition) async {
   for (var i = 0; i < 20 && !condition(); i++) {
     await Future<void>.delayed(Duration.zero);
@@ -104,6 +144,109 @@ void main() {
 
     expect(learningPathApi.currentPathCalls, 1);
     expect(container.read(pathControllerProvider).result?.pathId, 707);
+  });
+
+  test('기존 진단 handoff는 continuation과 첫 path view를 순서대로 기록한다', () async {
+    final analytics = _SpyAnalytics();
+    final handoff = PathAnalyticsHandoffStore()
+      ..stage(
+        const PathAnalyticsHandoff(
+          branch: PathAnalyticsBranch.existing,
+          userId: '73',
+          assessmentId: 77,
+          guestId: '123e4567-e89b-42d3-a456-426614174000',
+        ),
+      );
+    final container = ProviderContainer(
+      overrides: [
+        authControllerProvider.overrideWith(_AuthedAuthController.new),
+        journeyAnalyticsProvider.overrideWithValue(analytics),
+        pathAnalyticsHandoffStoreProvider.overrideWithValue(handoff),
+        analyticsSessionIdProvider.overrideWithValue('A' * 22),
+        learningPathApiProvider.overrideWithValue(
+          _StubLearningPathApi(
+            path: LearningPath.fromJson({...mockLearningPath(), 'pathId': 707}),
+          ),
+        ),
+        pathSseConnectProvider.overrideWithValue(
+          () => throw StateError('existing path should not regenerate'),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(pathControllerProvider.notifier).loadOrStart();
+    container
+        .read(pathControllerProvider.notifier)
+        .captureViewedPath(
+          container.read(pathControllerProvider).result!,
+          userId: '73',
+        );
+
+    expect(analytics.events.map((event) => event.$1), [
+      'existing_path_continued',
+      'path_first_viewed',
+    ]);
+    expect(analytics.events[0].$2, {
+      'user_id': '73',
+      'path_id': 707,
+      'assessment_id': 77,
+    });
+    expect(analytics.events[1].$2, {
+      'user_id': '73',
+      'path_id': 707,
+      'originating_session_id': 'A' * 22,
+    });
+  });
+
+  test('새 경로 생성 handoff는 generated 뒤 첫 path view를 기록한다', () async {
+    final analytics = _SpyAnalytics();
+    final handoff = PathAnalyticsHandoffStore()
+      ..stage(
+        const PathAnalyticsHandoff(
+          branch: PathAnalyticsBranch.generated,
+          userId: '73',
+          assessmentId: 77,
+        ),
+      );
+    final container = ProviderContainer(
+      overrides: [
+        authControllerProvider.overrideWith(_AuthedAuthController.new),
+        journeyAnalyticsProvider.overrideWithValue(analytics),
+        pathAnalyticsHandoffStoreProvider.overrideWithValue(handoff),
+        analyticsSessionIdProvider.overrideWithValue('B' * 22),
+        learningPathApiProvider.overrideWithValue(
+          _StubLearningPathApi(
+            path: LearningPath.fromJson({...mockLearningPath(), 'pathId': 808}),
+          ),
+        ),
+        pathSseConnectProvider.overrideWithValue(() => _emit(const ['done'])),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(pathControllerProvider.notifier).start();
+    container
+        .read(pathControllerProvider.notifier)
+        .captureViewedPath(
+          container.read(pathControllerProvider).result!,
+          userId: '73',
+        );
+
+    expect(analytics.events.map((event) => event.$1), [
+      'path_generated',
+      'path_first_viewed',
+    ]);
+    expect(analytics.events[0].$2, {
+      'path_id': 808,
+      'assessment_id': 77,
+      'user_id': '73',
+    });
+    expect(analytics.events[1].$2, {
+      'user_id': '73',
+      'path_id': 808,
+      'originating_session_id': 'B' * 22,
+    });
   });
 
   test('공용 currentPath의 404도 기존처럼 생성 SSE로 이어진다', () async {

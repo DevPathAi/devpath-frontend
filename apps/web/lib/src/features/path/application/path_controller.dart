@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:dp_core/dp_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../analytics/path_analytics.dart';
 import '../../../providers/api_providers.dart';
 import '../data/path_sse_source.dart';
 
@@ -50,6 +51,7 @@ class PathController extends Notifier<PathState> {
   StreamSubscription<SseEvent>? _sub;
   Completer<void>? _streamDone;
   int _generation = 0;
+  final Set<(String, int)> _viewedPaths = <(String, int)>{};
 
   @override
   PathState build() {
@@ -183,6 +185,47 @@ class PathController extends Notifier<PathState> {
       completed: kPathStageLabels,
       result: result,
     );
+  }
+
+  /// Records path analytics only when the authenticated path surface is shown.
+  /// Background refreshes (for example after content completion) must not
+  /// initialize auth or count as a user view.
+  void captureViewedPath(LearningPath path, {required String userId}) {
+    final analytics = ref.read(journeyAnalyticsProvider);
+    final handoff = ref
+        .read(pathAnalyticsHandoffStoreProvider)
+        .takeForUser(userId);
+    if (handoff != null) {
+      switch (handoff.branch) {
+        case PathAnalyticsBranch.generated:
+          final assessmentId = handoff.assessmentId;
+          if (assessmentId != null) {
+            analytics.capture('path_generated', {
+              'path_id': path.pathId,
+              'assessment_id': assessmentId,
+              'user_id': userId,
+            });
+          }
+        case PathAnalyticsBranch.existing:
+          final correlation = handoff.assessmentId != null
+              ? <String, Object?>{'assessment_id': handoff.assessmentId}
+              : <String, Object?>{'guest_id': handoff.guestId};
+          if (correlation.values.single != null) {
+            analytics.capture('existing_path_continued', {
+              'user_id': userId,
+              'path_id': path.pathId,
+              ...correlation,
+            });
+          }
+      }
+    }
+    if (_viewedPaths.add((userId, path.pathId))) {
+      analytics.capture('path_first_viewed', {
+        'user_id': userId,
+        'path_id': path.pathId,
+        'originating_session_id': ref.read(analyticsSessionIdProvider),
+      });
+    }
   }
 
   void _finishLoadFailure(Object error, int generation) {

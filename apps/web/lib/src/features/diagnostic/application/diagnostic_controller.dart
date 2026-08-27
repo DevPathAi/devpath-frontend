@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../analytics/journey_analytics.dart';
 import '../../../analytics/journey_handoff.dart';
+import '../../../analytics/path_analytics.dart';
 import '../../../providers/api_providers.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../auth/state/auth_state.dart';
@@ -811,12 +812,34 @@ class DiagnosticController extends Notifier<DiagnosticState> {
 
   void completePathHandoff() {
     if (!state.saved || state.busy) return;
+    _stagePathAnalyticsHandoff();
     if (state.pathBranch == DiagnosticPathBranch.newPath) {
       state = state.copyWith(pathHandoffRequested: true, failure: null);
       return;
     }
     if (state.pathBranch != DiagnosticPathBranch.existingActivePath) return;
     _clearAfterSuccessfulHandoff();
+  }
+
+  void _stagePathAnalyticsHandoff() {
+    final auth = ref.read(authControllerProvider);
+    if (auth is! AuthAuthenticated ||
+        state.claimedOwnerUserId != auth.user.id ||
+        state.pathBranch == DiagnosticPathBranch.unknown) {
+      return;
+    }
+    ref
+        .read(pathAnalyticsHandoffStoreProvider)
+        .stage(
+          PathAnalyticsHandoff(
+            branch: state.pathBranch == DiagnosticPathBranch.newPath
+                ? PathAnalyticsBranch.generated
+                : PathAnalyticsBranch.existing,
+            userId: auth.user.id,
+            assessmentId: state.assessmentId,
+            guestId: state.guestId,
+          ),
+        );
   }
 
   /// 새 경로 생성 완료가 확인된 뒤에만 continuation을 지운다.
