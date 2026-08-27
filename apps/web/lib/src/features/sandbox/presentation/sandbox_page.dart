@@ -552,7 +552,8 @@ class _SandboxPageState extends ConsumerState<SandboxPage> {
 
   bool _hasCurrentReview(RunState run, ReviewState review) =>
       review is ReviewLoaded &&
-      run is RunTerminal &&
+      run is RunCompleted &&
+      run.persisted &&
       review.sandboxSessionId == run.sandboxSessionId;
 
   void _scheduleFunnelCaptures(MissionWorkspaceKey key) {

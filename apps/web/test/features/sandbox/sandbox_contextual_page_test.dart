@@ -495,6 +495,39 @@ void main() {
     expect(primaryCount, 1);
   });
 
+  testWidgets('시간 초과 실행의 같은-session review는 재실행 action을 숨기지 않는다', (
+    tester,
+  ) async {
+    final store = MemorySandboxSessionStore()..write('73', key, 91);
+    await _pump(
+      tester,
+      track: 'BACKEND_SPRING',
+      fixedOwner: '73',
+      sessionStore: store,
+      sessionRead: (_) async => SandboxSession(
+        sessionId: 91,
+        language: SandboxLanguage.java,
+        contentId: key.contentId,
+        codeBlockId: null,
+        stdout: '',
+        stderr: 'timed out',
+        exitCode: null,
+        status: SandboxSessionStatus.timedOut,
+        truncated: false,
+        startedAt: DateTime.utc(2026, 8, 27),
+        finishedAt: DateTime.utc(2026, 8, 27, 0, 0, 1),
+      ),
+      fixedReview: const ReviewLoaded(
+        CodeReview(id: '501', status: 'DONE', confidence: 80),
+        sessionId: 91,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('다시 실행'), findsOneWidget);
+    expect(find.text('다음 미션으로'), findsNothing);
+  });
+
   testWidgets('FULLSTACK은 runtime 선택 전 비활성이고 명시 선택 뒤 generic을 실행한다', (
     tester,
   ) async {
