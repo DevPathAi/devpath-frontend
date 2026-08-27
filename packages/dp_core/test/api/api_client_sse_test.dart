@@ -17,13 +17,16 @@ class _SseAdapter implements HttpClientAdapter {
   ) async {
     requestOptions = o;
     return ResponseBody(
-      Stream.fromIterable(chunks.map((c) => Uint8List.fromList(utf8.encode(c)))),
+      Stream.fromIterable(
+        chunks.map((c) => Uint8List.fromList(utf8.encode(c))),
+      ),
       200,
       headers: {
         Headers.contentTypeHeader: ['text/event-stream'],
       },
     );
   }
+
   @override
   void close({bool force = false}) {}
 }
