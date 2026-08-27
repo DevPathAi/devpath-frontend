@@ -4,6 +4,9 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 
 import 'journey_analytics.dart';
+import 'release_analytics_runtime_web.dart'
+    if (dart.library.io) 'release_analytics_runtime_stub.dart'
+    as release_runtime;
 
 const _releaseSchema = 'mission-spine.release-analytics.v1';
 const _controlSchema = 'mission-spine.staging-control.v1';
@@ -13,6 +16,9 @@ const _captureUrl =
     'https://analytics-spy.staging.leva.ai.kr/v1/release/browser/analytics-events';
 const _analyticsOrigin = 'https://analytics-spy.staging.leva.ai.kr';
 final _candidateSha256 = RegExp(r'^[0-9a-f]{64}$');
+
+typedef ReleaseAnalyticsDelivery =
+    Future<void> Function(Dio dio, String url, Map<String, Object?> payload);
 
 class ReleaseAnalyticsMarker {
   const ReleaseAnalyticsMarker({
@@ -50,12 +56,19 @@ ReleaseAnalyticsMarker? parseReleaseAnalyticsMarker(String? raw) {
 }
 
 class ReleaseJourneyAnalyticsSdk implements JourneyAnalyticsSdk {
-  ReleaseJourneyAnalyticsSdk(this.marker, this._dio);
+  ReleaseJourneyAnalyticsSdk(
+    this.marker,
+    this._dio, {
+    ReleaseAnalyticsDelivery? delivery,
+  }) : _delivery = delivery ?? _deliverReleaseAnalytics {
+    _permission = _readPermission();
+  }
 
   final ReleaseAnalyticsMarker marker;
   final Dio _dio;
+  final ReleaseAnalyticsDelivery _delivery;
+  late final Future<bool> _permission;
   Future<void> _tail = Future<void>.value();
-  bool _permissionGranted = false;
 
   @override
   Future<void> capture(String event, Map<String, Object?> properties) {
@@ -64,7 +77,15 @@ class ReleaseJourneyAnalyticsSdk implements JourneyAnalyticsSdk {
   }
 
   Future<void> _capture(String event, Map<String, Object?> properties) async {
-    if (!_permissionGranted) {
+    if (!await _permission) return;
+    await _delivery(_dio, marker.captureUrl, {
+      'event': event,
+      'properties': properties,
+    });
+  }
+
+  Future<bool> _readPermission() async {
+    try {
       final response = await _dio.get<Object?>(
         marker.permissionUrl,
         options: Options(
@@ -79,13 +100,28 @@ class ReleaseJourneyAnalyticsSdk implements JourneyAnalyticsSdk {
           !_candidateSha256.hasMatch(body['candidate_spec_sha256'] as String) ||
           body['granted'] != true ||
           body['analytics_origin'] != _analyticsOrigin) {
-        return;
+        return false;
       }
-      _permissionGranted = true;
+      return true;
+    } catch (_) {
+      return false;
     }
-    await _dio.post<void>(
-      marker.captureUrl,
-      data: {'event': event, 'properties': properties},
+  }
+
+  static Future<void> _deliverReleaseAnalytics(
+    Dio dio,
+    String url,
+    Map<String, Object?> payload,
+  ) async {
+    if (await release_runtime.sendReleaseAnalyticsKeepalive(
+      url,
+      jsonEncode(payload),
+    )) {
+      return;
+    }
+    await dio.post<void>(
+      url,
+      data: payload,
       options: Options(
         contentType: Headers.jsonContentType,
         extra: {'withCredentials': false},

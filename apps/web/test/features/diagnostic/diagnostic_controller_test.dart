@@ -312,6 +312,9 @@ String _stored(
       DiagnosticContinuationPhase.questions => null,
       _ => preview,
     },
+    diagnosticStartedAt: phase == DiagnosticContinuationPhase.track
+        ? null
+        : _now,
     expiresAt: expiresAt ?? _now.add(diagnosticContinuationTtl),
     returnStage: phase,
     journeyId: _journeyId,
@@ -378,6 +381,60 @@ void main() {
       'duration_ms': 5000,
     });
   });
+
+  test(
+    'questions reload 뒤 complete도 원래 시작 시각의 factual duration을 기록한다',
+    () async {
+      var clock = _now;
+      const next = NextQuestion(
+        question: AssessmentQuestion(
+          id: 9,
+          type: 'MCQ',
+          content: '복구 문항',
+          bloomLevel: 'REMEMBER',
+          difficulty: 0.2,
+        ),
+        index: 8,
+        total: 15,
+      );
+      final storage = _FakeStorage();
+      final first = _container(
+        api: _FakeApi()..nextResponses = <NextQuestion?>[next],
+        storage: storage,
+        auth: _AuthHarness(const AuthUnauthenticated()),
+        clock: () => clock,
+      );
+      addTearDown(first.dispose);
+
+      await first
+          .read(diagnosticControllerProvider.notifier)
+          .startAsGuest('BACKEND_SPRING');
+      expect(storage.value, isNotNull);
+
+      clock = clock.add(const Duration(seconds: 7));
+      final analytics = _SpyAnalytics();
+      final reloaded = _container(
+        api: _FakeApi()..nextResponses = <NextQuestion?>[null],
+        storage: _FakeStorage(storage.value),
+        auth: _AuthHarness(const AuthUnauthenticated()),
+        analytics: analytics,
+        clock: () => clock,
+      );
+      addTearDown(reloaded.dispose);
+
+      await reloaded.read(diagnosticControllerProvider.notifier).resume();
+
+      final completed = analytics.events
+          .where((event) => event.$1 == 'diagnostic_completed')
+          .toList();
+      expect(completed, hasLength(1));
+      expect(completed.single.$2, {
+        'guest_id': _guestId,
+        'diagnosed_level': 'MID',
+        'duration_ms': 7000,
+      });
+    },
+  );
 
   test('reload된 guest preview는 diagnostic_completed를 합성하지 않는다', () async {
     final analytics = _SpyAnalytics();
