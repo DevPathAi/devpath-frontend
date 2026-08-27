@@ -200,11 +200,12 @@ class RunController extends Notifier<RunState> {
       _sessionId = result.sessionId;
       _storeSessionBestEffort(result.sessionId);
       _terminalReceived = true;
-      state = _terminalState(result, _logsOf(state), persisted: false);
+      final terminal = _terminalState(result, _logsOf(state), persisted: false);
       if (_durable) {
+        state = terminal;
         unawaited(_syncTerminalResult(result, generation));
       } else {
-        _completeInFlight();
+        _finishInFlight(terminal);
       }
     } on Object {
       _failProtocol('실행 결과 형식을 확인하지 못했어요.', generation);
@@ -215,13 +216,14 @@ class RunController extends Notifier<RunState> {
     if (!_isCurrent(generation)) return;
     _flushLogs();
     _terminalReceived = true;
-    state = RunTransportAborted(
-      logs: _logsOf(state),
-      sandboxSessionId: _sessionId,
-      message: message,
-    );
     unawaited(_sub?.cancel());
-    _completeInFlight();
+    _finishInFlight(
+      RunTransportAborted(
+        logs: _logsOf(state),
+        sandboxSessionId: _sessionId,
+        message: message,
+      ),
+    );
   }
 
   Future<void> _onStreamError(Object error, int generation) async {
@@ -237,33 +239,35 @@ class RunController extends Notifier<RunState> {
     }
     if (error is ApiException &&
         error.code == ApiErrorCode.sandboxUnavailable) {
-      state = RunUnavailable(logs: logs, message: error.message);
-      _completeInFlight();
+      _finishInFlight(RunUnavailable(logs: logs, message: error.message));
       return;
     }
     if (error is ApiException && error.code == ApiErrorCode.sandboxBusy) {
-      state = RunBusy(
-        logs: logs,
-        retryAfterSeconds: error.retryAfterSeconds,
-        message: error.message,
+      _finishInFlight(
+        RunBusy(
+          logs: logs,
+          retryAfterSeconds: error.retryAfterSeconds,
+          message: error.message,
+        ),
       );
-      _completeInFlight();
       return;
     }
-    state = RunTransportAborted(
-      logs: logs,
-      sandboxSessionId: sessionId,
-      message: error is ApiException ? error.message : '실행 스트림 연결이 중단되었어요.',
+    _finishInFlight(
+      RunTransportAborted(
+        logs: logs,
+        sandboxSessionId: sessionId,
+        message: error is ApiException ? error.message : '실행 스트림 연결이 중단되었어요.',
+      ),
     );
-    _completeInFlight();
   }
 
   Future<void> _onStreamDone(int generation) async {
     if (!_isCurrent(generation) || _terminalReceived) return;
     _flushLogs();
     if (!_durable) {
-      state = RunDone(logs: _logsOf(state), sandboxSessionId: _sessionId);
-      _completeInFlight();
+      _finishInFlight(
+        RunDone(logs: _logsOf(state), sandboxSessionId: _sessionId),
+      );
       return;
     }
     final sessionId = _sessionId;
@@ -271,11 +275,12 @@ class RunController extends Notifier<RunState> {
       await _recover(sessionId, generation);
       return;
     }
-    state = RunTransportAborted(
-      logs: _logsOf(state),
-      message: '실행이 종료되었지만 복구할 세션을 받지 못했어요.',
+    _finishInFlight(
+      RunTransportAborted(
+        logs: _logsOf(state),
+        message: '실행이 종료되었지만 복구할 세션을 받지 못했어요.',
+      ),
     );
-    _completeInFlight();
   }
 
   Future<void> _recover(int sessionId, int generation) async {
@@ -296,12 +301,13 @@ class RunController extends Notifier<RunState> {
         final session = await ref.read(sandboxSessionReadProvider)(sessionId);
         if (!_isCurrent(generation)) return;
         if (!_validRecovery(session)) {
-          state = RunTransportAborted(
-            logs: _logsOf(state),
-            sandboxSessionId: sessionId,
-            message: '복구한 실행 맥락이 현재 미션과 일치하지 않아요.',
+          _finishInFlight(
+            RunTransportAborted(
+              logs: _logsOf(state),
+              sandboxSessionId: sessionId,
+              message: '복구한 실행 맥락이 현재 미션과 일치하지 않아요.',
+            ),
           );
-          _completeInFlight();
           return;
         }
         final mergedLogs = _mergeRecoveredLogs(_logsOf(state), session);
@@ -313,13 +319,14 @@ class RunController extends Notifier<RunState> {
             truncated: session.truncated,
           );
           _terminalReceived = true;
-          state = _terminalState(
-            result,
-            mergedLogs,
-            persisted: true,
-            session: session,
+          _finishInFlight(
+            _terminalState(
+              result,
+              mergedLogs,
+              persisted: true,
+              session: session,
+            ),
           );
-          _completeInFlight();
           return;
         }
         state = RunRunning(
@@ -333,22 +340,26 @@ class RunController extends Notifier<RunState> {
         }
       } on Object catch (error) {
         if (!_isCurrent(generation)) return;
-        state = RunTransportAborted(
-          logs: _logsOf(state),
-          sandboxSessionId: sessionId,
-          message: error is ApiException ? error.message : '실행 상태를 복구하지 못했어요.',
+        _finishInFlight(
+          RunTransportAborted(
+            logs: _logsOf(state),
+            sandboxSessionId: sessionId,
+            message: error is ApiException
+                ? error.message
+                : '실행 상태를 복구하지 못했어요.',
+          ),
         );
-        _completeInFlight();
         return;
       }
     }
     if (_isCurrent(generation)) {
-      state = RunTransportAborted(
-        logs: _logsOf(state),
-        sandboxSessionId: sessionId,
-        message: '실행이 아직 진행 중이에요. 잠시 후 다시 확인해 주세요.',
+      _finishInFlight(
+        RunTransportAborted(
+          logs: _logsOf(state),
+          sandboxSessionId: sessionId,
+          message: '실행이 아직 진행 중이에요. 잠시 후 다시 확인해 주세요.',
+        ),
       );
-      _completeInFlight();
     }
   }
 
@@ -364,12 +375,13 @@ class RunController extends Notifier<RunState> {
       if (!_validRecovery(session) ||
           !session.status.isTerminal ||
           session.status != delivered.status) {
-        state = RunTransportAborted(
-          logs: _logsOf(state),
-          sandboxSessionId: delivered.sessionId,
-          message: '전달된 실행 결과와 저장된 실행 상태가 일치하지 않아요.',
+        _finishInFlight(
+          RunTransportAborted(
+            logs: _logsOf(state),
+            sandboxSessionId: delivered.sessionId,
+            message: '전달된 실행 결과와 저장된 실행 상태가 일치하지 않아요.',
+          ),
         );
-        _completeInFlight();
         return;
       }
       final persisted = SandboxTerminalResult(
@@ -378,17 +390,19 @@ class RunController extends Notifier<RunState> {
         exitCode: session.exitCode,
         truncated: session.truncated,
       );
-      state = _terminalState(
-        persisted,
-        _mergeRecoveredLogs(_logsOf(state), session),
-        persisted: true,
-        session: session,
+      _finishInFlight(
+        _terminalState(
+          persisted,
+          _mergeRecoveredLogs(_logsOf(state), session),
+          persisted: true,
+          session: session,
+        ),
       );
     } on Object {
       // The v2 result itself mirrors a persisted terminal row. A secondary GET
       // failure cannot relabel that execution; it only means tail sync failed.
+      _completeInFlight();
     }
-    _completeInFlight();
   }
 
   bool _validRecovery(SandboxSession session) {
@@ -516,6 +530,11 @@ class RunController extends Notifier<RunState> {
   void _completeInFlight() {
     final active = _inFlight;
     if (active != null && !active.isCompleted) active.complete();
+  }
+
+  void _finishInFlight(RunState next) {
+    _completeInFlight();
+    state = next;
   }
 
   void _resetForOwnerChange() {

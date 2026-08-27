@@ -16,6 +16,7 @@ class SseClient {
     Object? body,
     Map<String, Object?> requestHeaders = const {},
     Map<String, String> responseHeaderEvents = const {},
+    Duration? receiveTimeout,
   }) async* {
     final ResponseBody res;
     final Headers responseHeaders;
@@ -25,6 +26,7 @@ class SseClient {
         data: body,
         options: Options(
           responseType: ResponseType.stream,
+          receiveTimeout: receiveTimeout,
           headers: {
             Headers.acceptHeader: 'text/event-stream',
             ...requestHeaders,

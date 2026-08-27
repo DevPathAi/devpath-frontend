@@ -678,7 +678,8 @@ class _SandboxPageState extends ConsumerState<SandboxPage> {
       return DpNextActionState.disabled;
     }
     return switch (run) {
-      RunRunning() => DpNextActionState.pending,
+      RunRunning() ||
+      RunTerminal(persisted: false) => DpNextActionState.pending,
       RunCompleted() => DpNextActionState.ready,
       RunFailed() ||
       RunKilled() ||
