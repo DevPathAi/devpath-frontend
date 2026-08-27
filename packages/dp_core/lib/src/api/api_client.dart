@@ -7,9 +7,12 @@ import 'api_config.dart';
 
 /// dio 래퍼. 모든 응답 에러를 [ApiException]으로 정규화한다.
 class ApiClient {
-  ApiClient(this.dio);
+  ApiClient(this.dio) : _sseReceiveTimeout = null;
+
+  ApiClient._withSseTimeout(this.dio, this._sseReceiveTimeout);
 
   final Dio dio;
+  final Duration? _sseReceiveTimeout;
 
   factory ApiClient.create(
     ApiConfig config, {
@@ -37,7 +40,7 @@ class ApiClient {
         ),
       ),
     );
-    return ApiClient(dio);
+    return ApiClient._withSseTimeout(dio, config.sseTimeout);
   }
 
   /// GET 후 JSON map 반환. 실패 시 [ApiException] throw.
@@ -109,8 +112,9 @@ class ApiClient {
   /// SSE 스트림 연결(D1). 앱은 dio를 직접 만지지 않고 이 헬퍼만 사용.
   /// 실패는 SseClient.connect 규약대로 [ApiException]으로 정규화된다.
   /// feature의 `*ConnectProvider`는 `apiClient.sse(path, body: ...)`를 호출한다.
-  Stream<SseEvent> sse(String path, {Object? body}) =>
-      SseClient(dio).connect(path, body: body);
+  Stream<SseEvent> sse(String path, {Object? body}) => SseClient(
+    dio,
+  ).connect(path, body: body, receiveTimeout: _sseReceiveTimeout);
 
   /// multipart 업로드(part=[field]). 실패 시 [ApiException] throw.
   Future<T> postMultipart<T>(
@@ -156,5 +160,6 @@ extension ApiClientSseMetadata on ApiClient {
     body: body,
     requestHeaders: requestHeaders,
     responseHeaderEvents: responseHeaderEvents,
+    receiveTimeout: _sseReceiveTimeout,
   );
 }
