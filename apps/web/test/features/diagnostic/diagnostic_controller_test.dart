@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:devpath_web/src/analytics/journey_analytics.dart';
+import 'package:devpath_web/src/analytics/path_analytics.dart';
 import 'package:devpath_web/src/analytics/journey_handoff.dart';
 import 'package:devpath_web/src/features/auth/application/auth_controller.dart';
 import 'package:devpath_web/src/features/auth/state/auth_state.dart';
@@ -730,6 +731,13 @@ void main() {
     expect(container.read(diagnosticControllerProvider).hasPreview, isTrue);
 
     controller.completePathHandoff();
+
+    final analyticsHandoff = container
+        .read(pathAnalyticsHandoffStoreProvider)
+        .takeForUser('101');
+    expect(analyticsHandoff?.branch, PathAnalyticsBranch.existing);
+    expect(analyticsHandoff?.assessmentId, 77);
+    expect(analyticsHandoff?.guestId, _guestId);
 
     expect(storage.clearCount, 1);
     expect(container.read(diagnosticControllerProvider).hasPreview, isFalse);

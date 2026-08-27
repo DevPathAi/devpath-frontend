@@ -26,6 +26,8 @@ class PathPage extends ConsumerStatefulWidget {
 
 class _PathPageState extends ConsumerState<PathPage> {
   LearningPath? _missionRefetchedForPlan;
+  int? _analyticsScheduledPathId;
+  String? _analyticsScheduledUserId;
 
   @override
   void initState() {
@@ -51,6 +53,7 @@ class _PathPageState extends ConsumerState<PathPage> {
       authControllerProvider,
       (_, next) => _loadWhenAuthenticated(next),
     );
+    final auth = ref.watch(authControllerProvider);
     final missionSpineEnabled = ref.watch(
       appConfigProvider.select((config) => config.missionSpineEnabled),
     );
@@ -63,6 +66,7 @@ class _PathPageState extends ConsumerState<PathPage> {
     if (missionSpineEnabled) {
       _scheduleMissionRefreshForReadyPath(s, missionState!);
     }
+    _schedulePathAnalytics(s, auth);
 
     // 완료(PathPlanView)는 자체 콘텐츠를 SliverList로 헤더와 함께 스크롤한다.
     // 그 외 상태(진행·중단·실패)는 화면 중앙에 고정하는 SliverFillRemaining.
@@ -242,6 +246,42 @@ class _PathPageState extends ConsumerState<PathPage> {
             .read(currentMissionControllerProvider.notifier)
             .invalidateAndRefetch(),
       );
+    });
+  }
+
+  void _schedulePathAnalytics(PathState pathState, AuthState auth) {
+    final plan = pathState.phase == PathPhase.complete
+        ? pathState.result
+        : null;
+    final userId = switch (auth) {
+      AuthAuthenticated(:final user) => user.id,
+      _ => null,
+    };
+    if (plan == null || userId == null) return;
+    if (_analyticsScheduledPathId == plan.pathId &&
+        _analyticsScheduledUserId == userId) {
+      return;
+    }
+    _analyticsScheduledPathId = plan.pathId;
+    _analyticsScheduledUserId = userId;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final currentPath = ref.read(pathControllerProvider);
+      final currentAuth = ref.read(authControllerProvider);
+      if (currentPath.phase != PathPhase.complete ||
+          currentPath.result?.pathId != plan.pathId ||
+          currentAuth is! AuthAuthenticated ||
+          currentAuth.user.id != userId) {
+        if (_analyticsScheduledPathId == plan.pathId &&
+            _analyticsScheduledUserId == userId) {
+          _analyticsScheduledPathId = null;
+          _analyticsScheduledUserId = null;
+        }
+        return;
+      }
+      ref
+          .read(pathControllerProvider.notifier)
+          .captureViewedPath(plan, userId: userId);
     });
   }
 }

@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../analytics/analytics_contract.dart';
 import '../analytics/journey_analytics.dart';
 import '../analytics/journey_handoff.dart';
+import '../analytics/path_analytics.dart';
 import '../analytics/analytics_runtime.dart';
 import '../analytics/release_analytics.dart';
 import '../analytics/release_analytics_runtime.dart';
@@ -41,10 +42,27 @@ final analyticsIdGeneratorProvider = Provider<String Function()>(
 final analyticsUserAgentProvider = Provider<String>(
   (ref) => analyticsRuntimeUserAgent(),
 );
+final pathAnalyticsHandoffStoreProvider = Provider<PathAnalyticsHandoffStore>(
+  (ref) => PathAnalyticsHandoffStore(),
+);
 final releaseAnalyticsMarkerProvider = Provider<ReleaseAnalyticsMarker?>(
   (ref) => parseReleaseAnalyticsMarker(readReleaseAnalyticsMarkerValue()),
 );
 final releaseAnalyticsDioProvider = Provider<Dio>((ref) => Dio());
+final analyticsJourneyIdProvider = Provider<String>(
+  (ref) => getOrCreateJourneyId(
+    ref.watch(journeyIdStoreProvider),
+    randomBytes: (_) =>
+        _decodeGeneratedId(ref.watch(analyticsIdGeneratorProvider)()),
+  ),
+);
+final analyticsSessionIdProvider = Provider<String>(
+  (ref) => getOrCreateJourneyId(
+    ref.watch(analyticsSessionIdStoreProvider),
+    randomBytes: (_) =>
+        _decodeGeneratedId(ref.watch(analyticsIdGeneratorProvider)()),
+  ),
+);
 
 /// Vendor-neutral, opt-out default. ET1 deliberately installs no vendor SDK.
 final journeyAnalyticsProvider = Provider<JourneyAnalytics>((ref) {
@@ -58,15 +76,8 @@ final journeyAnalyticsProvider = Provider<JourneyAnalytics>((ref) {
         marker != null &&
         config.analyticsEnvironment == 'production' &&
         config.appVersion != 'dev';
-    final generator = ref.watch(analyticsIdGeneratorProvider);
-    final journeyId = getOrCreateJourneyId(
-      ref.watch(journeyIdStoreProvider),
-      randomBytes: (_) => _decodeGeneratedId(generator()),
-    );
-    final sessionId = getOrCreateJourneyId(
-      ref.watch(analyticsSessionIdStoreProvider),
-      randomBytes: (_) => _decodeGeneratedId(generator()),
-    );
+    final journeyId = ref.watch(analyticsJourneyIdProvider);
+    final sessionId = ref.watch(analyticsSessionIdProvider);
     return JourneyAnalyticsAdapter(
       sdk: releaseMode
           ? ReleaseJourneyAnalyticsSdk(

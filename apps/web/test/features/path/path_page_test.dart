@@ -132,6 +132,8 @@ class _CompletedPathController extends PathController {
 
   final PathPhase initialPhase;
   var loadCalls = 0;
+  var analyticsCaptureCalls = 0;
+  String? analyticsUserId;
 
   @override
   PathState build() => PathState(
@@ -142,6 +144,12 @@ class _CompletedPathController extends PathController {
   @override
   Future<void> loadOrStart() async {
     loadCalls += 1;
+  }
+
+  @override
+  void captureViewedPath(LearningPath path, {required String userId}) {
+    analyticsCaptureCalls += 1;
+    analyticsUserId = userId;
   }
 
   void finish() {
@@ -341,6 +349,8 @@ void main() {
     await tester.pump();
 
     expect(path.loadCalls, 0);
+    expect(path.analyticsCaptureCalls, 1);
+    expect(path.analyticsUserId, '73');
     expect(mission.loadCalls, 1);
     expect(mission.refreshCalls, 1);
   });
