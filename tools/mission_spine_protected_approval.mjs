@@ -129,7 +129,9 @@ export function validateProtectedApprovalFacts(facts) {
   exact(facts.run.id, runId, 'run.id');
   exact(facts.run.run_attempt, runAttempt, 'run.run_attempt');
   exact(facts.run.event, 'workflow_dispatch', 'run.event');
-  exact(facts.run.status, 'in_progress', 'run.status');
+  if (!['in_progress', 'waiting'].includes(facts.run.status)) {
+    fail('run.status mismatch');
+  }
   exact(facts.run.conclusion, null, 'run.conclusion');
   exact(facts.run.head_sha, facts.sourceSha, 'run.head_sha');
   exact(facts.run.head_branch, 'main', 'run.head_branch');
