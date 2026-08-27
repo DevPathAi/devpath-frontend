@@ -83,6 +83,15 @@ final class _TerminalRun extends RunController {
   );
 }
 
+final class _FixedRun extends RunController {
+  _FixedRun(super.workspaceKey, this.initial);
+
+  final RunState initial;
+
+  @override
+  RunState build() => initial;
+}
+
 Widget _host(
   ProviderContainer c, {
   MissionWorkspaceKey? workspaceKey,
@@ -457,6 +466,80 @@ void main() {
     expect(find.text('canonical review'), findsOneWidget);
     expect(c.read(reviewControllerProvider), isA<ReviewIdle>());
   });
+
+  for (final scenario in <({String name, RunTerminal run})>[
+    (
+      name: '아직 owner GET으로 확인되지 않은 COMPLETED',
+      run: const RunCompleted(
+        result: SandboxTerminalResult(
+          sessionId: 42,
+          status: SandboxSessionStatus.completed,
+          exitCode: 0,
+          truncated: false,
+        ),
+      ),
+    ),
+    (
+      name: 'FAILED',
+      run: const RunFailed(
+        result: SandboxTerminalResult(
+          sessionId: 42,
+          status: SandboxSessionStatus.failed,
+          exitCode: 1,
+          truncated: false,
+        ),
+        persisted: true,
+      ),
+    ),
+    (
+      name: 'KILLED',
+      run: const RunKilled(
+        result: SandboxTerminalResult(
+          sessionId: 42,
+          status: SandboxSessionStatus.killed,
+          exitCode: null,
+          truncated: false,
+        ),
+        persisted: true,
+      ),
+    ),
+    (
+      name: 'TIMED_OUT',
+      run: const RunTimedOut(
+        result: SandboxTerminalResult(
+          sessionId: 42,
+          status: SandboxSessionStatus.timedOut,
+          exitCode: null,
+          truncated: false,
+        ),
+        persisted: true,
+      ),
+    ),
+  ]) {
+    testWidgets('canonical ${scenario.name} 실행은 review를 자동 poll하지 않는다', (
+      tester,
+    ) async {
+      const workspaceKey = MissionWorkspaceKey(taskId: 7, contentId: 11);
+      final calls = <int>[];
+      final c = ProviderContainer(
+        overrides: [
+          currentMissionOwnerKeyProvider.overrideWithValue('owner-1'),
+          runControllerFamilyProvider(
+            workspaceKey,
+          ).overrideWith(() => _FixedRun(workspaceKey, scenario.run)),
+          reviewControllerFamilyProvider(
+            workspaceKey,
+          ).overrideWith(() => _RecordingReview(workspaceKey, calls)),
+        ],
+      );
+      addTearDown(c.dispose);
+
+      await tester.pumpWidget(_host(c, workspaceKey: workspaceKey));
+      await tester.pump();
+
+      expect(calls, isEmpty);
+    });
+  }
 
   testWidgets('같은 session ID라도 workspace가 바뀌면 새 review를 poll한다', (
     tester,

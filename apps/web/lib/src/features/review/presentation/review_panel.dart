@@ -127,7 +127,7 @@ class _ReviewPanelState extends ConsumerState<ReviewPanel> {
 
   int? _reviewableSessionId(RunState run) => switch (run) {
     RunDone(:final sandboxSessionId) => sandboxSessionId,
-    RunTerminal(:final sandboxSessionId) => sandboxSessionId,
+    RunCompleted(persisted: true, :final sandboxSessionId) => sandboxSessionId,
     _ => null,
   };
 
