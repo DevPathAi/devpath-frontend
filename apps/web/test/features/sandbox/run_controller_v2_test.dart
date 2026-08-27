@@ -432,6 +432,55 @@ void main() {
     },
   );
 
+  test('복구 terminal을 관찰한 즉시 다시 실행해도 새 stream을 시작한다', () async {
+    final store = MemorySandboxSessionStore()..write('user-1', _key, 91);
+    var connections = 0;
+    final container = ProviderContainer(
+      overrides: [
+        currentMissionOwnerKeyProvider.overrideWithValue('user-1'),
+        sandboxSessionStoreProvider.overrideWithValue(store),
+        sandboxRunV2ConnectProvider.overrideWithValue((_) {
+          connections += 1;
+          return _events([
+            const SseEvent(event: 'session', data: '92'),
+            const SseEvent(
+              event: 'result',
+              data:
+                  '{"sessionId":92,"status":"COMPLETED",'
+                  '"exitCode":0,"truncated":false}',
+            ),
+          ]);
+        }),
+        sandboxSessionReadProvider.overrideWithValue(
+          (id) async => _session(
+            id == 91
+                ? SandboxSessionStatus.timedOut
+                : SandboxSessionStatus.completed,
+            id: id,
+          ),
+        ),
+        sandboxRecoveryDelayProvider.overrideWithValue(Duration.zero),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final provider = runControllerFamilyProvider(_key);
+    final notifier = container.read(provider.notifier);
+    Future<void>? retry;
+    container.listen(provider, (_, next) {
+      if (next is RunTimedOut && retry == null) {
+        retry = notifier.run('retry', 'PYTHON');
+      }
+    });
+
+    await notifier.restore();
+    await retry;
+
+    expect(connections, 1);
+    expect(container.read(provider), isA<RunCompleted>());
+    expect(container.read(provider).sandboxSessionId, 92);
+  });
+
   test('output storm은 마지막 2,000 rendered lines만 유지한다', () async {
     final controller = StreamController<SseEvent>();
     final container = ProviderContainer(
