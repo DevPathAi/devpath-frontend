@@ -4,7 +4,7 @@ import 'package:dp_core/dp_core.dart';
 
 import '../../../analytics/journey_handoff.dart';
 
-const diagnosticContinuationVersion = 1;
+const diagnosticContinuationVersion = 2;
 const diagnosticContinuationTtl = Duration(minutes: 30);
 
 enum DiagnosticContinuationPhase {
@@ -23,6 +23,7 @@ class DiagnosticContinuation {
     required this.guestId,
     required this.track,
     required this.preview,
+    this.diagnosticStartedAt,
     required this.expiresAt,
     required this.returnStage,
     required this.journeyId,
@@ -32,6 +33,7 @@ class DiagnosticContinuation {
   final String? guestId;
   final String track;
   final AssessmentResult? preview;
+  final DateTime? diagnosticStartedAt;
   final DateTime expiresAt;
   final DiagnosticContinuationPhase returnStage;
   final String journeyId;
@@ -39,12 +41,14 @@ class DiagnosticContinuation {
   DiagnosticContinuation copyWith({
     String? guestId,
     AssessmentResult? preview,
+    DateTime? diagnosticStartedAt,
     DateTime? expiresAt,
     DiagnosticContinuationPhase? returnStage,
   }) => DiagnosticContinuation(
     guestId: guestId ?? this.guestId,
     track: track,
     preview: preview ?? this.preview,
+    diagnosticStartedAt: diagnosticStartedAt ?? this.diagnosticStartedAt,
     expiresAt: expiresAt ?? this.expiresAt,
     returnStage: returnStage ?? this.returnStage,
     journeyId: journeyId,
@@ -58,6 +62,7 @@ class DiagnosticContinuation {
           guestId == other.guestId &&
           track == other.track &&
           preview == other.preview &&
+          diagnosticStartedAt == other.diagnosticStartedAt &&
           expiresAt == other.expiresAt &&
           returnStage == other.returnStage &&
           journeyId == other.journeyId;
@@ -68,6 +73,7 @@ class DiagnosticContinuation {
     guestId,
     track,
     preview,
+    diagnosticStartedAt,
     expiresAt,
     returnStage,
     journeyId,
@@ -112,6 +118,7 @@ const _envelopeKeys = <String>{
   'guestId',
   'track',
   'preview',
+  'diagnosticStartedAt',
   'expiresAt',
   'returnStage',
   'journeyId',
@@ -136,6 +143,7 @@ String encodeDiagnosticContinuation(DiagnosticContinuation value) {
             'diagnosedLevel': value.preview!.diagnosedLevel,
             'confidenceWeight': value.preview!.confidenceWeight,
           },
+    'diagnosticStartedAt': value.diagnosticStartedAt?.toUtc().toIso8601String(),
     'expiresAt': value.expiresAt.toUtc().toIso8601String(),
     'returnStage': value.returnStage.name,
     'journeyId': value.journeyId,
@@ -155,6 +163,7 @@ DiagnosticContinuationRead decodeDiagnosticContinuation(
         json['version'] != diagnosticContinuationVersion ||
         json['guestId'] is! String? ||
         json['track'] is! String ||
+        json['diagnosticStartedAt'] is! String? ||
         json['expiresAt'] is! String ||
         json['returnStage'] is! String ||
         json['journeyId'] is! String) {
@@ -165,7 +174,12 @@ DiagnosticContinuationRead decodeDiagnosticContinuation(
         .where((value) => value.name == json['returnStage'])
         .firstOrNull;
     final expiresAt = _parseStrictUtcTimestamp(json['expiresAt'] as String);
-    if (phase == null || expiresAt == null) {
+    final diagnosticStartedAt = json['diagnosticStartedAt'] == null
+        ? null
+        : _parseStrictUtcTimestamp(json['diagnosticStartedAt'] as String);
+    if (phase == null ||
+        expiresAt == null ||
+        (json['diagnosticStartedAt'] != null && diagnosticStartedAt == null)) {
       return const DiagnosticContinuationRead.invalid();
     }
 
@@ -192,6 +206,7 @@ DiagnosticContinuationRead decodeDiagnosticContinuation(
       guestId: json['guestId'] as String?,
       track: json['track'] as String,
       preview: preview,
+      diagnosticStartedAt: diagnosticStartedAt,
       expiresAt: expiresAt,
       returnStage: phase,
       journeyId: json['journeyId'] as String,
@@ -254,7 +269,10 @@ bool _isValid(DiagnosticContinuation value) {
   if (value.version != diagnosticContinuationVersion ||
       !_tracks.contains(value.track) ||
       !isValidJourneyId(value.journeyId) ||
-      !value.expiresAt.isUtc) {
+      !value.expiresAt.isUtc ||
+      (value.diagnosticStartedAt != null &&
+          (!value.diagnosticStartedAt!.isUtc ||
+              value.diagnosticStartedAt!.isAfter(value.expiresAt)))) {
     return false;
   }
   final confidence = value.preview?.confidenceWeight;
@@ -268,7 +286,9 @@ bool _isValid(DiagnosticContinuation value) {
     DiagnosticContinuationPhase.track =>
       value.guestId == null && value.preview == null,
     DiagnosticContinuationPhase.questions =>
-      _isGuestId(value.guestId) && value.preview == null,
+      _isGuestId(value.guestId) &&
+          value.preview == null &&
+          value.diagnosticStartedAt != null,
     DiagnosticContinuationPhase.preview ||
     DiagnosticContinuationPhase.auth ||
     DiagnosticContinuationPhase.consent ||

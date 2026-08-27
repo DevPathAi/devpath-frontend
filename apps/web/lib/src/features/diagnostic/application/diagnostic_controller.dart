@@ -99,7 +99,9 @@ class DiagnosticController extends Notifier<DiagnosticState> {
 
     final decoded = decodeDiagnosticContinuation(raw, now: _now);
     if (decoded.status == DiagnosticContinuationReadStatus.valid) {
-      return DiagnosticState.fromContinuation(decoded.value!);
+      final continuation = decoded.value!;
+      _guestStartedAt = continuation.diagnosticStartedAt;
+      return DiagnosticState.fromContinuation(continuation);
     }
     _clearStorageBestEffort();
     return DiagnosticState(
@@ -1108,6 +1110,7 @@ class DiagnosticController extends Notifier<DiagnosticState> {
             guestId: state.guestId,
             track: state.track!,
             preview: state.preview,
+            diagnosticStartedAt: _guestStartedAt,
             expiresAt: expiresAt,
             returnStage: state.phase,
             journeyId: state.journeyId!,
