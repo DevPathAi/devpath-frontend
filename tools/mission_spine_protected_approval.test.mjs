@@ -183,14 +183,26 @@ test('protected approval pins the current GitHub API contract', () => {
   assert.doesNotMatch(verifierSource, /2022-11-28/);
 });
 
-test('protected approval rejects a run that is no longer executing', () => {
-  const completed = structuredClone(approvalFacts);
-  completed.workflowBytes = Buffer.from(approvalFacts.workflowBytes);
-  completed.run.status = 'completed';
-  completed.run.conclusion = 'success';
-  assert.throws(
-    () => validateProtectedApprovalFacts(completed),
-    /run.status/,
+test('protected approval rejects runs outside executing or peer-waiting states', () => {
+  for (const status of ['queued', 'pending', 'requested', 'completed']) {
+    const inactive = structuredClone(approvalFacts);
+    inactive.workflowBytes = Buffer.from(approvalFacts.workflowBytes);
+    inactive.run.status = status;
+    if (status === 'completed') inactive.run.conclusion = 'success';
+    assert.throws(
+      () => validateProtectedApprovalFacts(inactive),
+      /run.status/,
+    );
+  }
+});
+
+test('protected approval accepts a waiting run while an approved peer job executes', () => {
+  const waiting = structuredClone(approvalFacts);
+  waiting.workflowBytes = Buffer.from(approvalFacts.workflowBytes);
+  waiting.run.status = 'waiting';
+  assert.equal(
+    validateProtectedApprovalFacts(waiting).approved_by,
+    'VelkaressiaBlutkrone',
   );
 });
 
