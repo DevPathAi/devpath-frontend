@@ -75,7 +75,11 @@ sealed class RunTerminal extends RunState {
   /// Exact owner-scoped persisted payload returned by Sandbox GET. Rendered
   /// combined logs are deliberately not used as stdout/stderr evidence.
   final SandboxSession? session;
-  int get approvedContextFieldCount => explicitRun ? 1 : 0;
+
+  /// The review receives one approved context field: the durable sandbox
+  /// session. A reload clears [explicitRun], but the owner-scoped GET keeps
+  /// that approval verifiable for the restored session.
+  int get approvedContextFieldCount => persisted ? 1 : 0;
   @override
   final List<String> logs;
   @override

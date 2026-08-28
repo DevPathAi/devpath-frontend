@@ -872,6 +872,59 @@ void main() {
     },
   );
 
+  testWidgets('reload restore 뒤 visible review도 contextual funnel을 한 번 보낸다', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1024, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final analytics = _SpyAnalytics();
+    final sessionStore = MemorySandboxSessionStore()..write('73', key, 91);
+    final container = await _pump(
+      tester,
+      track: 'BACKEND_SPRING',
+      authenticated: true,
+      fixedOwner: '73',
+      analytics: analytics,
+      funnelStore: MemorySandboxFunnelStore(),
+      sessionStore: sessionStore,
+      sessionRead: (_) async => SandboxSession(
+        sessionId: 91,
+        language: SandboxLanguage.java,
+        contentId: key.contentId,
+        codeBlockId: null,
+        stdout: 'ok\n',
+        stderr: '',
+        exitCode: 0,
+        status: SandboxSessionStatus.completed,
+        truncated: false,
+        startedAt: DateTime.utc(2026, 8, 27),
+        finishedAt: DateTime.utc(2026, 8, 27, 0, 0, 1),
+      ),
+      fixedReview: const ReviewLoaded(
+        CodeReview(id: '501', status: 'DONE', confidence: 92),
+        sessionId: 91,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final run = container.read(runControllerFamilyProvider(key));
+    expect(run, isA<RunCompleted>());
+    expect((run as RunCompleted).persisted, isTrue);
+    expect(run.explicitRun, isFalse);
+    final review = analytics.events.singleWhere(
+      (event) => event.$1 == 'contextual_review_viewed',
+    );
+    expect(review.$2, {
+      'user_id': '73',
+      'task_id': 31,
+      'review_id': 501,
+      'approved_context_field_count': 1,
+      'next_action_outcome': 'next_mission',
+      'first_view': true,
+    });
+  });
+
   testWidgets('1024px visible Review는 contextual funnel을 즉시 한 번 보낸다', (
     tester,
   ) async {

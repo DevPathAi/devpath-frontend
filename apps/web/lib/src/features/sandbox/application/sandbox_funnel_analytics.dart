@@ -23,7 +23,6 @@ int? persistedCompletedRunId(RunState run) =>
 
 int? contextualReviewId({required RunState run, required ReviewState review}) {
   if (run is! RunCompleted ||
-      !run.explicitRun ||
       run.approvedContextFieldCount != 1 ||
       review is! ReviewLoaded ||
       review.sandboxSessionId != run.sandboxSessionId) {
