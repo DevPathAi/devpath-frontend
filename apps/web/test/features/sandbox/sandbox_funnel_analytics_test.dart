@@ -40,7 +40,7 @@ void main() {
   });
 
   test(
-    'review eligibility는 explicit run과 exact session의 positive DB id만 준다',
+    'review eligibility는 durable run과 exact session의 positive DB id만 준다',
     () {
       const explicit = RunCompleted(
         result: _result,
@@ -82,13 +82,29 @@ void main() {
       }
       expect(
         contextualReviewId(
-          run: const RunCompleted(result: _result, explicitRun: false),
+          run: const RunCompleted(
+            result: _result,
+            persisted: true,
+            explicitRun: false,
+          ),
+          review: const ReviewLoaded(
+            CodeReview(id: '501', status: 'DONE', confidence: 80),
+            sessionId: 91,
+          ),
+        ),
+        501,
+        reason: 'reload 뒤에도 owner GET으로 확인한 review view는 유효하다',
+      );
+      expect(
+        contextualReviewId(
+          run: const RunCompleted(result: _result, explicitRun: true),
           review: const ReviewLoaded(
             CodeReview(id: '501', status: 'DONE', confidence: 80),
             sessionId: 91,
           ),
         ),
         isNull,
+        reason: '현재 click만 있고 durable owner GET이 없으면 fail-closed한다',
       );
     },
   );
