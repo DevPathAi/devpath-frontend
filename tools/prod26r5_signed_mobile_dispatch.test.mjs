@@ -28,7 +28,7 @@ test('dispatcher is exact, Actions-only, and fail-closed', () => {
   for (const fragment of [
     'permissions:\n      actions: write\n      contents: read',
     'RELEASE_ID: ms-20260829-prod26r5',
-    'SOURCE_SHA: cef584ba59136ad4d09cf48dfd78b73700672ec8',
+    'SOURCE_SHA: 2aca74a58dbfff8c0d923bbdf06d812ea6ead2c4',
     'test "$GITHUB_ACTOR" = "VelkaressiaBlutkrone"',
     'test "$GITHUB_TRIGGERING_ACTOR" = "VelkaressiaBlutkrone"',
     'test "$GITHUB_RUN_ATTEMPT" = "1"',
