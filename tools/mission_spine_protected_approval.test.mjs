@@ -30,14 +30,14 @@ const et13WorkflowSource = readFileSync(
   'utf8',
 ).replace(/\r\n/g, '\n');
 
-test('prod26r6 dispatchers start candidate-bound main workflows as the Actions App', () => {
+test('prod26r7 dispatchers start candidate-bound main workflows as the Actions App', () => {
   assert.match(
     manualWorkflowSource,
     /authenticate-inputs:\n\s+if: github\.ref == 'refs\/heads\/main'/,
   );
   assert.match(
     manualWorkflowSource,
-    /dispatch-manual-at:\n\s+if: github\.ref == 'refs\/heads\/chore\/prod26r6-candidate-evidence-dispatch'/,
+    /dispatch-manual-at:\n\s+if: github\.ref == 'refs\/heads\/chore\/prod26r7-candidate-evidence-dispatch'/,
   );
   assert.match(
     et13WorkflowSource,
@@ -45,14 +45,14 @@ test('prod26r6 dispatchers start candidate-bound main workflows as the Actions A
   );
   assert.match(
     et13WorkflowSource,
-    /dispatch-final-et13:\n\s+if: github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/chore\/prod26r6-candidate-evidence-dispatch'/,
+    /dispatch-final-et13:\n\s+if: github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/chore\/prod26r7-candidate-evidence-dispatch'/,
   );
   for (const workflow of [manualWorkflowSource, et13WorkflowSource]) {
     assert.match(workflow, /actions: write/);
-    assert.match(workflow, /RELEASE_ID: ms-20260829-prod26r6/);
+    assert.match(workflow, /RELEASE_ID: ms-20260829-prod26r7/);
     assert.match(
       workflow,
-      /CANDIDATE_SPEC_SHA256: 2661d7089ebb5d2e85d53955126fab4a1f1f6926f887a89e90085c83e773bf47/,
+      /CANDIDATE_SPEC_SHA256: 876787696ed20ad1867b451a323fa213e1c413c16a5b1e2336bf61028fec9b3c/,
     );
     assert.match(workflow, /SOURCE_SHA: edc2c56f695eaad6d5e494bab81d5b5db4427e14/);
     assert.match(workflow, /test "\$inner_actor" = "github-actions\[bot\]"/);

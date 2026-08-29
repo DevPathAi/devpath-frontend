@@ -558,7 +558,7 @@ jobs:
           retention-days: 30
 
   dispatch-manual-at:
-    if: github.ref == 'refs/heads/chore/prod26r6-candidate-evidence-dispatch'
+    if: github.ref == 'refs/heads/chore/prod26r7-candidate-evidence-dispatch'
     name: Dispatch exact manual AT evidence
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -566,11 +566,11 @@ jobs:
       actions: write
       contents: read
     env:
-      RELEASE_ID: ms-20260829-prod26r6
-      CANDIDATE_RUN_ID: "33246724716"
+      RELEASE_ID: ms-20260829-prod26r7
+      CANDIDATE_RUN_ID: "33248859245"
       CANDIDATE_RUN_ATTEMPT: "1"
-      CANDIDATE_ARTIFACT_ID: "9713073109"
-      CANDIDATE_SPEC_SHA256: 2661d7089ebb5d2e85d53955126fab4a1f1f6926f887a89e90085c83e773bf47
+      CANDIDATE_ARTIFACT_ID: "9713707732"
+      CANDIDATE_SPEC_SHA256: 876787696ed20ad1867b451a323fa213e1c413c16a5b1e2336bf61028fec9b3c
       SOURCE_SHA: edc2c56f695eaad6d5e494bab81d5b5db4427e14
       INPUT_RELEASE_ID: ${{ inputs.release_id }}
       INPUT_CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
@@ -586,7 +586,7 @@ jobs:
           test "$GITHUB_ACTOR" = "VelkaressiaBlutkrone"
           test "$GITHUB_TRIGGERING_ACTOR" = "VelkaressiaBlutkrone"
           test "$GITHUB_RUN_ATTEMPT" = "1"
-          test "$GITHUB_REF" = "refs/heads/chore/prod26r6-candidate-evidence-dispatch"
+          test "$GITHUB_REF" = "refs/heads/chore/prod26r7-candidate-evidence-dispatch"
           test "$INPUT_RELEASE_ID" = "$RELEASE_ID"
           test "$INPUT_CANDIDATE_RUN_ID" = "$CANDIDATE_RUN_ID"
           test "$INPUT_CANDIDATE_RUN_ATTEMPT" = "$CANDIDATE_RUN_ATTEMPT"
@@ -606,9 +606,9 @@ jobs:
           )"
           test "$current_main" = "$SOURCE_SHA"
 
-          payload="$RUNNER_TEMP/prod26r6-manual-at-dispatch.json"
-          response="$RUNNER_TEMP/prod26r6-manual-at-dispatch-response.json"
-          run_document="$RUNNER_TEMP/prod26r6-manual-at-run.json"
+          payload="$RUNNER_TEMP/prod26r7-manual-at-dispatch.json"
+          response="$RUNNER_TEMP/prod26r7-manual-at-dispatch-response.json"
+          run_document="$RUNNER_TEMP/prod26r7-manual-at-run.json"
           test ! -e "$payload"
           test ! -e "$response"
           test ! -e "$run_document"
