@@ -14,11 +14,12 @@ void main() {
   test(
     'approval job is a read-only, first-attempt protected environment gate',
     () {
+      final approvalJob = workflow.split('\n  dispatch-baseline:').first;
       expect(workflow, contains("'on':\n  workflow_dispatch:"));
-      expect(workflow, contains('actions: read'));
-      expect(workflow, contains('contents: read'));
+      expect(approvalJob, contains('actions: read'));
+      expect(approvalJob, contains('contents: read'));
       expect(
-        workflow,
+        approvalJob,
         isNot(contains(RegExp(r'\b(?:actions|contents): write\b'))),
       );
       expect(workflow, contains('name: et13-baseline-approval'));
