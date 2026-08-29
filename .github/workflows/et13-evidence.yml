@@ -1191,7 +1191,7 @@ jobs:
           path: build/et13/stage/a11y/
 
   dispatch-final-et13:
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/chore/prod26r7-candidate-evidence-dispatch'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/chore/prod26r8-candidate-evidence-dispatch'
     name: Dispatch exact final ET13 evidence
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -1199,11 +1199,11 @@ jobs:
       actions: write
       contents: read
     env:
-      RELEASE_ID: ms-20260829-prod26r7
-      CANDIDATE_RUN_ID: "33248859245"
+      RELEASE_ID: ms-20260829-prod26r8
+      CANDIDATE_RUN_ID: "33251157388"
       CANDIDATE_RUN_ATTEMPT: "1"
-      CANDIDATE_ARTIFACT_ID: "9713707732"
-      CANDIDATE_SPEC_SHA256: 876787696ed20ad1867b451a323fa213e1c413c16a5b1e2336bf61028fec9b3c
+      CANDIDATE_ARTIFACT_ID: "9714399213"
+      CANDIDATE_SPEC_SHA256: a0ad5fd087db806c56fe41f195b7722cd97a821b71c6178f2959a12679d0614f
       BASELINE_RUN_ID: "33248336548"
       BASELINE_RUN_ATTEMPT: "1"
       BASELINE_ARTIFACT_ID: "9713569500"
@@ -1225,7 +1225,7 @@ jobs:
           test "$GITHUB_ACTOR" = "VelkaressiaBlutkrone"
           test "$GITHUB_TRIGGERING_ACTOR" = "VelkaressiaBlutkrone"
           test "$GITHUB_RUN_ATTEMPT" = "1"
-          test "$GITHUB_REF" = "refs/heads/chore/prod26r7-candidate-evidence-dispatch"
+          test "$GITHUB_REF" = "refs/heads/chore/prod26r8-candidate-evidence-dispatch"
           test "$INPUT_RELEASE_ID" = "$RELEASE_ID"
           test "$INPUT_CANDIDATE_RUN_ID" = "$CANDIDATE_RUN_ID"
           test "$INPUT_CANDIDATE_RUN_ATTEMPT" = "$CANDIDATE_RUN_ATTEMPT"
@@ -1248,9 +1248,9 @@ jobs:
           )"
           test "$current_main" = "$SOURCE_SHA"
 
-          payload="$RUNNER_TEMP/prod26r7-final-et13-dispatch.json"
-          response="$RUNNER_TEMP/prod26r7-final-et13-dispatch-response.json"
-          run_document="$RUNNER_TEMP/prod26r7-final-et13-run.json"
+          payload="$RUNNER_TEMP/prod26r8-final-et13-dispatch.json"
+          response="$RUNNER_TEMP/prod26r8-final-et13-dispatch-response.json"
+          run_document="$RUNNER_TEMP/prod26r8-final-et13-run.json"
           test ! -e "$payload"
           test ! -e "$response"
           test ! -e "$run_document"
