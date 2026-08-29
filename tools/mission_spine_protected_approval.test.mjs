@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import {
+  githubInitiatorIdentity,
   validateProtectedApprovalFacts,
 } from './mission_spine_protected_approval.mjs';
 
@@ -14,6 +15,10 @@ const workflowSha256 = createHash('sha256')
   .digest('hex');
 const verifierSource = readFileSync(
   new URL('./mission_spine_protected_approval.mjs', import.meta.url),
+  'utf8',
+);
+const baselineWorkflowSource = readFileSync(
+  new URL('../.github/workflows/et13-baseline-approval.yml', import.meta.url),
   'utf8',
 );
 const approvalFacts = {
@@ -383,5 +388,43 @@ test('ET13 release authentication environment is an exact protected binding', ()
   assert.equal(
     validateProtectedApprovalFacts(et13).approval_environment,
     et13.environmentName,
+  );
+});
+
+test('exact GitHub Actions automation may initiate but lookalikes are rejected', () => {
+  assert.deepEqual(
+    githubInitiatorIdentity({
+      id: 41898282,
+      login: 'github-actions[bot]',
+      type: 'Bot',
+    }, 'run.actor'),
+    { id: 41898282, login: 'github-actions[bot]' },
+  );
+  assert.deepEqual(
+    githubInitiatorIdentity({ id: 11, login: 'initiator', type: 'User' }, 'run.actor'),
+    { id: 11, login: 'initiator' },
+  );
+  for (const identity of [
+    { id: 41898282, login: 'github-actions-bot[bot]', type: 'Bot' },
+    { id: 41898283, login: 'github-actions[bot]', type: 'Bot' },
+    { id: 41898282, login: 'github-actions[bot]-suffix', type: 'Bot' },
+    { id: 41898282, login: 'github-actions[bot]', type: 'User' },
+  ]) {
+    assert.throws(() => githubInitiatorIdentity(identity, 'run.actor'));
+  }
+});
+
+test('ET13 baseline approval uses the exact automation-aware initiator validator', () => {
+  assert.match(
+    baselineWorkflowSource,
+    /const \{ githubInitiatorIdentity \} = await import\(\s*'\.\/tools\/mission_spine_protected_approval\.mjs'\s*\);/,
+  );
+  assert.equal(
+    baselineWorkflowSource.match(/githubInitiatorIdentity\(\s*currentRun\.(?:actor|triggering_actor)/g)?.length,
+    2,
+  );
+  assert.doesNotMatch(
+    baselineWorkflowSource,
+    /githubUserIdentity\(\s*currentRun\.(?:actor|triggering_actor)/,
   );
 });
