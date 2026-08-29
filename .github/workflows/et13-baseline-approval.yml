@@ -130,6 +130,9 @@ jobs:
           }
 
           async function main() {
+            const { githubInitiatorIdentity } = await import(
+              './tools/mission_spine_protected_approval.mjs'
+            );
             const repository = process.env.GITHUB_REPOSITORY;
             const sourceSha = process.env.GITHUB_SHA;
             const currentRunId = positiveInteger(process.env.GITHUB_RUN_ID, 'current run ID');
@@ -179,8 +182,11 @@ jobs:
             exact(currentRun.head_branch, 'main', 'currentRun.head_branch');
             exact(currentRun.repository?.full_name, repository, 'currentRun.repository');
             exactWorkflow(currentRun, approvalWorkflow, 'currentRun');
-            githubUserIdentity(currentRun.actor, 'currentRun.actor');
-            githubUserIdentity(currentRun.triggering_actor, 'currentRun.triggering_actor');
+            githubInitiatorIdentity(currentRun.actor, 'currentRun.actor');
+            githubInitiatorIdentity(
+              currentRun.triggering_actor,
+              'currentRun.triggering_actor',
+            );
 
             const environment = await github(
               `/repos/${repository}/environments/${encodeURIComponent(environmentName)}`,
