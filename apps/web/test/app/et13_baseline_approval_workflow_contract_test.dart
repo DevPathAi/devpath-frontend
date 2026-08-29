@@ -47,14 +47,28 @@ void main() {
       );
       expect(
         workflow,
-        contains("githubUserIdentity(currentRun.actor, 'currentRun.actor')"),
+        contains("const { githubInitiatorIdentity } = await import("),
+      );
+      expect(
+        workflow,
+        contains("'./tools/mission_spine_protected_approval.mjs'"),
       );
       expect(
         workflow,
         contains(
-          "githubUserIdentity(currentRun.triggering_actor, 'currentRun.triggering_actor')",
+          "githubInitiatorIdentity(currentRun.actor, 'currentRun.actor')",
         ),
       );
+      expect(
+        workflow,
+        contains(
+          "githubInitiatorIdentity(\n"
+          "              currentRun.triggering_actor,\n"
+          "              'currentRun.triggering_actor',",
+        ),
+      );
+      expect(workflow, contains("review.user?.type !== 'User'"));
+      expect(workflow, contains("entry.type === 'User'"));
       expect(workflow, isNot(contains('workflow initiator cannot approve')));
       expect(workflow, contains("currentRun.run_attempt, 1"));
       expect(workflow, isNot(contains('/pending_deployments')));
