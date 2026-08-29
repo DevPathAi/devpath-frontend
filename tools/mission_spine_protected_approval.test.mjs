@@ -130,6 +130,55 @@ test('protected approval permits the configured reviewer to initiate and approve
   );
 });
 
+test('protected approval accepts only the exact GitHub Actions automation initiator', () => {
+  const automated = structuredClone(approvalFacts);
+  automated.workflowBytes = Buffer.from(approvalFacts.workflowBytes);
+  automated.run.actor = {
+    id: 41898282,
+    login: 'github-actions[bot]',
+    type: 'Bot',
+  };
+  automated.run.triggering_actor = {
+    id: 41898282,
+    login: 'github-actions[bot]',
+    type: 'Bot',
+  };
+  assert.equal(
+    validateProtectedApprovalFacts(automated).approved_by,
+    'VelkaressiaBlutkrone',
+  );
+});
+
+test('protected approval rejects lookalike automation initiators and bot reviewers', () => {
+  for (const identity of [
+    { id: 41898282, login: 'evil-actions[bot]', type: 'Bot' },
+    { id: 41898282, login: 'github-actions[bot]suffix', type: 'Bot' },
+    { id: 7, login: 'github-actions[bot]', type: 'Bot' },
+    { id: 41898282, login: 'github-actions[bot]', type: 'User' },
+  ]) {
+    const lookalike = structuredClone(approvalFacts);
+    lookalike.workflowBytes = Buffer.from(approvalFacts.workflowBytes);
+    lookalike.run.actor = identity;
+    lookalike.run.triggering_actor = identity;
+    assert.throws(
+      () => validateProtectedApprovalFacts(lookalike),
+      /run\.actor/,
+    );
+  }
+
+  const botReviewer = structuredClone(approvalFacts);
+  botReviewer.workflowBytes = Buffer.from(approvalFacts.workflowBytes);
+  botReviewer.approvals[0].user = {
+    id: 41898282,
+    login: 'github-actions[bot]',
+    type: 'Bot',
+  };
+  assert.throws(
+    () => validateProtectedApprovalFacts(botReviewer),
+    /reviewer login is absent or non-human/,
+  );
+});
+
 test('protected approval rejects missing initiator identity and branch protection', () => {
   const missingActor = structuredClone(approvalFacts);
   missingActor.workflowBytes = Buffer.from(approvalFacts.workflowBytes);
