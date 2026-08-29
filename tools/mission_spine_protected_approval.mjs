@@ -108,7 +108,7 @@ function githubUserIdentity(value, name) {
   return { id, login };
 }
 
-function githubInitiatorIdentity(value, name) {
+export function githubInitiatorIdentity(value, name) {
   if (value?.type === 'Bot') {
     const id = positiveInteger(value.id, `${name}.id`);
     exact(id, githubActionsAutomationIdentity.id, `${name}.id`);
