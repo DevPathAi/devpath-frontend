@@ -5,6 +5,11 @@ import { pathToFileURL } from 'node:url';
 import process from 'node:process';
 
 const frontendRepository = 'DevPathAi/devpath-frontend';
+const githubActionsAutomationIdentity = Object.freeze({
+  id: 41898282,
+  login: 'github-actions[bot]',
+  type: 'Bot',
+});
 const frozenReviewers = Object.freeze([
   Object.freeze({ id: 77432570, login: 'VelkaressiaBlutkrone' }),
 ]);
@@ -103,6 +108,20 @@ function githubUserIdentity(value, name) {
   return { id, login };
 }
 
+function githubInitiatorIdentity(value, name) {
+  if (value?.type === 'Bot') {
+    const id = positiveInteger(value.id, `${name}.id`);
+    exact(id, githubActionsAutomationIdentity.id, `${name}.id`);
+    exact(
+      value.login,
+      githubActionsAutomationIdentity.login,
+      `${name}.login`,
+    );
+    return { id, login: value.login };
+  }
+  return githubUserIdentity(value, name);
+}
+
 function validateBinding(workflowPath, environmentName, jobName) {
   const environments = allowedBindings.get(workflowPath);
   const binding = environments?.get(environmentName);
@@ -142,8 +161,8 @@ export function validateProtectedApprovalFacts(facts) {
     'run.head_repository',
   );
   validateWorkflowPath(facts.run, facts.workflowPath);
-  githubUserIdentity(facts.run.actor, 'run.actor');
-  githubUserIdentity(facts.run.triggering_actor, 'run.triggering_actor');
+  githubInitiatorIdentity(facts.run.actor, 'run.actor');
+  githubInitiatorIdentity(facts.run.triggering_actor, 'run.triggering_actor');
 
   exact(facts.branch.name, 'main', 'protected branch name');
   exact(facts.branch.commit?.sha, facts.sourceSha, 'protected branch commit SHA');
