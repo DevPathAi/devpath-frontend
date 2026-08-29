@@ -21,6 +21,45 @@ const baselineWorkflowSource = readFileSync(
   new URL('../.github/workflows/et13-baseline-approval.yml', import.meta.url),
   'utf8',
 );
+const manualWorkflowSource = readFileSync(
+  new URL('../.github/workflows/mission-spine-manual-at-evidence.yml', import.meta.url),
+  'utf8',
+).replace(/\r\n/g, '\n');
+const et13WorkflowSource = readFileSync(
+  new URL('../.github/workflows/et13-evidence.yml', import.meta.url),
+  'utf8',
+).replace(/\r\n/g, '\n');
+
+test('prod26r6 dispatchers start candidate-bound main workflows as the Actions App', () => {
+  assert.match(
+    manualWorkflowSource,
+    /authenticate-inputs:\n\s+if: github\.ref == 'refs\/heads\/main'/,
+  );
+  assert.match(
+    manualWorkflowSource,
+    /dispatch-manual-at:\n\s+if: github\.ref == 'refs\/heads\/chore\/prod26r6-candidate-evidence-dispatch'/,
+  );
+  assert.match(
+    et13WorkflowSource,
+    /authenticate-release-inputs:\n\s+if: github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/main'/,
+  );
+  assert.match(
+    et13WorkflowSource,
+    /dispatch-final-et13:\n\s+if: github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/chore\/prod26r6-candidate-evidence-dispatch'/,
+  );
+  for (const workflow of [manualWorkflowSource, et13WorkflowSource]) {
+    assert.match(workflow, /actions: write/);
+    assert.match(workflow, /RELEASE_ID: ms-20260829-prod26r6/);
+    assert.match(
+      workflow,
+      /CANDIDATE_SPEC_SHA256: 2661d7089ebb5d2e85d53955126fab4a1f1f6926f887a89e90085c83e773bf47/,
+    );
+    assert.match(workflow, /SOURCE_SHA: edc2c56f695eaad6d5e494bab81d5b5db4427e14/);
+    assert.match(workflow, /test "\$inner_actor" = "github-actions\[bot\]"/);
+    assert.match(workflow, /test "\$inner_triggering_actor" = "github-actions\[bot\]"/);
+    assert.match(workflow, /test "\$\(jq -er '\.actor\.id' "\$run_document"\)" = "41898282"/);
+  }
+});
 const approvalFacts = {
   repository: 'DevPathAi/devpath-frontend',
   sourceSha: sha,
