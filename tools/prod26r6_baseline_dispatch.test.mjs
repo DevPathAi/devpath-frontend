@@ -14,7 +14,7 @@ test('protected baseline approval is isolated from the branch dispatcher', () =>
   );
   assert.match(
     workflow,
-    /  dispatch-baseline:\n    if: github\.ref == 'refs\/heads\/chore\/prod26r7-baseline-dispatch'/,
+    /  dispatch-baseline:\n    if: github\.ref == 'refs\/heads\/chore\/prod26r8-baseline-dispatch'/,
   );
 });
 
@@ -23,7 +23,7 @@ test('baseline dispatcher pins every raw review coordinate and fails closed', ()
   assert.ok(dispatcher);
   for (const fragment of [
     'permissions:\n      actions: write\n      contents: read',
-    'RELEASE_ID: ms-20260829-prod26r7',
+    'RELEASE_ID: ms-20260829-prod26r8',
     'SOURCE_SHA: edc2c56f695eaad6d5e494bab81d5b5db4427e14',
     'RAW_RUN_ID: "33245572930"',
     'RAW_RUN_ATTEMPT: "1"',
