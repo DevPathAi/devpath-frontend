@@ -291,7 +291,7 @@ jobs:
       contents: read
     env:
       RELEASE_ID: ms-20260829-prod26r5
-      SOURCE_SHA: cef584ba59136ad4d09cf48dfd78b73700672ec8
+      SOURCE_SHA: 2aca74a58dbfff8c0d923bbdf06d812ea6ead2c4
       INPUT_RELEASE_ID: ${{ inputs.release_id }}
       GITHUB_API_VERSION: "2026-03-10"
     steps:
