@@ -809,7 +809,7 @@ jobs:
           path: build/et13/approved/
 
   dispatch-baseline:
-    if: github.ref == 'refs/heads/chore/prod26r6-baseline-dispatch'
+    if: github.ref == 'refs/heads/chore/prod26r7-baseline-dispatch'
     name: Dispatch exact ET13 baseline approval
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -817,7 +817,7 @@ jobs:
       actions: write
       contents: read
     env:
-      RELEASE_ID: ms-20260829-prod26r6
+      RELEASE_ID: ms-20260829-prod26r7
       SOURCE_SHA: edc2c56f695eaad6d5e494bab81d5b5db4427e14
       RAW_RUN_ID: "33245572930"
       RAW_RUN_ATTEMPT: "1"
@@ -838,7 +838,7 @@ jobs:
           test "$GITHUB_ACTOR" = "VelkaressiaBlutkrone"
           test "$GITHUB_TRIGGERING_ACTOR" = "VelkaressiaBlutkrone"
           test "$GITHUB_RUN_ATTEMPT" = "1"
-          test "$GITHUB_REF" = "refs/heads/chore/prod26r6-baseline-dispatch"
+          test "$GITHUB_REF" = "refs/heads/chore/prod26r7-baseline-dispatch"
           test "$INPUT_RELEASE_ID" = "$RELEASE_ID"
           test "$INPUT_RAW_RUN_ID" = "$RAW_RUN_ID"
           test "$INPUT_RAW_RUN_ATTEMPT" = "$RAW_RUN_ATTEMPT"
@@ -858,9 +858,9 @@ jobs:
           )"
           test "$current_main" = "$SOURCE_SHA"
 
-          payload="$RUNNER_TEMP/prod26r6-baseline-dispatch.json"
-          response="$RUNNER_TEMP/prod26r6-baseline-dispatch-response.json"
-          run_document="$RUNNER_TEMP/prod26r6-baseline-run.json"
+          payload="$RUNNER_TEMP/prod26r7-baseline-dispatch.json"
+          response="$RUNNER_TEMP/prod26r7-baseline-dispatch-response.json"
+          run_document="$RUNNER_TEMP/prod26r7-baseline-run.json"
           test ! -e "$payload"
           test ! -e "$response"
           test ! -e "$run_document"
