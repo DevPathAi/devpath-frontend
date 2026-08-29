@@ -18,7 +18,7 @@ test('main signing jobs are isolated from the branch-only dispatcher', () => {
   );
   assert.match(
     workflow,
-    /  dispatch-signed-mobile:\n    if: github\.ref == 'refs\/heads\/chore\/prod26r7-signed-mobile-dispatch'/,
+    /  dispatch-signed-mobile:\n    if: github\.ref == 'refs\/heads\/chore\/prod26r8-signed-mobile-dispatch'/,
   );
 });
 
@@ -27,7 +27,7 @@ test('dispatcher is exact, Actions-only, and fail-closed', () => {
   assert.ok(dispatcher);
   for (const fragment of [
     'permissions:\n      actions: write\n      contents: read',
-    'RELEASE_ID: ms-20260829-prod26r7',
+    'RELEASE_ID: ms-20260829-prod26r8',
     'SOURCE_SHA: edc2c56f695eaad6d5e494bab81d5b5db4427e14',
     'test "$GITHUB_ACTOR" = "VelkaressiaBlutkrone"',
     'test "$GITHUB_TRIGGERING_ACTOR" = "VelkaressiaBlutkrone"',
