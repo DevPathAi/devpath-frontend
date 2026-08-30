@@ -555,3 +555,126 @@ jobs:
           if-no-files-found: error
           overwrite: false
           retention-days: 30
+  dispatch-manual-at:
+    if: github.ref == 'refs/heads/chore/prod26r9-candidate-evidence-dispatch'
+    name: Dispatch exact manual AT evidence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      contents: read
+    env:
+      RELEASE_ID: ms-20260830-prod26r9
+      CANDIDATE_RUN_ID: "33309753134"
+      CANDIDATE_RUN_ATTEMPT: "1"
+      CANDIDATE_ARTIFACT_ID: "9731606679"
+      CANDIDATE_SPEC_SHA256: f86f010532dff3d231528f5ba4bc9b128704b9582393415b520ab981f7ad9ca5
+      SOURCE_SHA: 3ae5864778665515669662cd5c6ecc09f7f149c9
+      INPUT_RELEASE_ID: ${{ inputs.release_id }}
+      INPUT_CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+      INPUT_CANDIDATE_RUN_ATTEMPT: ${{ inputs.candidate_run_attempt }}
+      INPUT_CANDIDATE_ARTIFACT_ID: ${{ inputs.candidate_artifact_id }}
+      INPUT_CANDIDATE_SPEC_SHA256: ${{ inputs.candidate_spec_sha256 }}
+      GITHUB_API_VERSION: "2026-03-10"
+    steps:
+      - name: Prove the exact one-shot dispatcher context
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTOR" = "VelkaressiaBlutkrone"
+          test "$GITHUB_TRIGGERING_ACTOR" = "VelkaressiaBlutkrone"
+          test "$GITHUB_RUN_ATTEMPT" = "1"
+          test "$GITHUB_REF" = "refs/heads/chore/prod26r9-candidate-evidence-dispatch"
+          test "$INPUT_RELEASE_ID" = "$RELEASE_ID"
+          test "$INPUT_CANDIDATE_RUN_ID" = "$CANDIDATE_RUN_ID"
+          test "$INPUT_CANDIDATE_RUN_ATTEMPT" = "$CANDIDATE_RUN_ATTEMPT"
+          test "$INPUT_CANDIDATE_ARTIFACT_ID" = "$CANDIDATE_ARTIFACT_ID"
+          test "$INPUT_CANDIDATE_SPEC_SHA256" = "$CANDIDATE_SPEC_SHA256"
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
+
+      - name: Dispatch protected main through the repository Actions App
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          current_main="$(
+            gh api -H "X-GitHub-Api-Version: $GITHUB_API_VERSION" \
+              "repos/$GITHUB_REPOSITORY/branches/main" --jq '.commit.sha'
+          )"
+          test "$current_main" = "$SOURCE_SHA"
+
+          payload="$RUNNER_TEMP/prod26r9-manual-at-dispatch.json"
+          response="$RUNNER_TEMP/prod26r9-manual-at-dispatch-response.json"
+          run_document="$RUNNER_TEMP/prod26r9-manual-at-run.json"
+          test ! -e "$payload"
+          test ! -e "$response"
+          test ! -e "$run_document"
+          umask 077
+          jq -n \
+            --arg release_id "$RELEASE_ID" \
+            --arg candidate_run_id "$CANDIDATE_RUN_ID" \
+            --arg candidate_run_attempt "$CANDIDATE_RUN_ATTEMPT" \
+            --arg candidate_artifact_id "$CANDIDATE_ARTIFACT_ID" \
+            --arg candidate_spec_sha256 "$CANDIDATE_SPEC_SHA256" \
+            '{
+              "ref": "main",
+              "inputs": {
+                "release_id": $release_id,
+                "candidate_run_id": $candidate_run_id,
+                "candidate_run_attempt": $candidate_run_attempt,
+                "candidate_artifact_id": $candidate_artifact_id,
+                "candidate_spec_sha256": $candidate_spec_sha256
+              }
+            }' >"$payload"
+
+          gh api --method POST \
+            -H "X-GitHub-Api-Version: $GITHUB_API_VERSION" \
+            --input "$payload" \
+            "repos/$GITHUB_REPOSITORY/actions/workflows/mission-spine-manual-at-evidence.yml/dispatches" \
+            >"$response"
+          inner_run_id="$(jq -er '.workflow_run_id | select(type == "number" and . > 0)' "$response")"
+          [[ "$inner_run_id" =~ ^[1-9][0-9]*$ ]]
+
+          cancel_inner() {
+            gh api --method POST \
+              -H "X-GitHub-Api-Version: $GITHUB_API_VERSION" \
+              "repos/$GITHUB_REPOSITORY/actions/runs/$inner_run_id/cancel" \
+              >/dev/null 2>&1 || true
+          }
+          trap 'status=$?; if test "$status" -ne 0; then cancel_inner; fi; exit "$status"' EXIT
+
+          for attempt in $(seq 1 12); do
+            if gh api -H "X-GitHub-Api-Version: $GITHUB_API_VERSION" \
+              "repos/$GITHUB_REPOSITORY/actions/runs/$inner_run_id" \
+              >"$run_document"; then
+              break
+            fi
+            test "$attempt" -lt 12
+            sleep 1
+          done
+
+          inner_actor="$(jq -er '.actor.login' "$run_document")"
+          inner_triggering_actor="$(jq -er '.triggering_actor.login' "$run_document")"
+          test "$inner_actor" = "github-actions[bot]"
+          test "$(jq -er '.actor.id' "$run_document")" = "41898282"
+          test "$(jq -er '.actor.type' "$run_document")" = "Bot"
+          test "$inner_triggering_actor" = "github-actions[bot]"
+          test "$(jq -er '.triggering_actor.id' "$run_document")" = "41898282"
+          test "$(jq -er '.triggering_actor.type' "$run_document")" = "Bot"
+          test "$(jq -er '.event' "$run_document")" = "workflow_dispatch"
+          test "$(jq -er '.head_branch' "$run_document")" = "main"
+          test "$(jq -er '.head_sha' "$run_document")" = "$SOURCE_SHA"
+          test "$(jq -er '.run_attempt' "$run_document")" = "1"
+          test "$(jq -er '.path' "$run_document")" = ".github/workflows/mission-spine-manual-at-evidence.yml"
+          test "$(jq -r '.conclusion' "$run_document")" = "null"
+          trap - EXIT
+
+          {
+            echo "### Independent manual AT dispatch"
+            echo "- inner run: $inner_run_id"
+            echo "- actor: $inner_actor"
+            echo "- triggering actor: $inner_triggering_actor"
+            echo "- source SHA: $SOURCE_SHA"
+            echo "- candidate artifact: $CANDIDATE_ARTIFACT_ID"
+          } >>"$GITHUB_STEP_SUMMARY"
