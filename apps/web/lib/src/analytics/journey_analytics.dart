@@ -97,8 +97,9 @@ class JourneyAnalyticsAdapter implements JourneyAnalytics {
     this._optedOut = true,
     bool excluded = false,
     InternalAnalyticsUserPolicy? isInternalUser,
-    this._schedule = _defaultSchedule,
+    AnalyticsSchedule? schedule,
   }) : _context = context,
+       _schedule = schedule ?? _defaultSchedule,
        _baseExcluded =
            excluded ||
            shouldExcludeAnalyticsTraffic(
