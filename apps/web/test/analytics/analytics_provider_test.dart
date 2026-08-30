@@ -6,6 +6,21 @@ import 'package:devpath_web/src/providers/api_providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+final class _CaptureSpySdk implements JourneyAnalyticsSdk {
+  final captures = <String>[];
+
+  @override
+  void capture(String event, Map<String, Object?> properties) {
+    captures.add(event);
+  }
+
+  @override
+  void identify(String userId) {}
+
+  @override
+  void reset() {}
+}
+
 class _ThrowingStore implements JourneyIdStore {
   @override
   void clear() => throw StateError('storage denied');
@@ -167,6 +182,57 @@ void main() {
           const {'page_view_id': 'ISEhISEhISEhISEhISEhIQ'},
         ),
         AnalyticsCaptureStatus.accepted,
+      );
+    },
+  );
+
+  test(
+    'release capture starts keepalive delivery before the next event turn',
+    () {
+      final journeyStore = MemoryJourneyIdStore()
+        ..write('AQIDBAUGBwgJCgsMDQ4PEA');
+      final sessionStore = MemoryJourneyIdStore()
+        ..write('EREREREREREREREREREREQ');
+      final marker = parseReleaseAnalyticsMarker('''{
+      "schema_version":"mission-spine.release-analytics.v1",
+      "permission_url":"https://api.leva.ai.kr/v1/release/browser/analytics-permission",
+      "capture_url":"https://analytics-spy.staging.leva.ai.kr/v1/release/browser/analytics-events"
+    }''');
+      final sdk = _CaptureSpySdk();
+      final container = ProviderContainer(
+        overrides: [
+          appConfigProvider.overrideWithValue(
+            const AppConfig(
+              baseUrl: 'https://api.leva.ai.kr',
+              useMock: false,
+              appVersion: 'abc123',
+              analyticsEnvironment: 'production',
+            ),
+          ),
+          journeyIdStoreProvider.overrideWithValue(journeyStore),
+          analyticsSessionIdStoreProvider.overrideWithValue(sessionStore),
+          analyticsUserAgentProvider.overrideWithValue(
+            'Mozilla/5.0 HeadlessChrome Playwright',
+          ),
+          releaseAnalyticsMarkerProvider.overrideWithValue(marker),
+          releaseAnalyticsSdkFactoryProvider.overrideWithValue(
+            (marker, dio) => sdk,
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final analytics = container.read(journeyAnalyticsProvider);
+      expect(
+        analytics.capture('landing_viewed', const {
+          'page_view_id': 'ISEhISEhISEhISEhISEhIQ',
+        }),
+        AnalyticsCaptureStatus.accepted,
+      );
+      expect(
+        sdk.captures,
+        ['landing_viewed'],
+        reason: 'a release claim must not outrun SDK queue registration',
       );
     },
   );

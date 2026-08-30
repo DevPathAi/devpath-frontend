@@ -49,6 +49,13 @@ final releaseAnalyticsMarkerProvider = Provider<ReleaseAnalyticsMarker?>(
   (ref) => parseReleaseAnalyticsMarker(readReleaseAnalyticsMarkerValue()),
 );
 final releaseAnalyticsDioProvider = Provider<Dio>((ref) => Dio());
+final releaseAnalyticsSdkFactoryProvider =
+    Provider<
+      JourneyAnalyticsSdk Function(ReleaseAnalyticsMarker marker, Dio dio)
+    >(
+      (ref) =>
+          (marker, dio) => ReleaseJourneyAnalyticsSdk(marker, dio),
+    );
 final analyticsJourneyIdProvider = Provider<String>(
   (ref) => getOrCreateJourneyId(
     ref.watch(journeyIdStoreProvider),
@@ -80,7 +87,7 @@ final journeyAnalyticsProvider = Provider<JourneyAnalytics>((ref) {
     final sessionId = ref.watch(analyticsSessionIdProvider);
     return JourneyAnalyticsAdapter(
       sdk: releaseMode
-          ? ReleaseJourneyAnalyticsSdk(
+          ? ref.watch(releaseAnalyticsSdkFactoryProvider)(
               marker,
               ref.watch(releaseAnalyticsDioProvider),
             )
@@ -92,6 +99,7 @@ final journeyAnalyticsProvider = Provider<JourneyAnalytics>((ref) {
         journeyId: journeyId,
       ),
       optedOut: !releaseMode,
+      schedule: releaseMode ? (work) => work() : null,
       excluded:
           !releaseMode &&
           shouldExcludeAnalyticsTraffic(
