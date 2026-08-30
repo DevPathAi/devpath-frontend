@@ -282,7 +282,7 @@ jobs:
           retention-days: 30
 
   dispatch-signed-mobile:
-    if: github.ref == 'refs/heads/chore/prod26r8-signed-mobile-dispatch'
+    if: github.ref == 'refs/heads/chore/prod26r9-signed-mobile-dispatch'
     name: Dispatch signed Android build
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -290,7 +290,7 @@ jobs:
       actions: write
       contents: read
     env:
-      RELEASE_ID: ms-20260829-prod26r8
+      RELEASE_ID: ms-20260830-prod26r9
       SOURCE_SHA: edc2c56f695eaad6d5e494bab81d5b5db4427e14
       INPUT_RELEASE_ID: ${{ inputs.release_id }}
       GITHUB_API_VERSION: "2026-03-10"
@@ -301,7 +301,7 @@ jobs:
           test "$GITHUB_ACTOR" = "VelkaressiaBlutkrone"
           test "$GITHUB_TRIGGERING_ACTOR" = "VelkaressiaBlutkrone"
           test "$GITHUB_RUN_ATTEMPT" = "1"
-          test "$GITHUB_REF" = "refs/heads/chore/prod26r8-signed-mobile-dispatch"
+          test "$GITHUB_REF" = "refs/heads/chore/prod26r9-signed-mobile-dispatch"
           test "$INPUT_RELEASE_ID" = "$RELEASE_ID"
           [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
 
@@ -316,9 +316,9 @@ jobs:
           )"
           test "$current_main" = "$SOURCE_SHA"
 
-          payload="$RUNNER_TEMP/prod26r8-signed-mobile-dispatch.json"
-          response="$RUNNER_TEMP/prod26r8-signed-mobile-dispatch-response.json"
-          run_document="$RUNNER_TEMP/prod26r8-signed-mobile-run.json"
+          payload="$RUNNER_TEMP/prod26r9-signed-mobile-dispatch.json"
+          response="$RUNNER_TEMP/prod26r9-signed-mobile-dispatch-response.json"
+          run_document="$RUNNER_TEMP/prod26r9-signed-mobile-run.json"
           test ! -e "$payload"
           test ! -e "$response"
           test ! -e "$run_document"
