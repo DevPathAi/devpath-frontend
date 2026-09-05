@@ -8,6 +8,8 @@ import '../application/mypage_controller.dart';
 import '../state/mypage_state.dart';
 import '../../common/application/track_catalog.dart';
 import '../../support/presentation/supportable_error.dart';
+import '../../mentor/application/mentor_access_controller.dart';
+import '../../mentor/state/mentor_access_state.dart';
 
 /// 마이페이지: 프로필 표시/편집 + 활동 집계(부분실패 내성) + 설정 진입.
 /// avatar 파일 선택 UI(웹 file picker)는 후속 — controller.uploadAvatar 배선은 완료.
@@ -22,9 +24,10 @@ class _MyPagePageState extends ConsumerState<MyPagePage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => ref.read(myPageControllerProvider.notifier).load(),
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(myPageControllerProvider.notifier).load();
+      ref.read(mentorAccessControllerProvider.notifier).load();
+    });
   }
 
   @override
@@ -129,6 +132,7 @@ class _BodyState extends ConsumerState<_Body> {
     final text = Theme.of(context).textTheme;
     final st = widget.state;
     final p = st.profile;
+    final mentorAccess = ref.watch(mentorAccessControllerProvider);
 
     Widget card(Widget child) => Container(
       width: double.infinity,
@@ -243,14 +247,35 @@ class _BodyState extends ConsumerState<_Body> {
               ],
             ),
           ),
+          card(
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('AI 멘토 초대', style: text.titleMedium),
+                const SizedBox(height: DpSpacing.sm),
+                switch (mentorAccess) {
+                  MentorAccessLoading() => const Text('초대 상태를 확인하는 중입니다.'),
+                  MentorAccessFailed() => const Text('초대 상태를 불러오지 못했습니다.'),
+                  MentorAccessReady(:final isActive) => Text(
+                    isActive
+                        ? 'AI 멘토를 사용할 수 있습니다.'
+                        : '초대 대기 중입니다. 보통 1일 안에 초대 메일이 갑니다.',
+                  ),
+                },
+              ],
+            ),
+          ),
           // 설정 진입
           card(
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.settings_outlined),
-              title: const Text('설정'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => context.go('/settings'),
+            Material(
+              color: Colors.transparent,
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.settings_outlined),
+                title: const Text('설정'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.go('/settings'),
+              ),
             ),
           ),
         ],

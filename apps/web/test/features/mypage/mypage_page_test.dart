@@ -1,6 +1,7 @@
 import 'package:devpath_web/src/features/mypage/application/mypage_controller.dart';
 import 'package:devpath_web/src/features/mypage/presentation/mypage_page.dart';
 import 'package:devpath_web/src/features/mypage/state/mypage_state.dart';
+import 'package:devpath_web/src/features/mentor/data/mentor_access_source.dart';
 import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
@@ -23,6 +24,9 @@ class _FixedController extends MyPageController {
 Widget _host(MyPageState state) => ProviderScope(
   overrides: [
     myPageControllerProvider.overrideWith(() => _FixedController(state)),
+    mentorAccessFetchProvider.overrideWithValue(
+      () async => const {'status': 'WAITLISTED', 'source': 'SELF'},
+    ),
   ],
   child: MaterialApp(theme: DpTheme.light(), home: const MyPagePage()),
 );
@@ -61,10 +65,7 @@ void main() {
     // 설정 진입 카드
     expect(find.text('설정'), findsOneWidget);
 
-    // 소스의 설정 카드는 ListTile을 배경색 있는 DecoratedBox로 감싸 프레임워크가
-    // "ink splashes may be invisible" 경고 assertion을 던진다(디버그 전용, 렌더 정상).
-    // lib/ 소스는 이 작업 범위 밖(불변)이므로 여기서 소비만 한다.
-    expect(tester.takeException(), isAssertionError);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('MyPageLoaded: 집계 부분 실패 시 안내 문구 렌더', (tester) async {
@@ -85,8 +86,7 @@ void main() {
     expect(find.text('학습 활동을 불러오지 못했습니다'), findsOneWidget);
     expect(find.text('커뮤니티 활동을 불러오지 못했습니다'), findsOneWidget);
 
-    // 설정 카드 ListTile-in-DecoratedBox 디버그 assertion 소비(위 참조).
-    expect(tester.takeException(), isAssertionError);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('MyPageLoading: 로딩 인디케이터 렌더', (tester) async {

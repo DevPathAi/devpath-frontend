@@ -30,6 +30,7 @@ class AppConfig {
   const AppConfig({
     required this.baseUrl,
     required this.useMock,
+    this.homeBaseUrl = 'https://leva.ai.kr',
     this.appVersion = 'dev',
     this.missionSpineEnabled = false,
     this.analyticsContractVersion = 'mission-spine.analytics.v1',
@@ -43,6 +44,10 @@ class AppConfig {
       defaultValue: 'https://mock.devpath.ai',
     ),
     useMock: bool.fromEnvironment('USE_MOCK', defaultValue: true),
+    homeBaseUrl: String.fromEnvironment(
+      'HOME_BASE_URL',
+      defaultValue: 'https://leva.ai.kr',
+    ),
     appVersion: String.fromEnvironment('APP_VERSION', defaultValue: 'dev'),
     missionSpineEnabled: bool.fromEnvironment(
       'MISSION_SPINE_ENABLED',
@@ -60,6 +65,7 @@ class AppConfig {
 
   final String baseUrl;
   final bool useMock;
+  final String homeBaseUrl;
 
   /// 빌드 식별자. `--dart-define=APP_VERSION=0.1.0+42` 로 주입한다.
   /// 미주입이면 'dev' — 제보에 "어느 빌드였는지"가 비지 않게 기본값을 둔다.

@@ -21,6 +21,8 @@ import '../features/community/presentation/question_create_page.dart';
 import '../features/community/presentation/question_edit_page.dart';
 import '../features/dashboard/presentation/dashboard_page.dart';
 import '../features/mentor/presentation/mentor_page.dart';
+import '../features/mentor/presentation/mentor_access_gate.dart';
+import '../features/mentor/application/mentor_invite_handoff.dart';
 import '../features/mentor/state/mentor_scope_key.dart';
 import '../features/mission/presentation/mission_content_route_resolver.dart';
 import '../features/mission/presentation/mission_mentor_route_resolver.dart';
@@ -170,17 +172,30 @@ final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/dashboard',
     refreshListenable: refresh,
-    redirect: (context, state) => gateRedirect(
-      ref.read(authControllerProvider),
-      state.matchedLocation,
-      missionSpineEnabled: missionSpineEnabled,
-      hasDiagnosticContinuation: ref
-          .read(diagnosticControllerProvider.notifier)
-          .hasRestorableContinuation,
-      diagnosticPathHandoffRequested: ref
-          .read(diagnosticControllerProvider)
-          .pathHandoffRequested,
-    ),
+    redirect: (context, state) {
+      final auth = ref.read(authControllerProvider);
+      final handoff = ref.read(mentorInviteHandoffStoreProvider);
+      if (auth is! AuthAuthenticated && isSafeMentorReturnTo(state.uri.path)) {
+        handoff.rememberReturnTo(state.uri.path);
+      }
+      final redirect = gateRedirect(
+        auth,
+        state.matchedLocation,
+        missionSpineEnabled: missionSpineEnabled,
+        hasDiagnosticContinuation: ref
+            .read(diagnosticControllerProvider.notifier)
+            .hasRestorableContinuation,
+        diagnosticPathHandoffRequested: ref
+            .read(diagnosticControllerProvider)
+            .pathHandoffRequested,
+      );
+      if (auth is AuthAuthenticated &&
+          state.matchedLocation == '/auth/callback' &&
+          redirect == '/dashboard') {
+        return handoff.takeReturnTo() ?? redirect;
+      }
+      return redirect;
+    },
     routes: [
       GoRoute(path: '/login', builder: (_, _) => const LoginPage()),
       GoRoute(
@@ -224,15 +239,20 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/mission/:taskId/mentor',
-            builder: (_, state) => MissionMentorRouteResolver(
-              taskId: state.pathParameters['taskId'],
-              entryIntent: state.extra is MentorEntryIntent
-                  ? state.extra! as MentorEntryIntent
-                  : null,
+            builder: (_, state) => MentorAccessGate(
+              child: MissionMentorRouteResolver(
+                taskId: state.pathParameters['taskId'],
+                entryIntent: state.extra is MentorEntryIntent
+                    ? state.extra! as MentorEntryIntent
+                    : null,
+              ),
             ),
           ),
           GoRoute(path: '/sandbox', builder: (_, _) => const SandboxPage()),
-          GoRoute(path: '/mentor', builder: (_, _) => const MentorPage()),
+          GoRoute(
+            path: '/mentor',
+            builder: (_, _) => const MentorAccessGate(child: MentorPage()),
+          ),
           GoRoute(
             path: '/community',
             builder: (_, state) => CommunityHomePage(

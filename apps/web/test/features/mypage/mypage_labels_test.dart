@@ -1,6 +1,7 @@
 import 'package:devpath_web/src/features/mypage/application/mypage_controller.dart';
 import 'package:devpath_web/src/features/mypage/presentation/mypage_page.dart';
 import 'package:devpath_web/src/features/mypage/state/mypage_state.dart';
+import 'package:devpath_web/src/features/mentor/data/mentor_access_source.dart';
 import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
@@ -33,7 +34,12 @@ class _CapturingController extends MyPageController {
 }
 
 Widget _host(_CapturingController ctrl) => ProviderScope(
-  overrides: [myPageControllerProvider.overrideWith(() => ctrl)],
+  overrides: [
+    myPageControllerProvider.overrideWith(() => ctrl),
+    mentorAccessFetchProvider.overrideWithValue(
+      () async => const {'status': 'WAITLISTED', 'source': 'SELF'},
+    ),
+  ],
   child: MaterialApp(theme: DpTheme.light(), home: const MyPagePage()),
 );
 
@@ -52,30 +58,9 @@ void _tallView(WidgetTester tester) {
   addTearDown(tester.view.reset);
 }
 
-/// 설정 카드가 `ListTile`을 배경색 있는 `DecoratedBox`로 감싸 프레임워크가
-/// "ink splashes may be invisible" 디버그 assertion을 던진다(렌더는 정상이고
-/// lib/ 소스의 사전 존재 동작이라 이 Task 범위 밖이다).
-///
-/// 이 assertion은 **리빌드마다 다시 던져진다** — 드롭다운을 여닫는 테스트에서는
-/// `takeException()` 한 번으로 소비되지 않는다. 그래서 이 문구를 가진 것만
-/// 골라 무시하고 나머지 오류는 그대로 통과시킨다.
-void _ignoreListTileInkAssertion() {
-  final original = FlutterError.onError;
-  FlutterError.onError = (details) {
-    if (details.exceptionAsString().contains(
-      'ListTile background color or ink splashes',
-    )) {
-      return;
-    }
-    original?.call(details);
-  };
-  addTearDown(() => FlutterError.onError = original);
-}
-
 void main() {
   testWidgets('학습 목표·트랙이 한국어 라벨로 표시된다 (enum 원문 노출 없음)', (tester) async {
     _tallView(tester);
-    _ignoreListTileInkAssertion();
     final ctrl = _CapturingController(_loaded);
     await tester.pumpWidget(_host(ctrl));
     await tester.pump();
@@ -88,7 +73,6 @@ void main() {
 
   testWidgets('라벨을 바꿔도 저장 payload에는 enum 원문이 실린다', (tester) async {
     _tallView(tester);
-    _ignoreListTileInkAssertion();
     final ctrl = _CapturingController(_loaded);
     await tester.pumpWidget(_host(ctrl));
     await tester.pump();

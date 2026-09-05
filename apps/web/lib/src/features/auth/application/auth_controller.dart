@@ -2,6 +2,8 @@ import 'package:dp_core/dp_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../providers/api_providers.dart';
+import '../../mentor/application/mentor_invite_handoff.dart';
+import '../../mentor/data/mentor_access_source.dart';
 import '../state/auth_state.dart';
 import 'oauth_launcher.dart';
 
@@ -65,6 +67,8 @@ class AuthController extends Notifier<AuthState> {
       if (!ref.mounted) return; // dispose 후 async gap에서 진입 방지
       await _store.save(access: data['access_token'] as String, refresh: '');
       if (!ref.mounted) return;
+      await _redeemPendingMentorInvite();
+      if (!ref.mounted) return;
       state = AuthAuthenticated(
         User.fromJson((data['user'] as Map).cast<String, dynamic>()),
       );
@@ -83,6 +87,20 @@ class AuthController extends Notifier<AuthState> {
             ? '로그인 상태를 확인하지 못했어요. 다시 시도해 주세요.'
             : null,
       ); // 네트워크/타임아웃/파싱 등 비-ApiException → 미인증
+    }
+  }
+
+  Future<void> _redeemPendingMentorInvite() async {
+    final handoff = ref.read(mentorInviteHandoffStoreProvider);
+    final code = handoff.peekCode();
+    if (code == null) return;
+    try {
+      await ref.read(mentorInviteRedeemProvider)(code);
+    } catch (_) {
+      // 로그인 자체는 성공시킨다. 멘토 화면은 서버 상태에 따라 계속 대기 UI를 보여준다.
+    } finally {
+      // raw code는 성공/실패와 관계없이 한 번의 callback 교환 뒤 즉시 폐기한다.
+      handoff.clearCode();
     }
   }
 
