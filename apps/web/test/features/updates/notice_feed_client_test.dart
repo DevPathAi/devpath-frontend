@@ -35,7 +35,7 @@ ResponseBody _json(int status, Map<String, dynamic> body, {String? etag}) =>
     );
 
 void main() {
-  test('첫 200을 LKG로 저장하고 다음 시작 요청은 ETag 304 캐시를 사용한다', () async {
+  test('첫 200을 LKG로 저장하고 브라우저가 관리하는 ETag 304 캐시를 사용한다', () async {
     final adapter = _SequenceAdapter([
       _json(200, {
         'schemaVersion': 1,
@@ -70,7 +70,7 @@ void main() {
     expect(first.single.title, 'AI 멘토 순차 초대 안내');
     expect(second.single.id, 'mentor-invite');
     expect(adapter.requests, hasLength(2));
-    expect(adapter.requests[1].headers['if-none-match'], '"feed-v1"');
+    expect(adapter.requests[1].headers, isNot(contains('if-none-match')));
     expect(cache.readPayload(), isNot(contains('rawCode')));
   });
 

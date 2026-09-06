@@ -18,7 +18,7 @@ class _AccessController extends MentorAccessController {
 }
 
 void main() {
-  testWidgets('대기자는 약속된 1일 안내와 첫 미션 이동을 보고 멘토 본문은 보지 않는다', (tester) async {
+  testWidgets('대기자는 비보장 일정 안내와 첫 미션 이동을 보고 멘토 본문은 보지 않는다', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -37,7 +37,8 @@ void main() {
     await tester.pump();
 
     expect(find.text('AI 멘토 초대 대기 중'), findsOneWidget);
-    expect(find.textContaining('보통 1일 안에 초대 메일'), findsOneWidget);
+    expect(find.textContaining('준비 상황에 따라 달라질 수 있어요'), findsOneWidget);
+    expect(find.textContaining('1일 안에'), findsNothing);
     expect(find.text('이번 주 미션 계속하기'), findsOneWidget);
     expect(find.text('MENTOR WORKSPACE'), findsNothing);
   });

@@ -53,6 +53,23 @@ void main() {
       expect(html, contains('ca-pub-2785578834914321'));
     });
 
+    test('초대 fragment를 외부 스크립트보다 먼저 세션으로 옮기고 주소에서 지운다', () {
+      final inviteBootstrap = html.indexOf('leva.mentor.invite.v1');
+      final adsenseBootstrap = html.indexOf('adsbygoogle.js');
+      final adsenseInviteGate = html.indexOf(
+        'window.__levaHasPendingMentorInvite !== true',
+      );
+
+      expect(inviteBootstrap, greaterThanOrEqualTo(0));
+      expect(inviteBootstrap, lessThan(adsenseBootstrap));
+      expect(html, contains('window.location.hash'));
+      expect(html, contains("searchParams.delete('invite')"));
+      expect(html, contains('window.history.replaceState'));
+      expect(html, contains('window.__levaHasPendingMentorInvite'));
+      expect(adsenseInviteGate, greaterThanOrEqualTo(0));
+      expect(adsenseInviteGate, lessThan(adsenseBootstrap));
+    });
+
     // 빌드가 치환하는 자리표시자다. 실수로 값을 박아 넣으면 배포 경로가 깨진다.
     test('base href 자리표시자를 유지한다', () {
       expect(html, contains(r'<base href="$FLUTTER_BASE_HREF">'));

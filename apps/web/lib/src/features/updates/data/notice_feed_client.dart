@@ -39,11 +39,9 @@ class NoticeFeedClient {
   Future<List<NoticeBanner>> loadActive(DateTime now) async {
     final cachedPayload = cache.readPayload();
     try {
-      final etag = cache.readEtag();
       final response = await dio.get<Object?>(
         '$homeBaseUrl/updates/feed.json',
         options: Options(
-          headers: {'if-none-match': ?etag},
           validateStatus: (status) => status == 200 || status == 304,
         ),
       );

@@ -10,7 +10,8 @@ import 'src/features/mentor/application/mentor_invite_handoff.dart';
 void main() {
   usePathUrlStrategy();
   GoRouter.optionURLReflectsImperativeAPIs = true;
-  // 초대 코드가 analytics나 브라우저 주소 기록에 닿기 전에 sessionStorage로 옮긴다.
+  // index.html이 외부 스크립트보다 먼저 처리한다. 이 호출은 비-web 실행과
+  // 조기 bootstrap을 우회한 환경에서도 같은 정리 계약을 지키는 fallback이다.
   captureMentorInviteHandoffFromVisibleUrl();
   captureJourneyHandoffFromVisibleUrl();
   runApp(const ProviderScope(child: DevPathWebApp()));

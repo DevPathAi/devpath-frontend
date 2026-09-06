@@ -63,7 +63,7 @@ class _MentorAccessGateState extends ConsumerState<MentorAccessGate> {
                   ),
                   const SizedBox(height: DpSpacing.sm),
                   const Text(
-                    '보통 1일 안에 초대 메일이 갑니다. 기다리는 동안에도 로드맵 첫 주차 미션을 바로 시작할 수 있어요.',
+                    '초대 일정은 준비 상황에 따라 달라질 수 있어요. 기다리는 동안에도 로드맵 첫 주차 미션을 바로 시작할 수 있어요.',
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: DpSpacing.xl),
