@@ -54,7 +54,7 @@ class _MentorAccessGateState extends ConsumerState<MentorAccessGate> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Icon(Icons.mark_email_unread_outlined, size: 48),
+                  const Icon(DpIcons.invitePending, size: 48),
                   const SizedBox(height: DpSpacing.lg),
                   Text(
                     'AI 멘토 초대 대기 중',

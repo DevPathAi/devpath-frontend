@@ -37,6 +37,16 @@ class _WebMentorInviteHandoffStore implements MentorInviteHandoffStore {
     web.window.sessionStorage.removeItem(mentorReturnToStorageKey);
     return isSafeMentorReturnTo(value) ? value : null;
   }
+
+  @override
+  void clearReturnTo() =>
+      web.window.sessionStorage.removeItem(mentorReturnToStorageKey);
+
+  @override
+  void clear() {
+    clearCode();
+    clearReturnTo();
+  }
 }
 
 MentorInviteHandoffStore createMentorInviteHandoffStore() =>

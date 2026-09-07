@@ -13,6 +13,12 @@ abstract interface class MentorInviteHandoffStore {
   void clearCode();
   void rememberReturnTo(String path);
   String? takeReturnTo();
+  void clearReturnTo();
+
+  void clear() {
+    clearCode();
+    clearReturnTo();
+  }
 
   String? takeCode() {
     final value = peekCode();
@@ -51,6 +57,15 @@ class MemoryMentorInviteHandoffStore implements MentorInviteHandoffStore {
     final value = _returnTo;
     _returnTo = null;
     return value;
+  }
+
+  @override
+  void clearReturnTo() => _returnTo = null;
+
+  @override
+  void clear() {
+    clearCode();
+    clearReturnTo();
   }
 }
 

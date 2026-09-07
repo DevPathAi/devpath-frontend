@@ -22,6 +22,7 @@ abstract final class DpIcons {
   static const IconData empty = Symbols.inbox_rounded;
   static const IconData error = Symbols.error_rounded;
   static const IconData retry = Symbols.refresh_rounded;
+  static const IconData invitePending = Symbols.mark_email_unread_rounded;
 
   // SSE 단계 표시(P3-C — Material Icons 대신 단일 Symbols 셋 유지, DD3)
   static const IconData stepDone = Symbols.check_circle_rounded;

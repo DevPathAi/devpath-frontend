@@ -98,6 +98,31 @@ String? gateRedirect(
   return null;
 }
 
+String? mentorInviteReturnRedirect({
+  required AuthState auth,
+  required String location,
+  required String? gateDestination,
+  required MentorInviteHandoffStore handoff,
+}) {
+  if (auth case AuthAuthenticated(:final user)) {
+    final prerequisitesDone =
+        user.consentStatus == ConsentStatus.done &&
+        user.onboardingStatus == OnboardingStatus.done;
+    final leavesPrerequisiteGate =
+        const {
+          '/auth/callback',
+          '/login',
+          '/consent',
+          '/diagnostic',
+        }.contains(location) &&
+        const {'/dashboard', '/path'}.contains(gateDestination);
+    if (prerequisitesDone && leavesPrerequisiteGate) {
+      return handoff.takeReturnTo() ?? gateDestination;
+    }
+  }
+  return gateDestination;
+}
+
 final routerProvider = Provider<GoRouter>((ref) {
   final missionSpineEnabled = ref.watch(
     appConfigProvider.select((config) => config.missionSpineEnabled),
@@ -189,12 +214,12 @@ final routerProvider = Provider<GoRouter>((ref) {
             .read(diagnosticControllerProvider)
             .pathHandoffRequested,
       );
-      if (auth is AuthAuthenticated &&
-          state.matchedLocation == '/auth/callback' &&
-          redirect == '/dashboard') {
-        return handoff.takeReturnTo() ?? redirect;
-      }
-      return redirect;
+      return mentorInviteReturnRedirect(
+        auth: auth,
+        location: state.matchedLocation,
+        gateDestination: redirect,
+        handoff: handoff,
+      );
     },
     routes: [
       GoRoute(path: '/login', builder: (_, _) => const LoginPage()),

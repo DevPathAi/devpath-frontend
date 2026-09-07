@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:devpath_web/src/features/mentor/application/mentor_access_controller.dart';
 import 'package:devpath_web/src/features/mentor/data/mentor_access_source.dart';
 import 'package:devpath_web/src/features/mentor/state/mentor_access_state.dart';
@@ -36,5 +38,42 @@ void main() {
           .isActive,
       isTrue,
     );
+  });
+
+  test('늦게 끝난 이전 요청이 최신 활성 상태를 덮지 않는다', () async {
+    final first = Completer<Map<String, dynamic>>();
+    final second = Completer<Map<String, dynamic>>();
+    var request = 0;
+    final container = ProviderContainer(
+      overrides: [
+        mentorAccessFetchProvider.overrideWithValue(() {
+          request++;
+          return request == 1 ? first.future : second.future;
+        }),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(mentorAccessControllerProvider.notifier);
+    final older = controller.load();
+    final newer = controller.load();
+    second.complete({
+      'status': 'ACTIVE',
+      'source': 'INVITE_CODE',
+      'waitlistedAt': '2026-09-05T00:00:00Z',
+      'activatedAt': '2026-09-05T01:00:00Z',
+    });
+    await newer;
+    first.complete({
+      'status': 'WAITLISTED',
+      'source': 'SELF',
+      'waitlistedAt': '2026-09-05T00:00:00Z',
+      'activatedAt': null,
+    });
+    await older;
+
+    final state = container.read(mentorAccessControllerProvider);
+    expect(state, isA<MentorAccessReady>());
+    expect((state as MentorAccessReady).isActive, isTrue);
   });
 }

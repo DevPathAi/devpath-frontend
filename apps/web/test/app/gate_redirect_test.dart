@@ -1,5 +1,6 @@
 import 'package:devpath_web/src/app/router.dart';
 import 'package:devpath_web/src/features/auth/state/auth_state.dart';
+import 'package:devpath_web/src/features/mentor/application/mentor_invite_handoff.dart';
 import 'package:dp_core/dp_core.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -271,5 +272,46 @@ void main() {
         '/path',
       );
     });
+  });
+
+  test('초대 callback은 consent와 diagnostic 완료 뒤 원래 mentor 경로로 복귀한다', () {
+    final handoff = MemoryMentorInviteHandoffStore()
+      ..rememberReturnTo('/mentor');
+    final pendingConsent = AuthAuthenticated(
+      _user(OnboardingStatus.pending, consent: ConsentStatus.pending),
+    );
+    final pendingOnboarding = AuthAuthenticated(
+      _user(OnboardingStatus.pending),
+    );
+    final ready = AuthAuthenticated(_user(OnboardingStatus.done));
+
+    expect(
+      mentorInviteReturnRedirect(
+        auth: pendingConsent,
+        location: '/auth/callback',
+        gateDestination: gateRedirect(pendingConsent, '/auth/callback'),
+        handoff: handoff,
+      ),
+      '/consent',
+    );
+    expect(
+      mentorInviteReturnRedirect(
+        auth: pendingOnboarding,
+        location: '/consent',
+        gateDestination: gateRedirect(pendingOnboarding, '/consent'),
+        handoff: handoff,
+      ),
+      '/diagnostic',
+    );
+    expect(
+      mentorInviteReturnRedirect(
+        auth: ready,
+        location: '/diagnostic',
+        gateDestination: gateRedirect(ready, '/diagnostic'),
+        handoff: handoff,
+      ),
+      '/mentor',
+    );
+    expect(handoff.takeReturnTo(), isNull);
   });
 }

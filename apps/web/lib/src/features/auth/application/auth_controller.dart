@@ -139,6 +139,7 @@ class AuthController extends Notifier<AuthState> {
 
   Future<void> logout() async {
     await _store.clear();
+    ref.read(mentorInviteHandoffStoreProvider).clear();
     ref.read(journeyAnalyticsProvider).reset();
     state = const AuthUnauthenticated();
   }

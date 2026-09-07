@@ -63,4 +63,15 @@ void main() {
     expect(isSafeMentorReturnTo('//evil.test/mentor'), isFalse);
     expect(isSafeMentorReturnTo('/dashboard'), isFalse);
   });
+
+  test('logout용 clear는 초대 코드와 returnTo를 함께 지운다', () {
+    final store = MemoryMentorInviteHandoffStore()
+      ..writeCode('A' * 43)
+      ..rememberReturnTo('/mentor');
+
+    store.clear();
+
+    expect(store.peekCode(), isNull);
+    expect(store.takeReturnTo(), isNull);
+  });
 }
