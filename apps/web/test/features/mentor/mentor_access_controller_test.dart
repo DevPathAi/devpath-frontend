@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:devpath_web/src/features/mentor/application/mentor_access_controller.dart';
 import 'package:devpath_web/src/features/mentor/data/mentor_access_source.dart';
 import 'package:devpath_web/src/features/mentor/state/mentor_access_state.dart';
+import 'package:dp_core/dp_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -75,5 +76,45 @@ void main() {
     final state = container.read(mentorAccessControllerProvider);
     expect(state, isA<MentorAccessReady>());
     expect((state as MentorAccessReady).isActive, isTrue);
+  });
+
+  test('API 오류 메시지와 비정상 응답 오류를 사용자 상태로 변환한다', () async {
+    var apiFailure = true;
+    final container = ProviderContainer(
+      overrides: [
+        mentorAccessFetchProvider.overrideWithValue(() async {
+          if (apiFailure) {
+            throw const ApiException(
+              code: ApiErrorCode.network,
+              message: '초대 상태 서버에 연결할 수 없어요.',
+            );
+          }
+          return const <String, dynamic>{'status': 7, 'source': 'SELF'};
+        }),
+      ],
+    );
+    addTearDown(container.dispose);
+    final controller = container.read(mentorAccessControllerProvider.notifier);
+
+    await controller.load();
+    expect(
+      container.read(mentorAccessControllerProvider),
+      isA<MentorAccessFailed>().having(
+        (state) => state.message,
+        'message',
+        '초대 상태 서버에 연결할 수 없어요.',
+      ),
+    );
+
+    apiFailure = false;
+    await controller.load();
+    expect(
+      container.read(mentorAccessControllerProvider),
+      isA<MentorAccessFailed>().having(
+        (state) => state.message,
+        'message',
+        'AI 멘토 초대 상태를 불러오지 못했어요.',
+      ),
+    );
   });
 }

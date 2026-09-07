@@ -14,10 +14,58 @@ class _AccessController extends MentorAccessController {
   MentorAccessState build() => initial;
 
   @override
-  Future<void> load() async {}
+  Future<void> load() async => loads++;
+
+  int loads = 0;
 }
 
 void main() {
+  testWidgets('초대 상태 확인 중에는 로딩 상태만 표시한다', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          mentorAccessControllerProvider.overrideWith(
+            () => _AccessController(const MentorAccessLoading()),
+          ),
+        ],
+        child: const MaterialApp(
+          home: MentorAccessGate(child: Text('MENTOR WORKSPACE')),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byType(DpLoading), findsOneWidget);
+    expect(find.text('MENTOR WORKSPACE'), findsNothing);
+  });
+
+  testWidgets('초대 상태 조회 실패를 설명하고 다시 시도할 수 있다', (tester) async {
+    final controller = _AccessController(
+      const MentorAccessFailed('초대 상태 서버에 연결할 수 없어요.'),
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          mentorAccessControllerProvider.overrideWith(() => controller),
+        ],
+        child: MaterialApp(
+          theme: DpTheme.light(),
+          home: const MentorAccessGate(child: Text('MENTOR WORKSPACE')),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byType(DpError), findsOneWidget);
+    expect(find.textContaining('초대 상태 서버에 연결할 수 없어요.'), findsOneWidget);
+    expect(find.text('MENTOR WORKSPACE'), findsNothing);
+    expect(controller.loads, 1, reason: '진입 시 최초 조회');
+
+    await tester.tap(find.text('다시 시도'));
+    await tester.pump();
+    expect(controller.loads, 2);
+  });
+
   testWidgets('대기자는 비보장 일정 안내와 첫 미션 이동을 보고 멘토 본문은 보지 않는다', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
