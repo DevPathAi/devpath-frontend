@@ -18,6 +18,18 @@ final Map<String, MockFixture> webMockFixtures = {
       'activatedAt': null,
     },
   ),
+  // 초대 fragment가 있으면 인증 bootstrap이 refresh 뒤 교환을 시도한다.
+  // 이 happy-path가 없으면 기본 목 실행이 미등록 404를 terminal 초대 실패로
+  // 해석해 유효한 code를 폐기한다.
+  'POST /mentor-access/redeem': (
+    200,
+    {
+      'status': 'ACTIVE',
+      'source': 'INVITE_CODE',
+      'waitlistedAt': '2026-09-05T00:00:00Z',
+      'activatedAt': '2026-09-08T00:00:00Z',
+    },
+  ),
   // 2026-08-03: 아래 셋이 없어 설정·마이페이지·학습 콘텐츠가 에러 화면으로 떴다.
   // GET /consents/me — ConsentsView.fromJson(settings_models.dart:13).
   // item.type 은 settings_page.dart 의 _consentMeta 키(TERMS/PRIVACY/MARKETING/
