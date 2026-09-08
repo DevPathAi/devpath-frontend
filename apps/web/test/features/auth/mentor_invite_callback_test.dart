@@ -11,10 +11,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _InviteCallbackAdapter implements HttpClientAdapter {
-  _InviteCallbackAdapter({List<int>? redeemStatuses})
-    : redeemStatuses = redeemStatuses ?? [200];
+  _InviteCallbackAdapter({
+    List<int>? redeemStatuses,
+    Map<int, String>? redeemErrorCodes,
+  }) : redeemStatuses = redeemStatuses ?? [200],
+       redeemErrorCodes = redeemErrorCodes ?? const {};
 
   final List<int> redeemStatuses;
+  final Map<int, String> redeemErrorCodes;
   String? redeemedCode;
   int refreshCalls = 0;
   var redeemed = false;
@@ -30,7 +34,9 @@ class _InviteCallbackAdapter implements HttpClientAdapter {
       final status = redeemStatuses.removeAt(0);
       if (status != 200) {
         return _json({
-          'code': status >= 500 ? 'INTERNAL_ERROR' : 'INVITE_CODE_INVALID',
+          'code':
+              redeemErrorCodes[status] ??
+              (status >= 500 ? 'INTERNAL_ERROR' : 'INVITE_CODE_INVALID'),
         }, status: status);
       }
       redeemed = true;
@@ -181,31 +187,57 @@ void main() {
     expect(await tokenStore.readAccess(), 'active-access');
   });
 
-  test('terminal 4xx redeem 실패만 code를 폐기하고 로그인은 유지한다', () async {
-    final adapter = _InviteCallbackAdapter(redeemStatuses: [400]);
-    final handoff = MemoryMentorInviteHandoffStore()..writeCode('D' * 43);
-    final container = ProviderContainer(
-      overrides: [
-        mentorInviteHandoffStoreProvider.overrideWithValue(handoff),
-        apiClientProvider.overrideWith((ref) {
-          final client = ApiClient.create(
-            const ApiConfig(baseUrl: 'https://api.leva.ai.kr'),
-          );
-          client.dio.httpClientAdapter = adapter;
-          return client;
-        }),
-      ],
-    );
-    addTearDown(container.dispose);
+  for (final wireCode in const [
+    'INVITE_CODE_INVALID',
+    'INVITE_CODE_DISABLED',
+    'INVITE_CODE_EXPIRED',
+    'INVITE_CODE_EXHAUSTED',
+  ]) {
+    test('$wireCode redeem 실패는 code를 폐기하고 로그인은 유지한다', () async {
+      final adapter = _InviteCallbackAdapter(
+        redeemStatuses: [400],
+        redeemErrorCodes: {400: wireCode},
+      );
+      final handoff = MemoryMentorInviteHandoffStore()..writeCode('D' * 43);
+      final container = _container(adapter: adapter, handoff: handoff);
+      addTearDown(container.dispose);
 
-    await container
-        .read(authControllerProvider.notifier)
-        .bootstrapFromCallback();
+      await container
+          .read(authControllerProvider.notifier)
+          .bootstrapFromCallback();
 
-    expect(container.read(authControllerProvider), isA<AuthAuthenticated>());
-    expect(handoff.peekCode(), isNull);
-    expect(adapter.refreshCalls, 1);
-  });
+      expect(container.read(authControllerProvider), isA<AuthAuthenticated>());
+      expect(handoff.peekCode(), isNull);
+      expect(adapter.refreshCalls, 1);
+    });
+  }
+
+  for (final (status, wireCode) in const [
+    (401, 'UNAUTHORIZED'),
+    (403, 'FORBIDDEN'),
+    (404, 'RESOURCE_NOT_FOUND'),
+  ]) {
+    test('$status $wireCode redeem 실패는 재시도를 위해 code를 보존한다', () async {
+      final adapter = _InviteCallbackAdapter(
+        redeemStatuses: [status],
+        redeemErrorCodes: {status: wireCode},
+      );
+      final handoff = MemoryMentorInviteHandoffStore()..writeCode('R' * 43);
+      final container = _container(adapter: adapter, handoff: handoff);
+      addTearDown(container.dispose);
+
+      await container
+          .read(authControllerProvider.notifier)
+          .bootstrapFromCallback();
+
+      expect(
+        container.read(authControllerProvider),
+        isA<AuthUnauthenticated>(),
+      );
+      expect(handoff.peekCode(), 'R' * 43);
+      expect(adapter.refreshCalls, 1);
+    });
+  }
 
   test('선택 저장소 read가 거부돼도 로그인 bootstrap은 성공한다', () async {
     final adapter = _InviteCallbackAdapter();
