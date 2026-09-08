@@ -46,7 +46,7 @@ void main() {
     final cta = tester.getSemantics(find.bySemanticsLabel('AI 멘토 보기'));
     expect(cta.getSemanticsData().hasAction(ui.SemanticsAction.tap), isTrue);
     expect(
-      cta.getSemanticsData().hasFlag(ui.SemanticsFlag.isFocusable),
+      cta.getSemanticsData().flagsCollection.isFocused != ui.Tristate.none,
       isTrue,
     );
 
@@ -56,7 +56,7 @@ void main() {
       isTrue,
     );
     expect(
-      dismiss.getSemanticsData().hasFlag(ui.SemanticsFlag.isFocusable),
+      dismiss.getSemanticsData().flagsCollection.isFocused != ui.Tristate.none,
       isTrue,
     );
     tester.platformDispatcher.onSemanticsActionEvent!(
