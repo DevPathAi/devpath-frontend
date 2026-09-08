@@ -11,6 +11,8 @@ void main() {
         'status': 'OPEN',
         'pagePath': '/path',
         'reporterId': 7,
+        'source': 'PUBLIC_HOME',
+        'contactEmail': 'reader@example.com',
         'failureCount': 3,
         'createdAt': '2026-08-03T10:11:12Z',
       });
@@ -19,6 +21,8 @@ void main() {
       expect(row.failureCount, 3);
       expect(row.typeLabel, '오류');
       expect(row.statusLabel, '접수됨'); // 필터·표기는 명사
+      expect(row.source, 'PUBLIC_HOME');
+      expect(row.contactEmail, 'reader@example.com');
     });
 
     test('상태 라벨 4종이 명사다', () {
@@ -51,6 +55,9 @@ void main() {
         'viewport': '1920x1080',
         'occurredAt': '2026-08-03T10:11:12Z',
         'reporterId': 7,
+        'source': 'PUBLIC_HOME',
+        'contactEmail': 'reader@example.com',
+        'privacyConsentAt': '2026-08-03T10:10:00Z',
         'createdAt': '2026-08-03T10:11:12Z',
         'failures': [
           {
@@ -77,6 +84,9 @@ void main() {
       // 네트워크 실패는 statusCode 가 null 이고, 그 구분 자체가 진단 정보다.
       expect(d.failures.last.statusCode, isNull);
       expect(d.failures.last.statusLabel, '네트워크 실패');
+      expect(d.source, 'PUBLIC_HOME');
+      expect(d.contactEmail, 'reader@example.com');
+      expect(d.privacyConsentAt, '2026-08-03T10:10:00Z');
     });
   });
 }

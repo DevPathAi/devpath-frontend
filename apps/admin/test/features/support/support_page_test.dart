@@ -80,4 +80,37 @@ void main() {
     expect(header.title, adminHeaderTitleFor('/support'));
     expect(find.byKey(const ValueKey('page-header-filters')), findsOneWidget);
   });
+
+  testWidgets('PUBLIC_HOME 상세에 회신 이메일과 개인정보 동의를 표시한다', (tester) async {
+    final note = TextEditingController();
+    addTearDown(note.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: DpTheme.light(),
+        home: Scaffold(
+          body: AdminSupportDetailProjection(
+            detail: const SupportRequestDetail(
+              id: 21,
+              type: 'INQUIRY',
+              title: '공개 문의',
+              body: '답변을 부탁드립니다.',
+              status: 'OPEN',
+              failures: [],
+              reporterId: null,
+              source: 'PUBLIC_HOME',
+              contactEmail: 'reader@example.com',
+              privacyConsentAt: '2026-09-05T10:11:12Z',
+            ),
+            noteController: note,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('PUBLIC_HOME'), findsOneWidget);
+    expect(find.text('reader@example.com'), findsOneWidget);
+    expect(find.text('2026-09-05T10:11:12Z'), findsOneWidget);
+    expect(find.text('접수자'), findsNothing);
+  });
 }

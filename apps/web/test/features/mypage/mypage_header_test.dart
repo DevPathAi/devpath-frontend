@@ -1,6 +1,7 @@
 import 'package:devpath_web/src/features/mypage/application/mypage_controller.dart';
 import 'package:devpath_web/src/features/mypage/presentation/mypage_page.dart';
 import 'package:devpath_web/src/features/mypage/state/mypage_state.dart';
+import 'package:devpath_web/src/features/mentor/data/mentor_access_source.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -23,6 +24,9 @@ void main() {
       ProviderScope(
         overrides: [
           myPageControllerProvider.overrideWith(_FixedController.new),
+          mentorAccessFetchProvider.overrideWithValue(
+            () async => const {'status': 'WAITLISTED', 'source': 'SELF'},
+          ),
         ],
         child: MaterialApp(theme: DpTheme.light(), home: const MyPagePage()),
       ),

@@ -21,6 +21,8 @@ import '../features/community/presentation/question_create_page.dart';
 import '../features/community/presentation/question_edit_page.dart';
 import '../features/dashboard/presentation/dashboard_page.dart';
 import '../features/mentor/presentation/mentor_page.dart';
+import '../features/mentor/presentation/mentor_access_gate.dart';
+import '../features/mentor/application/mentor_invite_handoff.dart';
 import '../features/mentor/state/mentor_scope_key.dart';
 import '../features/mission/presentation/mission_content_route_resolver.dart';
 import '../features/mission/presentation/mission_mentor_route_resolver.dart';
@@ -96,6 +98,37 @@ String? gateRedirect(
   return null;
 }
 
+String? mentorInviteReturnRedirect({
+  required AuthState auth,
+  required String location,
+  required String? gateDestination,
+  required MentorInviteHandoffStore handoff,
+  String? inFlightDestination,
+}) {
+  if (auth case AuthAuthenticated(:final user)) {
+    final prerequisitesDone =
+        user.consentStatus == ConsentStatus.done &&
+        user.onboardingStatus == OnboardingStatus.done;
+    if (prerequisitesDone &&
+        isSafeMentorReturnTo(inFlightDestination) &&
+        inFlightDestination != location) {
+      return inFlightDestination;
+    }
+    final leavesPrerequisiteGate =
+        const {
+          '/auth/callback',
+          '/login',
+          '/consent',
+          '/diagnostic',
+        }.contains(location) &&
+        const {'/dashboard', '/path'}.contains(gateDestination);
+    if (prerequisitesDone && leavesPrerequisiteGate) {
+      return takeMentorReturnToBestEffort(handoff) ?? gateDestination;
+    }
+  }
+  return gateDestination;
+}
+
 final routerProvider = Provider<GoRouter>((ref) {
   final missionSpineEnabled = ref.watch(
     appConfigProvider.select((config) => config.missionSpineEnabled),
@@ -103,6 +136,9 @@ final routerProvider = Provider<GoRouter>((ref) {
   // auth와 continuation 변화가 같은 redirect 판정에서 원자적으로 다시 읽힌다.
   final refresh = ValueNotifier<int>(0);
   var legacyHandoffScheduled = false;
+  // GoRouter may re-evaluate a redirect before the first destination commits.
+  // Keep the one-shot session return target stable across those evaluations.
+  String? inFlightMentorDestination;
   ref.onDispose(refresh.dispose);
   void notify() => refresh.value++;
   ref.listen(authControllerProvider, (previous, next) {
@@ -115,6 +151,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       _ => null,
     };
     if (previousUserId != null && previousUserId != nextUserId) {
+      inFlightMentorDestination = null;
       // PathState는 user-scoped다. logout/direct account switch에서 이전 계정의
       // complete result가 다음 계정에 재사용되지 않도록 소유 router가 폐기한다.
       ref.read(pathControllerProvider.notifier).reset();
@@ -170,17 +207,40 @@ final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/dashboard',
     refreshListenable: refresh,
-    redirect: (context, state) => gateRedirect(
-      ref.read(authControllerProvider),
-      state.matchedLocation,
-      missionSpineEnabled: missionSpineEnabled,
-      hasDiagnosticContinuation: ref
-          .read(diagnosticControllerProvider.notifier)
-          .hasRestorableContinuation,
-      diagnosticPathHandoffRequested: ref
-          .read(diagnosticControllerProvider)
-          .pathHandoffRequested,
-    ),
+    redirect: (context, state) {
+      final auth = ref.read(authControllerProvider);
+      final handoff = ref.read(mentorInviteHandoffStoreProvider);
+      if (auth is! AuthAuthenticated && isSafeMentorReturnTo(state.uri.path)) {
+        rememberMentorReturnToBestEffort(handoff, state.uri.path);
+      }
+      final redirect = gateRedirect(
+        auth,
+        state.matchedLocation,
+        missionSpineEnabled: missionSpineEnabled,
+        hasDiagnosticContinuation: ref
+            .read(diagnosticControllerProvider.notifier)
+            .hasRestorableContinuation,
+        diagnosticPathHandoffRequested: ref
+            .read(diagnosticControllerProvider)
+            .pathHandoffRequested,
+      );
+      final destination = mentorInviteReturnRedirect(
+        auth: auth,
+        location: state.matchedLocation,
+        gateDestination: redirect,
+        handoff: handoff,
+        inFlightDestination: inFlightMentorDestination,
+      );
+      // The session value is intentionally consumed once. This in-memory copy
+      // survives redirect re-entry, then disappears after the target commits.
+      if (state.matchedLocation == inFlightMentorDestination) {
+        inFlightMentorDestination = null;
+      } else if (inFlightMentorDestination == null &&
+          isSafeMentorReturnTo(destination)) {
+        inFlightMentorDestination = destination;
+      }
+      return destination;
+    },
     routes: [
       GoRoute(path: '/login', builder: (_, _) => const LoginPage()),
       GoRoute(
@@ -224,15 +284,20 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/mission/:taskId/mentor',
-            builder: (_, state) => MissionMentorRouteResolver(
-              taskId: state.pathParameters['taskId'],
-              entryIntent: state.extra is MentorEntryIntent
-                  ? state.extra! as MentorEntryIntent
-                  : null,
+            builder: (_, state) => MentorAccessGate(
+              child: MissionMentorRouteResolver(
+                taskId: state.pathParameters['taskId'],
+                entryIntent: state.extra is MentorEntryIntent
+                    ? state.extra! as MentorEntryIntent
+                    : null,
+              ),
             ),
           ),
           GoRoute(path: '/sandbox', builder: (_, _) => const SandboxPage()),
-          GoRoute(path: '/mentor', builder: (_, _) => const MentorPage()),
+          GoRoute(
+            path: '/mentor',
+            builder: (_, _) => const MentorAccessGate(child: MentorPage()),
+          ),
           GoRoute(
             path: '/community',
             builder: (_, state) => CommunityHomePage(

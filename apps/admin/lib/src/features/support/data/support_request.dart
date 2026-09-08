@@ -8,6 +8,8 @@ class SupportRequestRow {
     required this.failureCount,
     this.pagePath,
     this.reporterId,
+    this.source,
+    this.contactEmail,
     this.createdAt,
   });
 
@@ -22,6 +24,8 @@ class SupportRequestRow {
   final int failureCount;
   final String? pagePath;
   final int? reporterId;
+  final String? source;
+  final String? contactEmail;
   final String? createdAt;
 
   String get typeLabel => type == 'INQUIRY' ? '문의' : '오류';
@@ -44,6 +48,8 @@ class SupportRequestRow {
         failureCount: (json['failureCount'] as num?)?.toInt() ?? 0,
         pagePath: json['pagePath'] as String?,
         reporterId: (json['reporterId'] as num?)?.toInt(),
+        source: json['source'] as String?,
+        contactEmail: json['contactEmail'] as String?,
         createdAt: json['createdAt'] as String?,
       );
 }
@@ -102,6 +108,9 @@ class SupportRequestDetail {
     this.errorCode,
     this.occurredAt,
     this.reporterId,
+    this.source,
+    this.contactEmail,
+    this.privacyConsentAt,
     this.adminNote,
     this.handledBy,
     this.handledAt,
@@ -122,6 +131,9 @@ class SupportRequestDetail {
   final String? errorCode;
   final String? occurredAt;
   final int? reporterId;
+  final String? source;
+  final String? contactEmail;
+  final String? privacyConsentAt;
   final String? adminNote;
   final int? handledBy;
   final String? handledAt;
@@ -146,6 +158,9 @@ class SupportRequestDetail {
         errorCode: json['errorCode'] as String?,
         occurredAt: json['occurredAt'] as String?,
         reporterId: (json['reporterId'] as num?)?.toInt(),
+        source: json['source'] as String?,
+        contactEmail: json['contactEmail'] as String?,
+        privacyConsentAt: json['privacyConsentAt'] as String?,
         adminNote: json['adminNote'] as String?,
         handledBy: (json['handledBy'] as num?)?.toInt(),
         handledAt: json['handledAt'] as String?,

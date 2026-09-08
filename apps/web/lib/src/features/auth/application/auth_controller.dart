@@ -2,6 +2,8 @@ import 'package:dp_core/dp_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../providers/api_providers.dart';
+import '../../mentor/application/mentor_invite_handoff.dart';
+import '../../mentor/data/mentor_access_source.dart';
 import '../state/auth_state.dart';
 import 'oauth_launcher.dart';
 
@@ -61,10 +63,20 @@ class AuthController extends Notifier<AuthState> {
 
   Future<void> _performBootstrap({required bool includeApiError}) async {
     try {
-      final data = await _client.post<Map<String, dynamic>>('/auth/refresh');
+      var data = await _client.post<Map<String, dynamic>>('/auth/refresh');
       if (!ref.mounted) return; // dispose 후 async gap에서 진입 방지
       await _store.save(access: data['access_token'] as String, refresh: '');
       if (!ref.mounted) return;
+      final redeemed = await _redeemPendingMentorInvite();
+      if (!ref.mounted) return;
+      if (redeemed) {
+        // redeem은 DB 상태만 ACTIVE로 바꾼다. Gateway가 검사하는 claim을
+        // 갱신하기 위해 즉시 새 access token을 발급받는다.
+        data = await _client.post<Map<String, dynamic>>('/auth/refresh');
+        if (!ref.mounted) return;
+        await _store.save(access: data['access_token'] as String, refresh: '');
+        if (!ref.mounted) return;
+      }
       state = AuthAuthenticated(
         User.fromJson((data['user'] as Map).cast<String, dynamic>()),
       );
@@ -86,6 +98,50 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
+  Future<bool> _redeemPendingMentorInvite() async {
+    final handoff = ref.read(mentorInviteHandoffStoreProvider);
+    String? code;
+    try {
+      code = handoff.peekCode();
+    } catch (_) {
+      return false;
+    }
+    if (code == null) return false;
+    if (!isValidMentorInviteCode(code)) {
+      _clearPendingMentorInviteBestEffort(handoff);
+      return false;
+    }
+    try {
+      await ref.read(mentorInviteRedeemProvider)(code);
+      _clearPendingMentorInviteBestEffort(handoff);
+      return true;
+    } on ApiException catch (error) {
+      if (_isTerminalInviteFailure(error.status)) {
+        // 잘못됐거나 만료된 code는 반복 전송하지 않는다. 로그인 자체는 유지한다.
+        _clearPendingMentorInviteBestEffort(handoff);
+        return false;
+      }
+      // timeout, 429, 5xx 등은 callback 복구 UI에서 다시 시도할 수 있도록 보존한다.
+      rethrow;
+    }
+  }
+
+  void _clearPendingMentorInviteBestEffort(MentorInviteHandoffStore handoff) {
+    try {
+      handoff.clearCode();
+    } catch (_) {
+      // redeem 결과와 인증 상태가 선택 저장소 cleanup에 종속되면 안 된다.
+    }
+  }
+
+  bool _isTerminalInviteFailure(int? status) =>
+      status != null &&
+      status >= 400 &&
+      status < 500 &&
+      status != 408 &&
+      status != 425 &&
+      status != 429;
+
   /// OAuth 콜백 후 세션 복원: POST /auth/refresh(쿠키, 본문 없음) → access 저장
   /// + User 파싱 → AuthAuthenticated. 실패 시 AuthUnauthenticated(error).
   Future<void> bootstrapFromCallback() {
@@ -100,6 +156,11 @@ class AuthController extends Notifier<AuthState> {
 
   Future<void> logout() async {
     await _store.clear();
+    try {
+      ref.read(mentorInviteHandoffStoreProvider).clear();
+    } catch (_) {
+      // 브라우저 저장소가 막혀도 로그아웃 상태 전이는 완료한다.
+    }
     ref.read(journeyAnalyticsProvider).reset();
     state = const AuthUnauthenticated();
   }

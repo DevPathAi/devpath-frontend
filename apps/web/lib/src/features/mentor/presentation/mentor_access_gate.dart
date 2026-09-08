@@ -1,0 +1,90 @@
+import 'dart:async';
+
+import 'package:dp_design/dp_design.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../auth/application/auth_controller.dart';
+import '../../auth/state/auth_state.dart';
+import '../application/mentor_access_controller.dart';
+import '../state/mentor_access_state.dart';
+
+class MentorAccessGate extends ConsumerStatefulWidget {
+  const MentorAccessGate({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  ConsumerState<MentorAccessGate> createState() => _MentorAccessGateState();
+}
+
+class _MentorAccessGateState extends ConsumerState<MentorAccessGate> {
+  String? _loadRequestedForUserId;
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = ref.watch(authControllerProvider);
+    if (auth case AuthAuthenticated(:final user)) {
+      if (_loadRequestedForUserId != user.id) {
+        _loadRequestedForUserId = user.id;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            unawaited(ref.read(mentorAccessControllerProvider.notifier).load());
+          }
+        });
+      }
+    } else {
+      _loadRequestedForUserId = null;
+    }
+
+    return switch (ref.watch(mentorAccessControllerProvider)) {
+      MentorAccessLoading() => const Scaffold(
+        body: DpLoading(label: 'AI 멘토 초대 상태를 확인하는 중'),
+      ),
+      MentorAccessFailed(:final message) => Scaffold(
+        body: DpError(
+          title: '초대 상태를 확인하지 못했어요',
+          message: message,
+          onRetry: () => unawaited(
+            ref.read(mentorAccessControllerProvider.notifier).load(),
+          ),
+        ),
+      ),
+      MentorAccessReady(:final isActive) when isActive => widget.child,
+      MentorAccessReady() => Scaffold(
+        body: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: Padding(
+              padding: const EdgeInsets.all(DpSpacing.xl),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Icon(DpIcons.invitePending, size: 48),
+                  const SizedBox(height: DpSpacing.lg),
+                  Text(
+                    'AI 멘토 초대 대기 중',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                  const SizedBox(height: DpSpacing.sm),
+                  const Text(
+                    '초대 일정은 준비 상황에 따라 달라질 수 있어요. 기다리는 동안에도 로드맵 첫 주차 미션을 바로 시작할 수 있어요.',
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: DpSpacing.xl),
+                  FilledButton(
+                    onPressed: () => context.go('/path'),
+                    child: const Text('이번 주 미션 계속하기'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    };
+  }
+}

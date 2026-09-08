@@ -48,7 +48,7 @@ class ApiException implements Exception {
     );
   }
 
-  /// 중첩 §3.4 envelope Map → ApiException. HTTP(fromDio)와 SSE(event:error) 공용.
+  /// 중첩 §3.4 envelope 또는 flat Map → ApiException. HTTP와 SSE 공용.
   factory ApiException.fromEnvelope(
     Map<String, dynamic> body, {
     int? status,
@@ -56,7 +56,7 @@ class ApiException implements Exception {
   }) {
     final err = (body['error'] is Map)
         ? (body['error'] as Map).cast<String, dynamic>()
-        : const <String, dynamic>{};
+        : body;
     return ApiException(
       code: ApiErrorCode.fromWire(err['code'] as String?),
       message: (err['message'] as String?) ?? '알 수 없는 오류가 발생했습니다.',
