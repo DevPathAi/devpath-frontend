@@ -116,7 +116,7 @@ class AuthController extends Notifier<AuthState> {
       _clearPendingMentorInviteBestEffort(handoff);
       return true;
     } on ApiException catch (error) {
-      if (_isTerminalInviteFailure(error.status)) {
+      if (_isTerminalInviteFailure(error.code)) {
         // 잘못됐거나 만료된 code는 반복 전송하지 않는다. 로그인 자체는 유지한다.
         _clearPendingMentorInviteBestEffort(handoff);
         return false;
@@ -134,13 +134,13 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
-  bool _isTerminalInviteFailure(int? status) =>
-      status != null &&
-      status >= 400 &&
-      status < 500 &&
-      status != 408 &&
-      status != 425 &&
-      status != 429;
+  bool _isTerminalInviteFailure(ApiErrorCode code) => switch (code) {
+    ApiErrorCode.inviteCodeInvalid ||
+    ApiErrorCode.inviteCodeDisabled ||
+    ApiErrorCode.inviteCodeExpired ||
+    ApiErrorCode.inviteCodeExhausted => true,
+    _ => false,
+  };
 
   /// OAuth 콜백 후 세션 복원: POST /auth/refresh(쿠키, 본문 없음) → access 저장
   /// + User 파싱 → AuthAuthenticated. 실패 시 AuthUnauthenticated(error).

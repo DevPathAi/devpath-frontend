@@ -18,6 +18,24 @@ void main() {
     expect((data['user'] as Map)['nickname'], '지수');
   });
 
+  test('목 모드 초대 교환 성공은 후속 mentor access 조회를 ACTIVE로 전이한다', () async {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    final client = container.read(apiClientProvider);
+
+    final before = await client.get<Map<String, dynamic>>('/mentor-access/me');
+    await client.post<Map<String, dynamic>>(
+      '/mentor-access/redeem',
+      body: {'code': 'A' * 43},
+    );
+    final after = await client.get<Map<String, dynamic>>('/mentor-access/me');
+
+    expect(before['status'], 'WAITLISTED');
+    expect(after['status'], 'ACTIVE');
+    expect(after['source'], 'INVITE_CODE');
+    expect(after['activatedAt'], isNotNull);
+  });
+
   test('tokenStore는 InMemory 기본 구현이다', () {
     final container = ProviderContainer();
     addTearDown(container.dispose);

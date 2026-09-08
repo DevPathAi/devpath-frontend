@@ -1,3 +1,6 @@
+import 'dart:typed_data';
+
+import 'package:dio/dio.dart';
 import 'package:dp_core/dp_core.dart';
 
 /// web 프로토 목 REST 픽스처: `'METHOD /path'` → (status, jsonBody).
@@ -761,6 +764,40 @@ final Map<String, MockSequence> webMockSequences = {
     (200, null),
   ],
 };
+
+/// 앱의 기본 목 실행에서 endpoint 사이의 mentor access 상태 전이를 보존한다.
+///
+/// 고정 fixture map만 쓰면 redeem은 ACTIVE를 반환해도 다음 `/mentor-access/me`
+/// 조회가 다시 WAITLISTED를 반환한다. 실제 서버처럼 성공한 교환을 같은 client의
+/// 후속 조회에 반영하되, adapter 인스턴스끼리는 상태를 공유하지 않는다.
+MockHttpAdapter createWebMockHttpAdapter() {
+  final fixtures = Map<String, MockFixture>.of(webMockFixtures);
+  return _WebMockHttpAdapter(fixtures);
+}
+
+class _WebMockHttpAdapter extends MockHttpAdapter {
+  _WebMockHttpAdapter(this._mutableFixtures)
+    : super(_mutableFixtures, sequences: webMockSequences);
+
+  final Map<String, MockFixture> _mutableFixtures;
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    final response = await super.fetch(options, requestStream, cancelFuture);
+    if (options.method == 'POST' &&
+        options.path == '/mentor-access/redeem' &&
+        response.statusCode >= 200 &&
+        response.statusCode < 300) {
+      _mutableFixtures['GET /mentor-access/me'] =
+          webMockFixtures['POST /mentor-access/redeem']!;
+    }
+    return response;
+  }
+}
 
 /// NextQuestion.fromJson 계약에 맞춘 문항 한 건.
 Map<String, dynamic> _question(int id, String content, int index, int total) =>
