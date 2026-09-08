@@ -47,6 +47,7 @@ class _NoticeBannerBarState extends ConsumerState<NoticeBannerBar> {
               ),
               Semantics(
                 button: true,
+                focusable: true,
                 label: banner.ctaLabel,
                 onTap: openBanner,
                 child: ExcludeSemantics(
@@ -58,6 +59,7 @@ class _NoticeBannerBarState extends ConsumerState<NoticeBannerBar> {
               ),
               Semantics(
                 button: true,
+                focusable: true,
                 label: '공지 닫기',
                 onTap: dismissBanner,
                 child: ExcludeSemantics(
