@@ -7,6 +7,17 @@ import 'package:dp_core/dp_core.dart';
 final Map<String, MockFixture> webMockFixtures = {
   // ④ 오류 신고·문의 접수. 목 모드 기본값이 true 라 이 픽스처가 없으면 제보가 404로 실패한다.
   'POST /support/requests': (201, {'id': 42}),
+  // 기본 목 실행에서도 AI 멘토 메뉴가 실제 대기 상태를 보여줘야 한다.
+  // 이 픽스처가 없으면 MockHttpAdapter의 미매칭 404가 오류 화면으로 노출된다.
+  'GET /mentor-access/me': (
+    200,
+    {
+      'status': 'WAITLISTED',
+      'source': 'SELF',
+      'waitlistedAt': '2026-09-08T00:00:00Z',
+      'activatedAt': null,
+    },
+  ),
   // 2026-08-03: 아래 셋이 없어 설정·마이페이지·학습 콘텐츠가 에러 화면으로 떴다.
   // GET /consents/me — ConsentsView.fromJson(settings_models.dart:13).
   // item.type 은 settings_page.dart 의 _consentMeta 키(TERMS/PRIVACY/MARKETING/
