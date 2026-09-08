@@ -37,7 +37,12 @@ class NoticeFeedClient {
   final String homeBaseUrl;
 
   Future<List<NoticeBanner>> loadActive(DateTime now) async {
-    final cachedPayload = cache.readPayload();
+    String? cachedPayload;
+    try {
+      cachedPayload = cache.readPayload();
+    } catch (_) {
+      // localStorage가 차단돼도 공지 네트워크 요청은 계속한다.
+    }
     try {
       final response = await dio.get<Object?>(
         '$homeBaseUrl/updates/feed.json',
@@ -52,7 +57,11 @@ class NoticeFeedClient {
           ? response.data! as String
           : jsonEncode(response.data);
       final parsed = _activeFromPayload(payload, now);
-      cache.write(payload: payload, etag: response.headers.value('etag'));
+      try {
+        cache.write(payload: payload);
+      } catch (_) {
+        // 캐시는 선택 기능이다. 정상 feed를 저장 실패 때문에 버리지 않는다.
+      }
       return parsed;
     } catch (_) {
       if (cachedPayload != null) return _activeFromPayload(cachedPayload, now);

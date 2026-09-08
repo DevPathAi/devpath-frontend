@@ -1,6 +1,9 @@
+import 'package:devpath_web/src/features/auth/application/auth_controller.dart';
+import 'package:devpath_web/src/features/auth/state/auth_state.dart';
 import 'package:devpath_web/src/features/mentor/application/mentor_access_controller.dart';
 import 'package:devpath_web/src/features/mentor/presentation/mentor_access_gate.dart';
 import 'package:devpath_web/src/features/mentor/state/mentor_access_state.dart';
+import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,41 +22,75 @@ class _AccessController extends MentorAccessController {
   int loads = 0;
 }
 
+const _authenticated = AuthAuthenticated(
+  User(
+    id: 'mentor-user',
+    email: 'mentor@example.com',
+    nickname: '멘토 사용자',
+    role: UserRole.learner,
+    onboardingStatus: OnboardingStatus.done,
+    consentStatus: ConsentStatus.done,
+  ),
+);
+
+class _AuthController extends AuthController {
+  _AuthController(this.initial);
+  final AuthState initial;
+
+  @override
+  AuthState build() => initial;
+
+  void replace(AuthState next) => state = next;
+}
+
+Widget _host(
+  _AccessController access, {
+  _AuthController? auth,
+  Widget child = const Text('MENTOR WORKSPACE'),
+}) {
+  final authController = auth ?? _AuthController(_authenticated);
+  return ProviderScope(
+    overrides: [
+      authControllerProvider.overrideWith(() => authController),
+      mentorAccessControllerProvider.overrideWith(() => access),
+    ],
+    child: MaterialApp(
+      theme: DpTheme.light(),
+      home: MentorAccessGate(child: child),
+    ),
+  );
+}
+
 void main() {
   testWidgets('초대 상태 확인 중에는 로딩 상태만 표시한다', (tester) async {
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          mentorAccessControllerProvider.overrideWith(
-            () => _AccessController(const MentorAccessLoading()),
-          ),
-        ],
-        child: const MaterialApp(
-          home: MentorAccessGate(child: Text('MENTOR WORKSPACE')),
-        ),
-      ),
-    );
+    final access = _AccessController(const MentorAccessLoading());
+    await tester.pumpWidget(_host(access));
     await tester.pump();
 
     expect(find.byType(DpLoading), findsOneWidget);
     expect(find.text('MENTOR WORKSPACE'), findsNothing);
+    expect(access.loads, 1);
+  });
+
+  testWidgets('인증 복원이 끝난 뒤에만 초대 상태를 조회한다', (tester) async {
+    final access = _AccessController(const MentorAccessLoading());
+    final auth = _AuthController(const AuthLoading());
+
+    await tester.pumpWidget(_host(access, auth: auth));
+    await tester.pump();
+    expect(access.loads, 0);
+
+    auth.replace(_authenticated);
+    await tester.pump();
+    await tester.pump();
+    expect(access.loads, 1);
   });
 
   testWidgets('초대 상태 조회 실패를 설명하고 다시 시도할 수 있다', (tester) async {
     final controller = _AccessController(
       const MentorAccessFailed('초대 상태 서버에 연결할 수 없어요.'),
     );
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          mentorAccessControllerProvider.overrideWith(() => controller),
-        ],
-        child: MaterialApp(
-          theme: DpTheme.light(),
-          home: const MentorAccessGate(child: Text('MENTOR WORKSPACE')),
-        ),
-      ),
-    );
+    await tester.pumpWidget(_host(controller));
     await tester.pump();
 
     expect(find.byType(DpError), findsOneWidget);
@@ -68,17 +105,9 @@ void main() {
 
   testWidgets('대기자는 비보장 일정 안내와 첫 미션 이동을 보고 멘토 본문은 보지 않는다', (tester) async {
     await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          mentorAccessControllerProvider.overrideWith(
-            () => _AccessController(
-              const MentorAccessReady(status: 'WAITLISTED', source: 'SELF'),
-            ),
-          ),
-        ],
-        child: MaterialApp(
-          theme: DpTheme.light(),
-          home: const MentorAccessGate(child: Text('MENTOR WORKSPACE')),
+      _host(
+        _AccessController(
+          const MentorAccessReady(status: 'WAITLISTED', source: 'SELF'),
         ),
       ),
     );
@@ -93,16 +122,9 @@ void main() {
 
   testWidgets('활성 사용자는 멘토 본문을 본다', (tester) async {
     await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          mentorAccessControllerProvider.overrideWith(
-            () => _AccessController(
-              const MentorAccessReady(status: 'ACTIVE', source: 'BATCH'),
-            ),
-          ),
-        ],
-        child: const MaterialApp(
-          home: MentorAccessGate(child: Text('MENTOR WORKSPACE')),
+      _host(
+        _AccessController(
+          const MentorAccessReady(status: 'ACTIVE', source: 'BATCH'),
         ),
       ),
     );

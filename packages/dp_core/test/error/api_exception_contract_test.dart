@@ -22,7 +22,7 @@ void main() {
     );
   }
 
-  group('§3.4 중첩 envelope 계약', () {
+  group('오류 응답 계약', () {
     test('중첩 {"error":{code,message,trace_id}}를 필드별로 매핑한다', () {
       final ex = fromResponse(404, {
         'error': {
@@ -49,12 +49,24 @@ void main() {
         'MENTOR_BUSY': ApiErrorCode.mentorBusy,
         'AI_KILL_SWITCH_ACTIVE': ApiErrorCode.aiKillSwitchActive,
         'SANDBOX_UNAVAILABLE': ApiErrorCode.sandboxUnavailable,
+        'INVITE_CODE_INVALID': ApiErrorCode.inviteCodeInvalid,
+        'INVITE_CODE_DISABLED': ApiErrorCode.inviteCodeDisabled,
+        'INVITE_CODE_EXPIRED': ApiErrorCode.inviteCodeExpired,
+        'INVITE_CODE_EXHAUSTED': ApiErrorCode.inviteCodeExhausted,
+        'MENTOR_ACCESS_MISSING': ApiErrorCode.mentorAccessMissing,
+        'MENTOR_BATCH_DISABLED': ApiErrorCode.mentorBatchDisabled,
         'INTERNAL_ERROR':
             ApiErrorCode.unknown, // 프론트 enum에 INTERNAL_ERROR 없음 → unknown 폴백
       };
       wire.forEach((w, expected) {
         expect(ApiErrorCode.fromWire(w), expected, reason: 'wire=$w');
       });
+    });
+
+    test('Platform mentor flat {code} 오류도 typed code로 보존한다', () {
+      final ex = fromResponse(422, {'code': 'INVITE_CODE_INVALID'});
+      expect(ex.code, ApiErrorCode.inviteCodeInvalid);
+      expect(ex.status, 422);
     });
 
     test('알 수 없는 코드/누락은 unknown으로 폴백한다', () {

@@ -259,7 +259,7 @@ class _BodyState extends ConsumerState<_Body> {
                   MentorAccessReady(:final isActive) => Text(
                     isActive
                         ? 'AI 멘토를 사용할 수 있습니다.'
-                        : '초대 대기 중입니다. 보통 1일 안에 초대 메일이 갑니다.',
+                        : '초대 대기 중입니다. 담당자가 확인 후 초대 일정을 이메일로 안내해 드립니다.',
                   ),
                 },
               ],

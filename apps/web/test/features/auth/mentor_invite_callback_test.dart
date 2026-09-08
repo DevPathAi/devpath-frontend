@@ -30,10 +30,7 @@ class _InviteCallbackAdapter implements HttpClientAdapter {
       final status = redeemStatuses.removeAt(0);
       if (status != 200) {
         return _json({
-          'error': {
-            'code': status >= 500 ? 'INTERNAL_ERROR' : 'INVITE_CODE_INVALID',
-            'message': status >= 500 ? '일시적인 오류' : '유효하지 않은 초대 코드',
-          },
+          'code': status >= 500 ? 'INTERNAL_ERROR' : 'INVITE_CODE_INVALID',
         }, status: status);
       }
       redeemed = true;
@@ -70,6 +67,53 @@ class _InviteCallbackAdapter implements HttpClientAdapter {
   @override
   void close({bool force = false}) {}
 }
+
+class _ThrowingHandoffStore extends MemoryMentorInviteHandoffStore {
+  _ThrowingHandoffStore({
+    this.throwOnPeek = false,
+    this.throwOnClearCode = false,
+  });
+
+  bool throwOnPeek;
+  bool throwOnClearCode;
+  bool throwOnClear = false;
+
+  @override
+  String? peekCode() {
+    if (throwOnPeek) throw StateError('sessionStorage read denied');
+    return super.peekCode();
+  }
+
+  @override
+  void clearCode() {
+    if (throwOnClearCode) throw StateError('sessionStorage remove denied');
+    super.clearCode();
+  }
+
+  @override
+  void clear() {
+    if (throwOnClear) throw StateError('sessionStorage clear denied');
+    super.clear();
+  }
+}
+
+ProviderContainer _container({
+  required _InviteCallbackAdapter adapter,
+  required MentorInviteHandoffStore handoff,
+  TokenStore? tokenStore,
+}) => ProviderContainer(
+  overrides: [
+    mentorInviteHandoffStoreProvider.overrideWithValue(handoff),
+    if (tokenStore != null) tokenStoreProvider.overrideWithValue(tokenStore),
+    apiClientProvider.overrideWith((ref) {
+      final client = ApiClient.create(
+        const ApiConfig(baseUrl: 'https://api.leva.ai.kr'),
+      );
+      client.dio.httpClientAdapter = adapter;
+      return client;
+    }),
+  ],
+);
 
 void main() {
   test('OAuth callback은 code 교환 뒤 ACTIVE access token을 다시 발급받고 지운다', () async {
@@ -161,5 +205,78 @@ void main() {
     expect(container.read(authControllerProvider), isA<AuthAuthenticated>());
     expect(handoff.peekCode(), isNull);
     expect(adapter.refreshCalls, 1);
+  });
+
+  test('선택 저장소 read가 거부돼도 로그인 bootstrap은 성공한다', () async {
+    final adapter = _InviteCallbackAdapter();
+    final handoff = _ThrowingHandoffStore(throwOnPeek: true);
+    final container = _container(adapter: adapter, handoff: handoff);
+    addTearDown(container.dispose);
+
+    await container
+        .read(authControllerProvider.notifier)
+        .bootstrapFromCallback();
+
+    expect(container.read(authControllerProvider), isA<AuthAuthenticated>());
+    expect(adapter.redeemedCode, isNull);
+    expect(adapter.refreshCalls, 1);
+  });
+
+  test('redeem 뒤 선택 저장소 cleanup이 거부돼도 ACTIVE 로그인은 유지한다', () async {
+    final adapter = _InviteCallbackAdapter();
+    final tokenStore = InMemoryTokenStore();
+    final handoff = _ThrowingHandoffStore(throwOnClearCode: true)
+      ..writeCode('E' * 43);
+    final container = _container(
+      adapter: adapter,
+      handoff: handoff,
+      tokenStore: tokenStore,
+    );
+    addTearDown(container.dispose);
+
+    await container
+        .read(authControllerProvider.notifier)
+        .bootstrapFromCallback();
+
+    expect(container.read(authControllerProvider), isA<AuthAuthenticated>());
+    expect(adapter.redeemedCode, 'E' * 43);
+    expect(adapter.refreshCalls, 2);
+    expect(await tokenStore.readAccess(), 'active-access');
+  });
+
+  test('저장된 code 형식이 잘못되면 전송하지 않고 best-effort로 폐기한다', () async {
+    final adapter = _InviteCallbackAdapter();
+    final handoff = MemoryMentorInviteHandoffStore()..writeCode('short');
+    final container = _container(adapter: adapter, handoff: handoff);
+    addTearDown(container.dispose);
+
+    await container
+        .read(authControllerProvider.notifier)
+        .bootstrapFromCallback();
+
+    expect(container.read(authControllerProvider), isA<AuthAuthenticated>());
+    expect(adapter.redeemedCode, isNull);
+    expect(adapter.refreshCalls, 1);
+    expect(handoff.peekCode(), isNull);
+  });
+
+  test('logout 저장소 cleanup이 거부돼도 token과 인증 상태를 지운다', () async {
+    final adapter = _InviteCallbackAdapter();
+    final tokenStore = InMemoryTokenStore();
+    final handoff = _ThrowingHandoffStore();
+    final container = _container(
+      adapter: adapter,
+      handoff: handoff,
+      tokenStore: tokenStore,
+    );
+    addTearDown(container.dispose);
+    final controller = container.read(authControllerProvider.notifier);
+    await controller.bootstrapFromCallback();
+    handoff.throwOnClear = true;
+
+    await controller.logout();
+
+    expect(container.read(authControllerProvider), isA<AuthUnauthenticated>());
+    expect(await tokenStore.readAccess(), isNull);
   });
 }

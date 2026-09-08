@@ -74,8 +74,27 @@ bool isSafeMentorReturnTo(String? value) {
   return value != null && RegExp(r'^/mission/[0-9]+/mentor$').hasMatch(value);
 }
 
-bool _isValidInviteCode(String? value) =>
+bool isValidMentorInviteCode(String? value) =>
     value != null && RegExp(r'^[A-Za-z0-9_-]{32,128}$').hasMatch(value);
+
+void rememberMentorReturnToBestEffort(
+  MentorInviteHandoffStore store,
+  String path,
+) {
+  try {
+    store.rememberReturnTo(path);
+  } catch (_) {
+    // 저장소가 거부돼도 라우팅 자체는 계속한다.
+  }
+}
+
+String? takeMentorReturnToBestEffort(MentorInviteHandoffStore store) {
+  try {
+    return store.takeReturnTo();
+  } catch (_) {
+    return null;
+  }
+}
 
 Uri _withoutSensitiveParameters(Uri uri) {
   final query = <String, dynamic>{
@@ -140,7 +159,7 @@ void captureMentorInviteFromUri(
 
   // 먼저 주소에서 지운다. sessionStorage가 거부돼도 code가 주소에 남지 않아야 한다.
   replaceVisibleUri(_withoutSensitiveParameters(current));
-  if (codes?.length == 1 && _isValidInviteCode(codes!.single)) {
+  if (codes?.length == 1 && isValidMentorInviteCode(codes!.single)) {
     store.writeCode(codes.single);
   }
   if (returnPaths?.length == 1 && isSafeMentorReturnTo(returnPaths!.single)) {

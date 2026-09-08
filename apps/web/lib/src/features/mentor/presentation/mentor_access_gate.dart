@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../auth/application/auth_controller.dart';
+import '../../auth/state/auth_state.dart';
 import '../application/mentor_access_controller.dart';
 import '../state/mentor_access_state.dart';
 
@@ -18,18 +20,24 @@ class MentorAccessGate extends ConsumerStatefulWidget {
 }
 
 class _MentorAccessGateState extends ConsumerState<MentorAccessGate> {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        unawaited(ref.read(mentorAccessControllerProvider.notifier).load());
-      }
-    });
-  }
+  String? _loadRequestedForUserId;
 
   @override
   Widget build(BuildContext context) {
+    final auth = ref.watch(authControllerProvider);
+    if (auth case AuthAuthenticated(:final user)) {
+      if (_loadRequestedForUserId != user.id) {
+        _loadRequestedForUserId = user.id;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            unawaited(ref.read(mentorAccessControllerProvider.notifier).load());
+          }
+        });
+      }
+    } else {
+      _loadRequestedForUserId = null;
+    }
+
     return switch (ref.watch(mentorAccessControllerProvider)) {
       MentorAccessLoading() => const Scaffold(
         body: DpLoading(label: 'AI 멘토 초대 상태를 확인하는 중'),

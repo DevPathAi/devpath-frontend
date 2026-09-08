@@ -100,20 +100,37 @@ class AuthController extends Notifier<AuthState> {
 
   Future<bool> _redeemPendingMentorInvite() async {
     final handoff = ref.read(mentorInviteHandoffStoreProvider);
-    final code = handoff.peekCode();
+    String? code;
+    try {
+      code = handoff.peekCode();
+    } catch (_) {
+      return false;
+    }
     if (code == null) return false;
+    if (!isValidMentorInviteCode(code)) {
+      _clearPendingMentorInviteBestEffort(handoff);
+      return false;
+    }
     try {
       await ref.read(mentorInviteRedeemProvider)(code);
-      handoff.clearCode();
+      _clearPendingMentorInviteBestEffort(handoff);
       return true;
     } on ApiException catch (error) {
       if (_isTerminalInviteFailure(error.status)) {
         // 잘못됐거나 만료된 code는 반복 전송하지 않는다. 로그인 자체는 유지한다.
-        handoff.clearCode();
+        _clearPendingMentorInviteBestEffort(handoff);
         return false;
       }
       // timeout, 429, 5xx 등은 callback 복구 UI에서 다시 시도할 수 있도록 보존한다.
       rethrow;
+    }
+  }
+
+  void _clearPendingMentorInviteBestEffort(MentorInviteHandoffStore handoff) {
+    try {
+      handoff.clearCode();
+    } catch (_) {
+      // redeem 결과와 인증 상태가 선택 저장소 cleanup에 종속되면 안 된다.
     }
   }
 
@@ -139,7 +156,11 @@ class AuthController extends Notifier<AuthState> {
 
   Future<void> logout() async {
     await _store.clear();
-    ref.read(mentorInviteHandoffStoreProvider).clear();
+    try {
+      ref.read(mentorInviteHandoffStoreProvider).clear();
+    } catch (_) {
+      // 브라우저 저장소가 막혀도 로그아웃 상태 전이는 완료한다.
+    }
     ref.read(journeyAnalyticsProvider).reset();
     state = const AuthUnauthenticated();
   }

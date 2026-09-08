@@ -5,17 +5,38 @@ import 'mentor_invite_handoff.dart';
 class _WebMentorInviteHandoffStore implements MentorInviteHandoffStore {
   const _WebMentorInviteHandoffStore();
 
-  @override
-  String? peekCode() =>
-      web.window.sessionStorage.getItem(mentorInviteStorageKey);
+  String? _read(String key) {
+    try {
+      return web.window.sessionStorage.getItem(key);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void _write(String key, String value) {
+    try {
+      web.window.sessionStorage.setItem(key, value);
+    } catch (_) {
+      // 초대 handoff는 선택 기능이다. 저장소 거부가 인증을 막으면 안 된다.
+    }
+  }
+
+  void _remove(String key) {
+    try {
+      web.window.sessionStorage.removeItem(key);
+    } catch (_) {
+      // best-effort cleanup
+    }
+  }
 
   @override
-  void writeCode(String code) =>
-      web.window.sessionStorage.setItem(mentorInviteStorageKey, code);
+  String? peekCode() => _read(mentorInviteStorageKey);
 
   @override
-  void clearCode() =>
-      web.window.sessionStorage.removeItem(mentorInviteStorageKey);
+  void writeCode(String code) => _write(mentorInviteStorageKey, code);
+
+  @override
+  void clearCode() => _remove(mentorInviteStorageKey);
 
   @override
   String? takeCode() {
@@ -27,20 +48,19 @@ class _WebMentorInviteHandoffStore implements MentorInviteHandoffStore {
   @override
   void rememberReturnTo(String path) {
     if (isSafeMentorReturnTo(path)) {
-      web.window.sessionStorage.setItem(mentorReturnToStorageKey, path);
+      _write(mentorReturnToStorageKey, path);
     }
   }
 
   @override
   String? takeReturnTo() {
-    final value = web.window.sessionStorage.getItem(mentorReturnToStorageKey);
-    web.window.sessionStorage.removeItem(mentorReturnToStorageKey);
+    final value = _read(mentorReturnToStorageKey);
+    _remove(mentorReturnToStorageKey);
     return isSafeMentorReturnTo(value) ? value : null;
   }
 
   @override
-  void clearReturnTo() =>
-      web.window.sessionStorage.removeItem(mentorReturnToStorageKey);
+  void clearReturnTo() => _remove(mentorReturnToStorageKey);
 
   @override
   void clear() {

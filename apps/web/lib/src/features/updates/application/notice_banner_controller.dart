@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../providers/api_providers.dart';
@@ -22,7 +23,12 @@ class NoticeBannerReady extends NoticeBannerState {
   final NoticeBanner banner;
 }
 
-final noticeFeedDioProvider = Provider<Dio>((ref) => Dio());
+final noticeFeedRuntimeEnabledProvider = Provider<bool>((ref) => kIsWeb);
+final noticeFeedDioProvider = Provider<Dio>((ref) {
+  final dio = Dio();
+  ref.onDispose(() => dio.close(force: true));
+  return dio;
+});
 final noticeFeedCacheProvider = Provider<NoticeFeedCache>(
   (ref) => noticeFeedCache(),
 );
@@ -39,6 +45,9 @@ class NoticeBannerController extends Notifier<NoticeBannerState> {
 
   @override
   NoticeBannerState build() {
+    if (!ref.watch(noticeFeedRuntimeEnabledProvider)) {
+      return const NoticeBannerNone();
+    }
     Future.microtask(loadOnce);
     return const NoticeBannerLoading();
   }

@@ -1,7 +1,8 @@
 import 'package:devpath_web/src/features/mypage/application/mypage_controller.dart';
 import 'package:devpath_web/src/features/mypage/presentation/mypage_page.dart';
 import 'package:devpath_web/src/features/mypage/state/mypage_state.dart';
-import 'package:devpath_web/src/features/mentor/data/mentor_access_source.dart';
+import 'package:devpath_web/src/features/mentor/application/mentor_access_controller.dart';
+import 'package:devpath_web/src/features/mentor/state/mentor_access_state.dart';
 import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
@@ -21,17 +22,45 @@ class _FixedController extends MyPageController {
   Future<void> load() async {}
 }
 
-Widget _host(MyPageState state) => ProviderScope(
+class _FixedMentorAccessController extends MentorAccessController {
+  _FixedMentorAccessController(this._initial);
+  final MentorAccessState _initial;
+
+  @override
+  MentorAccessState build() => _initial;
+
+  @override
+  Future<void> load() async {}
+}
+
+Widget _host(
+  MyPageState state, {
+  MentorAccessState mentorAccess = const MentorAccessReady(
+    status: 'WAITLISTED',
+    source: 'SELF',
+  ),
+}) => ProviderScope(
+  key: UniqueKey(),
   overrides: [
     myPageControllerProvider.overrideWith(() => _FixedController(state)),
-    mentorAccessFetchProvider.overrideWithValue(
-      () async => const {'status': 'WAITLISTED', 'source': 'SELF'},
+    mentorAccessControllerProvider.overrideWith(
+      () => _FixedMentorAccessController(mentorAccess),
     ),
   ],
   child: MaterialApp(theme: DpTheme.light(), home: const MyPagePage()),
 );
 
 void main() {
+  const loaded = MyPageLoaded(
+    profile: ProfileView(bio: '백엔드 지망'),
+    dashboard: DashboardSummary(
+      streakDays: 3,
+      progressPercent: 40,
+      completedContentCount: 7,
+    ),
+    activity: MyActivity(questionCount: 2, answerCount: 5),
+  );
+
   testWidgets('MyPageLoaded: 프로필 편집 폼 + 활동 집계 + 설정 진입 렌더', (tester) async {
     tester.view.physicalSize = const Size(1200, 2400);
     tester.view.devicePixelRatio = 1.0;
@@ -102,5 +131,29 @@ void main() {
 
     expect(find.byType(DpError), findsOneWidget);
     expect(find.textContaining('프로필을 불러오지 못했습니다'), findsWidgets);
+  });
+
+  testWidgets('AI 멘토 카드는 네 상태를 구분하고 대기 일정을 보장하지 않는다', (tester) async {
+    tester.view.physicalSize = const Size(1200, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    for (final testCase in <(MentorAccessState, String)>[
+      (const MentorAccessLoading(), '초대 상태를 확인하는 중입니다.'),
+      (const MentorAccessFailed('offline'), '초대 상태를 불러오지 못했습니다.'),
+      (
+        const MentorAccessReady(status: 'WAITLISTED', source: 'SELF'),
+        '담당자가 확인 후 초대 일정을 이메일로 안내해 드립니다.',
+      ),
+      (
+        const MentorAccessReady(status: 'ACTIVE', source: 'INVITE_CODE'),
+        'AI 멘토를 사용할 수 있습니다.',
+      ),
+    ]) {
+      await tester.pumpWidget(_host(loaded, mentorAccess: testCase.$1));
+      await tester.pump();
+      expect(find.textContaining(testCase.$2), findsOneWidget);
+      expect(find.textContaining('1일 안에'), findsNothing);
+    }
   });
 }

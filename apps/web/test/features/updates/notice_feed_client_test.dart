@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:devpath_web/src/features/updates/data/notice_feed_cache.dart';
 import 'package:devpath_web/src/features/updates/data/notice_feed_client.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -39,6 +40,24 @@ class _FailingAdapter implements HttpClientAdapter {
   void close({bool force = false}) {}
 }
 
+class _ThrowingCache implements NoticeFeedCache {
+  _ThrowingCache({this.throwOnRead = false, this.throwOnWrite = false});
+
+  final bool throwOnRead;
+  final bool throwOnWrite;
+
+  @override
+  String? readPayload() {
+    if (throwOnRead) throw StateError('storage read denied');
+    return null;
+  }
+
+  @override
+  void write({required String payload}) {
+    if (throwOnWrite) throw StateError('storage write denied');
+  }
+}
+
 ResponseBody _json(int status, Map<String, dynamic> body, {String? etag}) =>
     ResponseBody.fromString(
       jsonEncode(body),
@@ -58,7 +77,7 @@ void main() {
           {
             'id': 'mentor-invite',
             'title': 'AI 멘토 순차 초대 안내',
-            'summary': '보통 1일 안에 초대 메일이 갑니다.',
+            'summary': '담당자가 확인 후 초대 일정을 이메일로 안내해 드립니다.',
             'startsAt': '2026-09-01T00:00:00+09:00',
             'endsAt': '2026-10-01T00:00:00+09:00',
             'cta': {
@@ -142,7 +161,6 @@ void main() {
             },
           ],
         }),
-        etag: '"cached"',
       );
     final dio = Dio()..httpClientAdapter = _FailingAdapter();
     final now = DateTime.parse('2026-09-05T00:00:00Z');
@@ -184,5 +202,40 @@ void main() {
         throwsA(isA<FormatException>()),
       );
     }
+  });
+
+  test('선택 캐시의 read/write 실패가 정상 feed를 막지 않는다', () async {
+    Map<String, dynamic> payload(String id) => {
+      'schemaVersion': 1,
+      'banners': [
+        {
+          'id': id,
+          'title': '공지',
+          'summary': '내용',
+          'startsAt': '2026-09-01T00:00:00Z',
+          'endsAt': '2026-10-01T00:00:00Z',
+          'cta': {'label': '열기', 'href': '/mentor'},
+        },
+      ],
+    };
+    final now = DateTime.parse('2026-09-05T00:00:00Z');
+
+    for (final cache in [
+      _ThrowingCache(throwOnRead: true),
+      _ThrowingCache(throwOnWrite: true),
+    ]) {
+      final dio = Dio()
+        ..httpClientAdapter = _SequenceAdapter([_json(200, payload('safe'))]);
+      final result = await NoticeFeedClient(
+        dio: dio,
+        cache: cache,
+        homeBaseUrl: 'https://leva.ai.kr',
+      ).loadActive(now);
+      expect(result.single.id, 'safe');
+    }
+  });
+
+  test('VM fallback cache는 호출마다 격리된다', () {
+    expect(noticeFeedCache(), isNot(same(noticeFeedCache())));
   });
 }

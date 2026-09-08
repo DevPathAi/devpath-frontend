@@ -11,6 +11,12 @@ enum ApiErrorCode {
   aiKillSwitchActive,
   sandboxBusy,
   sandboxUnavailable,
+  inviteCodeInvalid,
+  inviteCodeDisabled,
+  inviteCodeExpired,
+  inviteCodeExhausted,
+  mentorAccessMissing,
+  mentorBatchDisabled,
   network,
   unknown;
 
@@ -26,6 +32,12 @@ enum ApiErrorCode {
     'AI_KILL_SWITCH_ACTIVE' => aiKillSwitchActive,
     'SANDBOX_BUSY' => sandboxBusy,
     'SANDBOX_UNAVAILABLE' => sandboxUnavailable,
+    'INVITE_CODE_INVALID' => inviteCodeInvalid,
+    'INVITE_CODE_DISABLED' => inviteCodeDisabled,
+    'INVITE_CODE_EXPIRED' => inviteCodeExpired,
+    'INVITE_CODE_EXHAUSTED' => inviteCodeExhausted,
+    'MENTOR_ACCESS_MISSING' => mentorAccessMissing,
+    'MENTOR_BATCH_DISABLED' => mentorBatchDisabled,
     _ => unknown,
   };
 }

@@ -63,6 +63,8 @@ void main() {
       expect(inviteBootstrap, greaterThanOrEqualTo(0));
       expect(inviteBootstrap, lessThan(adsenseBootstrap));
       expect(html, contains('window.location.hash'));
+      expect(html, contains("sessionStorage.setItem('leva.mentor.invite.v1'"));
+      expect(html, contains(r'/^[A-Za-z0-9_-]{32,128}$/'));
       expect(html, contains("searchParams.delete('invite')"));
       expect(html, contains('window.history.replaceState'));
       expect(html, contains('window.__levaHasPendingMentorInvite'));

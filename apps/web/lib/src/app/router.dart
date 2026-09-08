@@ -117,7 +117,7 @@ String? mentorInviteReturnRedirect({
         }.contains(location) &&
         const {'/dashboard', '/path'}.contains(gateDestination);
     if (prerequisitesDone && leavesPrerequisiteGate) {
-      return handoff.takeReturnTo() ?? gateDestination;
+      return takeMentorReturnToBestEffort(handoff) ?? gateDestination;
     }
   }
   return gateDestination;
@@ -201,7 +201,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       final auth = ref.read(authControllerProvider);
       final handoff = ref.read(mentorInviteHandoffStoreProvider);
       if (auth is! AuthAuthenticated && isSafeMentorReturnTo(state.uri.path)) {
-        handoff.rememberReturnTo(state.uri.path);
+        rememberMentorReturnToBestEffort(handoff, state.uri.path);
       }
       final redirect = gateRedirect(
         auth,

@@ -1,6 +1,18 @@
 import 'package:devpath_web/src/features/mentor/application/mentor_invite_handoff.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+class _ThrowingReturnToStore extends MemoryMentorInviteHandoffStore {
+  @override
+  void rememberReturnTo(String path) {
+    throw StateError('sessionStorage write denied');
+  }
+
+  @override
+  String? takeReturnTo() {
+    throw StateError('sessionStorage read denied');
+  }
+}
+
 void main() {
   test('민감 parameter가 없으면 URL과 저장소를 건드리지 않는다', () {
     final store = MemoryMentorInviteHandoffStore()..writeCode('K' * 43);
@@ -105,5 +117,15 @@ void main() {
 
     expect(store.peekCode(), isNull);
     expect(store.takeReturnTo(), isNull);
+  });
+
+  test('returnTo 선택 저장소 실패는 라우팅 helper 밖으로 전파하지 않는다', () {
+    final store = _ThrowingReturnToStore();
+
+    expect(
+      () => rememberMentorReturnToBestEffort(store, '/mentor'),
+      returnsNormally,
+    );
+    expect(takeMentorReturnToBestEffort(store), isNull);
   });
 }
