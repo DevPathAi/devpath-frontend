@@ -23,32 +23,53 @@ class _NoticeBannerBarState extends ConsumerState<NoticeBannerBar> {
     }
     final banner = state.banner;
     final colors = context.dpColors;
-    return Material(
-      color: colors.accentSoft,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: DpSpacing.lg,
-          vertical: DpSpacing.sm,
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                '${banner.title} · ${banner.summary}',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+    void openBanner() => context.go(banner.ctaPath);
+    void dismissBanner() => setState(() => _dismissedId = banner.id);
+    return Semantics(
+      container: true,
+      explicitChildNodes: true,
+      label: '공지',
+      child: Material(
+        color: colors.accentSoft,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: DpSpacing.lg,
+            vertical: DpSpacing.sm,
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '${banner.title} · ${banner.summary}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-            ),
-            TextButton(
-              onPressed: () => context.go(banner.ctaPath),
-              child: Text(banner.ctaLabel),
-            ),
-            IconButton(
-              tooltip: '공지 닫기',
-              onPressed: () => setState(() => _dismissedId = banner.id),
-              icon: const Icon(Icons.close),
-            ),
-          ],
+              Semantics(
+                button: true,
+                label: banner.ctaLabel,
+                onTap: openBanner,
+                child: ExcludeSemantics(
+                  child: TextButton(
+                    onPressed: openBanner,
+                    child: Text(banner.ctaLabel),
+                  ),
+                ),
+              ),
+              Semantics(
+                button: true,
+                label: '공지 닫기',
+                onTap: dismissBanner,
+                child: ExcludeSemantics(
+                  child: IconButton(
+                    tooltip: '공지 닫기',
+                    onPressed: dismissBanner,
+                    icon: const Icon(Icons.close),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
