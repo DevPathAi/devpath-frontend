@@ -103,11 +103,17 @@ String? mentorInviteReturnRedirect({
   required String location,
   required String? gateDestination,
   required MentorInviteHandoffStore handoff,
+  String? inFlightDestination,
 }) {
   if (auth case AuthAuthenticated(:final user)) {
     final prerequisitesDone =
         user.consentStatus == ConsentStatus.done &&
         user.onboardingStatus == OnboardingStatus.done;
+    if (prerequisitesDone &&
+        isSafeMentorReturnTo(inFlightDestination) &&
+        inFlightDestination != location) {
+      return inFlightDestination;
+    }
     final leavesPrerequisiteGate =
         const {
           '/auth/callback',
@@ -130,6 +136,9 @@ final routerProvider = Provider<GoRouter>((ref) {
   // auth와 continuation 변화가 같은 redirect 판정에서 원자적으로 다시 읽힌다.
   final refresh = ValueNotifier<int>(0);
   var legacyHandoffScheduled = false;
+  // GoRouter may re-evaluate a redirect before the first destination commits.
+  // Keep the one-shot session return target stable across those evaluations.
+  String? inFlightMentorDestination;
   ref.onDispose(refresh.dispose);
   void notify() => refresh.value++;
   ref.listen(authControllerProvider, (previous, next) {
@@ -142,6 +151,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       _ => null,
     };
     if (previousUserId != null && previousUserId != nextUserId) {
+      inFlightMentorDestination = null;
       // PathState는 user-scoped다. logout/direct account switch에서 이전 계정의
       // complete result가 다음 계정에 재사용되지 않도록 소유 router가 폐기한다.
       ref.read(pathControllerProvider.notifier).reset();
@@ -214,12 +224,22 @@ final routerProvider = Provider<GoRouter>((ref) {
             .read(diagnosticControllerProvider)
             .pathHandoffRequested,
       );
-      return mentorInviteReturnRedirect(
+      final destination = mentorInviteReturnRedirect(
         auth: auth,
         location: state.matchedLocation,
         gateDestination: redirect,
         handoff: handoff,
+        inFlightDestination: inFlightMentorDestination,
       );
+      // The session value is intentionally consumed once. This in-memory copy
+      // survives redirect re-entry, then disappears after the target commits.
+      if (state.matchedLocation == inFlightMentorDestination) {
+        inFlightMentorDestination = null;
+      } else if (inFlightMentorDestination == null &&
+          isSafeMentorReturnTo(destination)) {
+        inFlightMentorDestination = destination;
+      }
+      return destination;
     },
     routes: [
       GoRoute(path: '/login', builder: (_, _) => const LoginPage()),
