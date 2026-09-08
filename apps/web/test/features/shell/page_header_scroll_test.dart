@@ -15,6 +15,7 @@ import 'package:devpath_web/src/features/dashboard/presentation/dashboard_page.d
 import 'package:devpath_web/src/features/mypage/application/mypage_controller.dart';
 import 'package:devpath_web/src/features/mypage/presentation/mypage_page.dart';
 import 'package:devpath_web/src/features/mypage/state/mypage_state.dart';
+import 'package:devpath_web/src/features/mentor/data/mentor_access_source.dart';
 import 'package:devpath_web/src/features/path/data/path_sse_source.dart';
 import 'package:devpath_web/src/features/path/presentation/path_page.dart';
 import 'package:devpath_web/src/features/settings/application/settings_controller.dart';
@@ -97,6 +98,9 @@ void main() {
               ),
             ),
           ),
+          mentorAccessFetchProvider.overrideWithValue(
+            () async => const {'status': 'WAITLISTED', 'source': 'SELF'},
+          ),
         ],
         child: MaterialApp(theme: DpTheme.light(), home: const MyPagePage()),
       ),
@@ -108,10 +112,7 @@ void main() {
 
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -300));
     await tester.pump();
-    // 소스의 설정 카드 ListTile-in-DecoratedBox 디버그 assertion 소비
-    // (mypage_page_test.dart:67,89와 동일 원인·동일 방식: 타입까지 확인해
-    // 다른 원인의 예외가 섞여도 조용히 통과하지 않게 한다).
-    expect(tester.takeException(), isAssertionError);
+    expect(tester.takeException(), isNull);
 
     _expectHeaderScrolledAway(tester);
   });

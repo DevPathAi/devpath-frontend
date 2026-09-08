@@ -154,10 +154,7 @@ final authFlowClientProvider = Provider<ApiClient>((ref) {
     ),
   );
   if (config.useMock) {
-    client.dio.httpClientAdapter = MockHttpAdapter(
-      webMockFixtures,
-      sequences: webMockSequences,
-    );
+    client.dio.httpClientAdapter = createWebMockHttpAdapter();
   }
   return client;
 });
@@ -215,10 +212,7 @@ final apiClientProvider = Provider<ApiClient>((ref) {
   );
 
   if (config.useMock) {
-    client.dio.httpClientAdapter = MockHttpAdapter(
-      webMockFixtures,
-      sequences: webMockSequences,
-    );
+    client.dio.httpClientAdapter = createWebMockHttpAdapter();
   }
   return client;
 });

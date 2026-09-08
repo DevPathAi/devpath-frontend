@@ -1,3 +1,6 @@
+import 'dart:typed_data';
+
+import 'package:dio/dio.dart';
 import 'package:dp_core/dp_core.dart';
 
 /// web 프로토 목 REST 픽스처: `'METHOD /path'` → (status, jsonBody).
@@ -7,6 +10,29 @@ import 'package:dp_core/dp_core.dart';
 final Map<String, MockFixture> webMockFixtures = {
   // ④ 오류 신고·문의 접수. 목 모드 기본값이 true 라 이 픽스처가 없으면 제보가 404로 실패한다.
   'POST /support/requests': (201, {'id': 42}),
+  // 기본 목 실행에서도 AI 멘토 메뉴가 실제 대기 상태를 보여줘야 한다.
+  // 이 픽스처가 없으면 MockHttpAdapter의 미매칭 404가 오류 화면으로 노출된다.
+  'GET /mentor-access/me': (
+    200,
+    {
+      'status': 'WAITLISTED',
+      'source': 'SELF',
+      'waitlistedAt': '2026-09-08T00:00:00Z',
+      'activatedAt': null,
+    },
+  ),
+  // 초대 fragment가 있으면 인증 bootstrap이 refresh 뒤 교환을 시도한다.
+  // 이 happy-path가 없으면 기본 목 실행이 미등록 404를 terminal 초대 실패로
+  // 해석해 유효한 code를 폐기한다.
+  'POST /mentor-access/redeem': (
+    200,
+    {
+      'status': 'ACTIVE',
+      'source': 'INVITE_CODE',
+      'waitlistedAt': '2026-09-05T00:00:00Z',
+      'activatedAt': '2026-09-08T00:00:00Z',
+    },
+  ),
   // 2026-08-03: 아래 셋이 없어 설정·마이페이지·학습 콘텐츠가 에러 화면으로 떴다.
   // GET /consents/me — ConsentsView.fromJson(settings_models.dart:13).
   // item.type 은 settings_page.dart 의 _consentMeta 키(TERMS/PRIVACY/MARKETING/
@@ -738,6 +764,40 @@ final Map<String, MockSequence> webMockSequences = {
     (200, null),
   ],
 };
+
+/// 앱의 기본 목 실행에서 endpoint 사이의 mentor access 상태 전이를 보존한다.
+///
+/// 고정 fixture map만 쓰면 redeem은 ACTIVE를 반환해도 다음 `/mentor-access/me`
+/// 조회가 다시 WAITLISTED를 반환한다. 실제 서버처럼 성공한 교환을 같은 client의
+/// 후속 조회에 반영하되, adapter 인스턴스끼리는 상태를 공유하지 않는다.
+MockHttpAdapter createWebMockHttpAdapter() {
+  final fixtures = Map<String, MockFixture>.of(webMockFixtures);
+  return _WebMockHttpAdapter(fixtures);
+}
+
+class _WebMockHttpAdapter extends MockHttpAdapter {
+  _WebMockHttpAdapter(this._mutableFixtures)
+    : super(_mutableFixtures, sequences: webMockSequences);
+
+  final Map<String, MockFixture> _mutableFixtures;
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    final response = await super.fetch(options, requestStream, cancelFuture);
+    if (options.method == 'POST' &&
+        options.path == '/mentor-access/redeem' &&
+        response.statusCode >= 200 &&
+        response.statusCode < 300) {
+      _mutableFixtures['GET /mentor-access/me'] =
+          webMockFixtures['POST /mentor-access/redeem']!;
+    }
+    return response;
+  }
+}
 
 /// NextQuestion.fromJson 계약에 맞춘 문항 한 건.
 Map<String, dynamic> _question(int id, String content, int index, int total) =>

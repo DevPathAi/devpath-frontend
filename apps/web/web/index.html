@@ -1,6 +1,57 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
+  <!-- 초대 code는 fragment로만 전달한다. 외부 스크립트가 실행되기 전에 주소에서
+       제거하고 sessionStorage로 옮겨 서버·CDN·referrer·광고 스크립트 노출을 막는다. -->
+  <script>
+    (function captureMentorInviteFragment() {
+      var url = new URL(window.location.href);
+      var rawFragment = window.location.hash;
+      var params = new URLSearchParams(rawFragment.slice(1));
+      var searchParams = url.searchParams;
+      var codes = params.getAll('invite');
+      var returnPaths = params.getAll('returnTo');
+      var hasLegacyQuery = searchParams.has('invite') || searchParams.has('returnTo');
+      var validInvite = codes.length === 1 && /^[A-Za-z0-9_-]{32,128}$/.test(codes[0]);
+      var pendingInvite = validInvite;
+      try {
+        pendingInvite = pendingInvite || /^[A-Za-z0-9_-]{32,128}$/.test(
+          window.sessionStorage.getItem('leva.mentor.invite.v1') || ''
+        );
+      } catch (_) {
+        // 저장소 접근이 거부되면 현재 URL의 유효한 fragment만으로 외부 스크립트를 막는다.
+      }
+      window.__levaHasPendingMentorInvite = pendingInvite;
+      if (codes.length === 0 && returnPaths.length === 0 && !hasLegacyQuery) return;
+
+      params.delete('invite');
+      params.delete('returnTo');
+      // 이미 서버 요청에는 도달한 legacy query는 신뢰하지 않고 추가 노출만 차단한다.
+      searchParams.delete('invite');
+      searchParams.delete('returnTo');
+      var remaining = params.toString();
+      url.hash = remaining ? '#' + remaining : '';
+      window.history.replaceState(
+        null,
+        '',
+        url.pathname + url.search + url.hash
+      );
+
+      try {
+        if (validInvite) {
+          window.sessionStorage.setItem('leva.mentor.invite.v1', codes[0]);
+        }
+        if (
+          returnPaths.length === 1 &&
+          (returnPaths[0] === '/mentor' || /^\/mission\/[0-9]+\/mentor$/.test(returnPaths[0]))
+        ) {
+          window.sessionStorage.setItem('leva.mentor.return_to.v1', returnPaths[0]);
+        }
+      } catch (_) {
+        // 저장소가 거부돼도 이미 주소를 정리했으므로 앱 부팅은 계속한다.
+      }
+    })();
+  </script>
   <!--
     If you are serving your web app in a path other than the root, change the
     href value below to reflect the base path you are serving from.
@@ -50,7 +101,10 @@
        ET13 fixture routes are a release-build evidence surface and must make no
        external request, so they fail closed before the script is created. -->
   <script>
-    if (!new URLSearchParams(window.location.search).has('fixture')) {
+    if (
+      !new URLSearchParams(window.location.search).has('fixture') &&
+      window.__levaHasPendingMentorInvite !== true
+    ) {
       var adsenseScript = document.createElement('script');
       adsenseScript.async = true;
       adsenseScript.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2785578834914321';

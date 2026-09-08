@@ -1,8 +1,10 @@
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../support/presentation/support_dialog.dart';
+import '../../updates/presentation/notice_banner_bar.dart';
 
 /// 셸 목적지(경로·아이콘·라벨·섹션).
 typedef ShellDestination = ({
@@ -106,12 +108,12 @@ int? shellDestinationIndexFor(String location) {
 }
 
 /// 라우터 결합 셸: 위치를 읽고, 명령 팔레트로 감싸 표현부에 위임.
-class AppShell extends StatelessWidget {
+class AppShell extends ConsumerWidget {
   const AppShell({super.key, required this.child});
   final Widget child;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final router = GoRouter.of(context);
     return ListenableBuilder(
       // Imperative `push` routes are wrapped in an internal match and are not
@@ -134,7 +136,12 @@ class AppShell extends StatelessWidget {
           child: AppShellView(
             location: location,
             onSelect: (path) => context.go(path),
-            child: child,
+            child: Column(
+              children: [
+                const NoticeBannerBar(),
+                Expanded(child: child),
+              ],
+            ),
           ),
         );
       },
