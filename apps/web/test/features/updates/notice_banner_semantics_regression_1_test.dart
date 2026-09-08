@@ -45,10 +45,18 @@ void main() {
 
     final cta = tester.getSemantics(find.bySemanticsLabel('AI 멘토 보기'));
     expect(cta.getSemanticsData().hasAction(ui.SemanticsAction.tap), isTrue);
+    expect(
+      cta.getSemanticsData().hasFlag(ui.SemanticsFlag.isFocusable),
+      isTrue,
+    );
 
     final dismiss = tester.getSemantics(find.bySemanticsLabel('공지 닫기'));
     expect(
       dismiss.getSemanticsData().hasAction(ui.SemanticsAction.tap),
+      isTrue,
+    );
+    expect(
+      dismiss.getSemanticsData().hasFlag(ui.SemanticsFlag.isFocusable),
       isTrue,
     );
     tester.platformDispatcher.onSemanticsActionEvent!(
