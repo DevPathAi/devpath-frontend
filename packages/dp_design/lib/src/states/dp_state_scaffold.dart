@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/dp_colors.dart';
 import '../theme/dp_spacing.dart';
+import '../theme/dp_tokens.dart';
 
 /// 상태 화면 공통 레이아웃: 아이콘 + 제목 + (메시지) + (단일 1차 행동) + (선택 보조 행동).
 ///
@@ -35,46 +36,107 @@ class DpStateScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.dpColors;
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(DpSpacing.xl),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 40, color: iconColor ?? c.textSecondary),
-            const SizedBox(height: DpSpacing.md),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleMedium,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(DpSpacing.lg),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480),
+          child: Container(
+            key: const ValueKey('dp-state-surface'),
+            width: double.infinity,
+            padding: const EdgeInsets.all(DpSpacing.xxl),
+            decoration: BoxDecoration(
+              color: c.surface,
+              border: Border.all(color: c.border),
+              borderRadius: BorderRadius.circular(
+                context.appTokens.panelRadius,
+              ),
             ),
-            if (message != null) ...[
-              const SizedBox(height: DpSpacing.sm),
-              Text(
-                message!,
-                textAlign: TextAlign.center,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(color: c.textSecondary),
-              ),
-            ],
-            if (actionLabel != null && onAction != null) ...[
-              const SizedBox(height: DpSpacing.lg),
-              FilledButton(onPressed: onAction, child: Text(actionLabel!)),
-            ],
-            if (secondaryActionLabel != null && onSecondaryAction != null) ...[
-              SizedBox(
-                height: (actionLabel != null && onAction != null)
-                    ? DpSpacing.xs
-                    : DpSpacing.lg,
-              ),
-              TextButton(
-                onPressed: onSecondaryAction,
-                child: Text(secondaryActionLabel!),
-              ),
-            ],
-          ],
+            child: _StateContent(
+              icon: icon,
+              title: title,
+              message: message,
+              actionLabel: actionLabel,
+              onAction: onAction,
+              iconColor: iconColor,
+              secondaryActionLabel: secondaryActionLabel,
+              onSecondaryAction: onSecondaryAction,
+            ),
+          ),
         ),
       ),
+    );
+  }
+}
+
+class _StateContent extends StatelessWidget {
+  const _StateContent({
+    required this.icon,
+    required this.title,
+    required this.message,
+    required this.actionLabel,
+    required this.onAction,
+    required this.iconColor,
+    required this.secondaryActionLabel,
+    required this.onSecondaryAction,
+  });
+
+  final IconData icon;
+  final String title;
+  final String? message;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+  final Color? iconColor;
+  final String? secondaryActionLabel;
+  final VoidCallback? onSecondaryAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.dpColors;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 64,
+          height: 64,
+          decoration: BoxDecoration(
+            color: c.accentSoft,
+            borderRadius: BorderRadius.circular(DpRadius.card),
+          ),
+          child: Icon(icon, size: 30, color: iconColor ?? c.primaryText),
+        ),
+        const SizedBox(height: DpSpacing.lg),
+        Text(
+          title,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        if (message != null) ...[
+          const SizedBox(height: DpSpacing.sm),
+          Text(
+            message!,
+            textAlign: TextAlign.center,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: c.textSecondary),
+          ),
+        ],
+        if (actionLabel != null && onAction != null) ...[
+          const SizedBox(height: DpSpacing.xl),
+          FilledButton(onPressed: onAction, child: Text(actionLabel!)),
+        ],
+        if (secondaryActionLabel != null && onSecondaryAction != null) ...[
+          SizedBox(
+            height: (actionLabel != null && onAction != null)
+                ? DpSpacing.xs
+                : DpSpacing.lg,
+          ),
+          TextButton(
+            onPressed: onSecondaryAction,
+            child: Text(secondaryActionLabel!),
+          ),
+        ],
+      ],
     );
   }
 }

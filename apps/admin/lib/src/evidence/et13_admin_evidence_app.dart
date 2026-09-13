@@ -108,7 +108,16 @@ class _Et13AdminSupportFixtureState extends State<_Et13AdminSupportFixture> {
   @override
   Widget build(BuildContext context) => Scaffold(
     body: AlertDialog(
-      title: const Text('#77 $_longKorean'),
+      title: Semantics(
+        label: '#77 $_longKorean',
+        child: ExcludeSemantics(
+          child: Text(
+            '#77 $_longKorean',
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ),
       content: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 640),
         child: AdminSupportDetailProjection(

@@ -221,7 +221,7 @@ void main() {
         .getRect(find.byKey(const ValueKey('chrome-bar-root')))
         .right;
     final acctRight = tester.getRect(find.byKey(const ValueKey('acct'))).right;
-    expect(barRight - acctRight, closeTo(DpSpacing.lg, 1.0));
+    expect(barRight - acctRight, closeTo(DpSpacing.xl, 1.0));
   });
 
   // 위 테스트가 60자짜리 crumbs를 쓴 이유가 바로 이 결함이다 — 짧은 crumbs로는
@@ -268,7 +268,7 @@ void main() {
     final actRight = tester
         .getRect(find.widgetWithIcon(IconButton, Icons.error_outline))
         .right;
-    expect(barRight - actRight, closeTo(DpSpacing.lg, 1.0));
+    expect(barRight - actRight, closeTo(DpSpacing.xl, 1.0));
   });
 
   // 링크 세그먼트만 탭 타깃 확보용 수평 패딩(sm)을 갖는 탓에 구분자가 한쪽으로

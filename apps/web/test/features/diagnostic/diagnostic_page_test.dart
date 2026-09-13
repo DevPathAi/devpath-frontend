@@ -157,6 +157,29 @@ void main() {
     expect(find.byKey(const ValueKey('brand-row')), findsOneWidget);
   });
 
+  testWidgets('390px에서 트랙 입력과 안내 문구가 화면 안에 머문다', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final controller = _FixedDiagnosticController(const DiagnosticState());
+
+    await tester.pumpWidget(_host(controller));
+    await tester.pump();
+
+    final viewport = tester.getRect(find.byType(Scaffold));
+    final field = tester.getRect(
+      find.byKey(const ValueKey('diagnostic-track')),
+    );
+    final hint = tester.getRect(
+      find.byKey(const ValueKey('diagnostic-track-hint')),
+    );
+    expect(field.left, greaterThanOrEqualTo(viewport.left));
+    expect(field.right, lessThanOrEqualTo(viewport.right));
+    expect(hint.left, greaterThanOrEqualTo(viewport.left));
+    expect(hint.right, lessThanOrEqualTo(viewport.right));
+    expect(hint.height, greaterThanOrEqualTo(32));
+  });
+
   testWidgets('선택한 트랙으로만 guest 진단을 시작한다', (tester) async {
     final controller = _FixedDiagnosticController(const DiagnosticState());
     await tester.pumpWidget(_host(controller));

@@ -312,8 +312,6 @@ void main() {
     expect(find.byType(DpMissionHeader), findsOneWidget);
     expect(find.byKey(const ValueKey('today-mission-section')), findsOneWidget);
     expect(find.byKey(const ValueKey('today-metrics-loading')), findsOneWidget);
-    expect(find.byKey(const ValueKey('today-ad-section')), findsOneWidget);
-    expect(find.byType(AdSlotWidget), findsOneWidget);
 
     final scroll = tester.widget<CustomScrollView>(
       find.byType(CustomScrollView),
@@ -330,6 +328,15 @@ void main() {
     expect(missionIndex, greaterThanOrEqualTo(0));
     expect(metricsIndex, greaterThan(missionIndex));
     expect(adIndex, greaterThan(metricsIndex));
+
+    // v2의 넉넉한 모바일 리듬에서는 마지막 sliver가 초기 cache 밖일 수 있다.
+    // 순서는 위에서 확인하고, 실제 광고는 스크롤했을 때 지연 생성되는지 검증한다.
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('today-ad-section')),
+      240,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.byType(AdSlotWidget), findsOneWidget);
   });
 
   testWidgets('flag ON은 mission을 metrics보다 먼저 시작하고 둘을 병렬로 유지한다', (

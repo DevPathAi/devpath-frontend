@@ -27,12 +27,12 @@ void main() {
     expect(shellDestinationIndexFor('/content/77'), isNull);
   });
 
-  testWidgets('좁은 폭(<840)은 NavigationBar', (tester) async {
+  testWidgets('좁은 폭(<600)은 Leva 플로팅 하단 내비', (tester) async {
     _setWidth(tester, 390);
     await tester.pumpWidget(
       _host(const AppShellView(location: '/dashboard', child: Text('본문'))),
     );
-    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.byType(DpMobileNavigation), findsOneWidget);
     expect(find.byType(DpNavRail), findsNothing);
   });
 
@@ -42,7 +42,7 @@ void main() {
       _host(const AppShellView(location: '/dashboard', child: Text('본문'))),
     );
     expect(find.byType(DpNavRail), findsOneWidget);
-    expect(find.byType(NavigationBar), findsNothing);
+    expect(find.byType(DpMobileNavigation), findsNothing);
   });
 
   testWidgets('목적지 선택 시 해당 경로로 콜백', (tester) async {

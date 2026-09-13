@@ -102,4 +102,36 @@ void main() {
     expect(find.text('항상 보이는 부제'), findsOneWidget);
     expect(find.text('호버해야 보이는 본문'), findsNothing); // hover 전이므로 미표시
   });
+
+  testWidgets(
+    'DpListRow: compact width moves trailing metadata below content',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 240);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: DpTheme.light(),
+          home: const Scaffold(
+            body: DpListRow(
+              title: '모바일에서도 충분히 읽히는 긴 게시글 제목',
+              subtitle: Text('본문의 핵심 내용을 보여주는 설명입니다.'),
+              trailing: Text('답변 12 · 추천 24'),
+            ),
+          ),
+        ),
+      );
+
+      expect(
+        find.byKey(const ValueKey('dp-list-row-mobile-layout')),
+        findsOneWidget,
+      );
+      expect(
+        tester.getTopLeft(find.text('답변 12 · 추천 24')).dy,
+        greaterThan(tester.getTopLeft(find.text('본문의 핵심 내용을 보여주는 설명입니다.')).dy),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

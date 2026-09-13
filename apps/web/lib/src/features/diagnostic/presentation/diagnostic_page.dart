@@ -204,6 +204,7 @@ class _StartView extends StatelessWidget {
         const SizedBox(height: DpSpacing.lg),
         DropdownButtonFormField<String>(
           key: const ValueKey('diagnostic-track'),
+          isExpanded: true,
           initialValue: selectedTrack,
           decoration: const InputDecoration(labelText: '진단할 트랙'),
           items: [

@@ -165,8 +165,8 @@ void main() {
   // left=255.6으로 결함이 나타난다. 그래서 이 테스트만 실제 구조를 그대로 세운다.
   //
   // 단언은 「중앙이 아니다」가 아니라 「헤더 텍스트와 같은 좌측선」이다 — 전자는 폭이
-  // 바뀌면 우연히 통과한다. 헤더의 좌측 여백은 DpSpacing.lg(16)이므로 세그먼트의
-  // 가로 여백도 lg여야 선이 맞는다(sm=8이면 8px 어긋난 채로 남는다).
+  // 바뀌면 우연히 통과한다. medium 헤더의 좌측 여백은 DpSpacing.xl(24)이므로
+  // 세그먼트도 같은 반응형 여백을 써야 한다.
   testWidgets('<1024: 세그먼트 탭이 페이지 헤더와 같은 좌측선에서 시작한다', (tester) async {
     tester.view.physicalSize = const Size(800, 900);
     tester.view.devicePixelRatio = 1.0;
@@ -202,7 +202,7 @@ void main() {
     final segLeft = tester.getTopLeft(find.byType(SegmentedButton<int>)).dx;
     final headerLeft = tester.getTopLeft(find.text('실습 샌드박스')).dx;
     expect(segLeft, headerLeft, reason: '세그먼트가 페이지 헤더의 좌측선과 어긋난다');
-    expect(segLeft, DpSpacing.lg, reason: '좌측선은 헤더 패딩 값(lg=16)이다');
+    expect(segLeft, DpSpacing.xl, reason: '좌측선은 medium 헤더 패딩 값(xl=24)이다');
   });
 
   // P3/D1 반영: 1024–1239 2페인 로그 접이 토글 — 접으면 LOG 페인 트리에서 제거.

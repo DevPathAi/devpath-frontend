@@ -17,11 +17,11 @@ void main() {
         ),
       ),
     );
-    expect(t.contentMaxWidth, 1440);
-    expect(t.readableMaxWidth, 880);
-    expect(t.railWidth, 256);
-    expect(t.railCollapsedWidth, 72);
-    expect(t.panelRadius, 10);
+    expect(t.contentMaxWidth, 1360);
+    expect(t.readableMaxWidth, 760);
+    expect(t.railWidth, 280);
+    expect(t.railCollapsedWidth, 80);
+    expect(t.panelRadius, 18);
   });
 
   testWidgets('다크 테마도 동일 레이아웃 토큰(밝기 무관)', (tester) async {
@@ -37,7 +37,7 @@ void main() {
         ),
       ),
     );
-    expect(t.railWidth, 256);
+    expect(t.railWidth, 280);
   });
 
   test('lerp는 동일 타입을 반환한다(ThemeExtension 계약)', () {

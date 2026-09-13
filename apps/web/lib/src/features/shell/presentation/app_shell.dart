@@ -183,8 +183,6 @@ class _AppShellViewState extends State<AppShellView> {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.dpColors;
-
     return DpAppShell(
       selectedIndex: _index,
       onSelect: (i) => widget.onSelect?.call(kShellDestinations[i].path),
@@ -192,17 +190,7 @@ class _AppShellViewState extends State<AppShellView> {
         for (final d in kShellDestinations)
           DpDestination(icon: d.icon, label: d.label, section: d.section),
       ],
-      brand: DpRailBrand(
-        mark: Container(
-          width: 22,
-          height: 22,
-          decoration: BoxDecoration(
-            color: c.primary,
-            borderRadius: BorderRadius.circular(DpRadius.button),
-          ),
-        ),
-        wordmark: 'Leva',
-      ),
+      brand: DpRailBrand(mark: const DpBrandMark(size: 32), wordmark: 'Leva'),
       account: _AccountMenu(onGo: widget.onSelect),
       breadcrumb: breadcrumbFor(widget.location),
       onCrumbTap: (p) => widget.onSelect?.call(p),

@@ -12,11 +12,11 @@ abstract final class DpSpacing {
 }
 
 abstract final class DpRadius {
-  static const double chip = 12;
-  static const double button = 8;
-  static const double card = 10;
-  static const double input = 8;
-  static const double dialog = 12;
+  static const double chip = 999;
+  static const double button = 12;
+  static const double card = 18;
+  static const double input = 12;
+  static const double dialog = 20;
 }
 
 abstract final class DpDurations {

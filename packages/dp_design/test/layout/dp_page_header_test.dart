@@ -18,9 +18,9 @@ void main() {
   testWidgets('제목은 headlineSmall 스케일을 쓴다', (tester) async {
     await tester.pumpWidget(_host(const DpPageHeader(title: '대시보드')));
     final widget = tester.widget<Text>(find.text('대시보드'));
-    expect(widget.style?.fontSize, 24);
-    expect(widget.style?.fontWeight, FontWeight.w600);
-    expect(widget.style?.height, 32 / 24);
+    expect(widget.style?.fontSize, 28);
+    expect(widget.style?.fontWeight, FontWeight.w700);
+    expect(widget.style?.height, 36 / 28);
   });
 
   testWidgets('설명·액션·필터 슬롯을 렌더', (tester) async {
@@ -98,7 +98,7 @@ void main() {
 
     final headerRight = tester.getRect(find.byType(DpPageHeader)).right;
     final actionRight = tester.getRect(find.byKey(const ValueKey('act'))).right;
-    // 헤더의 우측 패딩(DpSpacing.lg = 16)만큼만 떨어져 있어야 한다.
-    expect(headerRight - actionRight, closeTo(16, 1.0));
+    // 넓은 화면 헤더의 우측 패딩(DpSpacing.xl = 24)만큼만 떨어져 있어야 한다.
+    expect(headerRight - actionRight, closeTo(24, 1.0));
   });
 }

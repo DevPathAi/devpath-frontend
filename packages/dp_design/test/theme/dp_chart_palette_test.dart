@@ -9,17 +9,17 @@ import 'package:flutter_test/flutter_test.dart';
 /// 이 테스트는 스크립트가 검사한 그 값이 코드에 실제로 들어왔는지를 잠근다.
 void main() {
   test('라이트 차트 계열 색이 스펙 값과 일치한다', () {
-    expect(DpColors.light.chart1, const Color(0xFF1D4ED8));
-    expect(DpColors.light.chart2, const Color(0xFFBE185D));
-    expect(DpColors.light.chart3, const Color(0xFF7E22CE));
+    expect(DpColors.light.chart1, const Color(0xFF2563EB));
+    expect(DpColors.light.chart2, const Color(0xFFC026D3));
+    expect(DpColors.light.chart3, const Color(0xFFD97706));
     expect(DpColors.light.chart4, const Color(0xFF0F766E)); // 보조색 — 불변
   });
 
   test('다크 차트 계열 색이 스펙 값과 일치한다', () {
-    expect(DpColors.dark.chart1, const Color(0xFF60A5FA));
-    expect(DpColors.dark.chart2, const Color(0xFFF472B6));
-    expect(DpColors.dark.chart3, const Color(0xFFD8B4FE));
-    expect(DpColors.dark.chart4, const Color(0xFF2DD4BF)); // 보조색 — 불변
+    expect(DpColors.dark.chart1, const Color(0xFF77A5FF));
+    expect(DpColors.dark.chart2, const Color(0xFFE287F4));
+    expect(DpColors.dark.chart3, const Color(0xFFF6B864));
+    expect(DpColors.dark.chart4, const Color(0xFF4DD4C4));
   });
 
   test('계열 색이 브랜드·의미 토큰과 겹치지 않는다', () {

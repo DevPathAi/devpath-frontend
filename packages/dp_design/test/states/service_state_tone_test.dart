@@ -12,7 +12,7 @@ Color _iconColor(WidgetTester tester) =>
 
 void main() {
   // 서비스 상태는 사용자 잘못도 위험도 아니다 → 경고색이 아니라 중립을 쓴다.
-  // 액센트(앰버)와 warning 의 계열 충돌도 이 재배치로 해소된다.
+  // 서비스 상태는 브랜드 액센트·warning과 경쟁하지 않는 중립 톤을 쓴다.
   testWidgets('DpKillSwitch 아이콘은 중립색', (tester) async {
     await tester.pumpWidget(_wrap(const DpKillSwitch()));
     expect(_iconColor(tester), DpColors.light.textSecondary);

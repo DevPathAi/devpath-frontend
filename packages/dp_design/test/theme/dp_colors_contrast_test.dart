@@ -43,8 +43,7 @@ void main() {
       });
 
       test('★채움 위 텍스트 4.5:1 — 다크는 onPrimary 가 어두운 색이다', () {
-        // 앰버(#F59E0B) 위 흰 텍스트는 2.2:1 로 미달한다. 다크의 onPrimary 는
-        // #1A1200 이며 라이트(#FFFFFF)와 방향이 반대다. 이 단언이 그 반전을 지킨다.
+        // 밝은 인디고 채움 위에는 어두운 전경이 필요하다. 이 단언이 그 반전을 지킨다.
         expect(contrast(p.onPrimary, p.primary), greaterThanOrEqualTo(4.5));
       });
 

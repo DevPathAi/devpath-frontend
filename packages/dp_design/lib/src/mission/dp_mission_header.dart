@@ -57,6 +57,13 @@ class DpMissionHeader extends StatelessWidget {
           color: colors.surface,
           borderRadius: BorderRadius.circular(context.appTokens.panelRadius),
           border: Border.all(color: colors.border),
+          boxShadow: [
+            BoxShadow(
+              color: colors.textPrimary.withValues(alpha: 0.04),
+              blurRadius: 28,
+              offset: const Offset(0, 10),
+            ),
+          ],
         ),
         child: Stack(
           children: [
@@ -65,8 +72,13 @@ class DpMissionHeader extends StatelessWidget {
               bottom: 0,
               left: 0,
               child: DecoratedBox(
-                decoration: BoxDecoration(color: colors.primary),
-                child: const SizedBox(width: 3),
+                decoration: BoxDecoration(
+                  color: colors.primary,
+                  borderRadius: const BorderRadius.horizontal(
+                    left: Radius.circular(DpRadius.card),
+                  ),
+                ),
+                child: const SizedBox(width: 4),
               ),
             ),
             Padding(
