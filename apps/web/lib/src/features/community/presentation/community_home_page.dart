@@ -72,7 +72,7 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
     context.replace(uri.toString());
   }
 
-  /// FAB 스피드다이얼 — 질문/자유글/피드백 요청 3종 작성 진입.
+  /// FAB 스피드다이얼 — Q/A 질문/자유게시판 글/피드백 요청 3종 작성 진입.
   void _openComposeSheet(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
@@ -83,7 +83,7 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
             ListTile(
               leading: const Icon(DpIcons.mentor),
               title: const Text('질문하기'),
-              subtitle: const Text('Q&A 보드에 질문을 올려요'),
+              subtitle: const Text('Q/A에 질문을 올려요'),
               onTap: () {
                 Navigator.pop(sheetContext);
                 context.go('/community/new');
@@ -91,7 +91,7 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
             ),
             ListTile(
               leading: const Icon(DpIcons.community),
-              title: const Text('자유글'),
+              title: const Text('자유게시판'),
               subtitle: const Text('자유롭게 이야기를 나눠요'),
               onTap: () {
                 Navigator.pop(sheetContext);
@@ -267,9 +267,9 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
       _ => c.primary,
     };
     final label = switch (item.boardType) {
-      'FREE' => '자유',
+      'FREE' => '자유게시판',
       'FEEDBACK' => '피드백',
-      _ => 'Q&A',
+      _ => 'Q/A',
     };
     // 본문 매칭이 없으면 highlight 가 비어 오므로 excerpt 로 폴백한다.
     final body = item.highlight.isNotEmpty ? item.highlight : item.excerpt;
@@ -353,9 +353,9 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
       _ => c.primary,
     };
     final label = switch (post.boardType) {
-      'FREE' => '자유',
+      'FREE' => '자유게시판',
       'FEEDBACK' => '피드백',
-      _ => 'Q&A',
+      _ => 'Q/A',
     };
     return DpListRow(
       accentColor: accent,
@@ -392,7 +392,7 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
   }
 }
 
-/// 통합 피드 상단 보드 필터 — 전체/Q&A/자유/피드백.
+/// 통합 피드 상단 보드 필터 — 전체/자유게시판/Q/A/피드백.
 class _BoardFilterBar extends StatelessWidget {
   const _BoardFilterBar({required this.current, required this.onSelect});
 

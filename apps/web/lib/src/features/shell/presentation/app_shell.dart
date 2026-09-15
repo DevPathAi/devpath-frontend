@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../support/presentation/support_dialog.dart';
 import '../../updates/presentation/notice_banner_bar.dart';
+import '../../settings/application/settings_controller.dart';
 
 /// 셸 목적지(경로·아이콘·라벨·섹션).
 typedef ShellDestination = ({
@@ -19,11 +20,10 @@ const List<ShellDestination> kShellDestinations = [
   (path: '/dashboard', icon: DpIcons.dashboard, label: '오늘', section: '학습'),
   (path: '/path', icon: DpIcons.path, label: '학습 경로', section: '학습'),
   (path: '/mentor', icon: DpIcons.mentor, label: 'AI 멘토', section: '학습'),
-  (path: '/community', icon: DpIcons.community, label: '게시판', section: '커뮤니티'),
+  (path: '/community', icon: DpIcons.community, label: '커뮤니티', section: '커뮤니티'),
 ];
 
-const _crumbCommunity = (label: '커뮤니티', path: null);
-const _crumbBoard = (label: '게시판', path: '/community');
+const _crumbCommunity = (label: '커뮤니티', path: '/community');
 
 /// 경로 → 브레드크럼. **긴 경로를 먼저 검사한다**(`/community/new/post`가
 /// `/community/new`보다 앞). 알 수 없는 경로는 빈 목록을 반환한다 — 다만 web은
@@ -49,19 +49,19 @@ List<DpCrumb> breadcrumbFor(String location) {
     return const [learning, (label: '오늘', path: null)];
   }
   if (location.startsWith('/community/new/post')) {
-    return const [_crumbCommunity, _crumbBoard, (label: '새 글', path: null)];
+    return const [_crumbCommunity, (label: '새 글', path: null)];
   }
   if (location.startsWith('/community/new')) {
-    return const [_crumbCommunity, _crumbBoard, (label: '질문하기', path: null)];
+    return const [_crumbCommunity, (label: 'Q/A 질문하기', path: null)];
   }
   if (location.startsWith('/community/post/')) {
-    return const [_crumbCommunity, _crumbBoard, (label: '게시글', path: null)];
+    return const [_crumbCommunity, (label: '게시글', path: null)];
   }
   if (location == '/community') {
-    return const [_crumbCommunity, _crumbBoard];
+    return const [(label: '커뮤니티', path: null)];
   }
   if (location.startsWith('/community/')) {
-    return const [_crumbCommunity, _crumbBoard, (label: 'Q&A', path: null)];
+    return const [_crumbCommunity, (label: 'Q/A', path: null)];
   }
   if (location.startsWith('/dashboard')) {
     return const [learning, (label: '오늘', path: null)];
@@ -136,6 +136,8 @@ class AppShell extends ConsumerWidget {
           child: AppShellView(
             location: location,
             onSelect: (path) => context.go(path),
+            onLogout: () =>
+                ref.read(settingsControllerProvider.notifier).logout(),
             child: Column(
               children: [
                 const NoticeBannerBar(),
@@ -159,11 +161,13 @@ class AppShellView extends StatefulWidget {
     required this.location,
     required this.child,
     this.onSelect,
+    this.onLogout,
   });
 
   final String location;
   final Widget child;
   final void Function(String path)? onSelect;
+  final Future<void> Function()? onLogout;
 
   @override
   State<AppShellView> createState() => _AppShellViewState();
@@ -191,7 +195,7 @@ class _AppShellViewState extends State<AppShellView> {
           DpDestination(icon: d.icon, label: d.label, section: d.section),
       ],
       brand: DpRailBrand(mark: const DpBrandMark(size: 32), wordmark: 'Leva'),
-      account: _AccountMenu(onGo: widget.onSelect),
+      account: _AccountMenu(onGo: widget.onSelect, onLogout: widget.onLogout),
       breadcrumb: breadcrumbFor(widget.location),
       onCrumbTap: (p) => widget.onSelect?.call(p),
       onSearchTap: () => _openPalette(context),
@@ -221,8 +225,9 @@ class _AppShellViewState extends State<AppShellView> {
 /// 레일 하단(또는 compact 크롬바 우측) 계정 블록. admin의 행 메뉴와 같은
 /// MenuAnchor 패턴을 쓴다 — 새 상호작용을 도입하지 않는다.
 class _AccountMenu extends StatelessWidget {
-  const _AccountMenu({this.onGo});
+  const _AccountMenu({this.onGo, this.onLogout});
   final void Function(String path)? onGo;
+  final Future<void> Function()? onLogout;
 
   @override
   Widget build(BuildContext context) {
@@ -235,6 +240,10 @@ class _AccountMenu extends StatelessWidget {
         MenuItemButton(
           onPressed: () => onGo?.call('/settings'),
           child: const Text('설정'),
+        ),
+        MenuItemButton(
+          onPressed: onLogout == null ? null : () async => onLogout!.call(),
+          child: const Text('로그아웃'),
         ),
       ],
       // color를 명시하지 않는다 — 슬롯(DpNavRail은 railMuted, compact
