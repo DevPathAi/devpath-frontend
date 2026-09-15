@@ -1,6 +1,6 @@
-# HANDOFF — Leva 모바일 퍼스트 전면 리디자인
+# HANDOFF — GitHub 로그인 복구와 Flutter Web 고도화
 
-> 최종 업데이트: 2026-09-13
+> 최종 업데이트: 2026-09-15
 >
 > 저장소: `devpath-frontend`
 >
@@ -8,36 +8,77 @@
 >
 > 작업 브랜치: `feat/mobile-first-redesign`
 >
-> 구현 커밋: `af1995c` (`feat: redesign Leva UI for mobile-first use`)
+> 격리 worktree: `D:\workspace\dpa\.worktrees\frontend-mobile-first-redesign`
 
 ## 1. 현재 상태
 
-- Leva v2 공통 디자인 시스템과 web 중심 반응형 화면 재구성은 완료됐다.
-- 작업은 기존 사용자 작업 트리를 건드리지 않도록 아래 격리 worktree에서 수행했다.
-  - `D:\workspace\dpa\.worktrees\frontend-mobile-first-redesign`
-- 요청에 따라 gstack 계열 스킬은 사용하지 않았다.
-- 운영 배포와 `develop` 병합은 아직 하지 않았다.
-- 과거 React→Flutter 및 디자인 단계 기록은 `docs/superpowers/`의 기존 핸드오프 문서에 보존돼 있다.
+- GitHub 로그인 500 수정은 `devpath-platform`의 `main`에 병합되고 운영 배포까지 완료됐다.
+- Flutter Web 기능 변경은 이 브랜치에 구현·검증·커밋돼 있지만 아직 PR/배포하지 않았다.
+- React 재작성 없이 Flutter Web과 `packages/dp_design`을 유지하는 고도화 계획을 확정했다.
+- 이 HANDOFF 커밋을 푸시한 뒤 원격 `feat/mobile-first-redesign`이 다음 세션의 기준점이다.
 
-## 2. 완료한 변경
+## 2. 운영 완료 — GitHub 로그인 500
 
-- 인디고·슬레이트 기반 라이트/다크 팔레트, 타이포, 간격, 라운드, Material 컴포넌트 테마 재정의
-- 새 `DpBrandMark`와 Leva 소유 `DpMobileNavigation` 구현
-  - `selectedIndex == null`에서도 거짓 선택 시맨틱스를 만들지 않는다.
-- 64px 상단 브랜드 바, 확장/축소 레일, 반응형 페이지 헤더 재구성
-- 데스크톱 분할형·모바일 집중형 로그인 화면 재설계
-- KPI, 목록 행, 태그, 인터랙티브 카드, 상태 화면, 미션 헤더/다음 행동, 대시보드 패널 개선
-- web/admin/mobile PWA manifest 테마 색상 동기화
-- 모바일·접근성 회귀 수정
-  - 390px 진단 드롭다운 오버플로
-  - 짧은 높이의 상태 화면 오버플로
-  - admin 320px/200% KPI 및 긴 다이얼로그 오버플로
-  - 로그인 제목과 버튼의 좌측 기준선 불일치
-- 디자인 SSoT `DESIGN.md`를 Leva v2 기준으로 갱신
+### 원인과 수정
 
-## 3. 검증 결과
+- GitHub OAuth 자체는 성공했지만 로그인 후 `MentorAccessService.ensureForLogin`이 레거시
+  `BETA_PENDING` 사용자를 비활성 사용자로 거부해 500을 만들었다.
+- 삭제되지 않은 정확한 `BETA_PENDING` 상태만 트랜잭션과 pessimistic lock 안에서 `ACTIVE`로
+  복구한다.
+- 삭제 사용자와 알 수 없는 비활성 상태는 계속 거부한다. 멘토 접근 상태는 독립적으로
+  waitlisted 상태를 유지한다.
 
-최종 소스 기준으로 아래 명령을 통과했다.
+### 병합·배포 증거
+
+- platform 수정 커밋: `605ea91`, `9753da7`, `3010492`
+- platform `main` 병합 커밋: `8f6c9f5357771ae3dac1017bba5240c729d5cc76`
+- 운영 이미지: `ghcr.io/devpathai/devpath-platform-svc@sha256:f2b23a0961ff7f614770d59a5cd824008216ff12d5c2d701193644fd1e4e4089`
+- GitOps 운영 HEAD: `b9d6a6700c3c432850d05678a8ec4820e4e3543d`
+- release id: `ms-20260915-github-login`
+- Landing 배포 id: `1496e6fc-c0ab-41be-b3bb-718911757941`
+- platform 전체 테스트 325/325, 빌드, main CI, migration/services/OFF/ON, 900초 canary 통과.
+- 운영 재확인: `leva.ai.kr` 200, `app.leva.ai.kr` 200, GitHub OAuth 진입 302,
+  immutable release marker 200.
+- 운영 platform 로그 최근 45분에서 `active user is required`, `IllegalArgumentException`,
+  `ERROR`, HTTP 500 일치 항목 0건.
+
+### 검증 한계와 운영 부채
+
+- 실제 GitHub 계정의 OAuth callback 전체 왕복은 Windows UI 연결기가
+  `Browser is not available`을 반환해 자동 실측하지 못했다. 서버 테스트와 운영 진입/로그까지만
+  검증됐다.
+- GitHub environment `mission-spine-production-landing`에 영구
+  `CLOUDFLARE_API_TOKEN`이 없다. 이번 배포에는 로컬 Wrangler OAuth를 일시 주입했고 배포 직후
+  GitHub secret을 삭제했다. 다음 Landing 배포 전 영구 자격 증명 정비가 필요하다.
+- production migration ServiceAccount에 `imagePullSecrets`가 없고 staging GHCR pull secret은
+  유효하지 않다. 현재 이미지는 노드 캐시로 동작하지만 새 이미지 pull 전에 별도 수정해야 한다.
+
+## 3. 이 브랜치에서 완료한 변경
+
+### `7d247d8` — 진단 시작 화면 고도화
+
+- 시작 단계, `15문항 · 약 5분`, 기대 결과, 트랙 선택을 하나의 onboarding surface로 구성.
+- compact 1열, 넓은 화면 2열 전환과 정보 위계를 RED 위젯 테스트부터 구현.
+
+### `2bea7f5` — 커뮤니티 IA와 로그아웃
+
+- 커뮤니티 순서·명칭을 `전체 / 자유게시판 / Q/A / 피드백`으로 고정.
+- 전역 목적지 명칭을 `커뮤니티`로 통일하고 중복 breadcrumb를 제거.
+- 계정 메뉴 첫 단계에 로그아웃을 노출하고 관련 IA·shell 테스트를 추가.
+
+### `b9c6db9` — Flutter Web React급 계획
+
+- 계획 문서:
+  `docs/superpowers/plans/2026-09-15-flutter-web-react-grade-design.md`
+- 결론: React로 재작성하지 않는다. APP UI는 Flutter Web, 공개·검색 콘텐츠는 DOM 중심
+  `leva.ai.kr` 랜딩으로 역할을 분리한다.
+- 공용 디자인 시스템, 4단계 window class, 상태 matrix, 브라우저 UX, 접근성, renderer A/B,
+  Core Web Vitals, RED 테스트·릴리스 게이트를 확정했다.
+- 디자인 계획 검토: 6/10 → 9/10, `CLEAN`, 미결정 사항 0개.
+
+## 4. 검증 기록
+
+기존 Leva v2 리디자인 커밋 `af1995c` 기준 전체 검증:
 
 ```powershell
 dart run melos run format
@@ -47,52 +88,42 @@ flutter build web --release
 git diff --check
 ```
 
-- format: 737 files, 0 changed
-- analyze: web/admin/mobile/dp_design/dp_core 이슈 0건
-- test: web 948, admin 156, dp_design 220, dp_core 174 및 mobile 전체 통과
-- web release build 성공
-- manifest JSON 3개 파싱 성공
-- 구 팔레트 문자열 잔존 검색 결과 0건
-
-## 4. 로컬 브라우저 리뷰
-
-- 릴리스 빌드로 데스크톱 대시보드, compact 대시보드, 진단 화면을 확인했다.
-- 데스크톱은 레일·상단 바·카드·차트의 위계와 정렬이 안정적이다.
-- compact 화면은 단일 열 카드와 플로팅 하단 내비가 정상 전환된다.
-- Windows Chrome headless는 최소 창 폭이 500px라 390px 캡처가 잘려 보였지만, 실제 390px 경계는 위젯 테스트로 검증했다.
-- Windows UI 연결기는 `apps: []`, `browsers: []`를 반환했다. 직접 Chrome 실행과 헤드리스 캡처로 대체했다.
-- 리뷰 캡처는 `apps/web/build/review-*.png`에 있으며 빌드 산출물이므로 커밋하지 않는다.
+- format 737 files, 변경 0.
+- analyze: web/admin/mobile/dp_design/dp_core 이슈 0건.
+- test: web 948, admin 156, dp_design 220, dp_core 174 및 mobile 전체 통과.
+- web release build 성공.
+- 이후 진단·커뮤니티·shell 변경은 해당 위젯/IA 테스트를 RED→GREEN으로 통과했다.
+- 계획 문서는 필수 section, review report, 최종 `NO UNRESOLVED DECISIONS`,
+  `git diff --check`를 통과했다.
 
 ## 5. 다음 세션에서 할 큰 작업
 
-다음 세션은 아래 항목부터 시작한다. 이번 핸드오프 세션에서는 범위를 확장하지 않는다.
+다음 세션은 큰 구현과 긴 검증을 여기서 시작한다. 현재 종료 세션에서는 실행하지 않는다.
 
-1. 진단 시작 화면 고도화
-   - 현재 대시보드보다 정보 밀도와 제품 서사가 약하고 빈 공간이 많다.
-   - 단계 표시, 기대 결과, 진단 설명을 하나의 온보딩 surface로 재구성한다.
-2. 모바일 대시보드 정보 밀도 검토
-   - KPI가 모두 한 열이라 스크롤이 길다.
-   - 390px에서 2열 KPI 또는 가로 요약 패턴을 RED 테스트부터 비교한다.
-3. 라이트 테마 실브라우저 시각 리뷰
-   - 대비 자동 테스트는 통과했지만 이번 실브라우저 캡처는 시스템 다크 테마 중심이었다.
-4. 로그인 완료 이후 주요 경로 실브라우저 순회
-   - Today → Path → Content → Sandbox → Mentor → Community 순서로 desktop/compact를 확인한다.
-5. 리뷰 후 `develop` 대상 PR 생성 및 배포는 별도 승인된 세션에서 수행한다.
+1. `origin/develop` 동기화 후 전체 format/analyze/test/web release build를 새 HEAD에서 재실행한다.
+2. 320/390/600/840/1240과 light/dark에서 로그인·진단·커뮤니티·계정 메뉴를 캡처한다.
+3. GitHub OAuth와 로그아웃을 staging에서 실제 계정으로 왕복 검증한다.
+4. `feat/mobile-first-redesign → develop` PR을 만들고 CI 결과를 확인한다.
+5. 고도화 계획의 `/plan-eng-review`를 실행한 뒤 T1 Today/Path를 RED 테스트부터 착수한다.
 
 ## 6. 다음 세션 시작 명령
 
 ```powershell
 cd D:\workspace\dpa\.worktrees\frontend-mobile-first-redesign
-git fetch origin
+git fetch origin --prune
 git switch feat/mobile-first-redesign
 git status --short --branch
-git log -3 --oneline --decorate
+git log -5 --oneline --decorate
+Get-Content -Raw HANDOFF.md
+Get-Content -Raw docs\superpowers\plans\2026-09-15-flutter-web-react-grade-design.md
 ```
 
-예상 상태:
+저장된 세션 문맥은 `/context-restore`로 불러온다. 예상 상태는 원격과 동기화된 clean worktree다.
 
-- `feat/mobile-first-redesign`가 `origin/feat/mobile-first-redesign`를 추적
-- worktree clean
-- HEAD가 이 핸드오프 커밋
+## 7. 10분 종료·이관 규칙
 
-착수 전에는 `HANDOFF.md` §5의 첫 항목만 선택해 실패 테스트를 먼저 만든다.
+- 종료 요청을 받으면 새 기능, 전체 테스트, 배포, 대규모 리뷰를 시작하지 않는다.
+- 10분 안에 `git 상태 수집 → HANDOFF 갱신 → 문서 검사 → 명시 파일만 커밋 → push →
+  context-save` 순서로 끝낸다.
+- 10분을 넘길 가능성이 있는 작업은 HANDOFF의 다음 세션 목록으로 이동한다.
+- 차단은 실제 명령 결과와 함께 기록한다. 추측으로 사람에게 작업을 넘기지 않는다.
