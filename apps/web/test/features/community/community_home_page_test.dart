@@ -194,7 +194,7 @@ void main() {
     expect(find.text('상세 화면'), findsOneWidget);
   });
 
-  testWidgets('통합 피드: 필터칩 4개 + 보드 뱃지 + 일반글 탭 라우팅', (tester) async {
+  testWidgets('게시판 피드: 직접 전환 3개 + 보드 뱃지 + 일반글 탭 라우팅', (tester) async {
     final c = ProviderContainer(
       overrides: [
         communityListProvider.overrideWithValue(
@@ -208,14 +208,24 @@ void main() {
     await tester.pumpWidget(_host(c));
     await tester.pumpAndSettle();
 
-    // 필터: SegmentedButton(전체/자유게시판/Q/A/피드백)
+    // 로컬 내비: SegmentedButton(자유게시판/Q/A/피드백)
     expect(find.byType(SegmentedButton<CommunityBoard>), findsOneWidget);
-    expect(find.text('전체'), findsOneWidget);
-    expect(find.text('Q/A'), findsOneWidget);
-    expect(find.text('피드백'), findsOneWidget);
+    final boardNavigation = find.byType(SegmentedButton<CommunityBoard>);
+    expect(
+      find.descendant(of: boardNavigation, matching: find.text('전체')),
+      findsNothing,
+    );
+    expect(
+      find.descendant(of: boardNavigation, matching: find.text('Q/A')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: boardNavigation, matching: find.text('피드백')),
+      findsOneWidget,
+    );
     // 카드 제목 + 보드 필터/뱃지('자유게시판')
     expect(find.text('자유글'), findsOneWidget);
-    expect(find.text('자유게시판'), findsNWidgets(2)); // 세그먼트 + 뱃지
+    expect(find.text('자유게시판'), findsNWidgets(3)); // 헤더 + 세그먼트 + 뱃지
     // subtitle: FREE는 "댓글" 라벨
     expect(find.textContaining('댓글 1'), findsOneWidget);
 
@@ -225,7 +235,7 @@ void main() {
     expect(find.text('일반 상세 화면'), findsOneWidget);
   });
 
-  testWidgets('SegmentedButton 선택 시 selectBoard로 재조회한다', (tester) async {
+  testWidgets('SegmentedButton에서 Q/A 선택 시 해당 게시판으로 재조회한다', (tester) async {
     final seen = <String?>[];
     final c = ProviderContainer(
       overrides: [
@@ -243,9 +253,14 @@ void main() {
     await tester.pumpWidget(_host(c));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('자유게시판')); // QNA post라 세그먼트만 존재
+    await tester.tap(
+      find.descendant(
+        of: find.byType(SegmentedButton<CommunityBoard>),
+        matching: find.text('Q/A'),
+      ),
+    );
     await tester.pumpAndSettle();
-    expect(seen, contains('FREE'));
+    expect(seen, contains('QNA'));
   });
 
   testWidgets('initialBoard 쿼리로 진입 시 초기 필터가 반영된다', (tester) async {
@@ -279,6 +294,125 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(seen, contains('FREE'));
+  });
+
+  testWidgets('board 쿼리 없이 진입하면 자유게시판을 기본으로 조회한다', (tester) async {
+    final seen = <String?>[];
+    final c = ProviderContainer(
+      overrides: [
+        communityListProvider.overrideWithValue(({
+          String? board,
+          String? tag,
+          String? sort,
+        }) async {
+          seen.add(board);
+          return const [];
+        }),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    await tester.pumpWidget(_host(c));
+    await tester.pumpAndSettle();
+
+    expect(seen, contains('FREE'));
+    expect(find.text('전체'), findsNothing);
+    expect(find.text('자유게시판'), findsNWidgets(2)); // 헤더 + 세그먼트
+  });
+
+  testWidgets('같은 화면에서 board URL만 바뀌어도 새 게시판을 조회한다', (tester) async {
+    final seen = <String?>[];
+    final c = ProviderContainer(
+      overrides: [
+        communityListProvider.overrideWithValue(({
+          String? board,
+          String? tag,
+          String? sort,
+        }) async {
+          seen.add(board);
+          return const [];
+        }),
+      ],
+    );
+    addTearDown(c.dispose);
+    final router = GoRouter(
+      initialLocation: '/community?board=FREE',
+      routes: [
+        GoRoute(
+          path: '/community',
+          builder: (_, state) => CommunityHomePage(
+            initialBoard: state.uri.queryParameters['board'],
+          ),
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: c,
+        child: MaterialApp.router(theme: DpTheme.light(), routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+    router.go('/community?board=QNA');
+    await tester.pumpAndSettle();
+
+    expect(seen, containsAllInOrder(['FREE', 'QNA']));
+    expect(find.text('Q/A'), findsNWidgets(2)); // 헤더 + 세그먼트
+  });
+
+  testWidgets('셸 이동으로 q가 사라지면 검색 결과를 지우고 게시판 목록으로 복귀한다', (tester) async {
+    final c = ProviderContainer(
+      overrides: [
+        communityListProvider.overrideWithValue(
+          ({String? board, String? tag, String? sort}) async => [
+            _p(1, title: '게시판 목록', boardType: 'FREE'),
+          ],
+        ),
+        communitySearchProvider.overrideWithValue(
+          ({
+            required String q,
+            String? board,
+            String? tag,
+            bool? solved,
+            String? sort,
+            int page = 0,
+            int size = 20,
+          }) async => CommunitySearchResult(
+            items: [CommunitySearchItem(id: 2, title: '검색 결과', replyCount: 0)],
+            total: 1,
+          ),
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+    final router = GoRouter(
+      initialLocation: '/community?board=FREE&q=flutter',
+      routes: [
+        GoRoute(
+          path: '/community',
+          builder: (_, state) => CommunityHomePage(
+            initialBoard: state.uri.queryParameters['board'],
+            initialQuery: state.uri.queryParameters['q'],
+          ),
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: c,
+        child: MaterialApp.router(theme: DpTheme.light(), routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('검색 결과'), findsOneWidget);
+
+    router.go('/community?board=FREE');
+    await tester.pumpAndSettle();
+
+    expect(find.text('검색 결과'), findsNothing);
+    expect(find.text('게시판 목록'), findsOneWidget);
   });
 
   testWidgets('피드 행이 DpListRow로 렌더된다', (tester) async {
