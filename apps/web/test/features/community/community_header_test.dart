@@ -18,8 +18,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
     expect(find.byType(AppBar), findsNothing);
     final header = tester.widget<DpPageHeader>(find.byType(DpPageHeader));
-    expect(header.title, '커뮤니티');
-    expect(header.description, '질문하고 답하고 서로 피드백을 남깁니다');
+    expect(header.title, '자유게시판');
+    expect(header.description, '개발 이야기를 자유롭게 나눕니다');
     expect(find.byType(PinnedHeaderSliver), findsOneWidget);
     expect(
       find.byType(FloatingActionButton),
