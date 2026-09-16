@@ -258,7 +258,8 @@ flutter build web --release
 
 - 완료: 진단 시작, 커뮤니티 명칭/순서, 중복 breadcrumb, 1단계 logout, 전체
   format/analyze/test/build, light/dark 브라우저 캡처 40장.
-- 남음: PR CI와 staging 실제 계정 GitHub OAuth/logout 왕복 검증.
+- 남음: PR CI 확인.
+- 후속 출시 준비: staging 실제 계정 GitHub OAuth/logout 왕복 검증(Phase 4).
 - 산출: `feat/mobile-first-redesign → develop` PR. 운영 직접 배포는 하지 않는다.
 
 ### Phase 1 — 핵심 동선의 정보 밀도 (P1)

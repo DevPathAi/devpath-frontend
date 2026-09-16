@@ -90,7 +90,7 @@ git diff --check
 
 - format 737 files, 변경 0.
 - analyze: web/admin/mobile/dp_design/dp_core 이슈 0건.
-- test: web 948, admin 156, dp_design 220, dp_core 174 및 mobile 전체 통과.
+- test: web 953, admin 156, dp_design 220, dp_core 174 및 mobile 전체 통과.
 - web release build 성공.
 - 이후 진단·커뮤니티·shell 변경은 해당 위젯/IA 테스트를 RED→GREEN으로 통과했다.
 - 최종 브랜치 HEAD에서도 전체 format/analyze/test/web release build와 `git diff --check`가 통과했다.
