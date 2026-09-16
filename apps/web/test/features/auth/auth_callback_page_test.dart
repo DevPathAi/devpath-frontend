@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:devpath_web/src/features/auth/application/auth_controller.dart';
 import 'package:devpath_web/src/features/auth/presentation/auth_callback_page.dart';
 import 'package:devpath_web/src/features/auth/state/auth_state.dart';
@@ -21,6 +23,14 @@ class _CallbackAuthController extends AuthController {
 
   @override
   Future<void> bootstrapFromCallback() async => bootstrapCalls++;
+}
+
+class _PendingAuthController extends AuthController {
+  @override
+  AuthState build() => const AuthLoading();
+
+  @override
+  Future<void> bootstrapFromCallback() => Completer<void>().future;
 }
 
 class _ContinuationController extends DiagnosticController {
@@ -110,5 +120,31 @@ void main() {
     expect(find.text('로그인 다시 확인'), findsOneWidget);
     expect(find.text('진단 결과로 돌아가기'), findsOneWidget);
     expect(continuation.oauthFailure, isNotNull);
+  });
+
+  testWidgets('callback 진행 중에는 접근 가능한 로딩 상태를 보인다', (tester) async {
+    final auth = _PendingAuthController();
+    final continuation = _ContinuationController();
+    final router = GoRouter(
+      initialLocation: '/auth/callback',
+      routes: [
+        GoRoute(
+          path: '/auth/callback',
+          builder: (_, _) => const AuthCallbackPage(),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authControllerProvider.overrideWith(() => auth),
+          diagnosticControllerProvider.overrideWith(() => continuation),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pump();
+    expect(find.bySemanticsLabel('로그인을 확인하는 중'), findsOneWidget);
   });
 }

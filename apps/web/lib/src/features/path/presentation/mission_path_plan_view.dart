@@ -170,28 +170,17 @@ class _AvailablePath extends StatelessWidget {
           ),
           if (!detailMatches && plan != null) ...[
             const SizedBox(height: DpSpacing.sm),
-            Semantics(
-              liveRegion: true,
-              child: Text(
-                '현재 미션과 경로 상세가 아직 맞지 않아요.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: context.dpColors.warning,
-                ),
-              ),
+            const DpInlineNotice(
+              message: '현재 미션과 경로 상세가 아직 맞지 않아요.',
+              tone: DpInlineNoticeTone.warning,
             ),
           ],
           if (missionState.failureMessage != null) ...[
             const SizedBox(height: DpSpacing.sm),
-            Semantics(
-              liveRegion: true,
-              child: Text(
-                completionFailed
-                    ? '완료를 저장하지 못했어요. 현재 미션은 그대로예요.'
-                    : '마지막으로 확인한 미션을 표시하고 있어요.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: context.dpColors.danger,
-                ),
-              ),
+            DpInlineNotice(
+              message: completionFailed
+                  ? '완료를 저장하지 못했어요. 현재 미션은 그대로예요.'
+                  : '마지막으로 확인한 미션을 표시하고 있어요.',
             ),
           ],
           const SizedBox(height: DpSpacing.lg),

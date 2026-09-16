@@ -205,18 +205,10 @@ class _SupportingMetricsError extends StatelessWidget {
   final VoidCallback onRetry;
 
   @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      Expanded(
-        child: Text(
-          '보조 학습 지표를 불러오지 못했어요. $message',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: context.dpColors.textSecondary,
-          ),
-        ),
-      ),
-      const SizedBox(width: DpSpacing.sm),
-      TextButton(onPressed: onRetry, child: const Text('지표 다시 보기')),
-    ],
+  Widget build(BuildContext context) => DpInlineNotice(
+    message: '보조 학습 지표를 불러오지 못했어요. $message',
+    tone: DpInlineNoticeTone.warning,
+    actionLabel: '지표 다시 보기',
+    onAction: onRetry,
   );
 }

@@ -67,7 +67,11 @@ class _QnaDetailPageState extends ConsumerState<QnaDetailPage> {
             ),
             QnaFailed(:final message) => SliverFillRemaining(
               hasScrollBody: false,
-              child: SupportableError(message: message),
+              child: SupportableError(
+                message: message,
+                onRetry: () =>
+                    ref.read(qnaDetailControllerProvider.notifier).load(_id),
+              ),
             ),
             QnaLoaded(:final detail, :final submitting) => _Loaded(
               detail: detail,
