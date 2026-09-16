@@ -127,6 +127,44 @@ class _AvailableMission extends StatelessWidget {
             status: state.isStale
                 ? DpMissionHeaderStatus.stale
                 : DpMissionHeaderStatus.active,
+            variant: context.windowClass == DpWindowClass.compact
+                ? DpMissionHeaderVariant.compact
+                : DpMissionHeaderVariant.standard,
+            action: DpNextActionBand(
+              actionId: retriesCompletion
+                  ? 'retry_contentless_completion'
+                  : refreshFailed
+                  ? 'refresh_current_mission'
+                  : contentId == null
+                  ? 'complete_contentless_mission'
+                  : 'open_mission_content',
+              label: contentId == null ? '미션 완료' : '미션 열기',
+              expectedOutcome: retriesCompletion
+                  ? '완료 기록을 다시 저장하고 다음 미션을 확인합니다.'
+                  : refreshFailed
+                  ? '서버 기록에서 현재 미션을 다시 확인합니다.'
+                  : contentId == null
+                  ? '서버 확인 후 다음 미션을 불러옵니다.'
+                  : '콘텐츠에서 완료 조건을 확인합니다.',
+              state: actionState,
+              pendingLabel: completionPending ? '완료 확인 중' : '미션 확인 중',
+              retryLabel: retriesCompletion ? '완료 다시 시도' : '미션 다시 확인',
+              onPressed: (_) {
+                if (retriesCompletion ||
+                    (contentId == null && !refreshFailed)) {
+                  onCompleteContentless(task.taskId!);
+                } else if (refreshFailed) {
+                  onRetry();
+                } else {
+                  onOpenContent(
+                    MissionWorkspaceKey(
+                      taskId: task.taskId!,
+                      contentId: contentId!,
+                    ),
+                  );
+                }
+              },
+            ),
           ),
           if (state.failureMessage != null) ...[
             const SizedBox(height: DpSpacing.sm),
@@ -136,41 +174,6 @@ class _AvailableMission extends StatelessWidget {
                   : '미션을 새로 확인하지 못했어요. 마지막으로 확인한 미션은 유지됩니다.',
             ),
           ],
-          const SizedBox(height: DpSpacing.md),
-          DpNextActionBand(
-            actionId: retriesCompletion
-                ? 'retry_contentless_completion'
-                : refreshFailed
-                ? 'refresh_current_mission'
-                : contentId == null
-                ? 'complete_contentless_mission'
-                : 'open_mission_content',
-            label: contentId == null ? '미션 완료' : '미션 열기',
-            expectedOutcome: retriesCompletion
-                ? '완료 기록을 다시 저장하고 다음 미션을 확인합니다.'
-                : refreshFailed
-                ? '서버 기록에서 현재 미션을 다시 확인합니다.'
-                : contentId == null
-                ? '서버 확인 후 다음 미션을 불러옵니다.'
-                : '콘텐츠에서 완료 조건을 확인합니다.',
-            state: actionState,
-            pendingLabel: completionPending ? '완료 확인 중' : '미션 확인 중',
-            retryLabel: retriesCompletion ? '완료 다시 시도' : '미션 다시 확인',
-            onPressed: (_) {
-              if (retriesCompletion || (contentId == null && !refreshFailed)) {
-                onCompleteContentless(task.taskId!);
-              } else if (refreshFailed) {
-                onRetry();
-              } else {
-                onOpenContent(
-                  MissionWorkspaceKey(
-                    taskId: task.taskId!,
-                    contentId: contentId!,
-                  ),
-                );
-              }
-            },
-          ),
         ],
       ),
     );
@@ -197,14 +200,16 @@ class _CompletedMission extends StatelessWidget {
           progressValue: 1,
           progressLabel: '경로 진행',
           status: DpMissionHeaderStatus.completed,
-        ),
-        const SizedBox(height: DpSpacing.md),
-        DpNextActionBand(
-          actionId: 'open_completed_path',
-          label: '경로 돌아보기',
-          expectedOutcome: '완료한 주차와 학습 기록을 확인합니다.',
-          state: DpNextActionState.ready,
-          onPressed: (_) => onOpenPath(),
+          variant: context.windowClass == DpWindowClass.compact
+              ? DpMissionHeaderVariant.compact
+              : DpMissionHeaderVariant.standard,
+          action: DpNextActionBand(
+            actionId: 'open_completed_path',
+            label: '경로 돌아보기',
+            expectedOutcome: '완료한 주차와 학습 기록을 확인합니다.',
+            state: DpNextActionState.ready,
+            onPressed: (_) => onOpenPath(),
+          ),
         ),
       ],
     ),

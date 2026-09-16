@@ -108,4 +108,19 @@ void main() {
     final streakTop = tester.getTopLeft(find.text('연속 학습'));
     expect(weeklyTop.dy, lessThan(streakTop.dy));
   });
+
+  testWidgets('Today 보조 지표는 compact 에서 주간 활동과 스트릭만 남긴다', (tester) async {
+    tester.view.physicalSize = const Size(400, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(_supportingDashboardHost(_summary));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('weekly-activity-card')), findsOneWidget);
+    expect(find.text('연속 학습'), findsOneWidget);
+    expect(find.text('62%'), findsNothing);
+    expect(find.text('완료 콘텐츠'), findsNothing);
+    expect(find.byKey(const Key('progress-trend-card')), findsNothing);
+    expect(find.textContaining('첫걸음'), findsNothing);
+  });
 }

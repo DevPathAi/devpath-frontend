@@ -53,67 +53,80 @@ class DashboardBody extends StatelessWidget {
     required bool includeAd,
     Key? key,
   }) {
-    final cross = switch (context.windowClass) {
-      DpWindowClass.compact => 1,
-      DpWindowClass.medium => 2,
-      _ => 4, // expanded/large: 4열 Bento
-    };
-    final maxW = context.appTokens.contentMaxWidth;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // 열 수는 창 폭이 아니라 실제 가용 폭으로 정한다. Today 의 2열 구성에서는
+        // 보조 레일 폭(창의 2/5)이 기준이 되어야 KPI 카드가 눌리지 않는다.
+        final width = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : MediaQuery.sizeOf(context).width;
+        final cross = width < 600
+            ? 1
+            : width < 840
+            ? 2
+            : 4; // 4열 Bento
+        final showTrend = width >= _trendMinWidth;
+        final maxW = context.appTokens.contentMaxWidth;
 
-    // 셀 폭 배분(cross열 기준): CTA는 넓게, KPI는 1열, 도넛/배지는 폭별 조정.
-    final ctaSpan = cross >= 4 ? 2 : cross;
-    final donutSpan = cross >= 4 ? 2 : (cross == 2 ? 2 : 1);
-    final badgeSpan = cross;
+        // 셀 폭 배분(cross열 기준): CTA는 넓게, KPI는 1열, 도넛/배지는 폭별 조정.
+        final ctaSpan = cross >= 4 ? 2 : cross;
+        final donutSpan = cross >= 4 ? 2 : (cross == 2 ? 2 : 1);
+        final badgeSpan = cross;
 
-    final tiles = <StaggeredGridTile>[
-      if (includeLegacyHero) ...[
-        if (includeAd)
-          StaggeredGridTile.fit(
-            crossAxisCellCount: cross,
-            child: const AdSlotWidget(slot: 'DASHBOARD_TOP'),
+        final tiles = <StaggeredGridTile>[
+          if (includeLegacyHero) ...[
+            if (includeAd)
+              StaggeredGridTile.fit(
+                crossAxisCellCount: cross,
+                child: const AdSlotWidget(slot: 'DASHBOARD_TOP'),
+              ),
+            StaggeredGridTile.fit(
+              crossAxisCellCount: ctaSpan,
+              child: _HeroCta(title: summary.nextTaskTitle),
+            ),
+            _streakTile(summary),
+            _completedContentTile(summary),
+            _progressDonutTile(summary, donutSpan),
+            _weeklyActivityTile(summary, donutSpan),
+            _progressTrendTile(summary, donutSpan),
+          ] else ...[
+            // Today 보조 맥락: 이번 주 진행 근거 → 추세 → KPI. 도넛(헤더 진행과 중복)과
+            // 배지(장식)는 Today 에서 제외하고, compact 는 주간 활동과 스트릭만 남긴다.
+            _weeklyActivityTile(summary, donutSpan),
+            if (showTrend) _progressTrendTile(summary, donutSpan),
+            _streakTile(summary),
+            if (cross >= 2) _completedContentTile(summary),
+          ],
+          if (includeLegacyHero && summary.badges.isNotEmpty)
+            StaggeredGridTile.fit(
+              crossAxisCellCount: badgeSpan,
+              child: _BadgeStrip(badges: summary.badges),
+            ),
+        ];
+
+        return Align(
+          key: key,
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxW),
+            child: Padding(
+              padding: const EdgeInsets.all(DpSpacing.lg),
+              child: StaggeredGrid.count(
+                crossAxisCount: cross,
+                mainAxisSpacing: DpSpacing.md,
+                crossAxisSpacing: DpSpacing.md,
+                children: tiles,
+              ),
+            ),
           ),
-        StaggeredGridTile.fit(
-          crossAxisCellCount: ctaSpan,
-          child: _HeroCta(title: summary.nextTaskTitle),
-        ),
-        _streakTile(summary),
-        _completedContentTile(summary),
-        _progressDonutTile(summary, donutSpan),
-        _weeklyActivityTile(summary, donutSpan),
-        _progressTrendTile(summary, donutSpan),
-      ] else ...[
-        // Today 전용 위계: 이번 주 진행 근거를 먼저, 스트릭·보조 지표를 뒤에 둔다.
-        _weeklyActivityTile(summary, donutSpan),
-        _progressDonutTile(summary, donutSpan),
-        _streakTile(summary),
-        _completedContentTile(summary),
-        _progressTrendTile(summary, donutSpan),
-      ],
-      if (summary.badges.isNotEmpty)
-        StaggeredGridTile.fit(
-          crossAxisCellCount: badgeSpan,
-          child: _BadgeStrip(badges: summary.badges),
-        ),
-    ];
-
-    return Align(
-      key: key,
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxW),
-        child: Padding(
-          padding: const EdgeInsets.all(DpSpacing.lg),
-          child: StaggeredGrid.count(
-            crossAxisCount: cross,
-            mainAxisSpacing: DpSpacing.md,
-            crossAxisSpacing: DpSpacing.md,
-            children: tiles,
-          ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
+
+/// 추세 차트를 보일 최소 가용 폭. compact(≤400) 는 숨기고 2열 레일(≈480) 은 보인다.
+const double _trendMinWidth = 440;
 
 StaggeredGridTile _streakTile(DashboardSummary summary) =>
     StaggeredGridTile.fit(
