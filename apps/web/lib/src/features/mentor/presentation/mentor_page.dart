@@ -693,19 +693,11 @@ class _PartialNotice extends StatelessWidget {
       horizontal: DpSpacing.lg,
       vertical: DpSpacing.sm,
     ),
-    child: Row(
-      children: [
-        Expanded(
-          child: Text(
-            message ?? '연결이 끊겼어요. 부분답변을 받았어요.',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: context.dpColors.textSecondary,
-            ),
-          ),
-        ),
-        const SizedBox(width: DpSpacing.sm),
-        TextButton(onPressed: onRetry, child: const Text('다시 시도')),
-      ],
+    child: DpInlineNotice(
+      message: message ?? '연결이 끊겼어요. 부분답변을 받았어요.',
+      tone: DpInlineNoticeTone.warning,
+      actionLabel: '다시 시도',
+      onAction: onRetry,
     ),
   );
 }
@@ -717,11 +709,9 @@ class _PartialText extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.symmetric(horizontal: DpSpacing.lg),
-    child: Text(
-      message ?? '연결이 끊겼어요. 받은 답변은 그대로 두었어요.',
-      style: Theme.of(
-        context,
-      ).textTheme.bodySmall?.copyWith(color: context.dpColors.textSecondary),
+    child: DpInlineNotice(
+      message: message ?? '연결이 끊겼어요. 받은 답변은 그대로 두었어요.',
+      tone: DpInlineNoticeTone.warning,
     ),
   );
 }
@@ -734,13 +724,7 @@ class _InlineError extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.symmetric(horizontal: DpSpacing.lg),
-    child: Semantics(
-      liveRegion: true,
-      child: Text(
-        message,
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: color),
-      ),
-    ),
+    child: DpInlineNotice(message: message),
   );
 }
 

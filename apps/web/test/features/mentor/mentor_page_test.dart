@@ -129,6 +129,12 @@ void main() {
 
     expect(find.text('부분응답'), findsOneWidget); // 부분답변 보존
     expect(find.text('다시 시도'), findsOneWidget); // 재전송 액션
+    final notice = find.byKey(const ValueKey('dp-inline-notice'));
+    expect(notice, findsOneWidget);
+    expect(
+      find.descendant(of: notice, matching: find.text('다시 시도')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('참고자료 references 도착 시 칩으로 렌더', (tester) async {
