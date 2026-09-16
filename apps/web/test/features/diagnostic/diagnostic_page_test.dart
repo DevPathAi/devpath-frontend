@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:devpath_web/src/app/app_config.dart';
 import 'package:devpath_web/src/features/auth/application/auth_controller.dart';
 import 'package:devpath_web/src/features/auth/state/auth_state.dart';
@@ -155,6 +157,23 @@ void main() {
     expect(find.textContaining('로그인 없이'), findsOneWidget);
     expect(find.textContaining('레벨과 신뢰도'), findsOneWidget);
     expect(find.byKey(const ValueKey('brand-row')), findsOneWidget);
+  });
+
+  testWidgets('트랙 선택기는 보이는 제목을 접근 가능한 버튼 이름으로 연결한다', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final controller = _FixedDiagnosticController(const DiagnosticState());
+    await tester.pumpWidget(_host(controller));
+    await tester.pump();
+
+    final selector = tester.getSemantics(
+      find.bySemanticsLabel(RegExp('진단할 트랙')),
+    );
+    expect(
+      selector.getSemanticsData().hasAction(ui.SemanticsAction.tap),
+      isTrue,
+    );
+
+    semantics.dispose();
   });
 
   testWidgets('시작 화면은 단계·진단 설명·기대 결과·시작 행동을 하나의 온보딩 surface로 묶는다', (

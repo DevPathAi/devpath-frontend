@@ -292,8 +292,6 @@ class _DiagnosticTrackForm extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('진단할 트랙', style: text.titleMedium),
-        const SizedBox(height: DpSpacing.xs),
         Text(
           '선택한 트랙이 문항과 이후 학습 경로의 기준이 됩니다.',
           style: text.bodyMedium?.copyWith(color: colors.textSecondary),
@@ -303,7 +301,10 @@ class _DiagnosticTrackForm extends StatelessWidget {
           key: const ValueKey('diagnostic-track'),
           isExpanded: true,
           initialValue: selectedTrack,
-          decoration: const InputDecoration(hintText: '트랙을 선택하세요'),
+          decoration: const InputDecoration(
+            labelText: '진단할 트랙',
+            hintText: '트랙을 선택하세요',
+          ),
           items: [
             for (final entry in trackLabels.entries)
               DropdownMenuItem(value: entry.key, child: Text(entry.value)),
