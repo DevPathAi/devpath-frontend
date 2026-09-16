@@ -16,7 +16,7 @@ import '../../support/presentation/supportable_error.dart';
 class CommunityHomePage extends ConsumerStatefulWidget {
   const CommunityHomePage({super.key, this.initialBoard, this.initialQuery});
 
-  /// URL 쿼리 `?board=`(QNA/FREE/FEEDBACK) 프리셋. null=전체.
+  /// URL 쿼리 `?board=`(QNA/FREE/FEEDBACK) 프리셋. null=자유게시판.
   final String? initialBoard;
 
   /// URL 쿼리 `?q=` 프리셋. 값이 있으면 진입 즉시 검색 결과를 보여준다(딥링크·새로고침).
@@ -27,30 +27,57 @@ class CommunityHomePage extends ConsumerStatefulWidget {
 }
 
 class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
+  late CommunityBoard _entryBoard;
+
+  static CommunityBoard _resolveBoard(String? value) => value == null
+      ? CommunityBoard.free
+      : CommunityBoard.values.firstWhere(
+          (board) => board != CommunityBoard.all && board.value == value,
+          orElse: () => CommunityBoard.free,
+        );
+
   @override
   void initState() {
     super.initState();
+    _entryBoard = _resolveBoard(widget.initialBoard);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final board = CommunityBoard.values.firstWhere(
-        (b) => b.value == widget.initialBoard,
-        orElse: () => CommunityBoard.all,
-      );
       final notifier = ref.read(communityControllerProvider.notifier);
-      if (board == CommunityBoard.all) {
-        notifier.load();
-      } else {
-        notifier.selectBoard(board);
-      }
+      notifier.selectBoard(_entryBoard);
 
       // 검색어 변경 시 URL 을 갱신하므로 이 페이지가 다시 만들어질 수 있다. 이미 같은 검색어로
       // 결과를 들고 있으면 재조회하지 않는다(타이핑마다 중복 호출 방지).
       final q = widget.initialQuery?.trim() ?? '';
       final search = ref.read(communitySearchControllerProvider);
-      if (q.isNotEmpty && search.query != q) {
+      if (search.query != q) {
         ref
             .read(communitySearchControllerProvider.notifier)
-            .search(q, board: board.value);
+            .search(q, board: _entryBoard.value);
+      }
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant CommunityHomePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final nextBoard = _resolveBoard(widget.initialBoard);
+    final boardChanged = nextBoard != _entryBoard;
+    if (boardChanged) _entryBoard = nextBoard;
+
+    final nextQuery = widget.initialQuery?.trim() ?? '';
+    final search = ref.read(communitySearchControllerProvider);
+    final queryChanged = search.query != nextQuery;
+    if (!boardChanged && !queryChanged) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (boardChanged) {
+        ref.read(communityControllerProvider.notifier).selectBoard(nextBoard);
+      }
+      if (queryChanged) {
+        ref
+            .read(communitySearchControllerProvider.notifier)
+            .search(nextQuery, board: nextBoard.value);
       }
     });
   }
@@ -118,12 +145,13 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
     final s = ref.watch(communityControllerProvider);
     final notifier = ref.read(communityControllerProvider.notifier);
     final search = ref.watch(communitySearchControllerProvider);
+    final activeBoard = s.board == CommunityBoard.all ? _entryBoard : s.board;
 
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openComposeSheet(context),
         icon: const Icon(DpIcons.edit),
-        label: const Text('새 글'),
+        label: Text(activeBoard == CommunityBoard.qna ? '질문하기' : '글 작성'),
       ),
       body: CustomScrollView(
         // 스크린리더가 「N개 중 M번째」를 읽을 수 있게 목록 항목 수를 알린다.
@@ -136,10 +164,15 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
             ? s.posts.length
             : search.items.length,
         slivers: [
-          const SliverToBoxAdapter(
+          SliverToBoxAdapter(
             child: DpPageHeader(
-              title: '커뮤니티',
-              description: '질문하고 답하고 서로 피드백을 남깁니다',
+              title: activeBoard.label,
+              description: switch (activeBoard) {
+                CommunityBoard.free => '개발 이야기를 자유롭게 나눕니다',
+                CommunityBoard.qna => '막힌 문제를 질문하고 함께 해결합니다',
+                CommunityBoard.feedback => '코드와 프로젝트에 구체적인 의견을 나눕니다',
+                CommunityBoard.all => '개발 이야기를 자유롭게 나눕니다',
+              },
             ),
           ),
           PinnedHeaderSliver(
@@ -157,12 +190,14 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
                     ),
                     child: CommunitySearchBar(
                       initialQuery: widget.initialQuery ?? '',
-                      onChangedDebounced: (q) => _onQueryChanged(q, s.board),
+                      onChangedDebounced: (q) =>
+                          _onQueryChanged(q, activeBoard),
                     ),
                   ),
                   _BoardFilterBar(
-                    current: s.board,
+                    current: activeBoard,
                     onSelect: (board) {
+                      _entryBoard = board;
                       notifier.selectBoard(board);
                       // 검색 중이면 같은 검색어를 새 보드로 다시 조회한다.
                       if (search.phase != CommunitySearchPhase.idle) {
@@ -170,7 +205,7 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
                             .read(communitySearchControllerProvider.notifier)
                             .search(search.query, board: board.value);
                       }
-                      context.go('/community?board=${board.value ?? ''}');
+                      context.go('/community?board=${board.value}');
                     },
                   ),
                 ],
@@ -179,7 +214,7 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
           ),
           ...search.phase == CommunitySearchPhase.idle
               ? _bodySlivers(context, s, notifier)
-              : _searchSlivers(context, search, s.board),
+              : _searchSlivers(context, search, activeBoard),
         ],
       ),
     );
@@ -286,7 +321,9 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
         style: TextStyle(color: c.textSecondary, fontSize: 12),
       ),
       onTap: () => context.go(
-        isQna ? '/community/${item.id}' : '/community/post/${item.id}',
+        isQna
+            ? '/community/${item.id}'
+            : '/community/post/${item.id}?board=${item.boardType}',
       ),
     );
   }
@@ -370,7 +407,9 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
         style: TextStyle(color: c.textSecondary, fontSize: 12),
       ),
       onTap: () => context.go(
-        isQna ? '/community/${post.id}' : '/community/post/${post.id}',
+        isQna
+            ? '/community/${post.id}'
+            : '/community/post/${post.id}?board=${post.boardType}',
       ),
     );
   }
@@ -392,7 +431,7 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
   }
 }
 
-/// 통합 피드 상단 보드 필터 — 전체/자유게시판/Q/A/피드백.
+/// 모바일·본문용 로컬 내비게이션. 데스크톱 레일과 같은 세 게시판만 노출한다.
 class _BoardFilterBar extends StatelessWidget {
   const _BoardFilterBar({required this.current, required this.onSelect});
 
@@ -414,7 +453,9 @@ class _BoardFilterBar extends StatelessWidget {
           scrollDirection: Axis.horizontal,
           child: SegmentedButton<CommunityBoard>(
             segments: [
-              for (final b in CommunityBoard.values)
+              for (final b in CommunityBoard.values.where(
+                (board) => board != CommunityBoard.all,
+              ))
                 ButtonSegment(value: b, label: Text(b.label)),
             ],
             selected: {current},

@@ -85,17 +85,21 @@ void main() {
   // 순수 함수(breadcrumbFor) 테스트만으로는 배선이 끊겨도 통과한다 — 셸이
   // 실제로 크롬바에 전달하는지, 세그먼트 탭이 실제로 콜백을 트리거하는지
   // 위젯 테스트로 확인한다.
-  testWidgets('게시글 상세 위치는 크롬바에 2세그먼트 브레드크럼이 배선된다', (tester) async {
+  testWidgets('게시글 상세 위치는 크롬바에 3세그먼트 브레드크럼이 배선된다', (tester) async {
     _setWidth(tester, 1200);
     await tester.pumpWidget(
       _host(
-        const AppShellView(location: '/community/post/12', child: Text('본문')),
+        const AppShellView(
+          location: '/community/post/12?board=FREE',
+          child: Text('본문'),
+        ),
       ),
     );
 
     final chromeBar = tester.widget<DpChromeBar>(find.byType(DpChromeBar));
     expect(chromeBar.breadcrumb, const [
-      (label: '커뮤니티', path: '/community'),
+      (label: '커뮤니티', path: null),
+      (label: '자유게시판', path: '/community?board=FREE'),
       (label: '게시글', path: null),
     ]);
   });
@@ -106,21 +110,21 @@ void main() {
     await tester.pumpWidget(
       _host(
         AppShellView(
-          location: '/community/post/12',
+          location: '/community/post/12?board=FREE',
           onSelect: (p) => picked = p,
           child: const Text('본문'),
         ),
       ),
     );
 
-    // 레일 목적지 라벨도 "커뮤니티"라 크롬바 안으로 범위를 좁힌다.
+    // 레일 목적지 라벨도 "자유게시판"이라 크롬바 안으로 범위를 좁힌다.
     await tester.tap(
       find.descendant(
         of: find.byType(DpChromeBar),
-        matching: find.text('커뮤니티'),
+        matching: find.text('자유게시판'),
       ),
     );
-    expect(picked, '/community');
+    expect(picked, '/community?board=FREE');
   });
 
   // 계정 아이콘은 DpNavRail(다크 배경)과 DpChromeBar(밝은 배경, compact) 사이를
