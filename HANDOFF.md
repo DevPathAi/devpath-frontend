@@ -93,18 +93,18 @@ git diff --check
 - test: web 948, admin 156, dp_design 220, dp_core 174 및 mobile 전체 통과.
 - web release build 성공.
 - 이후 진단·커뮤니티·shell 변경은 해당 위젯/IA 테스트를 RED→GREEN으로 통과했다.
+- 최종 브랜치 HEAD에서도 전체 format/analyze/test/web release build와 `git diff --check`가 통과했다.
+- light/dark 브라우저 검수용 스크린샷 40장을 캡처해 확인했다.
 - 계획 문서는 필수 section, review report, 최종 `NO UNRESOLVED DECISIONS`,
   `git diff --check`를 통과했다.
 
 ## 5. 다음 세션에서 할 큰 작업
 
-다음 세션은 큰 구현과 긴 검증을 여기서 시작한다. 현재 종료 세션에서는 실행하지 않는다.
+전체 로컬 검증과 브라우저 캡처는 완료됐다. 다음 작업은 외부 동선과 PR 게이트다.
 
-1. `origin/develop` 동기화 후 전체 format/analyze/test/web release build를 새 HEAD에서 재실행한다.
-2. 320/390/600/840/1240과 light/dark에서 로그인·진단·커뮤니티·계정 메뉴를 캡처한다.
-3. GitHub OAuth와 로그아웃을 staging에서 실제 계정으로 왕복 검증한다.
-4. `feat/mobile-first-redesign → develop` PR을 만들고 CI 결과를 확인한다.
-5. 고도화 계획의 `/plan-eng-review`를 실행한 뒤 T1 Today/Path를 RED 테스트부터 착수한다.
+1. GitHub OAuth와 로그아웃을 staging에서 실제 계정으로 왕복 검증한다.
+2. `feat/mobile-first-redesign → develop` PR을 만들고 CI 결과를 확인한다.
+3. 고도화 계획의 `/plan-eng-review`를 실행한 뒤 T1 Today/Path를 RED 테스트부터 착수한다.
 
 ## 6. 다음 세션 시작 명령
 
