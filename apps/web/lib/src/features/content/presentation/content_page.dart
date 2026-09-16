@@ -641,47 +641,11 @@ class _InlineContentError extends StatelessWidget {
   final VoidCallback? onRetry;
 
   @override
-  Widget build(BuildContext context) {
-    final colors = context.dpColors;
-    return Semantics(
-      liveRegion: true,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: colors.surfaceMuted,
-          border: Border.all(color: colors.danger),
-          borderRadius: BorderRadius.circular(context.appTokens.panelRadius),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(DpSpacing.md),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final action = TextButton(
-                onPressed: onRetry,
-                child: Text(actionLabel),
-              );
-              if (constraints.maxWidth < 520) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(message),
-                    const SizedBox(height: DpSpacing.xs),
-                    Align(alignment: Alignment.centerLeft, child: action),
-                  ],
-                );
-              }
-              return Row(
-                children: [
-                  Expanded(child: Text(message)),
-                  const SizedBox(width: DpSpacing.sm),
-                  action,
-                ],
-              );
-            },
-          ),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => DpInlineNotice(
+    message: message,
+    actionLabel: actionLabel,
+    onAction: onRetry,
+  );
 }
 
 /// Loaded content production projection shared by the live page and the ET13
