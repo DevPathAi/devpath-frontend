@@ -16,39 +16,45 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - name: Dispatch signed Android build as GitHub Actions automation
+      - name: Dispatch release-ready ET13 evidence as GitHub Actions automation
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh api \
             --method POST \
-            "repos/${GITHUB_REPOSITORY}/actions/workflows/mission-spine-signed-mobile-build.yml/dispatches" \
-            --input - <<'JSON'
-          {
-            "ref": "main",
-            "inputs": {
-              "release_id": "ms-20260916-community-ia"
-            }
-          }
-          JSON
-
-      - name: Dispatch ET13 baseline approval as GitHub Actions automation
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh api \
-            --method POST \
-            "repos/${GITHUB_REPOSITORY}/actions/workflows/et13-baseline-approval.yml/dispatches" \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/et13-evidence.yml/dispatches" \
             --input - <<'JSON'
           {
             "ref": "main",
             "inputs": {
               "release_id": "ms-20260916-community-ia",
-              "raw_run_id": "35095691187",
-              "raw_run_attempt": "1",
-              "raw_artifact_id": "10446079281",
-              "raw_artifact_digest": "sha256:11e9a2693a2814beb62ff2944cfaa060cff94a21220bce3ff2cfdae2eabe9610",
-              "raw_workflow_sha256": "001654acab3847e3cdce750e84cf18315b8853f60a43c1289a34a14ae939843f"
+              "candidate_run_id": "35100929597",
+              "candidate_run_attempt": "1",
+              "candidate_artifact_id": "10448496032",
+              "candidate_spec_sha256": "a60c112f66cea0217757488c913700c1a323217ba8bc7c4ad28084335de9b93c",
+              "baseline_run_id": "35099749034",
+              "baseline_run_attempt": "1",
+              "baseline_artifact_id": "10446964240"
+            }
+          }
+          JSON
+
+      - name: Dispatch manual AT evidence as GitHub Actions automation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api \
+            --method POST \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/mission-spine-manual-at-evidence.yml/dispatches" \
+            --input - <<'JSON'
+          {
+            "ref": "main",
+            "inputs": {
+              "release_id": "ms-20260916-community-ia",
+              "candidate_run_id": "35100929597",
+              "candidate_run_attempt": "1",
+              "candidate_artifact_id": "10448496032",
+              "candidate_spec_sha256": "a60c112f66cea0217757488c913700c1a323217ba8bc7c4ad28084335de9b93c"
             }
           }
           JSON
