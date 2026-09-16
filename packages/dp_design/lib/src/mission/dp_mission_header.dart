@@ -24,6 +24,7 @@ class DpMissionHeader extends StatelessWidget {
     this.variant = DpMissionHeaderVariant.standard,
     this.status = DpMissionHeaderStatus.active,
     this.headingFocusNode,
+    this.action,
   }) : assert(progressValue >= 0 && progressValue <= 1);
 
   final String eyebrow;
@@ -38,6 +39,10 @@ class DpMissionHeader extends StatelessWidget {
   /// 라우트 이동 뒤 feature 계층이 제목에 프로그램 포커스를 둘 때 사용한다.
   /// 제목은 일반 tab traversal에는 참여하지 않는다.
   final FocusNode? headingFocusNode;
+
+  /// 1차 행동(`DpNextActionBand`). 제목 바로 아래, 완료 조건 위에 렌더된다.
+  /// 위계: 다음 행동 → 완료 조건 → 진행 → 보조 맥락([why]).
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
@@ -119,13 +124,7 @@ class DpMissionHeader extends StatelessWidget {
                       ),
                     ),
                   ),
-                  SizedBox(height: gap),
-                  Text(
-                    why,
-                    style: textTheme.bodyLarge?.copyWith(
-                      color: colors.textSecondary,
-                    ),
-                  ),
+                  if (action != null) ...[SizedBox(height: gap), action!],
                   SizedBox(height: gap),
                   Text(
                     '완료 조건 · $completionCriterion',
@@ -161,6 +160,13 @@ class DpMissionHeader extends StatelessWidget {
                           ),
                         ),
                       ],
+                    ),
+                  ),
+                  SizedBox(height: gap),
+                  Text(
+                    why,
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: colors.textSecondary,
                     ),
                   ),
                 ],

@@ -139,4 +139,37 @@ void main() {
       expect(title.style?.color, entry.$2.textPrimary);
     }
   });
+
+  testWidgets('action 슬롯은 제목 아래·완료 조건 위에 놓이고 why 는 진행 아래로 간다', (tester) async {
+    await tester.pumpWidget(
+      _host(
+        DpMissionHeader(
+          eyebrow: '3주차 · 미션 2',
+          title: 'JPA 연관관계의 주인을 설명하고 안전하게 매핑하기',
+          why: '이전 실습에서 생긴 중복 쿼리를 줄이기 위한 미션입니다.',
+          completionCriterion: '테스트 3개가 통과하면 완료',
+          progressValue: 0.5,
+          progressLabel: '이번 주 진행',
+          action: const Text('ACTION-SLOT'),
+        ),
+      ),
+    );
+    final title = tester.getTopLeft(
+      find.byKey(const ValueKey('dp-mission-header-title')),
+    );
+    final action = tester.getTopLeft(find.text('ACTION-SLOT'));
+    final criterion = tester.getTopLeft(find.text('완료 조건 · 테스트 3개가 통과하면 완료'));
+    final progress = tester.getTopLeft(find.text('이번 주 진행 · 50%'));
+    final why = tester.getTopLeft(find.text('이전 실습에서 생긴 중복 쿼리를 줄이기 위한 미션입니다.'));
+    expect(title.dy, lessThan(action.dy));
+    expect(action.dy, lessThan(criterion.dy));
+    expect(criterion.dy, lessThan(progress.dy));
+    expect(progress.dy, lessThan(why.dy));
+  });
+
+  testWidgets('action 이 없으면 기존 텍스트 계약이 그대로 렌더된다', (tester) async {
+    await tester.pumpWidget(_host(_header()));
+    expect(find.text('완료 조건 · 테스트 3개가 통과하면 완료'), findsOneWidget);
+    expect(find.text('이전 실습에서 생긴 중복 쿼리를 줄이기 위한 미션입니다.'), findsOneWidget);
+  });
 }
