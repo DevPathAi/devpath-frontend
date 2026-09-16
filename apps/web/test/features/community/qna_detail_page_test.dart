@@ -229,14 +229,16 @@ void main() {
   });
 
   testWidgets('조회 실패 시 헤더와 에러 안내가 함께 렌더된다', (tester) async {
+    var calls = 0;
     final c = ProviderContainer(
       overrides: [
-        qnaDetailFetchProvider.overrideWithValue(
-          (id) async => throw const ApiException(
+        qnaDetailFetchProvider.overrideWithValue((id) async {
+          calls += 1;
+          throw const ApiException(
             code: ApiErrorCode.unknown,
             message: '질문을 불러오지 못했어요',
-          ),
-        ),
+          );
+        }),
         lcsByQuestionProvider.overrideWithValue((qid) async => null),
       ],
     );
@@ -246,5 +248,11 @@ void main() {
 
     expect(tester.widget<DpPageHeader>(find.byType(DpPageHeader)).title, 'Q/A');
     expect(find.textContaining('질문을 불러오지 못했어요'), findsWidgets);
+
+    // 전체화면 실패는 복구 행동(다시 시도)을 가져야 한다.
+    expect(find.text('다시 시도'), findsOneWidget);
+    await tester.tap(find.text('다시 시도'));
+    await tester.pumpAndSettle();
+    expect(calls, 2);
   });
 }
