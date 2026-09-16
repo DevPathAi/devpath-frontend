@@ -1,0 +1,54 @@
+---
+name: Mission Spine Release Gate Dispatch
+
+'on':
+  push:
+    branches:
+      - automation/dispatch-ms-20260916-community-ia
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  dispatch:
+    name: Dispatch protected release gates
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Dispatch signed Android build as GitHub Actions automation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api \
+            --method POST \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/mission-spine-signed-mobile-build.yml/dispatches" \
+            --input - <<'JSON'
+          {
+            "ref": "main",
+            "inputs": {
+              "release_id": "ms-20260916-community-ia"
+            }
+          }
+          JSON
+
+      - name: Dispatch ET13 baseline approval as GitHub Actions automation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api \
+            --method POST \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/et13-baseline-approval.yml/dispatches" \
+            --input - <<'JSON'
+          {
+            "ref": "main",
+            "inputs": {
+              "release_id": "ms-20260916-community-ia",
+              "raw_run_id": "35095691187",
+              "raw_run_attempt": "1",
+              "raw_artifact_id": "10446079281",
+              "raw_artifact_digest": "sha256:11e9a2693a2814beb62ff2944cfaa060cff94a21220bce3ff2cfdae2eabe9610",
+              "raw_workflow_sha256": "001654acab3847e3cdce750e84cf18315b8853f60a43c1289a34a14ae939843f"
+            }
+          }
+          JSON
