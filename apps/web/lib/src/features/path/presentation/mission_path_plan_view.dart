@@ -142,117 +142,147 @@ class _AvailablePath extends StatelessWidget {
     final retriesCompletion = completionFailed && contentId == null;
     final nextUnlock = _nextUnlock(mission, matchingPlan);
 
+    final compact = context.windowClass == DpWindowClass.compact;
+    final wide = switch (context.windowClass) {
+      DpWindowClass.expanded || DpWindowClass.large => true,
+      _ => false,
+    };
+    final band = DpNextActionBand(
+      actionId: retriesCompletion
+          ? 'retry_path_contentless_completion'
+          : refreshFailed
+          ? 'refresh_path_current_mission'
+          : contentId == null
+          ? 'complete_path_contentless_mission'
+          : 'open_path_mission_content',
+      label: contentId == null ? '미션 완료' : '미션 열기',
+      expectedOutcome: retriesCompletion
+          ? '완료 기록을 다시 저장하고 다음 미션을 확인합니다.'
+          : refreshFailed
+          ? '서버 기록에서 현재 미션을 다시 확인합니다.'
+          : contentId == null
+          ? '서버 확인 후 다음 미션을 불러옵니다.'
+          : '콘텐츠에서 완료 조건을 확인합니다.',
+      state: actionState,
+      pendingLabel: completionPending ? '완료 확인 중' : '미션 확인 중',
+      retryLabel: retriesCompletion ? '완료 다시 시도' : '미션 다시 확인',
+      onPressed: (_) {
+        if (retriesCompletion || (contentId == null && !refreshFailed)) {
+          onCompleteContentless(task.taskId!);
+        } else if (refreshFailed) {
+          onRetryMission();
+        } else {
+          onOpenContent(
+            MissionWorkspaceKey(taskId: task.taskId!, contentId: contentId!),
+          );
+        }
+      },
+    );
+    // 위계: 다음 행동(헤더 안 band) → 완료 조건 → 진행(헤더 바 + spine) → 보조 맥락.
+    final primary = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        DpMissionHeader(
+          eyebrow: '${mission.weekNum}주차 · 미션 ${task.orderNum}',
+          title: task.title,
+          why: currentMilestone?.whyThisOrder ?? '서버가 정한 이번 주의 첫 미완료 과제예요.',
+          completionCriterion: contentId == null
+              ? '완료 기록이 서버에 확인되면 다음 미션이 열려요.'
+              : '연결된 콘텐츠의 완료 기준을 충족하면 다음 미션이 열려요.',
+          progressValue: progress,
+          progressLabel: '이번 주 $completedCount/${mission.tasks.length} 미션 완료',
+          status: missionState.isStale
+              ? DpMissionHeaderStatus.stale
+              : DpMissionHeaderStatus.active,
+          variant: compact
+              ? DpMissionHeaderVariant.compact
+              : DpMissionHeaderVariant.standard,
+          action: band,
+        ),
+        if (!detailMatches && plan != null) ...[
+          const SizedBox(height: DpSpacing.sm),
+          const DpInlineNotice(
+            message: '현재 미션과 경로 상세가 아직 맞지 않아요.',
+            tone: DpInlineNoticeTone.warning,
+          ),
+        ],
+        if (missionState.failureMessage != null) ...[
+          const SizedBox(height: DpSpacing.sm),
+          DpInlineNotice(
+            message: completionFailed
+                ? '완료를 저장하지 못했어요. 현재 미션은 그대로예요.'
+                : '마지막으로 확인한 미션을 표시하고 있어요.',
+          ),
+        ],
+        const SizedBox(height: DpSpacing.lg),
+        DpProgressSpine(
+          steps: [
+            for (final item in mission.tasks)
+              DpProgressStep(
+                id: 'task-${item.taskId}',
+                label: item.title,
+                state: item.completed
+                    ? DpProgressStepState.completed
+                    : item.taskId == task.taskId
+                    ? DpProgressStepState.current
+                    : DpProgressStepState.upcoming,
+              ),
+          ],
+          currentStepId: 'task-${task.taskId}',
+          layout: compact
+              ? DpProgressSpineLayout.text
+              : DpProgressSpineLayout.vertical,
+          label: '${mission.weekNum}주차 미션 순서',
+        ),
+      ],
+    );
+    final supporting = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          '다음 잠금 해제 · $nextUnlock',
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: context.dpColors.textSecondary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        if (currentMilestone != null) ...[
+          const SizedBox(height: DpSpacing.xl),
+          _CurrentWeekDetail(milestone: currentMilestone),
+        ],
+        if (matchingPlan != null) ...[
+          const SizedBox(height: DpSpacing.xl),
+          _RoadmapDetails(plan: matchingPlan, currentWeek: mission.weekNum!),
+        ] else if (isPlanLoading || planFailureMessage != null) ...[
+          const SizedBox(height: DpSpacing.xl),
+          _PlanEnrichmentStatus(
+            isLoading: isPlanLoading,
+            failureMessage: planFailureMessage,
+            onRetry: onRetryPlan,
+          ),
+        ],
+      ],
+    );
+
     return Padding(
       padding: const EdgeInsets.all(DpSpacing.lg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          DpMissionHeader(
-            eyebrow: '${mission.weekNum}주차 · 미션 ${task.orderNum}',
-            title: task.title,
-            why: currentMilestone?.whyThisOrder ?? '서버가 정한 이번 주의 첫 미완료 과제예요.',
-            completionCriterion: contentId == null
-                ? '완료 기록이 서버에 확인되면 다음 미션이 열려요.'
-                : '연결된 콘텐츠의 완료 기준을 충족하면 다음 미션이 열려요.',
-            progressValue: progress,
-            progressLabel: '이번 주 $completedCount/${mission.tasks.length} 미션 완료',
-            status: missionState.isStale
-                ? DpMissionHeaderStatus.stale
-                : DpMissionHeaderStatus.active,
-          ),
-          const SizedBox(height: DpSpacing.md),
-          Text(
-            '다음 잠금 해제 · $nextUnlock',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: context.dpColors.textSecondary,
-              fontWeight: FontWeight.w600,
+      child: wide
+          ? Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(flex: 3, child: primary),
+                const SizedBox(width: DpSpacing.xl),
+                Expanded(flex: 2, child: supporting),
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                primary,
+                const SizedBox(height: DpSpacing.lg),
+                supporting,
+              ],
             ),
-          ),
-          if (!detailMatches && plan != null) ...[
-            const SizedBox(height: DpSpacing.sm),
-            const DpInlineNotice(
-              message: '현재 미션과 경로 상세가 아직 맞지 않아요.',
-              tone: DpInlineNoticeTone.warning,
-            ),
-          ],
-          if (missionState.failureMessage != null) ...[
-            const SizedBox(height: DpSpacing.sm),
-            DpInlineNotice(
-              message: completionFailed
-                  ? '완료를 저장하지 못했어요. 현재 미션은 그대로예요.'
-                  : '마지막으로 확인한 미션을 표시하고 있어요.',
-            ),
-          ],
-          const SizedBox(height: DpSpacing.lg),
-          DpProgressSpine(
-            steps: [
-              for (final item in mission.tasks)
-                DpProgressStep(
-                  id: 'task-${item.taskId}',
-                  label: item.title,
-                  state: item.completed
-                      ? DpProgressStepState.completed
-                      : item.taskId == task.taskId
-                      ? DpProgressStepState.current
-                      : DpProgressStepState.upcoming,
-                ),
-            ],
-            currentStepId: 'task-${task.taskId}',
-            layout: DpProgressSpineLayout.vertical,
-            label: '${mission.weekNum}주차 미션 순서',
-          ),
-          const SizedBox(height: DpSpacing.lg),
-          DpNextActionBand(
-            actionId: retriesCompletion
-                ? 'retry_path_contentless_completion'
-                : refreshFailed
-                ? 'refresh_path_current_mission'
-                : contentId == null
-                ? 'complete_path_contentless_mission'
-                : 'open_path_mission_content',
-            label: contentId == null ? '미션 완료' : '미션 열기',
-            expectedOutcome: retriesCompletion
-                ? '완료 기록을 다시 저장하고 다음 미션을 확인합니다.'
-                : refreshFailed
-                ? '서버 기록에서 현재 미션을 다시 확인합니다.'
-                : contentId == null
-                ? '서버 확인 후 다음 미션을 불러옵니다.'
-                : '콘텐츠에서 완료 조건을 확인합니다.',
-            state: actionState,
-            pendingLabel: completionPending ? '완료 확인 중' : '미션 확인 중',
-            retryLabel: retriesCompletion ? '완료 다시 시도' : '미션 다시 확인',
-            onPressed: (_) {
-              if (retriesCompletion || (contentId == null && !refreshFailed)) {
-                onCompleteContentless(task.taskId!);
-              } else if (refreshFailed) {
-                onRetryMission();
-              } else {
-                onOpenContent(
-                  MissionWorkspaceKey(
-                    taskId: task.taskId!,
-                    contentId: contentId!,
-                  ),
-                );
-              }
-            },
-          ),
-          if (currentMilestone != null) ...[
-            const SizedBox(height: DpSpacing.xl),
-            _CurrentWeekDetail(milestone: currentMilestone),
-          ],
-          if (matchingPlan != null) ...[
-            const SizedBox(height: DpSpacing.xl),
-            _RoadmapDetails(plan: matchingPlan, currentWeek: mission.weekNum!),
-          ] else if (isPlanLoading || planFailureMessage != null) ...[
-            const SizedBox(height: DpSpacing.xl),
-            _PlanEnrichmentStatus(
-              isLoading: isPlanLoading,
-              failureMessage: planFailureMessage,
-              onRetry: onRetryPlan,
-            ),
-          ],
-        ],
-      ),
     );
   }
 }
@@ -292,21 +322,10 @@ class _CompletedPath extends StatelessWidget {
         ),
         if (missionState.isStale && missionState.failureMessage != null) ...[
           const SizedBox(height: DpSpacing.sm),
-          Semantics(
-            liveRegion: true,
-            child: Text(
-              '마지막으로 확인한 완료 결과예요.',
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: context.dpColors.danger),
-            ),
-          ),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton(
-              onPressed: onRetryMission,
-              child: const Text('완료 상태 다시 확인'),
-            ),
+          DpInlineNotice(
+            message: '마지막으로 확인한 완료 결과예요.',
+            actionLabel: '완료 상태 다시 확인',
+            onAction: onRetryMission,
           ),
         ],
         const SizedBox(height: DpSpacing.sm),
