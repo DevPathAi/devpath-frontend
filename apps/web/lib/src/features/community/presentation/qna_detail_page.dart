@@ -59,7 +59,7 @@ class _QnaDetailPageState extends ConsumerState<QnaDetailPage> {
     return Scaffold(
       body: CustomScrollView(
         slivers: [
-          const SliverToBoxAdapter(child: DpPageHeader(title: 'Q&A')),
+          const SliverToBoxAdapter(child: DpPageHeader(title: 'Q/A')),
           switch (s) {
             QnaLoading() => const SliverFillRemaining(
               hasScrollBody: false,

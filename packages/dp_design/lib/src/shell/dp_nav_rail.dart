@@ -60,7 +60,7 @@ class DpNavRail extends StatelessWidget {
           if (account != null) ...[
             Divider(height: 1, thickness: 1, color: c.railBorder),
             Padding(
-              padding: const EdgeInsets.all(DpSpacing.sm),
+              padding: const EdgeInsets.all(DpSpacing.md),
               child: _withRailForeground(c.railMuted, account!),
             ),
           ],
@@ -120,10 +120,10 @@ class DpNavRail extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(
+        DpSpacing.xl,
+        DpSpacing.xl,
         DpSpacing.md,
-        DpSpacing.md,
-        DpSpacing.sm,
-        DpSpacing.sm,
+        DpSpacing.lg,
       ),
       child: Row(
         children: [
@@ -173,7 +173,7 @@ class DpNavRail extends StatelessWidget {
                     d.section!,
                     style: text.labelMedium?.copyWith(
                       color: c.railFaint,
-                      letterSpacing: 0.8,
+                      letterSpacing: 1.1,
                     ),
                   ),
                 )
@@ -198,7 +198,7 @@ class DpNavRail extends StatelessWidget {
     final text = Theme.of(context).textTheme;
     final iconGlyph = Icon(
       d.icon,
-      size: 20,
+      size: 22,
       color: selected ? c.railText : c.railMuted,
     );
     final icon = d.badgeCount > 0
@@ -218,12 +218,15 @@ class DpNavRail extends StatelessWidget {
               color: selected ? c.railActive : Colors.transparent,
               borderRadius: BorderRadius.circular(DpRadius.button),
               border: selected
-                  ? Border(left: BorderSide(color: c.primary, width: 2))
+                  ? Border.all(
+                      color: c.primary.withValues(alpha: 0.38),
+                      width: 1,
+                    )
                   : null,
             ),
             padding: const EdgeInsets.symmetric(
-              horizontal: DpSpacing.sm,
-              vertical: DpSpacing.sm,
+              horizontal: DpSpacing.md,
+              vertical: DpSpacing.md,
             ),
             child: Row(
               mainAxisAlignment: extended
@@ -237,7 +240,7 @@ class DpNavRail extends StatelessWidget {
                     child: Text(
                       d.label,
                       overflow: TextOverflow.ellipsis,
-                      style: text.bodySmall?.copyWith(
+                      style: text.bodyMedium?.copyWith(
                         color: selected ? c.railText : c.railMuted,
                         fontWeight: selected
                             ? FontWeight.w600
@@ -270,8 +273,8 @@ class DpNavRail extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(
-        horizontal: DpSpacing.sm,
-        vertical: 1,
+        horizontal: DpSpacing.md,
+        vertical: DpSpacing.xs,
       ),
       child: withTooltip,
     );

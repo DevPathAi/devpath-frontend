@@ -36,12 +36,12 @@ void main() {
     ]);
   });
 
-  testWidgets('compact 폭은 NavigationBar', (tester) async {
+  testWidgets('compact 폭은 Leva 플로팅 하단 내비', (tester) async {
     _setWidth(tester, 500);
     await tester.pumpWidget(
       _host(const AdminShellView(location: '/dashboard', child: Text('본문'))),
     );
-    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.byType(DpMobileNavigation), findsOneWidget);
     expect(find.byType(DpNavRail), findsNothing);
   });
 

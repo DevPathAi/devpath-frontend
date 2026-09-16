@@ -20,6 +20,8 @@ export 'src/shell/dp_rail_brand.dart';
 export 'src/shell/dp_chrome_action.dart';
 export 'src/shell/dp_chrome_bar.dart';
 export 'src/shell/dp_app_shell.dart';
+export 'src/shell/dp_mobile_navigation.dart';
+export 'src/shell/dp_brand_mark.dart';
 export 'src/shell/dp_command.dart';
 export 'src/shell/dp_command_palette.dart';
 export 'src/interaction/dp_interactive_card.dart';

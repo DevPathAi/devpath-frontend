@@ -106,10 +106,10 @@ class SandboxLayoutState extends State<SandboxLayout> {
       children: [
         // 좌측 정렬 — Column의 기본 crossAxisAlignment(center)로는 세그먼트가
         // 중앙에 놓여 페이지 헤더의 좌측선과 어긋난다(실측 left=255.6 vs 헤더 16).
-        // 가로 여백은 헤더와 같은 lg(16)로 맞추고 세로만 sm(8)을 유지한다.
+        // 가로 여백은 반응형 헤더와 같은 값(compact=lg, 그 외=xl)으로 맞춘다.
         Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: DpSpacing.lg,
+          padding: EdgeInsets.symmetric(
+            horizontal: w < 600 ? DpSpacing.lg : DpSpacing.xl,
             vertical: DpSpacing.sm,
           ),
           child: Align(

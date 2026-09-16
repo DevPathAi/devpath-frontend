@@ -39,68 +39,109 @@ class DpListRow extends StatelessWidget {
     return DpInteractiveCard(
       onTap: onTap,
       padding: EdgeInsets.zero,
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (accentColor != null)
-              Container(
-                width: 3,
-                decoration: BoxDecoration(
-                  color: accentColor,
-                  borderRadius: const BorderRadius.horizontal(
-                    left: Radius.circular(DpRadius.card),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 520;
+          if (compact) {
+            return IntrinsicHeight(
+              key: const ValueKey('dp-list-row-mobile-layout'),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (accentColor != null) _accent(),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.all(DpSpacing.lg),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _content(context, text),
+                          if (trailing != null) ...[
+                            const SizedBox(height: DpSpacing.md),
+                            DefaultTextStyle.merge(
+                              style: text.bodySmall?.copyWith(
+                                color: context.dpColors.textSecondary,
+                              ),
+                              child: trailing!,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (accentColor != null) _accent(),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(DpSpacing.lg),
+                    child: _content(context, text),
                   ),
                 ),
-              ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(DpSpacing.md),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (badges.isNotEmpty) ...[
-                      Wrap(
-                        spacing: DpSpacing.xs,
-                        runSpacing: DpSpacing.xs,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: badges,
-                      ),
-                      const SizedBox(height: DpSpacing.xs),
-                    ],
-                    (preview != null && preview!.trim().isNotEmpty)
-                        ? _HoverPreview(
-                            preview: preview!,
-                            child: Text(title, style: text.titleSmall),
-                          )
-                        : Text(title, style: text.titleSmall),
-                    if (subtitle != null) ...[
-                      const SizedBox(height: DpSpacing.xs),
-                      DefaultTextStyle.merge(
-                        style: text.bodySmall?.copyWith(
-                          color: context.dpColors.textSecondary,
-                        ),
-                        child: subtitle!,
-                      ),
-                    ],
-                  ],
-                ),
-              ),
+                if (trailing != null)
+                  Padding(
+                    padding: const EdgeInsets.all(DpSpacing.lg),
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: trailing,
+                    ),
+                  ),
+              ],
             ),
-            if (trailing != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: DpSpacing.md,
-                  vertical: DpSpacing.md,
-                ),
-                child: Align(alignment: Alignment.centerRight, child: trailing),
-              ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
+
+  Widget _accent() => Container(
+    width: 4,
+    decoration: BoxDecoration(
+      color: accentColor,
+      borderRadius: const BorderRadius.horizontal(
+        left: Radius.circular(DpRadius.card),
+      ),
+    ),
+  );
+
+  Widget _content(BuildContext context, TextTheme text) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      if (badges.isNotEmpty) ...[
+        Wrap(
+          spacing: DpSpacing.xs,
+          runSpacing: DpSpacing.xs,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: badges,
+        ),
+        const SizedBox(height: DpSpacing.sm),
+      ],
+      (preview != null && preview!.trim().isNotEmpty)
+          ? _HoverPreview(
+              preview: preview!,
+              child: Text(title, style: text.titleSmall),
+            )
+          : Text(title, style: text.titleSmall),
+      if (subtitle != null) ...[
+        const SizedBox(height: DpSpacing.sm),
+        DefaultTextStyle.merge(
+          style: text.bodySmall?.copyWith(
+            color: context.dpColors.textSecondary,
+          ),
+          child: subtitle!,
+        ),
+      ],
+    ],
+  );
 }
 
 /// 제목 hover 시 OverlayPortal로 본문 미리보기(웹 전용 — MouseRegion hover).

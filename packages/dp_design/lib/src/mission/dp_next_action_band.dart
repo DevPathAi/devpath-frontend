@@ -83,9 +83,16 @@ class _DpNextActionBandState extends State<DpNextActionBand> {
         color: context.dpColors.surface,
         border: Border.all(color: context.dpColors.border),
         borderRadius: BorderRadius.circular(context.appTokens.panelRadius),
+        boxShadow: [
+          BoxShadow(
+            color: context.dpColors.textPrimary.withValues(alpha: 0.04),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(DpSpacing.lg),
+        padding: const EdgeInsets.all(DpSpacing.xl),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [

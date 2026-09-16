@@ -156,7 +156,7 @@ void main() {
     expect(find.text('작성 화면'), findsOneWidget);
   });
 
-  testWidgets('FAB 스피드다이얼 "자유글"은 일반 작성 화면으로 이동한다', (tester) async {
+  testWidgets('FAB 스피드다이얼 "자유게시판"은 일반 작성 화면으로 이동한다', (tester) async {
     final c = ProviderContainer(
       overrides: [
         communityListProvider.overrideWithValue(
@@ -170,12 +170,12 @@ void main() {
 
     await tester.tap(find.byType(FloatingActionButton));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('자유글'));
+    await tester.tap(find.widgetWithText(ListTile, '자유게시판'));
     await tester.pumpAndSettle();
     expect(find.text('일반 작성 화면'), findsOneWidget);
   });
 
-  testWidgets('QNA 항목 탭은 Q&A 상세로 이동한다', (tester) async {
+  testWidgets('QNA 항목 탭은 Q/A 상세로 이동한다', (tester) async {
     final c = ProviderContainer(
       overrides: [
         communityListProvider.overrideWithValue(
@@ -208,14 +208,14 @@ void main() {
     await tester.pumpWidget(_host(c));
     await tester.pumpAndSettle();
 
-    // 필터: SegmentedButton(전체/Q&A/자유/피드백)
+    // 필터: SegmentedButton(전체/자유게시판/Q/A/피드백)
     expect(find.byType(SegmentedButton<CommunityBoard>), findsOneWidget);
     expect(find.text('전체'), findsOneWidget);
-    expect(find.text('Q&A'), findsOneWidget);
+    expect(find.text('Q/A'), findsOneWidget);
     expect(find.text('피드백'), findsOneWidget);
-    // 카드 제목 + 보드 뱃지('자유')
+    // 카드 제목 + 보드 필터/뱃지('자유게시판')
     expect(find.text('자유글'), findsOneWidget);
-    expect(find.text('자유'), findsWidgets); // 세그먼트 + 뱃지
+    expect(find.text('자유게시판'), findsNWidgets(2)); // 세그먼트 + 뱃지
     // subtitle: FREE는 "댓글" 라벨
     expect(find.textContaining('댓글 1'), findsOneWidget);
 
@@ -243,7 +243,7 @@ void main() {
     await tester.pumpWidget(_host(c));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('자유')); // QNA post라 '자유'는 세그먼트뿐
+    await tester.tap(find.text('자유게시판')); // QNA post라 세그먼트만 존재
     await tester.pumpAndSettle();
     expect(seen, contains('FREE'));
   });

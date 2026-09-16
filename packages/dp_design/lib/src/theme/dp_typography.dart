@@ -18,15 +18,17 @@ abstract final class DpTypography {
       displaySmall: TextStyle(fontFamily: f, fontSize: 36, height: 44 / 36),
       headlineSmall: TextStyle(
         fontFamily: f,
-        fontSize: 24,
-        height: 32 / 24,
-        fontWeight: FontWeight.w600,
+        fontSize: 28,
+        height: 36 / 28,
+        fontWeight: FontWeight.w700,
+        letterSpacing: -0.5,
       ),
       titleLarge: TextStyle(
         fontFamily: f,
-        fontSize: 20,
-        height: 28 / 20,
+        fontSize: 22,
+        height: 30 / 22,
         fontWeight: FontWeight.w700,
+        letterSpacing: -0.25,
       ),
       titleMedium: TextStyle(
         fontFamily: f,

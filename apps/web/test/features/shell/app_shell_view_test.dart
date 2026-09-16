@@ -27,12 +27,12 @@ void main() {
     expect(shellDestinationIndexFor('/content/77'), isNull);
   });
 
-  testWidgets('좁은 폭(<840)은 NavigationBar', (tester) async {
+  testWidgets('좁은 폭(<600)은 Leva 플로팅 하단 내비', (tester) async {
     _setWidth(tester, 390);
     await tester.pumpWidget(
       _host(const AppShellView(location: '/dashboard', child: Text('본문'))),
     );
-    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.byType(DpMobileNavigation), findsOneWidget);
     expect(find.byType(DpNavRail), findsNothing);
   });
 
@@ -42,7 +42,7 @@ void main() {
       _host(const AppShellView(location: '/dashboard', child: Text('본문'))),
     );
     expect(find.byType(DpNavRail), findsOneWidget);
-    expect(find.byType(NavigationBar), findsNothing);
+    expect(find.byType(DpMobileNavigation), findsNothing);
   });
 
   testWidgets('목적지 선택 시 해당 경로로 콜백', (tester) async {
@@ -85,7 +85,7 @@ void main() {
   // 순수 함수(breadcrumbFor) 테스트만으로는 배선이 끊겨도 통과한다 — 셸이
   // 실제로 크롬바에 전달하는지, 세그먼트 탭이 실제로 콜백을 트리거하는지
   // 위젯 테스트로 확인한다.
-  testWidgets('게시글 상세 위치는 크롬바에 3세그먼트 브레드크럼이 배선된다', (tester) async {
+  testWidgets('게시글 상세 위치는 크롬바에 2세그먼트 브레드크럼이 배선된다', (tester) async {
     _setWidth(tester, 1200);
     await tester.pumpWidget(
       _host(
@@ -95,8 +95,7 @@ void main() {
 
     final chromeBar = tester.widget<DpChromeBar>(find.byType(DpChromeBar));
     expect(chromeBar.breadcrumb, const [
-      (label: '커뮤니티', path: null),
-      (label: '게시판', path: '/community'),
+      (label: '커뮤니티', path: '/community'),
       (label: '게시글', path: null),
     ]);
   });
@@ -114,9 +113,12 @@ void main() {
       ),
     );
 
-    // 레일 목적지 라벨도 "게시판"이라 크롬바 안으로 범위를 좁힌다.
+    // 레일 목적지 라벨도 "커뮤니티"라 크롬바 안으로 범위를 좁힌다.
     await tester.tap(
-      find.descendant(of: find.byType(DpChromeBar), matching: find.text('게시판')),
+      find.descendant(
+        of: find.byType(DpChromeBar),
+        matching: find.text('커뮤니티'),
+      ),
     );
     expect(picked, '/community');
   });
@@ -137,6 +139,28 @@ void main() {
 
     final context = tester.element(find.byIcon(DpIcons.account));
     expect(IconTheme.of(context).color, DpColors.light.textSecondary);
+  });
+
+  testWidgets('계정 메뉴 첫 단계에서 로그아웃을 실행할 수 있다', (tester) async {
+    _setWidth(tester, 390);
+    var logoutCalls = 0;
+    await tester.pumpWidget(
+      _host(
+        AppShellView(
+          location: '/dashboard',
+          onLogout: () async => logoutCalls++,
+          child: const Text('본문'),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byTooltip('계정'));
+    await tester.pumpAndSettle();
+    expect(find.text('로그아웃'), findsOneWidget);
+
+    await tester.tap(find.text('로그아웃'));
+    await tester.pump();
+    expect(logoutCalls, 1);
   });
 
   // I1 회귀 가드: kShellDestinations가 5→4로 줄면서 /settings가 목적지에서

@@ -40,4 +40,36 @@ void main() {
     await tester.pumpWidget(_host(const DpLoading()));
     expect(find.byType(DpLoading), findsOneWidget);
   });
+
+  testWidgets('empty and error states use the shared focused state surface', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_host(const DpEmpty(title: '아직 기록이 없어요')));
+    expect(find.byKey(const ValueKey('dp-state-surface')), findsOneWidget);
+
+    await tester.pumpWidget(
+      _host(const DpError(title: '불러오지 못했어요', message: '잠시 후 다시 시도해 주세요.')),
+    );
+    expect(find.byKey(const ValueKey('dp-state-surface')), findsOneWidget);
+  });
+
+  testWidgets('short mobile viewport keeps the state surface scrollable', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 250));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      _host(
+        DpError(
+          title: '검색 결과를 불러오지 못했어요',
+          message: '네트워크 상태를 확인한 뒤 다시 시도해 주세요.',
+          onRetry: () {},
+        ),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('다시 시도'), findsOneWidget);
+  });
 }

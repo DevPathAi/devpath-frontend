@@ -77,7 +77,7 @@ void main() {
     expect(find.text('채택됨'), findsOneWidget); // 채택된 답변
     // 이미 solved → 채택 버튼 없음
     expect(find.widgetWithText(TextButton, '채택'), findsNothing);
-    expect(tester.widget<DpPageHeader>(find.byType(DpPageHeader)).title, 'Q&A');
+    expect(tester.widget<DpPageHeader>(find.byType(DpPageHeader)).title, 'Q/A');
   });
 
   // 3-A 최종 리뷰 I-1: 게시글 상세(post_detail_page.dart)는 DpTag를 쓰는데 이 화면만
@@ -220,7 +220,7 @@ void main() {
     await tester.pumpWidget(_host(c));
     await tester.pump(); // load() 시작 → QnaLoading
 
-    expect(tester.widget<DpPageHeader>(find.byType(DpPageHeader)).title, 'Q&A');
+    expect(tester.widget<DpPageHeader>(find.byType(DpPageHeader)).title, 'Q/A');
     expect(find.byType(DpLoading), findsOneWidget);
 
     completer.complete(_detail(answers: const []));
@@ -244,7 +244,7 @@ void main() {
     await tester.pumpWidget(_host(c));
     await tester.pumpAndSettle();
 
-    expect(tester.widget<DpPageHeader>(find.byType(DpPageHeader)).title, 'Q&A');
+    expect(tester.widget<DpPageHeader>(find.byType(DpPageHeader)).title, 'Q/A');
     expect(find.textContaining('질문을 불러오지 못했어요'), findsWidgets);
   });
 }

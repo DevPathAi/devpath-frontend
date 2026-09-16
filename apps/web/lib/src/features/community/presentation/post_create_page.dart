@@ -26,7 +26,7 @@ class PostCreatePage extends ConsumerStatefulWidget {
     @visibleForTesting this.bodyController,
   });
 
-  /// 보드 프리셋 — 'FREE'(자유) | 'FEEDBACK'(피드백 요청).
+  /// 보드 프리셋 — 'FREE'(자유게시판) | 'FEEDBACK'(피드백 요청).
   final String board;
 
   /// null 이 아니면 편집 모드다 — 이 id 의 글을 고친다.
@@ -58,7 +58,7 @@ class _PostCreatePageState extends ConsumerState<PostCreatePage> {
 
   bool get _isFeedback => widget.board == 'FEEDBACK';
   String get _pageTitle =>
-      widget.isEdit ? '글 수정' : (_isFeedback ? '피드백 요청' : '자유글 작성');
+      widget.isEdit ? '글 수정' : (_isFeedback ? '피드백 요청' : '자유게시판 글 작성');
 
   @override
   void initState() {

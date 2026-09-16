@@ -141,9 +141,21 @@ class _SupportDetailDialogState extends ConsumerState<_SupportDetailDialog> {
   @override
   Widget build(BuildContext context) {
     final d = _detail;
+    final dialogTitle = d == null
+        ? '제보 #${widget.id} 상세'
+        : '#${d.id} ${d.title}';
 
     return AlertDialog(
-      title: Text(d == null ? '제보 #${widget.id} 상세' : '#${d.id} ${d.title}'),
+      title: Semantics(
+        label: dialogTitle,
+        child: ExcludeSemantics(
+          child: Text(
+            dialogTitle,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ),
       content: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 640),
         child: _loading
