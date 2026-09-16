@@ -227,6 +227,25 @@ void main() {
     expect(retryCalls, 1);
   });
 
+  testWidgets('stale 미션 실패와 상세 불일치는 인라인 알림으로 표시된다', (tester) async {
+    await tester.pumpWidget(
+      _host(
+        missionState: CurrentMissionState(
+          mission: _availableMission(),
+          isStale: true,
+          failureKind: CurrentMissionFailureKind.refresh,
+          failureMessage: '네트워크 오류',
+        ),
+        plan: _path(pathId: 202),
+      ),
+    );
+
+    final notices = find.byKey(const ValueKey('dp-inline-notice'));
+    expect(notices, findsNWidgets(2));
+    expect(find.text('현재 미션과 경로 상세가 아직 맞지 않아요.'), findsOneWidget);
+    expect(find.text('마지막으로 확인한 미션을 표시하고 있어요.'), findsOneWidget);
+  });
+
   testWidgets('320px와 200% 글자에서도 primary action 하나로 overflow 없이 읽힌다', (
     tester,
   ) async {
