@@ -730,4 +730,41 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('보조 지표 실패는 인라인 알림 + 재시도로 표시되고 Today primary는 유지된다', (
+    tester,
+  ) async {
+    await _pumpDashboard(
+      tester,
+      enabled: true,
+      missionApi: _DashboardMissionApi([Future.value(_mission('AVAILABLE'))]),
+      dashboardClient: _QueuedDashboardClient([
+        Future.value({
+          'streakDays': 'raw-sensitive-dashboard-payload',
+          'progressPercent': 62,
+          'nextTaskTitle': 'legacy next task',
+          'badges': <String>[],
+        }),
+        Future.value({
+          'streakDays': 7,
+          'progressPercent': 62,
+          'nextTaskTitle': 'legacy next task',
+          'badges': <String>[],
+          'completedContentCount': 12,
+        }),
+      ]),
+    );
+    await tester.pump();
+    expect(find.text('JPA 트랜잭션 경계 읽기'), findsOneWidget);
+    final notice = find.byKey(const ValueKey('dp-inline-notice'));
+    expect(notice, findsOneWidget);
+    expect(
+      find.descendant(of: notice, matching: find.text('지표 다시 보기')),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('지표 다시 보기'));
+    await tester.pump();
+    await tester.pump();
+    expect(find.byKey(const ValueKey('today-metrics-section')), findsOneWidget);
+  });
 }

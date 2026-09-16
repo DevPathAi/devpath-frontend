@@ -130,16 +130,10 @@ class _AvailableMission extends StatelessWidget {
           ),
           if (state.failureMessage != null) ...[
             const SizedBox(height: DpSpacing.sm),
-            Semantics(
-              liveRegion: true,
-              child: Text(
-                completionFailed
-                    ? '완료를 저장하지 못했어요. 현재 미션과 진행 상태는 그대로예요.'
-                    : '미션을 새로 확인하지 못했어요. 마지막으로 확인한 미션은 유지됩니다.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: context.dpColors.danger,
-                ),
-              ),
+            DpInlineNotice(
+              message: completionFailed
+                  ? '완료를 저장하지 못했어요. 현재 미션과 진행 상태는 그대로예요.'
+                  : '미션을 새로 확인하지 못했어요. 마지막으로 확인한 미션은 유지됩니다.',
             ),
           ],
           const SizedBox(height: DpSpacing.md),
