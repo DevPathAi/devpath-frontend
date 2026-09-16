@@ -72,4 +72,12 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('다시 시도'), findsOneWidget);
   });
+
+  testWidgets('DpLoading은 라벨 유무와 무관하게 liveRegion 시맨틱을 가진다', (tester) async {
+    await tester.pumpWidget(_host(const DpLoading()));
+    expect(find.bySemanticsLabel('불러오는 중'), findsOneWidget);
+    await tester.pumpWidget(_host(const DpLoading(label: '오늘의 미션을 불러오는 중')));
+    final node = tester.getSemantics(find.bySemanticsLabel('오늘의 미션을 불러오는 중'));
+    expect(node.flagsCollection.isLiveRegion, isTrue);
+  });
 }
