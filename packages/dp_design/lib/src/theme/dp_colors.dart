@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 /// 디자인 token 값의 코드 SSoT. DESIGN.md §1은 의도와 허용 사용 규칙을 정의한다.
 ///
-/// 팔레트는 **T2 잉크·앰버**. 따뜻한 무채색 그라운드에 앰버 하나를 액센트로 쓴다.
-/// 앰버는 "성취"(진행률·스트릭·1차 행동)를 전담한다.
+/// 팔레트는 **Leva v2 인디고·슬레이트**. 차분한 푸른 무채색 그라운드에
+/// 선명한 인디고를 핵심 행동과 학습 진행 신호로 쓴다.
 ///
 /// 이름 규칙: `primary` 는 **채움 전용**, 텍스트는 `primaryText`(≥4.5:1),
 /// 12~14px 강조는 `primaryTextStrong`(≥7:1). 이 이름 분리는 기존 소비 계약이며
@@ -53,7 +53,7 @@ class DpColors extends ThemeExtension<DpColors> {
   final Color primaryText;
   final Color primaryTextStrong;
 
-  /// [primary] 채움 위 텍스트. **다크에서는 어두운 색**이다(앰버 위 흰 텍스트는 대비 미달).
+  /// [primary] 채움 위 텍스트. 다크의 밝은 인디고 채움에는 어두운 색을 쓴다.
   final Color onPrimary;
 
   /// 1차 카드 배경·뱃지.
@@ -88,7 +88,7 @@ class DpColors extends ThemeExtension<DpColors> {
   final Color success;
 
   /// **진짜 경고 전용.** 서비스 상태(점검·한도·오프라인)는 중립을 쓰고,
-  /// 구분용 색은 [chart4] 를 쓴다. 액센트(앰버)와 계열이 가까워 용도를 좁혔다.
+  /// 구분용 색은 [chart4] 를 쓴다.
   final Color warning;
 
   final Color danger;
@@ -99,7 +99,7 @@ class DpColors extends ThemeExtension<DpColors> {
   /// 차트 팔레트. 데이터 **계열** 색은 [chart1]~[chart3], **구분용 보조색**은
   /// [chart4](틸)·[chart5](중립 회색)다.
   ///
-  /// **계열 색은 브랜드에서 분리돼 있다** — 액센트는 [primary](앰버)가, 데이터는
+  /// **계열 색은 브랜드에서 분리돼 있다** — 액센트는 [primary](인디고)가, 데이터는
   /// chart* 가 쓴다. 3-B 이전에는 chart1 이 primary 와 값이 같아 「차트를 chart1 로
   /// 이관」해도 픽셀이 하나도 바뀌지 않았다. 값을 바꿀 때는
   /// `docs/superpowers/specs/2026-08-07-chart-palette-check.py` 를 통과해야 한다.
@@ -114,71 +114,70 @@ class DpColors extends ThemeExtension<DpColors> {
   final Color codeText;
 
   static const light = DpColors(
-    primary: Color(0xFFB45309),
-    primaryText: Color(0xFF92400E),
-    primaryTextStrong: Color(0xFF78350F),
+    primary: Color(0xFF5653E7),
+    primaryText: Color(0xFF4338CA),
+    primaryTextStrong: Color(0xFF312E81),
     onPrimary: Color(0xFFFFFFFF),
-    accentSoft: Color(0xFFFDF1E0),
-    accentLine: Color(0xFFF2D0A0),
-    bg: Color(0xFFFAF9F7),
+    accentSoft: Color(0xFFEEF2FF),
+    accentLine: Color(0xFFC7D2FE),
+    bg: Color(0xFFF6F7FB),
     surface: Color(0xFFFFFFFF),
-    surfaceMuted: Color(0xFFF2F0EC),
-    border: Color(0xFFE2DED7),
-    textPrimary: Color(0xFF1A1815),
-    textSecondary: Color(0xFF615C54),
-    textFaint: Color(0xFF918B81),
-    railBg: Color(0xFF1A1815),
-    railText: Color(0xFFF2F0EC),
-    railMuted: Color(0xFFA9A298),
-    railFaint: Color(0xFF9C958B),
-    railActive: Color(0xFF2F2B24),
-    railBorder: Color(0xFF2B2823),
-    success: Color(0xFF15803D),
-    warning: Color(0xFFA16207),
-    danger: Color(0xFFB91C1C),
-    tagBg: Color(0xFFF2F0EC),
-    tagText: Color(0xFF524D45),
-    chart1: Color(0xFF1D4ED8),
-    chart2: Color(0xFFBE185D),
-    chart3: Color(0xFF7E22CE),
+    surfaceMuted: Color(0xFFF0F2F7),
+    border: Color(0xFFDDE1EA),
+    textPrimary: Color(0xFF171923),
+    textSecondary: Color(0xFF5E6472),
+    textFaint: Color(0xFF818998),
+    railBg: Color(0xFF11131B),
+    railText: Color(0xFFF5F7FB),
+    railMuted: Color(0xFFB7BDCA),
+    railFaint: Color(0xFF959DAD),
+    railActive: Color(0xFF272B3F),
+    railBorder: Color(0xFF2A2F3C),
+    success: Color(0xFF137A48),
+    warning: Color(0xFF9A5B00),
+    danger: Color(0xFFC12C36),
+    tagBg: Color(0xFFEEF0F5),
+    tagText: Color(0xFF4F5664),
+    chart1: Color(0xFF2563EB),
+    chart2: Color(0xFFC026D3),
+    chart3: Color(0xFFD97706),
     chart4: Color(0xFF0F766E),
-    chart5: Color(0xFF8B857D),
+    chart5: Color(0xFF64748B),
     codeEditorBg: Color(0xFF1E1E1E),
     codeLogBg: Color(0xFF0D1117),
     codeText: Color(0xFFD4D4D4),
   );
 
   static const dark = DpColors(
-    primary: Color(0xFFF59E0B),
-    primaryText: Color(0xFFFBBF24),
-    primaryTextStrong: Color(0xFFFCD34D),
-    // ★라이트와 반대 방향★ 앰버 위 흰 텍스트는 2.2:1 로 미달한다.
-    onPrimary: Color(0xFF1A1200),
-    accentSoft: Color(0xFF2E2007),
-    accentLine: Color(0xFF5C400E),
-    bg: Color(0xFF0F0E0C),
-    surface: Color(0xFF1A1815),
-    surfaceMuted: Color(0xFF231F1B),
-    border: Color(0xFF332E28),
-    textPrimary: Color(0xFFEAE7E2),
-    textSecondary: Color(0xFFA09991),
-    textFaint: Color(0xFF6F6961),
-    railBg: Color(0xFF221E1A),
-    railText: Color(0xFFEAE7E2),
-    railMuted: Color(0xFFA09991),
-    railFaint: Color(0xFF9A938A),
-    railActive: Color(0xFF332E28),
-    railBorder: Color(0xFF3A342D),
-    success: Color(0xFF4ADE80),
-    warning: Color(0xFFFCD34D),
-    danger: Color(0xFFF87171),
-    tagBg: Color(0xFF231F1B),
-    tagText: Color(0xFFA09991),
-    chart1: Color(0xFF60A5FA),
-    chart2: Color(0xFFF472B6),
-    chart3: Color(0xFFD8B4FE),
-    chart4: Color(0xFF2DD4BF),
-    chart5: Color(0xFF8B857D),
+    primary: Color(0xFF9B99FF),
+    primaryText: Color(0xFFB9B8FF),
+    primaryTextStrong: Color(0xFFD8D8FF),
+    onPrimary: Color(0xFF17163D),
+    accentSoft: Color(0xFF24244A),
+    accentLine: Color(0xFF454589),
+    bg: Color(0xFF0D0F15),
+    surface: Color(0xFF171922),
+    surfaceMuted: Color(0xFF222530),
+    border: Color(0xFF343846),
+    textPrimary: Color(0xFFF4F5F8),
+    textSecondary: Color(0xFFB6BCC8),
+    textFaint: Color(0xFF858C99),
+    railBg: Color(0xFF090B10),
+    railText: Color(0xFFF4F5F8),
+    railMuted: Color(0xFFB6BCC8),
+    railFaint: Color(0xFF929AA8),
+    railActive: Color(0xFF23263B),
+    railBorder: Color(0xFF292D38),
+    success: Color(0xFF5DD39E),
+    warning: Color(0xFFF6C177),
+    danger: Color(0xFFFF7B84),
+    tagBg: Color(0xFF262A36),
+    tagText: Color(0xFFC3C8D2),
+    chart1: Color(0xFF77A5FF),
+    chart2: Color(0xFFE287F4),
+    chart3: Color(0xFFF6B864),
+    chart4: Color(0xFF4DD4C4),
+    chart5: Color(0xFFA1AAB8),
     codeEditorBg: Color(0xFF1E1E1E),
     codeLogBg: Color(0xFF0D1117),
     codeText: Color(0xFFC9D1D9),

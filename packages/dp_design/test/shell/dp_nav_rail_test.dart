@@ -106,9 +106,8 @@ void main() {
     expect(find.text('김개발'), findsOneWidget);
   });
 
-  // Important 1: 다크 레일 위에서 account에 무스타일 위젯을 넣으면 railBg와
-  // 같은 색(#1A1815 = textPrimary)으로 렌더돼 완전히 묻힌다. 레일이 자기
-  // 배경에 맞는 전경색을 기본값으로 공급해야 한다.
+  // Important 1: 어두운 레일의 account에 본문 전경색을 상속하면 대비가 보장되지
+  // 않는다. 레일이 자기 배경에 맞는 전경색을 기본값으로 공급해야 한다.
   // brand 워드마크는 DpRailBrand가 색을 직접 확정하므로(dp_rail_brand_test.dart
   // 참고) 이 기본-전경색 메커니즘이 더 이상 적용되지 않는다 — 그래서 여기서는
   // account만 검증한다.

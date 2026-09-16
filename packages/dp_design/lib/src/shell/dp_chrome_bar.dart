@@ -4,6 +4,7 @@ import '../icons/dp_icons.dart';
 import '../theme/dp_colors.dart';
 import '../theme/dp_spacing.dart';
 import 'dp_chrome_action.dart';
+import 'dp_rail_brand.dart';
 
 /// 브레드크럼 세그먼트. [path]가 null이면 비클릭(섹션명 등).
 ///
@@ -25,9 +26,10 @@ class DpChromeBar extends StatelessWidget {
     this.actions = const [],
     this.account,
     this.compact = false,
+    this.brand,
   });
 
-  static const double height = 46;
+  static const double height = 64;
 
   final List<DpCrumb> breadcrumb;
   final ValueChanged<String>? onCrumbTap;
@@ -35,6 +37,7 @@ class DpChromeBar extends StatelessWidget {
   final List<DpChromeAction> actions;
   final Widget? account;
   final bool compact;
+  final DpRailBrand? brand;
 
   @override
   Widget build(BuildContext context) {
@@ -47,7 +50,9 @@ class DpChromeBar extends StatelessWidget {
         color: c.surface,
         border: Border(bottom: BorderSide(color: c.border)),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: DpSpacing.lg),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? DpSpacing.md : DpSpacing.xl,
+      ),
       // I2(3단계 해소): actions·account 그룹은 non-flex 자식이라 RenderFlex가
       // 무한 주축 제약으로 먼저 측정한다 — actions가 늘어나면(스펙 §3.0
       // trailing 슬롯) 오버플로할 수 있었다. DpPageHeader.actions의
@@ -106,8 +111,11 @@ class DpChromeBar extends StatelessWidget {
               Expanded(
                 child: Row(
                   children: [
-                    Flexible(child: _crumbs(context, c)),
-                    const SizedBox(width: DpSpacing.lg),
+                    if (compact && brand != null)
+                      Flexible(child: _mobileBrand(context, c))
+                    else
+                      Flexible(child: _crumbs(context, c)),
+                    SizedBox(width: compact ? DpSpacing.xs : DpSpacing.lg),
                     if (!compact && onSearchTap != null)
                       Flexible(flex: 2, child: _search(context, c))
                     else if (compact && onSearchTap != null)
@@ -138,6 +146,28 @@ class DpChromeBar extends StatelessWidget {
           );
         },
       ),
+    );
+  }
+
+  Widget _mobileBrand(BuildContext context, DpColors c) {
+    final b = brand!;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox.square(dimension: 28, child: FittedBox(child: b.mark)),
+        const SizedBox(width: DpSpacing.sm),
+        Flexible(
+          child: Text(
+            b.wordmark,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: c.textPrimary,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.2,
+            ),
+          ),
+        ),
+      ],
     );
   }
 

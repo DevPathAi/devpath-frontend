@@ -37,10 +37,11 @@ DpAppShell _shell({
 );
 
 void main() {
-  testWidgets('compact(<600)은 NavigationBar, 레일 없음', (tester) async {
+  testWidgets('compact(<600)은 DpMobileNavigation, 레일 없음', (tester) async {
     _setWidth(tester, 500);
     await tester.pumpWidget(_host(_shell()));
-    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.byType(DpMobileNavigation), findsOneWidget);
+    expect(find.byType(NavigationBar), findsNothing);
     expect(find.byType(DpNavRail), findsNothing);
   });
 
@@ -49,7 +50,7 @@ void main() {
     await tester.pumpWidget(_host(_shell()));
     final rail = tester.widget<DpNavRail>(find.byType(DpNavRail));
     expect(rail.extended, isFalse);
-    expect(find.byType(NavigationBar), findsNothing);
+    expect(find.byType(DpMobileNavigation), findsNothing);
   });
 
   testWidgets('expanded(≥840)은 펼친 DpNavRail', (tester) async {
@@ -130,15 +131,15 @@ void main() {
   });
 
   // Task 6 리뷰 minor(3-A Task 15 이월): 위 테스트는 폭 1000 = **레일 경로**만 덮는다.
-  // compact는 NavigationBar라 렌더 경로가 통째로 다르므로, 거기서 badge가 사라져도
+  // compact는 제품 전용 하단바라 렌더 경로가 통째로 다르므로, 거기서 badge가 사라져도
   // 아무 테스트도 red가 되지 않았다. 폭 400을 따로 잠근다 —
   // NavigationBar 존재를 먼저 단언해 「compact 경로였다」는 전제부터 고정한다.
-  testWidgets('compact(NavigationBar) 경로에서도 badgeCount>0은 Badge 표시', (
+  testWidgets('compact(DpMobileNavigation) 경로에서도 badgeCount>0은 Badge 표시', (
     tester,
   ) async {
     _setWidth(tester, 400);
     await tester.pumpWidget(_host(_shell()));
-    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.byType(DpMobileNavigation), findsOneWidget);
     expect(find.byType(Badge), findsOneWidget);
   });
 

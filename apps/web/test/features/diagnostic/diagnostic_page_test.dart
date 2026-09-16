@@ -157,6 +157,77 @@ void main() {
     expect(find.byKey(const ValueKey('brand-row')), findsOneWidget);
   });
 
+  testWidgets('시작 화면은 단계·진단 설명·기대 결과·시작 행동을 하나의 온보딩 surface로 묶는다', (
+    tester,
+  ) async {
+    final controller = _FixedDiagnosticController(const DiagnosticState());
+    await tester.pumpWidget(_host(controller));
+    await tester.pump();
+
+    final surface = find.byKey(const ValueKey('diagnostic-onboarding-surface'));
+    expect(surface, findsOneWidget);
+
+    for (final label in <String>['1 트랙 선택', '2 실력 진단', '3 학습 경로']) {
+      expect(
+        find.descendant(of: surface, matching: find.text(label)),
+        findsOneWidget,
+      );
+    }
+    expect(find.bySemanticsLabel('현재 단계: 트랙 선택'), findsOneWidget);
+    expect(
+      find.descendant(of: surface, matching: find.textContaining('약 5분')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: surface, matching: find.textContaining('15문항')),
+      findsWidgets,
+    );
+
+    for (final outcome in <String>['현재 레벨', '진단 신뢰도', '맞춤 학습 경로']) {
+      expect(
+        find.descendant(of: surface, matching: find.text(outcome)),
+        findsOneWidget,
+      );
+    }
+    expect(
+      find.descendant(
+        of: surface,
+        matching: find.byKey(const ValueKey('diagnostic-track')),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: surface,
+        matching: find.widgetWithText(FilledButton, '진단 시작하기'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('390px에서 트랙 입력과 안내 문구가 화면 안에 머문다', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final controller = _FixedDiagnosticController(const DiagnosticState());
+
+    await tester.pumpWidget(_host(controller));
+    await tester.pump();
+
+    final viewport = tester.getRect(find.byType(Scaffold));
+    final field = tester.getRect(
+      find.byKey(const ValueKey('diagnostic-track')),
+    );
+    final hint = tester.getRect(
+      find.byKey(const ValueKey('diagnostic-track-hint')),
+    );
+    expect(field.left, greaterThanOrEqualTo(viewport.left));
+    expect(field.right, lessThanOrEqualTo(viewport.right));
+    expect(hint.left, greaterThanOrEqualTo(viewport.left));
+    expect(hint.right, lessThanOrEqualTo(viewport.right));
+    expect(hint.height, greaterThanOrEqualTo(32));
+  });
+
   testWidgets('선택한 트랙으로만 guest 진단을 시작한다', (tester) async {
     final controller = _FixedDiagnosticController(const DiagnosticState());
     await tester.pumpWidget(_host(controller));

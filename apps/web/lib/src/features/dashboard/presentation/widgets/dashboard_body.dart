@@ -157,11 +157,18 @@ StaggeredGridTile _progressTrendTile(DashboardSummary summary, int span) =>
 Widget _panel(BuildContext context, Widget child) {
   final c = context.dpColors;
   return Container(
-    padding: const EdgeInsets.all(DpSpacing.lg),
+    padding: const EdgeInsets.all(DpSpacing.xl),
     decoration: BoxDecoration(
       color: c.surface,
       border: Border.all(color: c.border),
       borderRadius: BorderRadius.circular(context.appTokens.panelRadius),
+      boxShadow: [
+        BoxShadow(
+          color: c.textPrimary.withValues(alpha: 0.035),
+          blurRadius: 24,
+          offset: const Offset(0, 8),
+        ),
+      ],
     ),
     child: child,
   );

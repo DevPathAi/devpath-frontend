@@ -5,8 +5,8 @@ enum CommunityPhase { loading, loaded, failed }
 /// 보드 필터. all=전체(board 미전달), 나머지는 백엔드 boardType 값.
 enum CommunityBoard {
   all(null, '전체'),
-  qna('QNA', 'Q&A'),
-  free('FREE', '자유'),
+  free('FREE', '자유게시판'),
+  qna('QNA', 'Q/A'),
   feedback('FEEDBACK', '피드백');
 
   const CommunityBoard(this.value, this.label);

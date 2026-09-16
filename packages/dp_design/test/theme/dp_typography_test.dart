@@ -32,7 +32,7 @@ void main() {
     });
 
     test('DESIGN.md §2 스케일과 일치한다', () {
-      expect(t.titleLarge!.fontSize, 20);
+      expect(t.titleLarge!.fontSize, 22);
       expect(t.titleLarge!.fontWeight, FontWeight.w700);
       expect(t.titleSmall!.fontSize, 14);
       expect(t.titleSmall!.fontWeight, FontWeight.w600);

@@ -27,10 +27,10 @@ void main() {
     // 레일이 본문 배경과 같은 계열이면 「잉크 레일」의 분리감이 사라진다.
     expect(decoration.color, isNot(DpColors.dark.bg));
     expect(decoration.color, DpColors.dark.railBg);
-    // 밝히는 방향으로 분리한다(계산: 어둡게는 순검정에서도 1.088에 그친다).
+    // v2 셸은 본문보다 더 짙은 네이비로 레일을 분리한다.
     expect(
       DpColors.dark.railBg.computeLuminance(),
-      greaterThan(DpColors.dark.bg.computeLuminance()),
+      lessThan(DpColors.dark.bg.computeLuminance()),
     );
   });
 

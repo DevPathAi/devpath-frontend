@@ -248,11 +248,11 @@ void main() {
         );
 
         expect(light['--dp-token-manifest-version'], '"1.0.0"');
-        expect(light['--dp-color-primary'], '#B45309');
-        expect(dark['--dp-color-primary'], '#F59E0B');
+        expect(light['--dp-color-primary'], '#5653E7');
+        expect(dark['--dp-color-primary'], '#9B99FF');
         expect(light['--dp-space-lg'], '16px');
-        expect(light['--dp-state-focus-ring'], '#92400E');
-        expect(dark['--dp-state-focus-ring'], '#FBBF24');
+        expect(light['--dp-state-focus-ring'], '#4338CA');
+        expect(dark['--dp-state-focus-ring'], '#B9B8FF');
         expect(light['--dp-state-focus-ring-width'], '2px');
       },
     );

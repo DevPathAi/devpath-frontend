@@ -19,11 +19,11 @@ class AppTokens extends ThemeExtension<AppTokens> {
   final double panelRadius;
 
   static const standard = AppTokens(
-    contentMaxWidth: 1440,
-    readableMaxWidth: 880,
-    railWidth: 256,
-    railCollapsedWidth: 72,
-    panelRadius: 10, // = DpRadius.card
+    contentMaxWidth: 1360,
+    readableMaxWidth: 760,
+    railWidth: 280,
+    railCollapsedWidth: 80,
+    panelRadius: 18, // = DpRadius.card
   );
 
   @override

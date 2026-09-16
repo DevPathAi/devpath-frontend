@@ -35,11 +35,20 @@ class DpKpiCard extends StatelessWidget {
       excludeSemantics: true,
       label: '$label $value${suffix ?? ''}',
       child: Container(
+        // KPI 그리드는 200% 텍스트에서도 고정 extent 안에 들어가야 한다.
+        // 외곽 리듬은 lg로 유지하고 아이콘 surface로 시각적 밀도를 보강한다.
         padding: const EdgeInsets.all(DpSpacing.lg),
         decoration: BoxDecoration(
           color: c.surface,
           border: Border.all(color: c.border),
           borderRadius: BorderRadius.circular(context.appTokens.panelRadius),
+          boxShadow: [
+            BoxShadow(
+              color: c.textPrimary.withValues(alpha: 0.035),
+              blurRadius: 24,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -48,8 +57,16 @@ class DpKpiCard extends StatelessWidget {
             Row(
               children: [
                 if (icon != null) ...[
-                  Icon(icon, size: 20, color: c.primary),
-                  const SizedBox(width: DpSpacing.xs),
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: c.accentSoft,
+                      borderRadius: BorderRadius.circular(DpRadius.button),
+                    ),
+                    child: Icon(icon, size: 20, color: c.primaryText),
+                  ),
+                  const SizedBox(width: DpSpacing.md),
                 ],
                 Text(
                   label,
@@ -57,13 +74,17 @@ class DpKpiCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: DpSpacing.sm),
+            const SizedBox(height: DpSpacing.md),
             TweenAnimationBuilder<int>(
               duration: countUpDuration,
               tween: IntTween(begin: 0, end: value),
               builder: (_, v, _) => Text(
                 '$v${suffix ?? ''}',
-                style: text.displaySmall?.copyWith(color: c.primaryText),
+                style: text.displaySmall?.copyWith(
+                  color: c.textPrimary,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -1,
+                ),
               ),
             ),
             if (progress != null) ...[

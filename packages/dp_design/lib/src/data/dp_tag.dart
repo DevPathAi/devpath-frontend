@@ -21,16 +21,21 @@ class DpTag extends StatelessWidget {
     return Container(
       key: const ValueKey('dp-tag'),
       padding: const EdgeInsets.symmetric(
-        horizontal: DpSpacing.xs,
-        vertical: 2,
+        horizontal: DpSpacing.sm,
+        vertical: DpSpacing.xs,
       ),
       decoration: BoxDecoration(
         color: c.tagBg,
-        borderRadius: BorderRadius.circular(DpRadius.button),
+        borderRadius: BorderRadius.circular(DpRadius.chip),
       ),
       child: Text(
         label,
-        style: TextStyle(fontSize: 11, color: tone ?? c.tagText),
+        style: TextStyle(
+          fontSize: 12,
+          height: 16 / 12,
+          fontWeight: FontWeight.w600,
+          color: tone ?? c.tagText,
+        ),
       ),
     );
   }

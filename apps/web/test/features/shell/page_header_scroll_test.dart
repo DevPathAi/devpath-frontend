@@ -278,7 +278,7 @@ void main() {
     _expectHeaderScrolledAway(tester);
   });
 
-  testWidgets('Q&A 상세 화면에서 헤더가 스크롤과 함께 사라진다', (tester) async {
+  testWidgets('Q/A 상세 화면에서 헤더가 스크롤과 함께 사라진다', (tester) async {
     tester.view.physicalSize = const Size(800, 400);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
@@ -303,7 +303,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Q&A'), findsWidgets);
+    expect(find.text('Q/A'), findsWidgets);
     _expectHeaderVisible(tester);
 
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -300));
@@ -312,7 +312,7 @@ void main() {
     _expectHeaderScrolledAway(tester);
   });
 
-  testWidgets('자유글 작성 화면에서 헤더가 스크롤과 함께 사라진다', (tester) async {
+  testWidgets('자유게시판 글 작성 화면에서 헤더가 스크롤과 함께 사라진다', (tester) async {
     tester.view.physicalSize = const Size(800, 400);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
@@ -341,7 +341,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('자유글 작성'), findsWidgets);
+    expect(find.text('자유게시판 글 작성'), findsWidgets);
     _expectHeaderVisible(tester);
 
     await _dragOutsideEditor(tester);

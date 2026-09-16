@@ -62,8 +62,20 @@ class _DpInteractiveCardState extends State<DpInteractiveCard> {
           borderRadius: radius,
           child: DecoratedBox(
             decoration: BoxDecoration(
+              color: _hovered
+                  ? c.accentSoft.withValues(alpha: 0.45)
+                  : c.surface,
               borderRadius: radius,
               border: Border.all(color: borderColor, width: borderWidth),
+              boxShadow: _hovered
+                  ? [
+                      BoxShadow(
+                        color: c.textPrimary.withValues(alpha: 0.07),
+                        blurRadius: 24,
+                        offset: const Offset(0, 8),
+                      ),
+                    ]
+                  : null,
             ),
             child: Padding(padding: widget.padding, child: widget.child),
           ),

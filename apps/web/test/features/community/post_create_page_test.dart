@@ -83,7 +83,7 @@ void main() {
     await tester.pumpWidget(_host(c));
     await tester.pumpAndSettle();
 
-    expect(find.text('자유글 작성'), findsOneWidget); // 페이지 헤더
+    expect(find.text('자유게시판 글 작성'), findsOneWidget); // 페이지 헤더
     // 본문이 QuillEditor 로 바뀌어 TextField 는 제목/태그 2개만 남는다.
     expect(find.byType(TextField), findsNWidgets(2));
     expect(find.byType(QuillEditor), findsOneWidget);
@@ -163,7 +163,7 @@ void main() {
         .state<ScrollableState>(
           find
               .ancestor(
-                of: find.text('자유글 작성'),
+                of: find.text('자유게시판 글 작성'),
                 matching: find.byType(Scrollable),
               )
               .first,
@@ -256,7 +256,7 @@ void main() {
         .state<ScrollableState>(
           find
               .ancestor(
-                of: find.text('자유글 작성'),
+                of: find.text('자유게시판 글 작성'),
                 matching: find.byType(Scrollable),
               )
               .first,

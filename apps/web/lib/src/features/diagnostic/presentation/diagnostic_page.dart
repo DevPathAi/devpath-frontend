@@ -187,25 +187,123 @@ class _StartView extends StatelessWidget {
   Widget build(BuildContext context) {
     final selectedTrack = state.track;
     final isMember = auth is AuthAuthenticated;
+    final colors = context.dpColors;
+    return Container(
+      key: const ValueKey('diagnostic-onboarding-surface'),
+      padding: const EdgeInsets.all(DpSpacing.xl),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        border: Border.all(color: colors.border),
+        borderRadius: BorderRadius.circular(DpRadius.card),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const _DiagnosticJourney(),
+          const SizedBox(height: DpSpacing.xl),
+          Divider(color: colors.border, height: 1),
+          const SizedBox(height: DpSpacing.xl),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final overview = _DiagnosticOverview(
+                missionSpineEnabled: missionSpineEnabled,
+              );
+              final form = _DiagnosticTrackForm(
+                selectedTrack: selectedTrack,
+                isMember: isMember,
+                notifier: notifier,
+              );
+              if (constraints.maxWidth < 600) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    overview,
+                    const SizedBox(height: DpSpacing.xl),
+                    Divider(color: colors.border, height: 1),
+                    const SizedBox(height: DpSpacing.xl),
+                    form,
+                  ],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(flex: 11, child: overview),
+                  const SizedBox(width: DpSpacing.xl),
+                  Expanded(flex: 10, child: form),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DiagnosticOverview extends StatelessWidget {
+  const _DiagnosticOverview({required this.missionSpineEnabled});
+
+  final bool missionSpineEnabled;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.dpColors;
+    final text = Theme.of(context).textTheme;
     return Column(
-      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('실력 진단 15문항', style: Theme.of(context).textTheme.titleMedium),
+        Text('실력 진단 15문항', style: text.headlineSmall),
+        const SizedBox(height: DpSpacing.sm),
+        Text(
+          '약 5분이면 완료해요',
+          style: text.labelLarge?.copyWith(color: colors.primaryTextStrong),
+        ),
         if (missionSpineEnabled) ...[
           const SizedBox(height: DpSpacing.sm),
           Text(
-            '로그인 없이 시작하고, 완료하면 현재 레벨과 신뢰도를 먼저 확인할 수 있어요.',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: context.dpColors.textSecondary,
-            ),
+            '로그인 없이 시작하고, 답변에 따라 난이도가 조정돼요. 완료하면 현재 레벨과 신뢰도를 먼저 확인할 수 있습니다.',
+            style: text.bodyMedium?.copyWith(color: colors.textSecondary),
           ),
         ],
         const SizedBox(height: DpSpacing.lg),
+        const _DiagnosticOutcomes(),
+      ],
+    );
+  }
+}
+
+class _DiagnosticTrackForm extends StatelessWidget {
+  const _DiagnosticTrackForm({
+    required this.selectedTrack,
+    required this.isMember,
+    required this.notifier,
+  });
+
+  final String? selectedTrack;
+  final bool isMember;
+  final DiagnosticController notifier;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.dpColors;
+    final text = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('진단할 트랙', style: text.titleMedium),
+        const SizedBox(height: DpSpacing.xs),
+        Text(
+          '선택한 트랙이 문항과 이후 학습 경로의 기준이 됩니다.',
+          style: text.bodyMedium?.copyWith(color: colors.textSecondary),
+        ),
+        const SizedBox(height: DpSpacing.md),
         DropdownButtonFormField<String>(
           key: const ValueKey('diagnostic-track'),
+          isExpanded: true,
           initialValue: selectedTrack,
-          decoration: const InputDecoration(labelText: '진단할 트랙'),
+          decoration: const InputDecoration(hintText: '트랙을 선택하세요'),
           items: [
             for (final entry in trackLabels.entries)
               DropdownMenuItem(value: entry.key, child: Text(entry.value)),
@@ -219,7 +317,7 @@ class _StartView extends StatelessWidget {
           Text(
             '트랙을 먼저 골라주세요. 고른 트랙이 문항과 이후 경로의 기준이 됩니다.',
             key: const ValueKey('diagnostic-track-hint'),
-            style: Theme.of(context).textTheme.bodySmall,
+            style: text.bodySmall?.copyWith(color: colors.textSecondary),
           ),
         ],
         const SizedBox(height: DpSpacing.lg),
@@ -227,11 +325,98 @@ class _StartView extends StatelessWidget {
           onPressed: selectedTrack == null
               ? null
               : () => isMember
-                    ? notifier.startAsMember(selectedTrack)
-                    : notifier.startAsGuest(selectedTrack),
+                    ? notifier.startAsMember(selectedTrack!)
+                    : notifier.startAsGuest(selectedTrack!),
           child: const Text('진단 시작하기'),
         ),
       ],
+    );
+  }
+}
+
+class _DiagnosticJourney extends StatelessWidget {
+  const _DiagnosticJourney();
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text('진단 순서', style: Theme.of(context).textTheme.labelLarge),
+      const SizedBox(height: DpSpacing.sm),
+      const Wrap(
+        spacing: DpSpacing.sm,
+        runSpacing: DpSpacing.sm,
+        children: [
+          _JourneyStep(label: '1 트랙 선택', current: true),
+          _JourneyStep(label: '2 실력 진단'),
+          _JourneyStep(label: '3 학습 경로'),
+        ],
+      ),
+    ],
+  );
+}
+
+class _JourneyStep extends StatelessWidget {
+  const _JourneyStep({required this.label, this.current = false});
+
+  final String label;
+  final bool current;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.dpColors;
+    return Semantics(
+      label: current ? '현재 단계: 트랙 선택' : null,
+      selected: current,
+      excludeSemantics: current,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: DpSpacing.md,
+          vertical: DpSpacing.sm,
+        ),
+        decoration: BoxDecoration(
+          color: current ? colors.accentSoft : colors.surfaceMuted,
+          border: Border.all(
+            color: current ? colors.accentLine : colors.border,
+          ),
+          borderRadius: BorderRadius.circular(DpRadius.chip),
+        ),
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+            color: current ? colors.primaryTextStrong : colors.textSecondary,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DiagnosticOutcomes extends StatelessWidget {
+  const _DiagnosticOutcomes();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.dpColors;
+    final text = Theme.of(context).textTheme;
+    return Container(
+      padding: const EdgeInsets.all(DpSpacing.md),
+      decoration: BoxDecoration(
+        color: colors.surfaceMuted,
+        borderRadius: BorderRadius.circular(DpRadius.input),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('진단 후 바로 확인', style: text.labelLarge),
+          const SizedBox(height: DpSpacing.sm),
+          const Wrap(
+            spacing: DpSpacing.xl,
+            runSpacing: DpSpacing.sm,
+            children: [Text('현재 레벨'), Text('진단 신뢰도'), Text('맞춤 학습 경로')],
+          ),
+        ],
+      ),
     );
   }
 }

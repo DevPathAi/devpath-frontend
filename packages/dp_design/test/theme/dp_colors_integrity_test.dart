@@ -71,11 +71,10 @@ void main() {
     expect(c.surfaceMuted, DpColors.light.surfaceMuted);
   });
 
-  test('T2 팔레트 기준값 — 라이트 배경은 따뜻한 무채색', () {
-    expect(DpColors.light.bg, const Color(0xFFFAF9F7));
-    expect(DpColors.light.primary, const Color(0xFFB45309));
-    expect(DpColors.light.railBg, const Color(0xFF1A1815));
-    // 다크의 onPrimary 는 어두운 색이다(라이트와 반대).
-    expect(DpColors.dark.onPrimary, const Color(0xFF1A1200));
+  test('Leva v2 팔레트 기준값 — 인디고와 푸른 무채색', () {
+    expect(DpColors.light.bg, const Color(0xFFF6F7FB));
+    expect(DpColors.light.primary, const Color(0xFF5653E7));
+    expect(DpColors.light.railBg, const Color(0xFF11131B));
+    expect(DpColors.dark.onPrimary, const Color(0xFF17163D));
   });
 }

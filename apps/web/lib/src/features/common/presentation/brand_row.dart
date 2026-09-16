@@ -16,14 +16,7 @@ Widget brandRow(BuildContext context, {List<Widget> actions = const []}) {
     ),
     child: Row(
       children: [
-        Container(
-          width: 24,
-          height: 24,
-          decoration: BoxDecoration(
-            color: c.primary,
-            borderRadius: BorderRadius.circular(DpRadius.button),
-          ),
-        ),
+        const DpBrandMark(size: 32),
         const SizedBox(width: DpSpacing.sm),
         // Flexible로 감싼다 — Spacer(Expanded)와 같은 Row의 non-flex 자식은
         // 무한 주축 제약으로 측정되어 ellipsis가 발동하지 않고 오버플로한다.
@@ -31,7 +24,11 @@ Widget brandRow(BuildContext context, {List<Widget> actions = const []}) {
           child: Text(
             'Leva',
             overflow: TextOverflow.ellipsis,
-            style: text.titleSmall?.copyWith(color: c.textPrimary),
+            style: text.titleMedium?.copyWith(
+              color: c.textPrimary,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.2,
+            ),
           ),
         ),
         const Spacer(),
