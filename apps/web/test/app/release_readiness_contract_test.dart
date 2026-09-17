@@ -32,6 +32,21 @@ void main() {
     expect(nginx, contains('if (\$mission_release_ready != "true")'));
     expect(nginx, contains('if (\$mission_probe_authorized = 0)'));
     expect(nginx, contains('add_header Cache-Control "no-store" always;'));
+
+    // 운영 실측(2026-09-17): main.dart.js 5,969,649 B 가 content-encoding 없이,
+    // Cache-Control 없이 내려갔다. 이미지가 사전 압축하고 nginx 가 gzip_static 으로
+    // 그대로 서빙하며, 모든 응답은 ETag 재검증(no-cache)으로 돈다.
+    expect(nginx, contains('gzip_static on;'));
+    expect(nginx, contains('gzip_vary on;'));
+    expect(nginx, contains('add_header Cache-Control "no-cache" always;'));
+    expect(
+      dockerfile,
+      contains('gzip -9 -n -c "\$f" > "\$f.gz"'),
+      reason:
+          'runtime stage must precompress the Flutter bundle deterministically',
+    );
+    expect(dockerfile, contains("-name '*.wasm'"));
+    expect(dockerfile, contains("-name '*.otf'"));
     expect(
       nginx,
       contains(
