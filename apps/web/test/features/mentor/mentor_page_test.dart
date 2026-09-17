@@ -84,6 +84,18 @@ void main() {
 
     expect(find.textContaining('첫 질문'), findsOneWidget);
 
+    // 외부 리뷰(2026-09-17): 추천 질문 칩이 트랙과 무관한 고정값("Riverpod이 뭔가요?")이었다.
+    // 칩은 어느 트랙에서도 뜻이 통하는 학습 상황 질문이어야 하고, 특정 프레임워크 이름을 박지 않는다.
+    expect(find.widgetWithText(ActionChip, 'Riverpod이 뭔가요?'), findsNothing);
+    for (final example in mentorExampleQuestions) {
+      expect(find.widgetWithText(ActionChip, example), findsOneWidget);
+    }
+    expect(mentorExampleQuestions, hasLength(3));
+    expect(
+      mentorExampleQuestions.join(' '),
+      isNot(matches(RegExp(r'Riverpod|Spring|Flutter|React|Django'))),
+    );
+
     // T1: 페이지 헤더 배선 회귀 가드 — DpPageHeader(title: 'AI 멘토', ...)를
     // 통째로 지워도 이 파일의 나머지 테스트는 버블·참고자료만 봐서 무커버였다.
     final header = tester.widget<DpPageHeader>(find.byType(DpPageHeader));

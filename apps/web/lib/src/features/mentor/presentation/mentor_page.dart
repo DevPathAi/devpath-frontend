@@ -13,7 +13,13 @@ import '../state/mentor_scope_key.dart';
 import '../state/mentor_state.dart';
 import 'web_mentor_context_projection.dart';
 
-const _kExamples = ['비동기란?', '테스트는 어떻게 작성하나요?', 'Riverpod이 뭔가요?'];
+/// 빈 상태의 추천 질문. 트랙과 무관하게 뜻이 통하는 학습 상황 질문만 둔다 — 특정
+/// 프레임워크 이름(예: Riverpod)을 박으면 다른 트랙 학습자에게 무관한 칩이 된다(외부 리뷰 2026-09-17).
+const mentorExampleQuestions = [
+  '지금 보는 오류 메시지가 왜 나는지 설명해 주세요',
+  '이번 미션의 완료 조건을 어떻게 확인하나요?',
+  '이 코드에 테스트를 어디부터 붙이면 좋을까요?',
+];
 
 /// 하단에서 이 픽셀 이내면 새 메시지·토큰을 자동 추종(더 멀면 사용자가 읽는 중으로 보고 억제).
 const double _kFollowThreshold = 120;
@@ -592,7 +598,7 @@ class _Empty extends StatelessWidget {
             runSpacing: DpSpacing.sm,
             alignment: WrapAlignment.center,
             children: [
-              for (final example in _kExamples)
+              for (final example in mentorExampleQuestions)
                 ActionChip(
                   label: Text(example),
                   onPressed: () => onPick(example),

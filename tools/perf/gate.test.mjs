@@ -29,6 +29,20 @@ test('gate: +5.01% 전송량 회귀는 실패한다', () => {
   assert.match(violations[0], /total/);
 });
 
+test('gate: 회귀 %가 넘어도 절대 증가가 transfer_regression_min_bytes 미만이면 통과한다', () => {
+  // CI 실측(PR #217): warm 전송은 HTML+매니페스트 13 KB 뿐이라 스플래시 1.4 KB 가 +10.98% 로 잡혔다.
+  // 퍼센트 게이트는 작은 총량에서 과민하므로 바이트 바닥을 함께 본다.
+  const floored = { ...budget, transfer_regression_min_bytes: 4096 };
+  const baseline = report([row({ phase: 'warm', transfer_bytes: { total: 13000, js: 0, canvaskit_or_wasm: 0, fonts: 0, images: 0, other: 13000 } })]);
+  const small = report([row({ phase: 'warm', transfer_bytes: { total: 14500, js: 0, canvaskit_or_wasm: 0, fonts: 0, images: 0, other: 14500 } })]);
+  assert.deepEqual(evaluate(small, baseline, floored), []);
+  // 바닥을 넘는 증가는 여전히 실패한다(+40%, +5.2 KB).
+  const large = report([row({ phase: 'warm', transfer_bytes: { total: 18200, js: 0, canvaskit_or_wasm: 0, fonts: 0, images: 0, other: 18200 } })]);
+  assert.equal(evaluate(large, baseline, floored).length, 1);
+  // 바닥이 없으면(기존 예산) 종전대로 퍼센트만 본다.
+  assert.equal(evaluate(small, baseline, budget).length, 1);
+});
+
 test('gate: 절대 임계(INP·CLS·ready) 초과는 기준선과 무관하게 실패한다', () => {
   const baseline = report([row()]);
   const current = report([row({ p75: { fcp_ms: 800, ready_ms: 2600, lcp_ms: null, inp_ms: 250, cls: 0.2 } })]);

@@ -72,6 +72,10 @@ LABEL ai.leva.app_version="${APP_VERSION}" \
       ai.leva.analytics_contract_version="${ANALYTICS_CONTRACT_VERSION}" \
       ai.leva.analytics_environment="${ANALYTICS_ENVIRONMENT}"
 COPY --from=build /src/apps/web/build/web /usr/share/nginx/html
+# 텍스트·wasm·폰트 자산을 사전 압축한다. nginx gzip_static 이 Accept-Encoding: gzip 에 .gz 를 준다.
+RUN find /usr/share/nginx/html -type f \( -name '*.js' -o -name '*.wasm' -o -name '*.json' \
+      -o -name '*.otf' -o -name '*.ttf' -o -name '*.css' -o -name '*.html' -o -name '*.svg' \) \
+      -exec sh -c 'for f; do gzip -9 -n -c "$f" > "$f.gz"; done' _ '{}' +
 COPY apps/web/nginx.conf /etc/nginx/templates/default.conf.template
 COPY apps/web/release-entrypoint.sh /usr/local/bin/devpath-release-entrypoint
 RUN chmod 0555 /usr/local/bin/devpath-release-entrypoint

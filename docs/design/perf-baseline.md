@@ -17,7 +17,7 @@
 
 ## 예산과 게이트
 
-`perf/budget.json`: LCP(또는 ready) ≤ 2500ms · INP ≤ 200ms · CLS ≤ 0.1 · 전송량 회귀 ≤ +5%(total 과 js+renderer 각각, 기준선의 같은 route·profile·phase 행 대비).
+`perf/budget.json`: LCP(또는 ready) ≤ 2500ms · INP ≤ 200ms · CLS ≤ 0.1 · 전송량 회귀 ≤ +5%(total 과 js+renderer 각각, 기준선의 같은 route·profile·phase 행 대비) **이면서** 절대 증가 > 4 KB(`transfer_regression_min_bytes`; warm 은 13 KB 뿐이라 퍼센트만으로는 스플래시 1.4 KB 도 회귀로 잡혔다).
 
 `enforce_absolute: false` — 첫 기준선이 절대 예산 밖(아래)이라 절대 임계 초과는 **경고**로만 남기고, 전송량 회귀는 **즉시 실패**로 강제한다. 절대 임계 안으로 들어오면 `true` 로 바꾼다(기준선을 낮춰 맞추지 않는다).
 
