@@ -60,4 +60,7 @@ test('measureNavigation: 모든 Playwright 대기에 명시적 타임아웃이 �
   // 차단된 외부 호스트로의 반복 요청 때문. 루프백 요청만 보는 quiet() 로 판정한다.
   assert.doesNotMatch(src, /waitForLoadState\('networkidle'/);
   assert.match(src, /await net\.quiet\(\{ idleMs: 1000, timeout: READY_TIMEOUT_MS \}\)/);
+  // 초기 전송량은 주 행동 클릭 전에 스냅샷한다(클릭이 연 화면의 지연 자산이 섞이면 warm 이 오염된다).
+  assert.match(src, /const transfer = \{ \.\.\.net\.transfer \};\n  const fcp = /);
+  assert.doesNotMatch(src, /transfers\.(cold|warm)\.push\(\{ \.\.\.net\.transfer \}\)/);
 });

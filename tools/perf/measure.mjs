@@ -229,6 +229,9 @@ async function measureNavigation(page, base, route, net) {
   // Slow 4G 에서는 ready 뒤에도 폰트가 계속 내려온다. Playwright networkidle 대신 루프백 요청만
   // 잠잠해지길 기다린다(차단된 외부 호스트로의 반복 요청은 전송량과 무관하다).
   await net.quiet({ idleMs: 1000, timeout: READY_TIMEOUT_MS });
+  // 초기 전송량은 주 행동 클릭 전에 확정한다. 클릭이 다른 화면으로 이동해 지연 자산(예: 코드 폰트)을
+  // 내려받으면 그것은 다음 화면의 비용이지 이 라우트의 초기 전송이 아니다.
+  const transfer = { ...net.transfer };
   const fcp = await page.evaluate(() => performance.getEntriesByName('first-contentful-paint')[0]?.startTime ?? null);
   const action = PRIMARY_ACTION[route];
   const target = page.getByRole(action.role, { name: action.name }).first();
@@ -237,9 +240,12 @@ async function measureNavigation(page, base, route, net) {
     await target.click({ trial: false, timeout: 5000 }).catch(() => {});
     interacted = true;
     await page.waitForTimeout(1200);
+    // 클릭이 시작한 다운로드가 다음 단계(warm)로 새지 않도록 여기서 잠잠해질 때까지 기다린다.
+    await net.quiet({ idleMs: 1000, timeout: READY_TIMEOUT_MS });
   }
   const metrics = await page.evaluate(() => globalThis.__leva);
   return {
+    transfer,
     fcp_ms: fcp,
     ready_ms: readyMs,
     lcp_ms: metrics.lcp,
@@ -274,11 +280,13 @@ export async function run(options) {
           const page = await context.newPage();
           const net = await throttle(context, page, spec);
           try {
-            samples.cold.push(await measureNavigation(page, base(server), route, net));
-            transfers.cold.push({ ...net.transfer });
+            const cold = await measureNavigation(page, base(server), route, net);
+            samples.cold.push(cold);
+            transfers.cold.push(cold.transfer);
             net.reset();
-            samples.warm.push(await measureNavigation(page, base(server), route, net));
-            transfers.warm.push({ ...net.transfer });
+            const warm = await measureNavigation(page, base(server), route, net);
+            samples.warm.push(warm);
+            transfers.warm.push(warm.transfer);
           } finally {
             await context.close();
           }
