@@ -19,10 +19,11 @@ visual matrix(320/600/840/1240 × light/dark)가 compact 와 desktop 을 모두 
 | fixture 수 | 12 | 15 |
 | visual case (`fixture × 4 폭 × 2 테마`) | 96 | 120 |
 | a11y case (`fixture × 2`) | 24 | 30 |
+| browser smoke (`web 배포 fixture × 2 테마`, `tools/et13/capture.mjs`) | 16 | 22 |
 | web surface case | 48 / 12 | 72 / 18 |
 | `projection_contract_sha256` | `c66d08b6…4bde3` | `106e8d29…de3ca` |
 
-`tools/et13_evidence.dart` 의 case 수는 이제 `_fixtureIds.length` 에서 파생된다(`_visualCaseCount`, `_a11yCaseCount`) — 다음 fixture 추가는 id 목록·카탈로그·스키마 prefixItems·계약 테스트만 바꾸면 된다. 5개 스키마(`catalog`·`evidence`·`manifest`·`generated-cases`·`baseline-approval`)의 `prefixItems`/`minItems`/`maxItems` 를 함께 갱신했고, 생성 카탈로그는 `dart run tools/et13_evidence.dart generate` 로만 만든다.
+`tools/et13_evidence.dart` 의 case 수는 이제 `_fixtureIds.length` 에서 파생된다(`_visualCaseCount`, `_a11yCaseCount`) — 다음 fixture 추가는 id 목록·카탈로그·스키마 prefixItems·계약 테스트, 그리고 `tools/et13/capture.mjs` 의 web 배포 fixture 수 핀(현재 11 — producer 계약 테스트가 `expectedDistributions` 와 같은 값인지 대조)을 바꾸면 된다. 이 핀은 첫 PR CI 의 `produce-atomic-pair` 가 `browser smoke requires 8 web-hosted fixtures` 로 실패해 드러났고(로컬 게이트가 대조하지 않던 구멍), 계약 테스트로 막았다. 5개 스키마(`catalog`·`evidence`·`manifest`·`generated-cases`·`baseline-approval`)의 `prefixItems`/`minItems`/`maxItems` 를 함께 갱신했고, 생성 카탈로그는 `dart run tools/et13_evidence.dart generate` 로만 만든다.
 
 ## 투영 위젯
 

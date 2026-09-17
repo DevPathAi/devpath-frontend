@@ -64,6 +64,16 @@ void main() {
     expect(capture, contains("'wcag22aa'"));
     expect(capture, contains('page.screenshot'));
     expect(capture, contains('browser-smoke'));
+    expect(
+      capture,
+      contains(
+        "if (webHostedFixtures.length !== 11) "
+        "fail('browser smoke requires 11 web-hosted fixtures');",
+      ),
+      reason:
+          'browser smoke must pin the same web-distribution fixture count as '
+          'tools/et13_evidence.dart expectedDistributions (web: 11)',
+    );
     expect(capture, contains('pixel-stable across two captures'));
     expect(capture, contains('PNG axes differ from its catalog profile'));
     expect(capture, contains("page.on('requestfailed'"));

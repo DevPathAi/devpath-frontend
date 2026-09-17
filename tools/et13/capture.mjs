@@ -381,7 +381,7 @@ async function main() {
     const webHostedFixtures = catalog.fixtures.filter(
       (fixture) => fixture.distribution === 'web',
     );
-    if (webHostedFixtures.length !== 8) fail('browser smoke requires 8 web-hosted fixtures');
+    if (webHostedFixtures.length !== 11) fail('browser smoke requires 11 web-hosted fixtures');
     for (const fixture of webHostedFixtures) {
       for (const theme of ['light', 'dark']) {
         const smokeId = `${fixture.id}--browser-smoke--w320--${theme}--text200`;
