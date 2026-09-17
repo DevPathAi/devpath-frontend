@@ -11,9 +11,12 @@ import 'dp_typography.dart';
 abstract final class DpCodeFont {
   static const String assetPath = 'packages/dp_design/fonts/D2Coding.ttf';
   static Future<void>? _loading;
-  static bool _loaded = false;
 
-  static bool get isLoaded => _loaded;
+  /// 로드 완료 여부. 코드 스타일을 그리는 위젯이 이를 듣고 서브트리를 다시 만든다
+  /// (fallback 폰트로 잡힌 첫 레이아웃의 스크롤 시맨틱스가 남지 않도록).
+  static final ValueNotifier<bool> loaded = ValueNotifier<bool>(false);
+
+  static bool get isLoaded => loaded.value;
 
   /// 멱등. 같은 Future 를 돌려주며, 실패하면 캐시를 비워 다음 호출이 다시 시도한다.
   static Future<void> ensureLoaded() => _loading ??= _load();
@@ -23,7 +26,7 @@ abstract final class DpCodeFont {
       final loader = FontLoader(DpTypography.codeFamily)
         ..addFont(rootBundle.load(assetPath));
       await loader.load();
-      _loaded = true;
+      loaded.value = true;
     } catch (_) {
       _loading = null;
       rethrow;
@@ -33,6 +36,6 @@ abstract final class DpCodeFont {
   @visibleForTesting
   static void resetForTest() {
     _loading = null;
-    _loaded = false;
+    loaded.value = false;
   }
 }

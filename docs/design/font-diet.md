@@ -23,6 +23,10 @@
 
 기준선 `perf/baseline.json` 은 이 빌드로 runs=3 재측정해 갱신했다(전송량은 결정적이라 게이트는 새 값 대비 +5% 회귀를 본다).
 
+## 지연 로드가 드러낸 시맨틱스 함정
+
+PR CI 의 `browser-ux` 가 390px `/content/future-async-await` 에서 axe `scrollable-region-focusable`(serious) 로 실패했다. 코드 블록이 처음엔 fallback 폰트로 배치돼 가로 스크롤 범위가 생기고, D2Coding 이 등록되며 텍스트는 다시 배치되지만 **스크롤 시맨틱 노드는 `overflow-x: scroll` 로 남았다**(로컬 재현: 로드 4 s 뒤 재스캔에도 유지, 화면은 두 빌드가 동일). `DpCodeFont.loaded`(ValueNotifier) 를 `DpMarkdown` 이 듣고 로드 완료 시 서브트리를 새 키로 다시 만들어 시맨틱스를 새로 생성한다(테스트 `dp_code_font_test.dart`). 수정 후 axe 390/1240 통과.
+
 ## ET13 영향
 
 - `evidence/et13/assets.lock.json` 과 `tools/et13_evidence.dart` `_expectedAssets` 의 다섯 폰트 bytes/sha256 을 재고정하고 `derived_by: tools/fonts/subset_fonts.py` 를 적었다. `validate` 와 계약 테스트 통과.
