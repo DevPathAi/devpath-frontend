@@ -37,3 +37,6 @@ apps/mobile/build/
 
 # 브라우저 UX 러너 리포트(CI 아티팩트로만 보존)
 evidence/browser-ux/
+
+# 성능 측정 리포트(CI 아티팩트로만 보존)
+evidence/perf/
