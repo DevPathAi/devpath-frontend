@@ -441,6 +441,7 @@ React로 재작성할 필요가 없다. 현재 디자인 시스템과 Flutter We
 - 결과: PR [#209](https://github.com/DevPathAi/devpath-frontend/pull/209) → develop merge `c370c73e`. CI job `perf-gate`.
 - `tools/perf/measure.mjs`(5 라우트 × mobile/desktop × cold/warm, runs=3, nearest-rank p75), `perf/baseline.json`(CanvasKit), `perf/renderer-ab-2026-09-17.json`(wasm), `perf/budget.json`, `tools/perf/gate.mjs`.
 - 실측: cold 전송 22 MB(폰트 10.4 · JS 5.9 · CanvasKit 5.7), 모바일 Slow 4G ready 21.4 s, 데스크톱 3.8 s. wasm은 −12% 전송, −27%/−21% ready.
+- 후속 수정: PR [#212](https://github.com/DevPathAi/devpath-frontend/pull/212)(merge `9687b05e`) — `networkidle` 대기만 기본 30 s 라 Slow 4G 에서 간헐 만료(코드 무변경 PR 에서 실측) → 명시 120 s + 계약 테스트. 기준선은 3회, CI 는 5회 표본이다.
 - 편차: 절대 예산(LCP 2.5 s 등)은 첫 기준선이 밖이라 `enforce_absolute: false` 경고 모드, 전송량 +5% 회귀만 강제. 브라우저는 Chromium만(Firefox/Safari A/B 미수행). CanvasKit은 LCP 후보가 없어 `ready_ms`를 대용. 문서: `docs/design/perf-baseline.md`.
 
 - `/login`, `/dashboard`, `/path`, `/mentor`, `/community`의 cold/warm p75를 분리한다.
