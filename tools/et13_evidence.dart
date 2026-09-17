@@ -2529,7 +2529,11 @@ Map<String, Object?> _validateCaptureSummary({
     'captureSummary.capture_surface',
   );
   _exactValue(summary['device_evidence'], false, 'captureSummary.device');
-  _exactValue(summary['case_count'], 120, 'captureSummary.case_count');
+  _exactValue(
+    summary['case_count'],
+    _visualCaseCount + _a11yCaseCount,
+    'captureSummary.case_count',
+  );
   final actual = _array(summary['cases'], 'captureSummary.cases');
   final expected = <Map<String, Object?>>[
     for (final lane in ['visual', 'a11y'])
@@ -2540,7 +2544,10 @@ Map<String, Object?> _validateCaptureSummary({
         _object(raw, '$lane.case'),
   ];
   if (actual.length != expected.length) {
-    _fail('capture summary must contain exactly 120 ordered cases');
+    _fail(
+      'capture summary must contain exactly '
+      '${_visualCaseCount + _a11yCaseCount} ordered cases',
+    );
   }
   for (var index = 0; index < actual.length; index++) {
     final result = _object(actual[index], 'captureSummary.cases[$index]');

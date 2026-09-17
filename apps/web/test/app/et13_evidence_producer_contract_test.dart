@@ -74,6 +74,18 @@ void main() {
           'browser smoke must pin the same web-distribution fixture count as '
           'tools/et13_evidence.dart expectedDistributions (web: 11)',
     );
+    final tool = File('../../tools/et13_evidence.dart').readAsStringSync();
+    expect(
+      tool,
+      contains('_visualCaseCount + _a11yCaseCount'),
+      reason:
+          'the capture summary total must be derived from the fixture list; '
+          'the old literal 120 (96 visual + 24 a11y) collided with the new '
+          'visual count and only failed in CI',
+    );
+    expect(tool, isNot(contains("summary['case_count'], 120")));
+    expect(tool, isNot(contains('exactly 120 ordered cases')));
+    expect(capture, isNot(contains('/120 passed')));
     expect(capture, contains('pixel-stable across two captures'));
     expect(capture, contains('PNG axes differ from its catalog profile'));
     expect(capture, contains("page.on('requestfailed'"));
