@@ -27,7 +27,7 @@ visual matrix(320/600/840/1240 × light/dark)가 compact 와 desktop 을 모두 
 
 ## 투영 위젯
 
-`WebCommunityBoardProjection` 은 `CommunityHomePage` 가 provider 로 채우는 H1·설명·게시판 세그먼트·목록·빈 상태를 순수 입력만으로 그린다. 페이지도 같은 `CommunityBoardFilterBar`·`CommunityPostRow`·`CommunityBadgeChip` 을 쓰므로 fixture 와 운영 화면이 갈라지지 않는다. 검색·광고·라우팅은 fixture 밖이다.
+`WebCommunityBoardProjection` 은 `CommunityHomePage` 가 provider 로 채우는 H1·설명(compact 에서는 제목 메뉴)·목록·빈 상태를 순수 입력만으로 그린다. 페이지도 같은 `CommunityBoardHeader`·`CommunityBoardEmpty`·`CommunityPostRow`·`CommunityBadgeChip` 을 쓰므로 fixture 와 운영 화면이 갈라지지 않는다. 검색·정렬·광고·라우팅은 fixture 밖이다. 페이지 안 게시판 세그먼트는 2026-09-17 에 제거했다 — 세 fixture 의 visual baseline 은 다음 승인 때 다시 렌더된다.
 
 ## baseline 승인 절차
 

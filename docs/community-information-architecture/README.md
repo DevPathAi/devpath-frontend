@@ -61,7 +61,7 @@ URL·브라우저 동작, 상호작용 상태, 접근성, 성능, 시각 회귀 
 
 - 데스크톱: 세 게시판을 사이드바의 독립 목적지로 항상 노출한다.
 - 모바일: 하단 내비게이션은 `오늘 / 학습 경로 / AI 멘토 / 커뮤니티` 네 항목을 유지하고,
-  커뮤니티 안의 44px 이상 세그먼트 컨트롤로 세 게시판을 전환한다.
+  커뮤니티 페이지의 제목 메뉴(44px 이상, compact 전용)로 세 게시판을 전환한다. 페이지 안 세그먼트는 2026-09-17 에 제거했다(history D07).
 - `/community` 또는 알 수 없는 `board` 값은 자유게시판으로 해석한다.
 - `전체`는 사용자에게 노출되는 주요 게시판에서 제외한다.
 - URL, 사이드바 선택, H1, 설명, 브레드크럼, 상세·작성 화면의 복귀 문맥은 같은 `board` 값을 쓴다.
@@ -85,7 +85,7 @@ URL·브라우저 동작, 상호작용 상태, 접근성, 성능, 시각 회귀 
 | 책임 | 파일 |
 |---|---|
 | 데스크톱·모바일 목적지, 선택 인덱스, 브레드크럼 | `apps/web/lib/src/features/shell/presentation/app_shell.dart` |
-| 기본 게시판, URL 동기화, 제목·설명, 세그먼트, CTA | `apps/web/lib/src/features/community/presentation/community_home_page.dart` |
+| 기본 게시판, URL 동기화, 제목·설명(compact 제목 메뉴), 정렬, 게시판별 CTA | `apps/web/lib/src/features/community/presentation/community_home_page.dart` |
 | compact/desktop 목적지 분리 계약 | `packages/dp_design/lib/src/shell/dp_app_shell.dart` |
 | 정보 구조 회귀 테스트 | `apps/web/test/features/community/community_information_architecture_test.dart` |
 | 데스크톱·모바일 계층 테스트 | `apps/web/test/features/community/community_navigation_hierarchy_test.dart` |

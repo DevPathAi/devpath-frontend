@@ -167,7 +167,7 @@ kShellDestinations
 - compact 커뮤니티의 기본 경로는 `/community?board=FREE`다.
 - `DpAppShell`은 `compactDestinations`, `compactSelectedIndex`, `onCompactSelect`를 별도로 받는다.
 - compact 선택값이 없을 때 desktop index로 잘못 폴백하지 않는다.
-- 커뮤니티 내부 세 게시판은 페이지 상단 세그먼트가 담당한다.
+- 커뮤니티 내부 세 게시판은 compact 에서만 페이지 제목 메뉴가 담당한다(레일이 보이는 폭은 레일만; 2026-09-17 세그먼트 제거).
 
 **합격 기준**
 
@@ -189,7 +189,7 @@ kShellDestinations
 **구현 계약**
 
 - `_resolveBoard(null)`과 알 수 없는 값은 `CommunityBoard.free`다.
-- `CommunityBoard.all`은 `_resolveBoard`와 사용자 세그먼트에서 제외한다.
+- `CommunityBoard.all`은 `_resolveBoard`와 제목 메뉴(`kCommunityBoards`)에서 제외한다.
 - 첫 진입은 `initState` 이후 선택 게시판을 controller에 전달한다.
 - 같은 위젯에서 URL만 바뀌면 `didUpdateWidget`이 board/query 변화를 비교해 다시 조회한다.
 - 검색어 갱신은 `go`가 아니라 `replace`를 써서 타이핑 문자 수만큼 브라우저 history를 쌓지 않는다.
@@ -197,7 +197,7 @@ kShellDestinations
 
 **합격 기준**
 
-- URL 직접 입력, 새로고침, 셸 전환, 세그먼트 전환이 모두 같은 결과를 낸다.
+- URL 직접 입력, 새로고침, 셸 전환, 제목 메뉴 전환이 모두 같은 결과를 낸다.
 - `?board=ALL` 또는 임의 값이 사용자에게 `전체`를 노출하지 않는다.
 - 검색어를 지우면 현재 게시판의 기본 목록으로 돌아간다.
 
@@ -393,7 +393,7 @@ React로 재작성할 필요가 없다. 현재 디자인 시스템과 Flutter We
 | `자유`를 `자유게시판`으로 표기 | shell/home page | 정확한 label 테스트 | FREE 캡처 | DONE |
 | 피드백 직접 노출 | shell/home page | 목적지·index 테스트 | FEEDBACK 캡처 | DONE |
 | `게시판` 중간 계층 제거 | desktop 목적지·breadcrumb | 목적지 계층 테스트 | sidebar/breadcrumb 육안 확인 | DONE |
-| `전체` 제거 | 세그먼트 필터 | exposed board 테스트 | 세 URL에서 미노출 확인 | DONE |
+| `전체` 제거 | `kCommunityBoards`(제목 메뉴) | exposed board 테스트 | 세 URL에서 미노출 확인 | DONE |
 | 다른 작업자가 같은 결과 재현 | workflow/history/handoff | 링크·diff 검사 | 다음 세션 restore 절차 | DONE |
 
 ## 5. 다음 세션 Task 큐

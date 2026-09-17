@@ -190,7 +190,7 @@ untracked: CODEX.md
 |---|---|
 | `community_information_architecture_test.dart` | 노출 게시판 정확한 순서·명칭, shell 목적지, breadcrumb |
 | `community_navigation_hierarchy_test.dart` | desktop 세 목적지, URL별 index, compact 네 목적지 |
-| `community_home_page_test.dart` | 기본 FREE, query 진입·변경, 세그먼트, 목록·빈 상태·CTA |
+| `community_home_page_test.dart` | 기본 FREE, query 진입·변경, compact 제목 메뉴, 정렬, 목록·게시판별 빈 상태·CTA 직행 |
 | `app_shell_breadcrumb_test.dart` | 홈/상세/작성 계층과 경로 match 순서 |
 | `app_shell_view_test.dart` | 폭별 shell, callback, 선택 상태, chrome |
 | `dp_app_shell_adaptive_destinations_test.dart` | compact 전용 목적지와 null selection |
