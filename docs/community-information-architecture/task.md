@@ -398,38 +398,73 @@ React로 재작성할 필요가 없다. 현재 디자인 시스템과 Flutter We
 
 ## 5. 다음 세션 Task 큐
 
-### N01 — Cloudflare 장기 자격 증명 정리 (`NEXT`, P0 운영)
+> 2026-09-17 후속 세션에서 N02~N06을 순서대로 구현·머지했다(모두 `origin/develop`, 각 PR은 CI 녹색 확인 후 merge commit).
+> N01만 실측 차단(인간 단계)으로 남았다. 각 항목의 상세 설계·실측·후속 과제는 `docs/design/*.md`가 원천이다.
+
+### N01 — Cloudflare 장기 자격 증명 정리 (`BLOCKED_HUMAN`, P0 운영)
+
+- 실측 차단(2026-09-17): 로컬 wrangler OAuth 토큰은 Cloudflare 토큰 관리 API에서 `9109`로 거부되고 Global API Key는 로컬에 없다.
+  대시보드에서 `Account → Cloudflare Pages → Edit` 단일 권한 토큰을 만드는 것만 인간 단계다. 값은 어디에도 기록하지 않는다.
+- 인간이 실행할 명령(토큰을 `%USERPROFILE%\cf-pages-token.txt`에 저장한 뒤):
+  `! gh secret set CLOUDFLARE_API_TOKEN --repo DevPathAi/devpath-gitops --env mission-spine-production-landing < "$env:USERPROFILE\cf-pages-token.txt"; Remove-Item "$env:USERPROFILE\cf-pages-token.txt"`
+- 그 뒤 AI가 `mission-spine-landing-last.yml` preflight를 비파괴로 실행하고 런북을 갱신한다.
 
 - 임시로 복구한 Landing 배포 자격 증명을 장기 수명·최소 권한의 scoped API token으로 교체한다.
 - 토큰 값은 어떤 문서나 로그에도 기록하지 않는다.
 - 교체 후 dry-run 또는 비파괴 identity 검증과 Landing workflow의 인증 단계만 검증한다.
 - 성공 기준: 다음 landing-last 실행이 로컬 OAuth 세션에 의존하지 않는다.
 
-### N02 — 전체 앱 상태 matrix 통일 (`NEXT`, P1 제품)
+### N02 — 전체 앱 상태 matrix 통일 (`DONE`, P1 제품)
+
+- 결과: PR [#206](https://github.com/DevPathAi/devpath-frontend/pull/206) → develop merge `41e267a8`.
+- 신설 primitive는 `DpInlineNotice`(danger/warning/info) 하나. `DpLoading`은 `SemanticsRole.status` 라벨을 가진다.
+- 계약 테스트 `apps/web/test/app/state_matrix_contract_test.dart`가 13개 화면 소스에서 임시 로딩·에러 패턴을 금지한다.
+- 로그인은 세션 복원 중 버튼 대신 로딩을 보인다(의도된 동작 변경). 문서: `docs/design/app-state-matrix.md`.
 
 - 대상: 로그인, 진단, Today, Path, Community, Content, Sandbox, Mentor.
 - 각 화면의 loading/empty/error/success/partial과 복구 행동을 테스트로 먼저 고정한다.
 - `DpStateScaffold`를 우선 재사용하고, 두 화면 이상에 같은 의미가 있을 때만 새 primitive를 만든다.
 
-### N03 — 브라우저 UX·접근성 자동화 (`NEXT`, P1 품질)
+### N03 — 브라우저 UX·접근성 자동화 (`DONE`, P1 품질)
+
+- 결과: PR [#208](https://github.com/DevPathAi/devpath-frontend/pull/208) → develop merge `c375b36b`. CI job `browser-ux`(ET13 핀 Playwright 이미지, `--network none`).
+- `tools/browser_ux/run.mjs` 8 시나리오(deep link 복귀·새로고침·back/forward·키보드 순회·dialog focus 복귀·overflow/44px·reduced-motion·axe wcag22aa), 390/768/1024/1440, 200% 텍스트.
+- dp_design 수정 4건(카드 단일 탭 정지·`SemanticsRole` status/alert·셸 `WidgetOrderTraversalPolicy`·표준 밀도+세그먼트 44px). 부트스트랩이 커스텀 host element에 임베딩한다(axe meta-viewport 해소).
+- 편차: 키보드 순회 기대값은 실측 순서(검색 → 게시판 3 → 글 작성 → 행 3)다. 라우트 `FocusScope` 경계 때문에 레일이 페이지 순회에 없다(레일 우선 순회는 후속). 문서: `docs/design/browser-ux-contract.md`.
 
 - deep link, 새로고침, back, focus 복귀, 키보드 순회, 200% 텍스트, reduced-motion을 자동화한다.
 - 390/768/1024/1440에서 overflow와 44px target을 검증한다.
 - 실제 Flutter semantics와 브라우저 접근성 트리를 모두 확인한다.
 
-### N04 — 성능 기준선과 예산 (`NEXT`, P1 성능)
+### N04 — 성능 기준선과 예산 (`DONE`, P1 성능)
+
+- 결과: PR [#209](https://github.com/DevPathAi/devpath-frontend/pull/209) → develop merge `c370c73e`. CI job `perf-gate`.
+- `tools/perf/measure.mjs`(5 라우트 × mobile/desktop × cold/warm, runs=3, nearest-rank p75), `perf/baseline.json`(CanvasKit), `perf/renderer-ab-2026-09-17.json`(wasm), `perf/budget.json`, `tools/perf/gate.mjs`.
+- 실측: cold 전송 22 MB(폰트 10.4 · JS 5.9 · CanvasKit 5.7), 모바일 Slow 4G ready 21.4 s, 데스크톱 3.8 s. wasm은 −12% 전송, −27%/−21% ready.
+- 후속 수정: PR [#212](https://github.com/DevPathAi/devpath-frontend/pull/212)(merge `9687b05e`) — `networkidle` 대기만 기본 30 s 라 Slow 4G 에서 간헐 만료(코드 무변경 PR 에서 실측) → 명시 120 s + 계약 테스트. 기준선은 3회, CI 는 5회 표본이다.
+- 편차: 절대 예산(LCP 2.5 s 등)은 첫 기준선이 밖이라 `enforce_absolute: false` 경고 모드, 전송량 +5% 회귀만 강제. 브라우저는 Chromium만(Firefox/Safari A/B 미수행). CanvasKit은 LCP 후보가 없어 `ready_ms`를 대용. 문서: `docs/design/perf-baseline.md`.
 
 - `/login`, `/dashboard`, `/path`, `/mentor`, `/community`의 cold/warm p75를 분리한다.
 - 기본 web 빌드와 wasm 빌드를 지원 브라우저별로 A/B한다.
 - LCP ≤2.5s, INP ≤200ms, CLS ≤0.1과 초기 전송량 5% 회귀 방지 기준을 CI에 연결한다.
 
-### N05 — Today/Path 정보 밀도 재편 (`NEXT`, P1 디자인)
+### N05 — Today/Path 정보 밀도 재편 (`DONE`, P1 디자인)
+
+- 결과: PR [#207](https://github.com/DevPathAi/devpath-frontend/pull/207) → develop merge `846228d5`.
+- `DpMissionHeader`에 `action` 슬롯(순서 eyebrow → title → action → 완료 조건 → progress → why). Today/Path는 expanded 이상에서 3:2 두 열, compact는 한 열.
+- 장식 카드(도넛·배지)와 중복 제목·설명을 제거했다. 그리드 열 수는 `LayoutBuilder` 가용 폭으로 정한다. 문서: `docs/design/today-path-hierarchy.md`.
 
 - `다음 행동 → 완료 조건 → 진행 → 보조 맥락` 순서로 재구성한다.
 - compact와 large의 구성 자체를 다르게 설계한다.
 - 사용자 행동이 아닌 장식 카드와 중복 제목을 제거한다.
 
-### N06 — 시각 회귀 확대 (`NEXT`, P2 출시)
+### N06 — 시각 회귀 확대 (`DONE`, P2 출시)
+
+- 결과: PR [#210](https://github.com/DevPathAi/devpath-frontend/pull/210) → develop merge `fa778c2d`.
+- `WebCommunityBoardProjection` 추출 후 FREE/QNA/FEEDBACK fixture 3종을 catalog에 추가(12→15, visual 96→120, a11y 24→30, browser smoke 16→22). projection sha `106e8d29…`.
+- 편차: 기존 matrix(320/600/840/1240 × light/dark, a11y 320 light 200% / 1240 dark 200%)를 그대로 적용했고 DPR 1/2 분리는 하지 않았다(ET13 matrix 계약 변경이 필요해 후속).
+- baseline은 `pending_external_review` 그대로다. release_ready 전환은 `et13-baseline-approval.yml` 경로의 사람 승인·provenance로만 한다.
+- 실측: 첫 CI의 `produce-atomic-pair`가 `browser smoke requires 8 web-hosted fixtures`로 실패했다(`tools/et13/capture.mjs`의 하드코딩, 로컬 게이트 미대조). 11로 핀했다. 두 번째 CI는 `captureSummary.case_count must be 120; found 150`(총합 96+24를 하드코딩, 새 visual 120과 우연히 일치)로 실패해 총합도 파생시켰다. 둘 다 producer 계약 테스트로 막았다. 문서: `docs/design/et13-community-fixtures.md`.
 
 - 커뮤니티 FREE/QNA/FEEDBACK fixture를 ET13 catalog에 추가한다.
 - 390/768/1024/1440 smoke와 light/dark, DPR 1/2, text 100/200%를 분리한다.

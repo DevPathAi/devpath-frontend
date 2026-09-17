@@ -39,17 +39,32 @@
 | release PR | [#204](https://github.com/DevPathAi/devpath-frontend/pull/204) |
 | 운영 배포 | 완료 |
 
-### 1.3 이 문서 작업 상태
+### 1.3 큐 진행 상태 (2026-09-17 후속 세션)
+
+| 큐 | 상태 | PR | develop merge | 원천 문서 |
+|---|---|---|---|---|
+| N01 Cloudflare durable token | 인간 단계 대기(실측 차단) | — | — | [task.md](./task.md) §5 N01 |
+| N02 상태 matrix | 완료 | [#206](https://github.com/DevPathAi/devpath-frontend/pull/206) | `41e267a8` | `docs/design/app-state-matrix.md` |
+| N05 Today/Path 위계 | 완료 | [#207](https://github.com/DevPathAi/devpath-frontend/pull/207) | `846228d5` | `docs/design/today-path-hierarchy.md` |
+| N03 브라우저 UX·a11y | 완료 | [#208](https://github.com/DevPathAi/devpath-frontend/pull/208) | `c375b36b` | `docs/design/browser-ux-contract.md` |
+| N04 성능 기준선 | 완료 | [#209](https://github.com/DevPathAi/devpath-frontend/pull/209) | `c370c73e` | `docs/design/perf-baseline.md` |
+| N06 ET13 커뮤니티 fixture | 완료 | [#210](https://github.com/DevPathAi/devpath-frontend/pull/210) | `fa778c2d` | `docs/design/et13-community-fixtures.md` |
+
+이 다섯 PR은 모두 `origin/develop` 기반이며 `main`에는 아직 릴리스되지 않았다(프론트엔드는 `main` push에서만 배포된다).
+다음 릴리스 PR(`develop` → `main`)은 새 CI job `browser-ux`·`perf-gate`와 ET13 catalog 15 fixture를 함께 실어 나른다.
+
+### 1.4 이 문서 작업 상태
 
 | 항목 | 값 |
 |---|---|
-| 저장소 | `D:\workspace\dpa\.worktrees\frontend-community-ia-handoff` |
-| 브랜치 | `docs/community-ia-design-handoff-20260917` |
-| 기준 | `origin/develop`의 `a8fc36fa7eaa7cd53c84992122d97c4a883d960b` |
+| 저장소 | `D:\workspace\dpa\.worktrees\frontend-queue-handoff-20260917` |
+| 브랜치 | `docs/community-ia-queue-handoff-20260917` |
+| 기준 | `origin/develop`의 PR #210 merge commit 이후 |
+| 이전 문서 브랜치 | `docs/community-ia-design-handoff-20260917`(PR #205, merge `895e29c5`) |
 | 변경 종류 | Markdown 문서만 변경, Flutter 코드 변경 없음 |
-| 예정 커밋 제목 | `docs: document community IA delivery and handoff` |
+| 예정 커밋 제목 | `docs: record N02-N06 queue completion in community IA handoff` |
 | 커밋 확인법 | `git log -1 --oneline` |
-| 원격 확인법 | `git status --short --branch`와 `git ls-remote --heads origin docs/community-ia-design-handoff-20260917` |
+| 원격 확인법 | `git status --short --branch`와 `git ls-remote --heads origin docs/community-ia-queue-handoff-20260917` |
 
 자기 자신을 포함하는 문서 commit SHA는 문서 안에 하드코딩하지 않았다. 다음 작업자는 위 명령으로 원격
 HEAD를 읽는다.
@@ -57,7 +72,7 @@ HEAD를 읽는다.
 ## 2. 다음 세션 시작 명령
 
 ```powershell
-Set-Location D:\workspace\dpa\.worktrees\frontend-community-ia-handoff
+Set-Location D:\workspace\dpa\.worktrees\frontend-queue-handoff-20260917
 git fetch origin --prune
 git status --short --branch
 git log -5 --oneline --decorate
@@ -67,7 +82,7 @@ git rev-parse '@{upstream}'
 
 예상 결과:
 
-- 브랜치가 `docs/community-ia-design-handoff-20260917`이다.
+- 브랜치가 `docs/community-ia-queue-handoff-20260917`이다(머지 뒤라면 `origin/develop`에서 새 worktree를 만든다).
 - worktree가 clean이다.
 - HEAD와 upstream이 같다.
 
@@ -77,7 +92,7 @@ git rev-parse '@{upstream}'
 2. [task.md](./task.md)의 “다음 세션 Task 큐”
 3. [workflow.md](./workflow.md)의 해당 Task 절차
 4. [history.md](./history.md)의 장애/결정 기록
-5. 이 문서의 P0/P1 큐
+5. 이 문서의 §1.3 큐 진행 상태와 §9 남은 우선순위
 
 세션 시작 시 `context-restore`를 실행할 수 있으면 가장 최근 체크포인트를 복원한다. 체크포인트가
 없거나 도구가 없더라도 이 문서만으로 이어갈 수 있다.
@@ -290,6 +305,9 @@ Landing evidence artifact `10456108479`는 2026-10-16 만료 예정이다. 장�
 
 ## 9. 다음 세션 우선순위
 
+> 9.2~9.5는 2026-09-17 후속 세션에서 완료됐다(§1.3). 각 절의 원래 요구는 남기고 결과와 남은 편차를 덧붙였다.
+> 남은 순서: 9.1(인간 단계) → 9.6 후속 과제.
+
 ### 9.1 P0 — Cloudflare durable token
 
 예상 산출물:
@@ -300,6 +318,10 @@ Landing evidence artifact `10456108479`는 2026-10-16 만료 예정이다. 장�
 
 코드 변경이 필요하지 않을 수 있다. 실제 API/secret update 권한이 거부될 때만 정확한 거부 메시지와
 복사 실행 가능한 다음 명령을 남긴다.
+
+실측(2026-09-17): 토큰 관리 API가 로컬 wrangler OAuth 토큰을 `9109`로 거부했고 Global API Key는 로컬에
+없다. 토큰 생성만 인간 단계이며 정확한 명령은 [task.md](./task.md) §5 N01에 있다. secret 교체 뒤 preflight와
+런북 갱신은 AI가 이어받는다.
 
 ### 9.2 P1 — 전체 앱 상태와 정보 구조
 
@@ -313,6 +335,9 @@ Path: 현재 주차 → 다음 추천 → 전체 진행
 실행 전 `docs/superpowers/plans/2026-09-15-flutter-web-react-grade-design.md`의 T1/T2를 최신 코드와
 다시 대조한다. 테스트를 먼저 만들고 새 별도 worktree에서 작업한다.
 
+결과: N02 PR #206(`41e267a8`), N05 PR #207(`846228d5`). `DpInlineNotice`·`DpMissionHeader.action`·상태 matrix
+계약 테스트·Today/Path 3:2 두 열. 상세는 `docs/design/app-state-matrix.md`, `docs/design/today-path-hierarchy.md`.
+
 ### 9.3 P1 — 브라우저 UX·접근성
 
 필수 case:
@@ -325,17 +350,37 @@ Path: 현재 주차 → 다음 추천 → 전체 진행
 - reduced-motion에서 정보 손실 없음
 - 스크린리더가 선택된 board와 목록 항목 수를 정확히 읽음
 
+결과: N03 PR #208(`c375b36b`), CI job `browser-ux`, `tools/browser_ux/` 8 시나리오 17/17 통과. 편차: 키보드 순회에
+셸 레일이 없다(라우트 `FocusScope` 경계, 레일 우선 순회는 후속). 상세는 `docs/design/browser-ux-contract.md`.
+
 ### 9.4 P1 — 성능 기준선
 
 단일 warm load 숫자를 완료 증적으로 사용하지 않는다. Chrome/Edge와 지원 Firefox/Safari에서 cold/warm,
 mobile/desktop을 분리하고 p75를 저장한다. Monaco, 광고, 폰트, CanvasKit/Wasm의 초기 로드 기여도를
 route별로 분리한다.
 
+결과: N04 PR #209(`c370c73e`), CI job `perf-gate`, `perf/baseline.json`·`perf/budget.json`·wasm A/B. 편차: Chromium만
+측정했고 절대 예산은 경고 모드(`enforce_absolute: false`), 전송량 +5% 회귀만 강제. cold 전송 22 MB 중 폰트가
+10.4 MB다. 상세는 `docs/design/perf-baseline.md`.
+
 ### 9.5 P2 — ET13 커뮤니티 fixture
 
 현재 release candidate의 ET13 catalog는 전체 제품 기준선 96 visual/24 a11y case를 제공하지만,
 FREE/QNA/FEEDBACK 세 운영 화면을 전용 fixture로 직접 봉인하지는 않는다. 다음 catalog revision에서
 세 board의 desktop/compact fixture를 추가한다.
+
+결과: N06 PR #210(`fa778c2d`), catalog 15 fixture(visual 120 · a11y 30 · browser smoke 22), baseline은
+`pending_external_review` 유지. 상세는 `docs/design/et13-community-fixtures.md`.
+
+### 9.6 후속 과제 (큐 완주 뒤 남은 것)
+
+1. 폰트 10.4 MB: Pretendard 한글 서브셋 woff2·필요 weight만, D2Coding 은 샌드박스 진입 시 지연 로드(N04 실측 근거).
+2. 렌더러 전략: wasm A/B(전송 −12%, ready −27%/−21%) 근거로 결정. 운영 빌드의 gstatic CDN 캐시 효과는 별도 측정.
+3. `main.dart.js` 5.7 MB: deferred loading 후보(샌드박스·Monaco·에디터).
+4. 위 셋 반영 뒤 `perf/budget.json` `enforce_absolute: true`(기준선을 낮춰 맞추지 않는다).
+5. 키보드 순회에 셸 레일 포함(라우트 `FocusScope` 경계 재설계). 스크롤 컨테이너가 Tab 정지로 잡히는 엔진 동작은 미해결.
+6. ET13 baseline release_ready 전환은 사람 승인·provenance로만. DPR 1/2 분리는 matrix 계약 변경이 필요하다.
+7. Firefox/Safari 성능·a11y 측정은 미수행.
 
 ## 10. 하지 말아야 할 재작업
 
@@ -403,7 +448,9 @@ FREE/QNA/FEEDBACK 세 운영 화면을 전용 fixture로 직접 봉인하지는 
 
 ## 13. 다음 작업자에게 남기는 최종 판단
 
-커뮤니티 요구사항은 “아직 검토 중”이 아니라 운영 완료 상태다. 다음 세션은 같은 UI를 다시 만드는 데
-쓰지 말고, 우선 Cloudflare credential의 내구성을 정리한 뒤 React급 품질 기준을 Today/Path와 전체
-상태·접근성·성능 게이트로 확장해야 한다. 이때 커뮤니티 구현은 adaptive navigation과 URL-state
-동기화의 참조 구현으로 사용한다.
+커뮤니티 요구사항은 “아직 검토 중”이 아니라 운영 완료 상태다. 2026-09-17 후속 세션에서 React급 품질
+기준(상태 matrix·Today/Path 위계·브라우저 UX/a11y 게이트·성능 게이트·ET13 커뮤니티 fixture)도 develop에
+전부 들어갔다(§1.3). 다음 세션은 같은 것을 다시 만들지 말고, (1) Cloudflare durable token 인간 단계를
+끝내고, (2) §9.6 후속 과제 중 폰트 서브셋부터 시작하며, (3) 다음 `develop` → `main` 릴리스에 새 CI job과
+catalog 15 fixture가 함께 실리는지 확인한다. 커뮤니티 구현은 adaptive navigation과 URL-state 동기화의
+참조 구현으로 계속 사용한다.
