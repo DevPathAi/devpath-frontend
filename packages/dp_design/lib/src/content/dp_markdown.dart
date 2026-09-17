@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:markdown_widget/markdown_widget.dart';
 
+import '../theme/dp_code_font.dart';
 import '../theme/dp_colors.dart';
 import '../theme/dp_spacing.dart';
 import '../theme/dp_typography.dart';
@@ -32,6 +35,8 @@ class DpMarkdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 코드 스팬·블록이 D2Coding 을 쓴다. 로드가 끝나면 텍스트가 다시 배치된다.
+    unawaited(DpCodeFont.ensureLoaded());
     final theme = Theme.of(context);
     final colors = context.dpColors;
     final isDark = Theme.of(context).brightness == Brightness.dark;
