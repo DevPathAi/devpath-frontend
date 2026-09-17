@@ -4,7 +4,7 @@
 
 **Goal:** 실제 Chromium(Playwright)에서 mock 릴리스 빌드를 상대로 deep link · 새로고침 · back/forward · focus 복귀 · 키보드 순회 · 200% 텍스트 · reduced-motion 을 390/768/1024/1440 폭에서 자동 검증하고, overflow 와 44px 터치 타깃, axe 접근성 위반을 게이트로 건다. 결과는 JSON 리포트 + CI 아티팩트.
 
-**Architecture:** `tools/browser_ux/`(Node ESM, Playwright 1.55.0 + axe-core 4.10.3 — ET13 와 같은 버전 고정)에 정적 SPA 서버(`serve.mjs`)와 시나리오 러너(`run.mjs`)를 둔다. 앱은 `flutter build web --release --dart-define=USE_MOCK=true --dart-define=MISSION_SPINE_ENABLED=true --dart-define=MOCK_PROFILE=onboarded --dart-define=HOME_BASE_URL=http://127.0.0.1:<port>` 로 빌드해 백엔드·외부 네트워크 없이 돈다(실측: 기본 mock 유저는 `onboardingStatus=PENDING` 이라 모든 라우트가 `/diagnostic` 로 게이트됨 → `MOCK_PROFILE` 정의 추가). Flutter 시맨틱스는 `flt-semantics-placeholder` 클릭으로 활성화하고, 200% 텍스트는 `document.documentElement.style.fontSize='32px'`(실측: 16→32px 에서 콘텐츠 높이 2배)로, reduced-motion 은 Playwright `reducedMotion:'reduce'` 로 준다. 앱 쪽 접근성 결함 두 가지(페이지 헤더가 heading 역할이 아님, 커뮤니티 목록이 항목 수를 읽지 않음)는 dart 테스트 우선으로 고친다.
+**Architecture:** `tools/browser_ux/`(Node ESM, Playwright 1.55.0 + axe-core 4.10.3 — ET13 와 같은 버전 고정)에 정적 SPA 서버(`serve.mjs`)와 시나리오 러너(`run.mjs`)를 둔다. 앱은 `flutter build web --release --no-web-resources-cdn --dart-define=USE_MOCK=true --dart-define=MISSION_SPINE_ENABLED=true --dart-define=MOCK_PROFILE=onboarded --dart-define=HOME_BASE_URL=http://127.0.0.1:<port>` 로 빌드해 백엔드·외부 네트워크 없이 돈다(실측: `--no-web-resources-cdn` 없이는 CanvasKit 이 gstatic CDN 에서 동적 import 되어 외부 차단 시 렌더가 멈춘다 — ET13 와 같은 플래그 필요; 기본 mock 유저는 `onboardingStatus=PENDING` 이라 모든 라우트가 `/diagnostic` 로 게이트됨 → `MOCK_PROFILE` 정의 추가). Flutter 시맨틱스는 `flt-semantics-placeholder` 클릭으로 활성화하고, 200% 텍스트는 `document.documentElement.style.fontSize='32px'`(실측: 16→32px 에서 콘텐츠 높이 2배)로, reduced-motion 은 Playwright `reducedMotion:'reduce'` 로 준다. 앱 쪽 접근성 결함 두 가지(페이지 헤더가 heading 역할이 아님, 커뮤니티 목록이 항목 수를 읽지 않음)는 dart 테스트 우선으로 고친다.
 
 **Tech Stack:** Flutter 3.44.1 web(mock), Node 24, Playwright 1.55.0, axe-core 4.10.3, GitHub Actions(`ci.yml` 새 job `browser-ux`).
 
@@ -92,7 +92,7 @@ void main() {
 
 - [ ] Step 1 `run.test.mjs` 작성 → 실패. Step 3 구현. Step 4 로컬 실행:
 ```bash
-cd <worktree>/apps/web && flutter build web --release --no-pub --dart-define=USE_MOCK=true --dart-define=MISSION_SPINE_ENABLED=true --dart-define=MOCK_PROFILE=onboarded --dart-define=HOME_BASE_URL=http://127.0.0.1:1
+cd <worktree>/apps/web && flutter build web --release --no-pub --no-web-resources-cdn --dart-define=USE_MOCK=true --dart-define=MISSION_SPINE_ENABLED=true --dart-define=MOCK_PROFILE=onboarded --dart-define=HOME_BASE_URL=http://127.0.0.1:1
 cd <worktree>/tools/browser_ux && npm ci --ignore-scripts && npx playwright install chromium && node run.mjs --dist=../../apps/web/build/web --out=../../evidence/browser-ux/latest.json
 ```
   첫 실행 결과로 `expectations.json` 을 고정하고, 발견된 실패(overflow/타깃/axe)는 별도 Task 로 앱을 고친다(러너 기준을 낮추지 않는다).

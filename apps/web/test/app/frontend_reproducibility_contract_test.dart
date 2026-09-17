@@ -214,6 +214,10 @@ List<String> _workflowPinErrors(String source) {
     '$_dockerLogin # v4.6.0',
     '$_buildPush # v7.3.0',
     '$_uploadArtifact # v4.6.2',
+    // browser-ux(N03): 빌드는 Flutter action, 러너는 ET13 와 같은 핀 Playwright 이미지.
+    '$_checkout # v6.1.0',
+    '$_flutterAction # v2.23.0',
+    '$_uploadArtifact # v4.6.2',
   ];
 
   if (uses.length != expectedUses.length ||
@@ -232,8 +236,8 @@ List<String> _workflowPinErrors(String source) {
   if (RegExp(r'\b[a-z0-9-]+-latest\b').hasMatch(source)) {
     errors.add('latest runner labels are forbidden');
   }
-  if (_count(source, 'runs-on: ubuntu-24.04') != 5) {
-    errors.add('all five CI jobs must use ubuntu-24.04');
+  if (_count(source, 'runs-on: ubuntu-24.04') != 6) {
+    errors.add('all six CI jobs must use ubuntu-24.04');
   }
   final setupBuildxSteps = _actionStepBodies(source, _setupBuildx);
   if (setupBuildxSteps.length != 3 ||
@@ -256,6 +260,9 @@ List<String> _workflowPinErrors(String source) {
       !source.contains('dart run melos bootstrap --enforce-lockfile') ||
       !source.contains('lock_sha256_before=') ||
       !source.contains(_lockInvariant) ||
+      // bootstrap 하는 job 마다 lock 불변식이 따라붙어야 한다(analyze-test·browser-ux).
+      _count(source, _lockInvariant) !=
+          _count(source, 'dart run melos bootstrap --enforce-lockfile') ||
       source.contains('dart pub global activate melos')) {
     errors.add('CI must use the locked Flutter workspace Melos');
   }
