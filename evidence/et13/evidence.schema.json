@@ -148,8 +148,8 @@
     "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "fixtureIds": {
       "type": "array",
-      "minItems": 12,
-      "maxItems": 12,
+      "minItems": 15,
+      "maxItems": 15,
       "prefixItems": [
         {"const": "web-today-available"},
         {"const": "web-path-current-week"},
@@ -162,7 +162,10 @@
         {"const": "mobile-today-available"},
         {"const": "mobile-content-reading"},
         {"const": "dp-design-mission-ledger"},
-        {"const": "dp-design-context-payload-preview"}
+        {"const": "dp-design-context-payload-preview"},
+        {"const": "web-community-free"},
+        {"const": "web-community-qna"},
+        {"const": "web-community-feedback"}
       ],
       "items": false
     },

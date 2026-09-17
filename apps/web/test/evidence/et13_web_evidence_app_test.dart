@@ -15,6 +15,9 @@ void main() {
     'web-mentor-context-preview': WebMentorContextProjection,
     'dp-design-mission-ledger': DpEt13MissionLedgerFixture,
     'dp-design-context-payload-preview': DpEt13ContextPayloadPreviewFixture,
+    'web-community-free': WebCommunityBoardProjection,
+    'web-community-qna': WebCommunityBoardProjection,
+    'web-community-feedback': WebCommunityBoardProjection,
   };
 
   for (final fixture in fixtures.entries) {

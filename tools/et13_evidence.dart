@@ -8,7 +8,7 @@ const _visualVersion = 'leva.et13.visual-cases.v1';
 const _a11yVersion = 'leva.et13.a11y-cases.v1';
 const _projectionContractVersion = 'leva.et13.projection-contract.v1';
 const _projectionContractSha256 =
-    'c66d08b6425628a06b27d07e08d648cfb3568d9db7c8d8aca2371172ccf4bde3';
+    '106e8d2951f44345611627df3cef5a52eef938ab1dfac117750febaa51fde3ca';
 const _pendingReview = 'pending_external_review';
 const _approved = 'approved';
 const _diagnostic = 'diagnostic';
@@ -36,15 +36,21 @@ const _fixtureIds = <String>[
   'mobile-content-reading',
   'dp-design-mission-ledger',
   'dp-design-context-payload-preview',
+  'web-community-free',
+  'web-community-qna',
+  'web-community-feedback',
 ];
+// fixture 수에서 파생되는 case 수: visual = fixture × 4 폭 × 2 테마, a11y = fixture × 2.
+final int _visualCaseCount = _fixtureIds.length * 4 * 2;
+final int _a11yCaseCount = _fixtureIds.length * 2;
 const _visualSurfaceCounts = <String, int>{
-  'web': 48,
+  'web': 72,
   'admin': 16,
   'mobile': 16,
   'dp_design': 16,
 };
 const _a11ySurfaceCounts = <String, int>{
-  'web': 12,
+  'web': 18,
   'admin': 4,
   'mobile': 4,
   'dp_design': 4,
@@ -402,7 +408,7 @@ Map<String, Object?> validateCatalog({
   }
 
   final fixtures = _array(catalog['fixtures'], r'$catalog.fixtures');
-  if (fixtures.length != 12) _fail('catalog must contain exactly 12 fixtures');
+  if (fixtures.length != 15) _fail('catalog must contain exactly 15 fixtures');
   final owners = <String, int>{};
   final distributions = <String, int>{};
   final actualIds = <String>[];
@@ -464,13 +470,13 @@ Map<String, Object?> validateCatalog({
     _fail('fixture order drifted: $actualIds');
   }
   const expectedOwners = <String, int>{
-    'web': 6,
+    'web': 9,
     'admin': 2,
     'mobile': 2,
     'dp_design': 2,
   };
   const expectedDistributions = <String, int>{
-    'web': 8,
+    'web': 11,
     'admin': 2,
     'mobile': 2,
   };
@@ -649,7 +655,7 @@ Map<String, Object?> _case({
     'projection_contract_sha256': catalog['projection_contract_sha256'],
     'projection_matrix': catalog['projection_matrix'],
     'fixture_ids': _fixtureIds,
-    'case_count': 96,
+    'case_count': _visualCaseCount,
     'surface_case_counts': _visualSurfaceCounts,
     'cases': visualCases,
   };
@@ -660,7 +666,7 @@ Map<String, Object?> _case({
     'projection_contract_sha256': catalog['projection_contract_sha256'],
     'projection_matrix': catalog['projection_matrix'],
     'fixture_ids': _fixtureIds,
-    'case_count': 24,
+    'case_count': _a11yCaseCount,
     'surface_case_counts': _a11ySurfaceCounts,
     'cases': a11yCases,
   };
@@ -1697,7 +1703,7 @@ Map<String, Object?> validateBaselineApproval({
       path: catalogPath,
     )['projection_contract_sha256'],
     'fixture_ids': _fixtureIds,
-    'case_count': 96,
+    'case_count': _visualCaseCount,
     'surface_case_counts': visualGenerated['surface_case_counts'],
     'capture_surface': _captureSurface,
     'device_evidence': false,
@@ -1736,7 +1742,11 @@ Map<String, Object?> validateBaselineApproval({
   )) {
     _fail('baseline approval fixture order drifted');
   }
-  _exactValue(approval['case_count'], 96, 'baselineApproval.case_count');
+  _exactValue(
+    approval['case_count'],
+    _visualCaseCount,
+    'baselineApproval.case_count',
+  );
   _exactValue(
     approval['approval_repository'],
     'DevPathAi/devpath-frontend',
@@ -1966,7 +1976,7 @@ void _validateExactApprovedBaselineBundle({
   if (!_setEquals(expectedFiles, actualFiles) ||
       !_setEquals(expectedDirectories, actualDirectories)) {
     _fail(
-      'approved baseline bundle must contain exactly 96 PNGs and two metadata files',
+      'approved baseline bundle must contain exactly $_visualCaseCount PNGs and two metadata files',
     );
   }
 }
@@ -2029,7 +2039,7 @@ void validateResultArtifacts({
           : 'evidence/et13/generated/a11y-cases.v1.json');
   final generated = _readObject(casePath);
   final expectedCases = _array(generated['cases'], 'generated.cases');
-  final expectedCount = visual ? 96 : 24;
+  final expectedCount = visual ? _visualCaseCount : _a11yCaseCount;
   final expectedSurfaceCounts = visual
       ? _visualSurfaceCounts
       : _a11ySurfaceCounts;
@@ -2182,7 +2192,7 @@ Map<String, Object?> validateResultManifestDocument({
       'evidence/et13/generated/${visual ? 'visual' : 'a11y'}-cases.v1.json';
   final generated = _readObject(casePath);
   final expectedCases = _array(generated['cases'], 'generated.cases');
-  final expectedCount = visual ? 96 : 24;
+  final expectedCount = visual ? _visualCaseCount : _a11yCaseCount;
   final expectedSurfaceCounts = visual
       ? _visualSurfaceCounts
       : _a11ySurfaceCounts;
@@ -2303,7 +2313,7 @@ void validateResultManifest({
   final casePath = visual
       ? 'evidence/et13/generated/visual-cases.v1.json'
       : 'evidence/et13/generated/a11y-cases.v1.json';
-  final expectedCount = visual ? 96 : 24;
+  final expectedCount = visual ? _visualCaseCount : _a11yCaseCount;
   final expectedSurfaceCounts = visual
       ? _visualSurfaceCounts
       : _a11ySurfaceCounts;
@@ -2519,7 +2529,11 @@ Map<String, Object?> _validateCaptureSummary({
     'captureSummary.capture_surface',
   );
   _exactValue(summary['device_evidence'], false, 'captureSummary.device');
-  _exactValue(summary['case_count'], 120, 'captureSummary.case_count');
+  _exactValue(
+    summary['case_count'],
+    _visualCaseCount + _a11yCaseCount,
+    'captureSummary.case_count',
+  );
   final actual = _array(summary['cases'], 'captureSummary.cases');
   final expected = <Map<String, Object?>>[
     for (final lane in ['visual', 'a11y'])
@@ -2530,12 +2544,15 @@ Map<String, Object?> _validateCaptureSummary({
         _object(raw, '$lane.case'),
   ];
   if (actual.length != expected.length) {
-    _fail('capture summary must contain exactly 120 ordered cases');
+    _fail(
+      'capture summary must contain exactly '
+      '${_visualCaseCount + _a11yCaseCount} ordered cases',
+    );
   }
   for (var index = 0; index < actual.length; index++) {
     final result = _object(actual[index], 'captureSummary.cases[$index]');
     final expectedCase = expected[index];
-    final visual = index < 96;
+    final visual = index < _visualCaseCount;
     _exactKeys(
       result,
       visual
@@ -2629,7 +2646,7 @@ Map<String, Object?> writeCandidateSpec({
     'projection_contract_sha256':
         validateCatalog()['projection_contract_sha256'],
     'fixture_ids': _fixtureIds,
-    'case_count': visual ? 96 : 24,
+    'case_count': visual ? _visualCaseCount : _a11yCaseCount,
     'surface_case_counts': generated['surface_case_counts'],
     'capture_surface': _captureSurface,
     'device_evidence': false,
@@ -2708,7 +2725,7 @@ Map<String, Object?> _validateCandidateSpec({
     'case_catalog_schema_version': visual ? _visualVersion : _a11yVersion,
     'projection_contract_sha256':
         validateCatalog()['projection_contract_sha256'],
-    'case_count': visual ? 96 : 24,
+    'case_count': visual ? _visualCaseCount : _a11yCaseCount,
     'capture_surface': _captureSurface,
     'device_evidence': false,
     'input_provenance_file_sha256': _rawSha(provenancePath),
@@ -3137,7 +3154,7 @@ Map<String, Object?> writeResultManifest({
       'baseline_set_sha256': baseline.setSha,
       'baseline_approval_sha256': baseline.approvalSha,
     },
-    'case_count': visual ? 96 : 24,
+    'case_count': visual ? _visualCaseCount : _a11yCaseCount,
     'surface_case_counts': visual ? _visualSurfaceCounts : _a11ySurfaceCounts,
     'cases': cases,
   };
@@ -3243,8 +3260,8 @@ Map<String, Object?> writeSanitizedEvidence({
     'case_catalog_schema_version': candidate['case_catalog_schema_version'],
     'projection_contract_sha256': candidate['projection_contract_sha256'],
     'fixture_ids': _fixtureIds,
-    'case_count': visual ? 96 : 24,
-    'passed_case_count': visual ? 96 : 24,
+    'case_count': visual ? _visualCaseCount : _a11yCaseCount,
+    'passed_case_count': visual ? _visualCaseCount : _a11yCaseCount,
     'failed_case_count': 0,
     'surface_case_counts': candidate['surface_case_counts'],
     'capture_surface': _captureSurface,
@@ -3370,8 +3387,8 @@ void validateSanitizedEvidence({
     'case_catalog_schema_version': visual ? _visualVersion : _a11yVersion,
     'projection_contract_sha256':
         validateCatalog()['projection_contract_sha256'],
-    'case_count': visual ? 96 : 24,
-    'passed_case_count': visual ? 96 : 24,
+    'case_count': visual ? _visualCaseCount : _a11yCaseCount,
+    'passed_case_count': visual ? _visualCaseCount : _a11yCaseCount,
     'failed_case_count': 0,
     'capture_surface': _captureSurface,
     'device_evidence': false,
@@ -3546,7 +3563,9 @@ void main(List<String> arguments) {
       case 'generate':
         writeGeneratedCatalogs();
         validateGeneratedCatalogs();
-        stdout.writeln('ET13 generated catalogs: visual=96 a11y=24');
+        stdout.writeln(
+          'ET13 generated catalogs: visual=$_visualCaseCount a11y=$_a11yCaseCount',
+        );
       case 'validate':
         validateCanonicalLineEndings();
         validateContractDocuments();
