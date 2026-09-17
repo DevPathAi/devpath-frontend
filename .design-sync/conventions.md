@@ -24,7 +24,7 @@ Accessibility floor (from `guidelines/DESIGN.md` §6): 44×44px hit targets, vis
 
 ## Where the truth lives
 
-Read before styling: `styles.css` → `tokens/leva-tokens.css` (every token and its light/dark value), `tokens/leva-base.css`, `fonts/fonts.css`. The design contract (colour meaning, type scale, spacing, responsive classes, accessibility baseline, shell structure) is `guidelines/DESIGN.md`. Tokens are generated from the Flutter `DpSemanticTokenManifest` (contract `leva.semantic-tokens` 1.0.0); do not edit them here.
+Read before styling: `styles.css` → `tokens/leva-tokens.css` (every token and its light/dark value), `tokens/leva-base.css`, `fonts/fonts.css`. The design contract (colour meaning, type scale, spacing, responsive classes, accessibility baseline, shell structure) is `guidelines/DESIGN.md`. Tokens are generated from the Flutter `DpSemanticTokenManifest` (contract `leva.semantic-tokens`; the version is `--dp-token-manifest-version`); do not edit them here.
 
 ## One idiomatic snippet
 

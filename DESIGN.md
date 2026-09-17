@@ -29,8 +29,11 @@ Leva v2의 프라이머리는 **인디고·슬레이트**다. 차가운 중립 �
 
 32개 토큰 전부가 `DpColors`(`packages/dp_design/lib/src/theme/dp_colors.dart`)의 단일 클래스에 있으며,
 이 문서의 값은 그 코드에서 그대로 옮긴 것이다(코드가 SSoT, 이 표는 사본).
-`DpSemanticTokenManifest`(`dp_semantic_tokens.dart`) v1.0.0은 Flutter name, CSS custom property,
+`DpSemanticTokenManifest`(`dp_semantic_tokens.dart`) v1.1.0은 Flutter name, CSS custom property,
 light/dark 값, allowed usage와 default/hover/pressed/focus/selected/disabled/error mapping을 공개한다.
+값이 바뀌면 `version`도 올린다 — v1.1.0(2026-09-17)은 9/13 mobile-first 개편으로 바뀐 값(인디고 팔레트,
+반경 999/12/18/12/20, headline-small·title-large, 레이아웃 폭 1360/760/280/80)을 계약 버전에 반영한 것으로
+이름·구조 변경은 없다. 랜딩 mirror(`devpath-home-page/assets/tokens.css`)는 이 버전을 따라 맞춘다.
 
 **면 (Surface) — 3단계**
 | 토큰 | 라이트 | 다크 | 용도 |
