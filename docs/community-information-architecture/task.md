@@ -400,6 +400,7 @@ React로 재작성할 필요가 없다. 현재 디자인 시스템과 Flutter We
 
 > 2026-09-17 후속 세션에서 N02~N06을 순서대로 구현·머지했다(모두 `origin/develop`, 각 PR은 CI 녹색 확인 후 merge commit).
 > N01만 실측 차단(인간 단계)으로 남았다. 각 항목의 상세 설계·실측·후속 과제는 `docs/design/*.md`가 원천이다.
+> 같은 날 릴리스 PR #213으로 `main`(`d10ee171`)에 반영됐고, 후속 폰트 다이어트 #215는 그 뒤 `develop`에만 있다(handoff.md §1.3·§6.1.5).
 
 ### N01 — Cloudflare 장기 자격 증명 정리 (`BLOCKED_HUMAN`, P0 운영)
 
