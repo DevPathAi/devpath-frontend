@@ -9,6 +9,7 @@ import '../application/community_controller.dart';
 import '../application/community_search_controller.dart';
 import '../state/community_search_state.dart';
 import '../state/community_state.dart';
+import 'web_community_board_projection.dart';
 import 'widgets/community_search_bar.dart';
 import 'widgets/search_highlight.dart';
 import '../../support/presentation/supportable_error.dart';
@@ -167,12 +168,9 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
           SliverToBoxAdapter(
             child: DpPageHeader(
               title: activeBoard.label,
-              description: switch (activeBoard) {
-                CommunityBoard.free => '개발 이야기를 자유롭게 나눕니다',
-                CommunityBoard.qna => '막힌 문제를 질문하고 함께 해결합니다',
-                CommunityBoard.feedback => '코드와 프로젝트에 구체적인 의견을 나눕니다',
-                CommunityBoard.all => '개발 이야기를 자유롭게 나눕니다',
-              },
+              description: WebCommunityBoardProjection.descriptionFor(
+                activeBoard,
+              ),
             ),
           ),
           PinnedHeaderSliver(
@@ -194,7 +192,7 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
                           _onQueryChanged(q, activeBoard),
                     ),
                   ),
-                  _BoardFilterBar(
+                  CommunityBoardFilterBar(
                     current: activeBoard,
                     onSelect: (board) {
                       _entryBoard = board;
@@ -313,8 +311,8 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
       title: item.title,
       subtitle: body.isEmpty ? null : SearchHighlightText(body),
       badges: [
-        _badgeChip(context, label),
-        if (isQna && item.solved) _badgeChip(context, '✓ 해결됨', tone: c.success),
+        CommunityBadgeChip(label),
+        if (isQna && item.solved) CommunityBadgeChip('✓ 해결됨', tone: c.success),
       ],
       trailing: Text(
         '${isQna ? '답변' : '댓글'} ${item.replyCount} · 추천 ${item.upvoteCount}',
@@ -373,97 +371,18 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
                   return const AdSlotWidget(slot: 'COMMUNITY_FEED');
                 }
                 final p = s.posts[(showAd && i > feedAdAt) ? i - 1 : i];
-                return _postRow(context, p);
+                return CommunityPostRow(
+                  post: p,
+                  onTap: () => context.go(
+                    p.boardType == 'QNA'
+                        ? '/community/${p.id}'
+                        : '/community/post/${p.id}?board=${p.boardType}',
+                  ),
+                );
               },
             ),
           ),
         ];
     }
-  }
-
-  Widget _postRow(BuildContext context, CommunityPostSummary post) {
-    final c = context.dpColors;
-    final isQna = post.boardType == 'QNA';
-    final accent = switch (post.boardType) {
-      'FREE' => c.border,
-      'FEEDBACK' => c.chart4,
-      _ => c.primary,
-    };
-    final label = switch (post.boardType) {
-      'FREE' => '자유게시판',
-      'FEEDBACK' => '피드백',
-      _ => 'Q/A',
-    };
-    return DpListRow(
-      accentColor: accent,
-      title: post.title,
-      preview: post.excerpt.isEmpty ? null : post.excerpt,
-      badges: [
-        _badgeChip(context, label),
-        if (isQna && post.solved) _badgeChip(context, '✓ 해결됨', tone: c.success),
-      ],
-      trailing: Text(
-        '${isQna ? '답변' : '댓글'} ${post.replyCount} · 추천 ${post.upvoteCount}',
-        style: TextStyle(color: c.textSecondary, fontSize: 12),
-      ),
-      onTap: () => context.go(
-        isQna
-            ? '/community/${post.id}'
-            : '/community/post/${post.id}?board=${post.boardType}',
-      ),
-    );
-  }
-
-  Widget _badgeChip(BuildContext context, String text, {Color? tone}) {
-    final c = context.dpColors;
-    final fg = tone ?? c.textSecondary;
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: DpSpacing.xs,
-        vertical: 2,
-      ),
-      decoration: BoxDecoration(
-        color: c.border,
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Text(text, style: TextStyle(fontSize: 11, color: fg)),
-    );
-  }
-}
-
-/// 모바일·본문용 로컬 내비게이션. 데스크톱 레일과 같은 세 게시판만 노출한다.
-class _BoardFilterBar extends StatelessWidget {
-  const _BoardFilterBar({required this.current, required this.onSelect});
-
-  final CommunityBoard current;
-  final void Function(CommunityBoard) onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        DpSpacing.lg,
-        DpSpacing.md,
-        DpSpacing.lg,
-        DpSpacing.sm,
-      ),
-      child: SizedBox(
-        width: double.infinity,
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: SegmentedButton<CommunityBoard>(
-            segments: [
-              for (final b in CommunityBoard.values.where(
-                (board) => board != CommunityBoard.all,
-              ))
-                ButtonSegment(value: b, label: Text(b.label)),
-            ],
-            selected: {current},
-            showSelectedIcon: false,
-            onSelectionChanged: (s) => onSelect(s.first),
-          ),
-        ),
-      ),
-    );
   }
 }
