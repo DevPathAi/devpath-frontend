@@ -171,6 +171,12 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
     expect(find.widgetWithText(MenuItemButton, '추천순'), findsOneWidget);
+    // 열리면 focus 가 첫 항목으로 간다. 웹 시맨틱스에서는 메뉴 안에 focus 받은 노드가 없으면
+    // DOM focus 가 body 로 빠져 Escape·화살표가 어디에도 닿지 않는다(브라우저 UX 게이트 실측).
+    expect(
+      FocusManager.instance.primaryFocus?.debugLabel,
+      'community-sort-first-item',
+    );
 
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await tester.pumpAndSettle();

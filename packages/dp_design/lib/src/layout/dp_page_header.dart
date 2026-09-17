@@ -159,11 +159,28 @@ class _TitleMenu extends StatefulWidget {
 class _TitleMenuState extends State<_TitleMenu> {
   // 메뉴가 닫힐 때 focus 를 여는 버튼으로 되돌리려면 MenuAnchor 가 그 노드를 알아야 한다.
   final _buttonFocus = FocusNode(debugLabel: 'page-header-title-menu');
+  final _firstItemFocus = FocusNode(
+    debugLabel: 'page-header-title-menu-first-item',
+  );
 
   @override
   void dispose() {
     _buttonFocus.dispose();
+    _firstItemFocus.dispose();
     super.dispose();
+  }
+
+  /// 열 때 focus 를 첫 항목으로 옮긴다(WAI-ARIA 메뉴 버튼). 웹 시맨틱스에서는 메뉴 안에
+  /// focus 받은 노드가 없으면 DOM focus 가 body 로 빠져 Escape·화살표가 닿지 않는다.
+  void _toggle(MenuController controller) {
+    if (controller.isOpen) {
+      controller.close();
+      return;
+    }
+    controller.open();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && controller.isOpen) _firstItemFocus.requestFocus();
+    });
   }
 
   @override
@@ -176,8 +193,9 @@ class _TitleMenuState extends State<_TitleMenu> {
     return MenuAnchor(
       childFocusNode: _buttonFocus,
       menuChildren: [
-        for (final item in items)
+        for (final (index, item) in items.indexed)
           MenuItemButton(
+            focusNode: index == 0 ? _firstItemFocus : null,
             // 선택 표시가 없는 항목도 같은 폭을 비워 라벨이 한 줄로 정렬된다.
             leadingIcon: item.selected
                 ? const Icon(Icons.check, size: 18)
@@ -187,8 +205,7 @@ class _TitleMenuState extends State<_TitleMenu> {
           ),
       ],
       builder: (context, controller, _) {
-        void toggle() =>
-            controller.isOpen ? controller.close() : controller.open();
+        void toggle() => _toggle(controller);
         // 헤더와 버튼을 한 시맨틱 노드로 합치면 웹에서 `<h2>` 가 버튼 역할을 삼키고
         // 도움말이 제목 텍스트에 섞인다(실측). 제목은 순수 헤더로, 메뉴는 옆의 버튼으로 둔다.
         return Row(

@@ -1,5 +1,6 @@
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Widget _host(Widget child) => MaterialApp(
@@ -107,5 +108,37 @@ void main() {
     await tester.tap(find.text('자유게시판'));
     await tester.pumpAndSettle();
     expect(find.widgetWithText(MenuItemButton, 'Q/A'), findsOneWidget);
+  });
+
+  testWidgets('메뉴가 열리면 focus 가 첫 항목으로 가고 Escape 로 닫으면 버튼으로 돌아온다', (
+    tester,
+  ) async {
+    // 웹 시맨틱스에서는 메뉴 안에 focus 받은 노드가 없으면 DOM focus 가 body 로 빠져
+    // Escape·화살표가 어디에도 닿지 않는다(브라우저 UX 게이트 실측).
+    await tester.pumpWidget(
+      _host(
+        DpPageHeader(
+          title: '자유게시판',
+          titleMenu: [
+            (label: '자유게시판', selected: true, onSelect: () {}),
+            (label: 'Q/A', selected: false, onSelect: () {}),
+          ],
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const ValueKey('page-header-title-menu')));
+    await tester.pumpAndSettle();
+    expect(
+      FocusManager.instance.primaryFocus?.debugLabel,
+      'page-header-title-menu-first-item',
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(MenuItemButton, 'Q/A'), findsNothing);
+    expect(
+      FocusManager.instance.primaryFocus?.debugLabel,
+      'page-header-title-menu',
+    );
   });
 }

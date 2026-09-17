@@ -218,11 +218,26 @@ class CommunitySortMenu extends StatefulWidget {
 class _CommunitySortMenuState extends State<CommunitySortMenu> {
   // 메뉴가 닫힐 때 focus 를 여는 버튼으로 되돌리려면 MenuAnchor 가 그 노드를 알아야 한다.
   final _buttonFocus = FocusNode(debugLabel: 'community-sort-button');
+  final _firstItemFocus = FocusNode(debugLabel: 'community-sort-first-item');
 
   @override
   void dispose() {
     _buttonFocus.dispose();
+    _firstItemFocus.dispose();
     super.dispose();
+  }
+
+  /// 열 때 focus 를 첫 항목으로 옮긴다(WAI-ARIA 메뉴 버튼). 웹 시맨틱스에서는 메뉴 안에
+  /// focus 받은 노드가 없으면 DOM focus 가 body 로 빠져 Escape·화살표가 닿지 않는다.
+  void _toggle(MenuController controller) {
+    if (controller.isOpen) {
+      controller.close();
+      return;
+    }
+    controller.open();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && controller.isOpen) _firstItemFocus.requestFocus();
+    });
   }
 
   @override
@@ -232,6 +247,9 @@ class _CommunitySortMenuState extends State<CommunitySortMenu> {
     menuChildren: [
       for (final sort in CommunitySort.values)
         MenuItemButton(
+          focusNode: sort == CommunitySort.values.first
+              ? _firstItemFocus
+              : null,
           leadingIcon: sort == widget.current
               ? const Icon(Icons.check, size: 18)
               : const SizedBox(width: 18),
@@ -243,9 +261,7 @@ class _CommunitySortMenuState extends State<CommunitySortMenu> {
       message: '정렬',
       child: TextButton(
         focusNode: _buttonFocus,
-        onPressed: widget.enabled
-            ? () => controller.isOpen ? controller.close() : controller.open()
-            : null,
+        onPressed: widget.enabled ? () => _toggle(controller) : null,
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
