@@ -170,7 +170,8 @@ async function measureNavigation(page, base, route) {
   const readyMs = await page.evaluate(() => performance.now());
   await placeholder.dispatchEvent('click');
   await page.locator('flt-semantics').first().waitFor({ state: 'attached', timeout: READY_TIMEOUT_MS });
-  await page.waitForLoadState('networkidle');
+  // Slow 4G 에서는 ready 뒤에도 폰트 10 MB 가 계속 내려와 networkidle 까지 30s(기본) 를 넘긴다(CI 실측).
+  await page.waitForLoadState('networkidle', { timeout: READY_TIMEOUT_MS });
   const fcp = await page.evaluate(() => performance.getEntriesByName('first-contentful-paint')[0]?.startTime ?? null);
   const action = PRIMARY_ACTION[route];
   const target = page.getByRole(action.role, { name: action.name }).first();

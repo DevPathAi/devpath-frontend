@@ -49,3 +49,12 @@ test('validateMeasureReport: 스키마 필수 키와 라우트 행을 검증한�
   assert.ok(validateMeasureReport({ ...good, conditions: { locale: 'ko-KR' } }).length > 0);
   assert.ok(validateMeasureReport({}).length > 0);
 });
+
+test('measureNavigation: 모든 Playwright 대기에 명시적 타임아웃이 있다', async () => {
+  // CI 실측(run 35174425725): Slow 4G 프로파일에서 waitForLoadState('networkidle') 가
+  // 기본 30s 로 만료돼 측정이 죽었다. 기본 타임아웃에 기대는 대기를 금지한다.
+  const { readFile } = await import('node:fs/promises');
+  const src = await readFile(new URL('./measure.mjs', import.meta.url), 'utf8');
+  assert.doesNotMatch(src, /waitForLoadState\('networkidle'\)/);
+  assert.match(src, /waitForLoadState\('networkidle', \{ timeout: READY_TIMEOUT_MS \}\)/);
+});
