@@ -27,6 +27,16 @@ Map<String, dynamic> mockAuthRefreshUser({String profile = mockProfile}) => {
   'consentStatus': 'DONE',
 };
 
+/// `GET /community/posts` 픽스처를 게시판(`FREE`/`QNA`/`FEEDBACK`)별 결정적 목록으로 돌려준다.
+/// ET13 커뮤니티 fixture 와 위젯 테스트가 같은 승인된 데이터를 쓴다.
+List<CommunityPostSummary> mockCommunityPosts(String boardType) {
+  final (_, body) = webMockFixtures['GET /community/posts']!;
+  return [
+    for (final raw in (body as List).cast<Map<String, dynamic>>())
+      CommunityPostSummary.fromJson(raw),
+  ].where((post) => post.boardType == boardType).toList();
+}
+
 final Map<String, MockFixture> webMockFixtures = {
   // ④ 오류 신고·문의 접수. 목 모드 기본값이 true 라 이 픽스처가 없으면 제보가 404로 실패한다.
   'POST /support/requests': (201, {'id': 42}),
