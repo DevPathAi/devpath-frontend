@@ -138,6 +138,7 @@ const PRIMARY_ACTION = {
 
 async function throttle(context, page, spec) {
   const cdp = await context.newCDPSession(page);
+  const isLoopback = (url) => /^http:\/\/127\.0\.0\.1:(?!1\/)\d+\//.test(url ?? '');
   await cdp.send('Network.enable');
   // 루프백 서버(http://127.0.0.1:<port>) 이외의 요청을 막는다: https 전부, HOME_BASE_URL(127.0.0.1:1).
   await cdp.send('Network.setBlockedURLs', { urls: ['https://*', 'http://127.0.0.1:1/*'] });
@@ -150,18 +151,73 @@ async function throttle(context, page, spec) {
   });
   const transfer = { total: 0, js: 0, canvaskit_or_wasm: 0, fonts: 0, images: 0, other: 0 };
   const kinds = new Map();
+  // 진행 중 요청 추적. Playwright 의 networkidle 은 차단된 외부 호스트(gstatic 폴백 폰트 등)로의
+  // 반복 요청에도 잠잠해지지 않아 CI 에서 120s 를 넘겼다(run 35174425725·35171… 실측).
+  // 전송량은 루프백 자산으로만 이루어지므로 루프백 요청만 보고 조용해지길 기다린다.
+  const inflight = new Map();
+  const recent = [];
+  const sentByHost = {};
+  const externalUrls = new Set();
+  const remember = (event) => {
+    recent.push(event);
+    if (recent.length > 40) recent.shift();
+  };
+  cdp.on('Network.requestWillBeSent', (event) => {
+    inflight.set(event.requestId, event.request.url);
+    const host = new URL(event.request.url).host;
+    sentByHost[host] = (sentByHost[host] ?? 0) + 1;
+    if (!isLoopback(event.request.url)) externalUrls.add(event.request.url);
+    remember({ t: Date.now(), phase: 'sent', url: event.request.url });
+  });
+  cdp.on('Network.loadingFailed', (event) => {
+    remember({ t: Date.now(), phase: 'failed', url: inflight.get(event.requestId), error: event.errorText });
+    inflight.delete(event.requestId);
+  });
   cdp.on('Network.responseReceived', (event) => {
     kinds.set(event.requestId, classifyResource(event.response.url, event.response.mimeType ?? ''));
   });
   cdp.on('Network.loadingFinished', (event) => {
+    remember({ t: Date.now(), phase: 'finished', url: inflight.get(event.requestId), bytes: event.encodedDataLength });
+    inflight.delete(event.requestId);
     const kind = kinds.get(event.requestId) ?? 'other';
     transfer[kind] += event.encodedDataLength;
     transfer.total += event.encodedDataLength;
   });
-  return { cdp, transfer, reset: () => { for (const key of Object.keys(transfer)) transfer[key] = 0; } };
+  /** 루프백 요청이 idleMs 동안 하나도 진행 중이지 않을 때까지 기다린다. 초과 시 진단을 담아 던진다. */
+  const quiet = async ({ idleMs, timeout }) => {
+    const started = Date.now();
+    let quietSince = null;
+    while (true) {
+      const busy = [...inflight.values()].filter(isLoopback);
+      if (busy.length === 0) {
+        quietSince ??= Date.now();
+        if (Date.now() - quietSince >= idleMs) return;
+      } else {
+        quietSince = null;
+      }
+      if (Date.now() - started > timeout) {
+        const error = new Error(
+          `loopback network did not go quiet within ${timeout}ms; in-flight=${JSON.stringify(busy)}; ` +
+            `recent=${JSON.stringify(recent.slice(-20))}`,
+        );
+        error.name = 'TimeoutError';
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  };
+  /** 컨텍스트 수명 동안 호스트별 요청 수와 외부 URL(차단됨). 루프백 외 요청은 전송량에 들어가지 않는다. */
+  const requestSummary = () => ({ by_host: { ...sentByHost }, external: [...externalUrls] });
+  return {
+    cdp,
+    transfer,
+    quiet,
+    requestSummary,
+    reset: () => { for (const key of Object.keys(transfer)) transfer[key] = 0; },
+  };
 }
 
-async function measureNavigation(page, base, route) {
+async function measureNavigation(page, base, route, net) {
   await page.goto(base + route, { waitUntil: 'domcontentloaded', timeout: NAV_TIMEOUT_MS });
   const placeholder = page.locator('flt-semantics-placeholder').first();
   await placeholder.waitFor({ state: 'attached', timeout: READY_TIMEOUT_MS });
@@ -170,8 +226,12 @@ async function measureNavigation(page, base, route) {
   const readyMs = await page.evaluate(() => performance.now());
   await placeholder.dispatchEvent('click');
   await page.locator('flt-semantics').first().waitFor({ state: 'attached', timeout: READY_TIMEOUT_MS });
-  // Slow 4G 에서는 ready 뒤에도 폰트 10 MB 가 계속 내려와 networkidle 까지 30s(기본) 를 넘긴다(CI 실측).
-  await page.waitForLoadState('networkidle', { timeout: READY_TIMEOUT_MS });
+  // Slow 4G 에서는 ready 뒤에도 폰트가 계속 내려온다. Playwright networkidle 대신 루프백 요청만
+  // 잠잠해지길 기다린다(차단된 외부 호스트로의 반복 요청은 전송량과 무관하다).
+  await net.quiet({ idleMs: 1000, timeout: READY_TIMEOUT_MS });
+  // 초기 전송량은 주 행동 클릭 전에 확정한다. 클릭이 다른 화면으로 이동해 지연 자산(예: 코드 폰트)을
+  // 내려받으면 그것은 다음 화면의 비용이지 이 라우트의 초기 전송이 아니다.
+  const transfer = { ...net.transfer };
   const fcp = await page.evaluate(() => performance.getEntriesByName('first-contentful-paint')[0]?.startTime ?? null);
   const action = PRIMARY_ACTION[route];
   const target = page.getByRole(action.role, { name: action.name }).first();
@@ -180,9 +240,12 @@ async function measureNavigation(page, base, route) {
     await target.click({ trial: false, timeout: 5000 }).catch(() => {});
     interacted = true;
     await page.waitForTimeout(1200);
+    // 클릭이 시작한 다운로드가 다음 단계(warm)로 새지 않도록 여기서 잠잠해질 때까지 기다린다.
+    await net.quiet({ idleMs: 1000, timeout: READY_TIMEOUT_MS });
   }
   const metrics = await page.evaluate(() => globalThis.__leva);
   return {
+    transfer,
     fcp_ms: fcp,
     ready_ms: readyMs,
     lcp_ms: metrics.lcp,
@@ -217,15 +280,17 @@ export async function run(options) {
           const page = await context.newPage();
           const net = await throttle(context, page, spec);
           try {
-            samples.cold.push(await measureNavigation(page, base(server), route));
-            transfers.cold.push({ ...net.transfer });
+            const cold = await measureNavigation(page, base(server), route, net);
+            samples.cold.push(cold);
+            transfers.cold.push(cold.transfer);
             net.reset();
-            samples.warm.push(await measureNavigation(page, base(server), route));
-            transfers.warm.push({ ...net.transfer });
+            const warm = await measureNavigation(page, base(server), route, net);
+            samples.warm.push(warm);
+            transfers.warm.push(warm.transfer);
           } finally {
             await context.close();
           }
-          console.log(`${profile} ${route} run ${run + 1}/${options.runs} cold ready=${Math.round(samples.cold.at(-1).ready_ms ?? -1)}ms warm ready=${Math.round(samples.warm.at(-1).ready_ms ?? -1)}ms`);
+          console.log(`${profile} ${route} run ${run + 1}/${options.runs} cold ready=${Math.round(samples.cold.at(-1).ready_ms ?? -1)}ms warm ready=${Math.round(samples.warm.at(-1).ready_ms ?? -1)}ms requests=${JSON.stringify(net.requestSummary())}`);
         }
         for (const phase of ['cold', 'warm']) {
           const rows = samples[phase];
