@@ -40,3 +40,10 @@ evidence/browser-ux/
 
 # 성능 측정 리포트(CI 아티팩트로만 보존)
 evidence/perf/
+
+# design-sync (claude.ai/design) local artifacts
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules
