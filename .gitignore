@@ -34,3 +34,6 @@ apps/mobile/build/
 .superpowers/
 .omc/
 .gstack/
+
+# 브라우저 UX 러너 리포트(CI 아티팩트로만 보존)
+evidence/browser-ux/
