@@ -6,7 +6,7 @@
 // 등장 = 첫 상호작용 가능 시점), lcp_ms(있으면), inp_ms(주 행동 클릭의 event
 // duration 최댓값), cls 를 함께 기록한다. null 은 "측정 불가"이며 0 으로 적지 않는다.
 //
-// 사용: node measure.mjs --dist=<build/web> --renderer=<canvaskit|wasm> --out=<json> [--runs=5] [--built-from=<sha>]
+// 사용: node measure.mjs --dist=<build/web> --renderer=<canvaskit|wasm> --out=<json> [--runs=5] [--routes=/a,/b] [--profiles=mobile,desktop] [--built-from=<sha>]
 import { execFileSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -95,6 +95,8 @@ function parseArgs(argv) {
     throw new Error('usage: node measure.mjs --dist=<build/web> --renderer=<canvaskit|wasm> --out=<json> [--runs=5]');
   }
   options.runs = Number(options.runs);
+  options.routes = options.routes ? options.routes.split(',') : ROUTES;
+  options.profiles = options.profiles ? options.profiles.split(',') : Object.keys(PROFILES);
   return options;
 }
 
@@ -137,6 +139,8 @@ const PRIMARY_ACTION = {
 async function throttle(context, page, spec) {
   const cdp = await context.newCDPSession(page);
   await cdp.send('Network.enable');
+  // 루프백 서버(http://127.0.0.1:<port>) 이외의 요청을 막는다: https 전부, HOME_BASE_URL(127.0.0.1:1).
+  await cdp.send('Network.setBlockedURLs', { urls: ['https://*', 'http://127.0.0.1:1/*'] });
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: spec.cpu_throttle });
   await cdp.send('Network.emulateNetworkConditions', {
     offline: false,
@@ -195,7 +199,8 @@ export async function run(options) {
   const routes = [];
   try {
     for (const [profile, spec] of Object.entries(PROFILES)) {
-      for (const route of ROUTES) {
+      if (!(options.profiles ?? Object.keys(PROFILES)).includes(profile)) continue;
+      for (const route of options.routes ?? ROUTES) {
         const samples = { cold: [], warm: [] };
         const transfers = { cold: [], warm: [] };
         for (let run = 0; run < options.runs; run += 1) {
@@ -205,7 +210,8 @@ export async function run(options) {
             locale: CONDITIONS.locale,
             serviceWorkers: 'block',
           });
-          await context.route('**/*', (r) => (new URL(r.request().url()).origin === server.base ? r.continue() : r.abort('blockedbyclient')));
+          // Playwright 의 route 가로채기는 Chromium HTTP 캐시를 비활성화해 warm 측정을 망친다(실측).
+          // 외부 차단은 CDP Network.setBlockedURLs 로 한다(throttle() 안에서).
           await context.addInitScript(OBSERVER_SCRIPT);
           const page = await context.newPage();
           const net = await throttle(context, page, spec);
