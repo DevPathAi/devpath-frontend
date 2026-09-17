@@ -1,0 +1,14 @@
+{
+  "schema_version": "leva.perf-budget.v1",
+  "lcp_ms_max": 2500,
+  "ready_ms_max": 2500,
+  "inp_ms_max": 200,
+  "cls_max": 0.1,
+  "transfer_regression_pct_max": 5,
+  "notes": [
+    "CanvasKit 은 <canvas> 에 그리므로 브라우저 LCP 후보가 없을 수 있다. lcp_ms 가 null 이면 ready_ms(첫 상호작용 가능 시점)를 같은 임계로 판정한다.",
+    "전송량 회귀는 perf/baseline.json 의 같은 route·profile·phase 행 대비 total 과 js+canvaskit_or_wasm 각각 +5% 초과 시 실패.",
+    "enforce_absolute=false: 첫 기준선(2026-09-17, cold 총 22MB·모바일 FCP 수십 초)이 절대 예산 밖이라 절대 임계는 경고로만 기록한다. 전송량 회귀(+5%)는 즉시 강제. 예산 안으로 들어오면 true 로 바꾼다."
+  ],
+  "enforce_absolute": false
+}
