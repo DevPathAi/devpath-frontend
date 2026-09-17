@@ -5,5 +5,5 @@
   "shape": "package",
   "readmeHeader": ".design-sync/conventions.md",
   "guidelinesGlob": ["DESIGN.md"],
-  "buildCmd": "py <scratch>/build_ds_bundle.py after `flutter test packages/dp_design/test/theme/dp_semantic_tokens_dump_test.dart` (off-script tokens-only layout; see .design-sync/NOTES.md)"
+  "buildCmd": "py .design-sync/scripts/build_ds_bundle.py && py .design-sync/scripts/build_ds_readme.py (after DP_TOKEN_DUMP=build/dp-tokens.css flutter test test/theme/dp_semantic_tokens_dump_test.dart in packages/dp_design; off-script tokens-only layout, see .design-sync/NOTES.md)"
 }
