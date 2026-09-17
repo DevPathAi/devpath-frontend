@@ -424,7 +424,7 @@ class DpSemanticStateMapping {
 /// 사용할 CSS 이름과 상태 mapping을 함께 고정한다.
 abstract final class DpSemanticTokenManifest {
   static const String schema = 'leva.semantic-tokens';
-  static const String version = '1.0.0';
+  static const String version = '1.1.0';
 
   static final List<DpSemanticColorToken> colors = List.unmodifiable(
     DpSemanticColorRole.values.map(DpSemanticColorToken.new),
@@ -560,9 +560,12 @@ String _kebabCase(String value) => value
     )
     .toLowerCase();
 
-String _formatNumber(num value) => value == value.roundToDouble()
-    ? value.toInt().toString()
-    : value.toStringAsFixed(3).replaceFirst(RegExp(r'0+$'), '');
+/// 3자리로 반올림한 뒤 뒤따르는 0과 소수점을 지운다. `22 * (30 / 22)` 처럼
+/// 부동소수점 오차가 있는 값(30.000000000000004)도 `30` 으로 찍힌다.
+String _formatNumber(num value) {
+  final trimmed = value.toStringAsFixed(3).replaceFirst(RegExp(r'\.?0+$'), '');
+  return trimmed.isEmpty ? '0' : trimmed;
+}
 
 String _colorToCss(Color color) {
   final argb = color.toARGB32();

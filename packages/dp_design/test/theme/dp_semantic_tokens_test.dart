@@ -6,7 +6,7 @@ void main() {
   group('DpSemanticTokenManifest v1', () {
     test('manifest schema/version and CSS names are stable and unique', () {
       expect(DpSemanticTokenManifest.schema, 'leva.semantic-tokens');
-      expect(DpSemanticTokenManifest.version, '1.0.0');
+      expect(DpSemanticTokenManifest.version, '1.1.0');
 
       final tokens = DpSemanticTokenManifest.tokens;
       expect(tokens, isNotEmpty);
@@ -247,14 +247,44 @@ void main() {
           Brightness.dark,
         );
 
-        expect(light['--dp-token-manifest-version'], '"1.0.0"');
+        expect(light['--dp-token-manifest-version'], '"1.1.0"');
         expect(light['--dp-color-primary'], '#5653E7');
         expect(dark['--dp-color-primary'], '#9B99FF');
         expect(light['--dp-space-lg'], '16px');
+        expect(light['--dp-radius-chip'], '999px');
+        expect(light['--dp-radius-panel'], '18px');
+        expect(light['--dp-layout-content-max'], isNull);
         expect(light['--dp-state-focus-ring'], '#4338CA');
         expect(dark['--dp-state-focus-ring'], '#B9B8FF');
         expect(light['--dp-state-focus-ring-width'], '2px');
       },
     );
+
+    test('CSS typography projection formats line heights as plain px', () {
+      final light = DpSemanticTokenManifest.cssCustomProperties(
+        Brightness.light,
+      );
+      // 22 * (30 / 22) is 30.000000000000004 in floating point; the projection
+      // must still print "30px", never "30.px" or "30.000px".
+      expect(
+        light['--dp-type-title-large'],
+        '700 22px/30px "packages/dp_design/Pretendard"',
+      );
+      expect(
+        light['--dp-type-headline-small'],
+        '700 28px/36px "packages/dp_design/Pretendard"',
+      );
+      expect(
+        light['--dp-type-body-large'],
+        '400 16px/25.6px "packages/dp_design/Pretendard"',
+      );
+      for (final entry in light.entries) {
+        expect(
+          entry.value,
+          isNot(matches(RegExp(r'\d\.px|\.0+px'))),
+          reason: '${entry.key} has a malformed number',
+        );
+      }
+    });
   });
 }
