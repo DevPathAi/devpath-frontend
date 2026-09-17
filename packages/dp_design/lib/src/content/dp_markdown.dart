@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:markdown_widget/markdown_widget.dart';
 
+import '../theme/dp_code_font.dart';
 import '../theme/dp_colors.dart';
 import '../theme/dp_spacing.dart';
 import '../theme/dp_typography.dart';
@@ -32,6 +35,8 @@ class DpMarkdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 코드 스팬·블록이 D2Coding 을 쓴다. 로드가 끝나면 텍스트가 다시 배치된다.
+    unawaited(DpCodeFont.ensureLoaded());
     final theme = Theme.of(context);
     final colors = context.dpColors;
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -133,13 +138,22 @@ class DpMarkdown extends StatelessWidget {
       ],
     );
 
-    return Align(
-      alignment: AlignmentDirectional.topStart,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: readingMaxWidth),
-        child: SizedBox(
-          width: double.infinity,
-          child: _DpSelectableMarkdown(data: data, config: config),
+    // 코드 폰트가 로드되면 서브트리를 새 키로 다시 만든다. fallback 폰트로 잡힌 첫
+    // 레이아웃의 스크롤 범위가 시맨틱스에 남아 axe scrollable-region-focusable 로
+    // 잡히는 것을 막는다(390px /content 실측).
+    return ValueListenableBuilder<bool>(
+      valueListenable: DpCodeFont.loaded,
+      builder: (context, codeFontLoaded, _) => KeyedSubtree(
+        key: ValueKey('dp-markdown-code-font-$codeFontLoaded'),
+        child: Align(
+          alignment: AlignmentDirectional.topStart,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: readingMaxWidth),
+            child: SizedBox(
+              width: double.infinity,
+              child: _DpSelectableMarkdown(data: data, config: config),
+            ),
+          ),
         ),
       ),
     );

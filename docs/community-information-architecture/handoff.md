@@ -374,7 +374,8 @@ FREE/QNA/FEEDBACK 세 운영 화면을 전용 fixture로 직접 봉인하지는 
 
 ### 9.6 후속 과제 (큐 완주 뒤 남은 것)
 
-1. 폰트 10.4 MB: Pretendard 한글 서브셋 woff2·필요 weight만, D2Coding 은 샌드박스 진입 시 지연 로드(N04 실측 근거).
+0. **(새로 실측, 결정 필요) 운영 nginx 가 모든 자산을 무압축·`Cache-Control` 없이 서빙한다** — `main.dart.js` 5.97 MB·`canvaskit.wasm` 7.2 MB·폰트가 raw 로 내려간다. `apps/web/nginx.conf` 사전 압축(`gzip_static`/brotli)+ETag 캐시 헤더는 cold 17 MB → 약 6–7 MB 로, 폰트 서브셋보다 크다. `web-image-release-contract`·perf 측정기(압축 서빙 재현)와 함께 바꿔야 한다. 상세 `docs/design/font-diet.md`.
+1. ~~폰트 10.4 MB~~ 완료: 한국어 웹 서브셋 + D2Coding 지연 로드(`docs/design/font-diet.md`, `tools/fonts/`). cold fonts 10.4 → 5.6 MB. 변수 폰트·woff2 는 실측 기각.
 2. 렌더러 전략: wasm A/B(전송 −12%, ready −27%/−21%) 근거로 결정. 운영 빌드의 gstatic CDN 캐시 효과는 별도 측정.
 3. `main.dart.js` 5.7 MB: deferred loading 후보(샌드박스·Monaco·에디터).
 4. 위 셋 반영 뒤 `perf/budget.json` `enforce_absolute: true`(기준선을 낮춰 맞추지 않는다).
