@@ -19,7 +19,7 @@
 | `refresh-keeps-board` | 768 | `/community?board=FEEDBACK` 새로고침 후 URL·H1 유지 | 불일치 |
 | `back-forward-boards` | 1024 | 자유게시판→Q/A→피드백 뒤 back×2·forward×1 이 URL 과 H1 을 함께 되돌림 | 단계별 불일치 |
 | `keyboard-traversal` | 1440 | `/community` 에서 Tab 순회 순서가 `expectations.json` 의 실측 고정값과 일치 | 순서 불일치 · 기대값 미기록 |
-| `dialog-focus-return` | 1024 | 글 작성 버튼 Enter → dialog 등장 → Escape → focus 가 여는 버튼으로 복귀 | dialog 없음 · focus 미복귀 |
+| `dialog-focus-return` | 1024 | 글 작성 버튼 Enter → 모달 시트(Dismiss barrier) 등장 → Escape 로 닫힘 → focus 가 여는 버튼으로 복귀 | 시트 없음 · 미닫힘 · focus 미복귀 |
 | `overflow-and-targets` | 390/768/1024/1440 × 100/200% | 8개 라우트에서 `scrollWidth ≤ innerWidth`; 390·100% 에서 모든 `role=button` 이 44×44 이상 | overflow · 작은 타깃 |
 | `reduced-motion-parity` | 768 | `/dashboard` `/community` `/path` 의 시맨틱 라벨 집합이 reduced-motion 에서도 동일 | 라벨 손실 |
 | `axe` | 390 light · 1240 dark | 8개 라우트 axe(wcag2a/2aa/21a/21aa/best-practice) | critical/serious ≥ 1 |
