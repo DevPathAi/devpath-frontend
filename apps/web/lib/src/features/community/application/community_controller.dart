@@ -14,6 +14,9 @@ class CommunityController extends Notifier<CommunityState> {
     await load();
   }
 
+  /// 정렬 전환. 재조회하지 않는다 — [CommunityState.visiblePosts] 가 같은 목록을 다시 줄 세운다.
+  void selectSort(CommunitySort sort) => state = state.copyWith(sort: sort);
+
   Future<void> load({String? tag, String? sort}) async {
     state = state.copyWith(phase: CommunityPhase.loading);
     try {

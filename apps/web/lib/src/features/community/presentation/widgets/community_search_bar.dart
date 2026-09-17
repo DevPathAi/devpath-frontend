@@ -10,10 +10,14 @@ class CommunitySearchBar extends StatefulWidget {
     super.key,
     required this.onChangedDebounced,
     this.initialQuery = '',
+    this.hintText = '글 검색 (제목·본문·태그)',
   });
 
   final ValueChanged<String> onChangedDebounced;
   final String initialQuery;
+
+  /// 검색 범위를 알리는 힌트. 게시판 페이지는 게시판 이름을 넣어 넘긴다.
+  final String hintText;
 
   @override
   State<CommunitySearchBar> createState() => _CommunitySearchBarState();
@@ -60,7 +64,7 @@ class _CommunitySearchBarState extends State<CommunitySearchBar> {
       onChanged: _onChanged,
       textInputAction: TextInputAction.search,
       decoration: InputDecoration(
-        hintText: '글 검색 (제목·본문·태그)',
+        hintText: widget.hintText,
         prefixIcon: const Icon(DpIcons.search, size: 20),
         suffixIcon: _controller.text.isEmpty
             ? null
