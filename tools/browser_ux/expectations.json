@@ -1,20 +1,17 @@
 {
   "schema_version": "leva.browser-ux.expectations.v1",
-  "recorded_from": "2adb8b036e108a07c2a355ba8e18fd3e20ed096d",
+  "recorded_from": "f25e2e96afe7363cc46a0db3cd7f0c07997d19fd",
   "notes": [
-    "community_desktop: /community 1440px 에서 Tab 순서(첫 8 정지). 라우트 FocusScope 경계 때문에 셸 레일은 페이지 스코프 밖이라 순회에 포함되지 않는다(문서 참조).",
+    "community_desktop: /community 1440px 에서 Tab 순서(첫 4 정지). mock 자유게시판은 글이 1개라 본문 정지는 검색·정렬·작성·행 넷이다. 라우트 FocusScope 경계 때문에 셸 레일은 페이지 스코프 밖이라 순회에 포함되지 않는다(문서 참조).",
+    "recorded_from 은 실측한 작업 트리의 부모 커밋이다(페이지 안 게시판 세그먼트 제거 + 정렬 메뉴 추가 변경 위에서 실측).",
     "갱신은 실측 후 PR 리뷰 승인으로만 한다."
   ],
   "keyboard_traversal": {
     "community_desktop": [
-      "글 검색 (제목·본문·태그)",
-      "자유게시판",
-      "Q/A",
-      "피드백",
+      "자유게시판에서 검색 (제목·본문·태그)",
+      "최신순",
       "글 작성",
-      "Q/A\n✓ 해결됨\nasync/await가 헷갈려요\n답변 2 · 추천 3",
-      "자유게시판\n오늘 배운 것 공유\n댓글 4 · 추천 5",
-      "피드백\n제 코드 리뷰 부탁해요\n댓글 1 · 추천 1"
+      "오늘 배운 것 공유\n댓글 4 · 추천 5"
     ]
   }
 }
