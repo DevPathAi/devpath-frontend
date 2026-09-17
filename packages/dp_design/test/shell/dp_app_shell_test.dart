@@ -189,4 +189,20 @@ void main() {
     expect(find.byType(DpChromeBar), findsOneWidget);
     expect(find.byTooltip('액션'), findsOneWidget);
   });
+
+  testWidgets('넓은 화면의 포커스 순회는 기하학이 아니라 위젯 순서(레일 → 본문)를 따른다', (tester) async {
+    _setWidth(tester, 1440);
+    await tester.pumpWidget(_host(_shell()));
+    final group = tester.widget<FocusTraversalGroup>(
+      find
+          .ancestor(
+            of: find.byType(DpNavRail),
+            matching: find.byType(FocusTraversalGroup),
+          )
+          .first,
+    );
+    // 본문 검색창이 레일 항목보다 위에 놓이면 reading-order 정책은 검색을 먼저
+    // 방문한다. 전역 목적지(레일)가 항상 먼저 오도록 위젯 순서 정책을 고정한다.
+    expect(group.policy, isA<WidgetOrderTraversalPolicy>());
+  });
 }

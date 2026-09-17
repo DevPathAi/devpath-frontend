@@ -1,3 +1,5 @@
+import 'dart:ui' show SemanticsRole;
+
 import 'package:flutter/material.dart';
 
 import '../theme/dp_colors.dart';
@@ -10,7 +12,7 @@ enum DpInlineNoticeTone { danger, warning, info }
 /// 이미 그린 데이터를 유지한 채 보여주는 인라인 알림(부분 실패·저장 실패·경고).
 ///
 /// 전체 화면 상태(`DpError`/`DpEmpty`)와 달리 콘텐츠 흐름 안에 놓이며,
-/// 스크린리더는 liveRegion 으로 메시지를 읽는다. 행동은 [actionLabel] 이 있을 때
+/// 스크린리더는 alert/status 라이브 리전으로 메시지를 읽는다. 행동은 [actionLabel] 이 있을 때
 /// 하나만 렌더되고, [onAction] 이 null 이면 비활성이다(제출 중 등).
 class DpInlineNotice extends StatelessWidget {
   const DpInlineNotice({
@@ -48,8 +50,11 @@ class DpInlineNotice extends StatelessWidget {
 
     return Semantics(
       key: const ValueKey('dp-inline-notice'),
-      liveRegion: true,
       container: true,
+      // danger 는 즉시 읽어야 하는 alert, 그 외는 status(폴라이트) 로 노출한다.
+      role: tone == DpInlineNoticeTone.danger
+          ? SemanticsRole.alert
+          : SemanticsRole.status,
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: accent.withValues(alpha: 0.08),

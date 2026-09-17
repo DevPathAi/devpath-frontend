@@ -1,8 +1,10 @@
 import 'package:dp_design/src/states/dp_empty.dart';
 import 'package:dp_design/src/states/dp_error.dart';
+import 'package:dp_design/src/states/dp_inline_notice.dart';
 import 'package:dp_design/src/states/dp_loading.dart';
 import 'package:dp_design/src/theme/dp_theme.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Widget _host(Widget child) => MaterialApp(
@@ -73,11 +75,39 @@ void main() {
     expect(find.text('다시 시도'), findsOneWidget);
   });
 
-  testWidgets('DpLoading은 라벨 유무와 무관하게 liveRegion 시맨틱을 가진다', (tester) async {
+  testWidgets('DpLoading은 라벨 유무와 무관하게 status 라이브 리전이다', (tester) async {
     await tester.pumpWidget(_host(const DpLoading()));
     expect(find.bySemanticsLabel('불러오는 중'), findsOneWidget);
     await tester.pumpWidget(_host(const DpLoading(label: '오늘의 미션을 불러오는 중')));
     final node = tester.getSemantics(find.bySemanticsLabel('오늘의 미션을 불러오는 중'));
-    expect(node.flagsCollection.isLiveRegion, isTrue);
+    expect(node.role, SemanticsRole.status);
+  });
+
+  testWidgets('DpLoading 은 status 역할을 가져 aria-label 이 허용된다', (tester) async {
+    await tester.pumpWidget(_host(const DpLoading(label: '불러오는 중입니다')));
+    final node = tester.getSemantics(find.bySemanticsLabel('불러오는 중입니다'));
+    expect(node.role, SemanticsRole.status);
+  });
+
+  testWidgets('DpInlineNotice 는 danger 면 alert, 그 외는 status 역할이다', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_host(const DpInlineNotice(message: '저장하지 못했어요')));
+    expect(
+      tester.getSemantics(find.byKey(const ValueKey('dp-inline-notice'))).role,
+      SemanticsRole.alert,
+    );
+    await tester.pumpWidget(
+      _host(
+        const DpInlineNotice(
+          message: '연결이 끊겼어요',
+          tone: DpInlineNoticeTone.warning,
+        ),
+      ),
+    );
+    expect(
+      tester.getSemantics(find.byKey(const ValueKey('dp-inline-notice'))).role,
+      SemanticsRole.status,
+    );
   });
 }

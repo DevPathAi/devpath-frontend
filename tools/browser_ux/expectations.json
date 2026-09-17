@@ -1,0 +1,20 @@
+{
+  "schema_version": "leva.browser-ux.expectations.v1",
+  "recorded_from": "2adb8b036e108a07c2a355ba8e18fd3e20ed096d",
+  "notes": [
+    "community_desktop: /community 1440px 에서 Tab 순서(첫 8 정지). 라우트 FocusScope 경계 때문에 셸 레일은 페이지 스코프 밖이라 순회에 포함되지 않는다(문서 참조).",
+    "갱신은 실측 후 PR 리뷰 승인으로만 한다."
+  ],
+  "keyboard_traversal": {
+    "community_desktop": [
+      "글 검색 (제목·본문·태그)",
+      "자유게시판",
+      "Q/A",
+      "피드백",
+      "글 작성",
+      "Q/A\n✓ 해결됨\nasync/await가 헷갈려요\n답변 2 · 추천 3",
+      "자유게시판\n오늘 배운 것 공유\n댓글 4 · 추천 5",
+      "피드백\n제 코드 리뷰 부탁해요\n댓글 1 · 추천 1"
+    ]
+  }
+}

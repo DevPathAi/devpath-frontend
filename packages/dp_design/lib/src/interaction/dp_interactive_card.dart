@@ -50,6 +50,16 @@ class _DpInteractiveCardState extends State<DpInteractiveCard> {
 
     return FocusableActionDetector(
       enabled: widget.onTap != null,
+      // 포커스 노드는 이 detector 하나만 갖는다. 안쪽 InkWell 이 자기 노드를 더 만들면
+      // 카드마다 Tab 정지가 두 번 생긴다(브라우저 실측). Enter/Space 활성화는 여기서 받는다.
+      actions: <Type, Action<Intent>>{
+        ActivateIntent: CallbackAction<ActivateIntent>(
+          onInvoke: (_) {
+            widget.onTap?.call();
+            return null;
+          },
+        ),
+      },
       mouseCursor: widget.onTap != null
           ? SystemMouseCursors.click
           : MouseCursor.defer,
@@ -59,6 +69,7 @@ class _DpInteractiveCardState extends State<DpInteractiveCard> {
         color: Colors.transparent,
         child: InkWell(
           onTap: widget.onTap,
+          canRequestFocus: false,
           borderRadius: radius,
           child: DecoratedBox(
             decoration: BoxDecoration(
