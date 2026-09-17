@@ -132,6 +132,39 @@
       "capture_scope": "component_projection",
       "source_widget": "DpEt13ContextPayloadPreviewFixture",
       "substitutions": ["hosted by the Flutter Web production distribution"]
+    },
+    {
+      "id": "web-community-free",
+      "owner": "web",
+      "distribution": "web",
+      "route": "/?fixture=web-community-free",
+      "ready_semantics_label": "ET13_READY:web-community-free",
+      "surface_label": "web-community-free",
+      "capture_scope": "body_projection",
+      "source_widget": "WebCommunityBoardProjection",
+      "substitutions": ["controller/provider state replaced by approved deterministic fixture"]
+    },
+    {
+      "id": "web-community-qna",
+      "owner": "web",
+      "distribution": "web",
+      "route": "/?fixture=web-community-qna",
+      "ready_semantics_label": "ET13_READY:web-community-qna",
+      "surface_label": "web-community-qna",
+      "capture_scope": "body_projection",
+      "source_widget": "WebCommunityBoardProjection",
+      "substitutions": ["controller/provider state replaced by approved deterministic fixture"]
+    },
+    {
+      "id": "web-community-feedback",
+      "owner": "web",
+      "distribution": "web",
+      "route": "/?fixture=web-community-feedback",
+      "ready_semantics_label": "ET13_READY:web-community-feedback",
+      "surface_label": "web-community-feedback",
+      "capture_scope": "body_projection",
+      "source_widget": "WebCommunityBoardProjection",
+      "substitutions": ["controller/provider state replaced by approved deterministic fixture"]
     }
   ],
   "projection_contract_version": "leva.et13.projection-contract.v1",
@@ -207,9 +240,27 @@
       "capture_scope": "component_projection",
       "source_widget": "DpEt13ContextPayloadPreviewFixture",
       "substitutions": ["hosted by the Flutter Web production distribution"]
+    },
+    {
+      "fixture_id": "web-community-free",
+      "capture_scope": "body_projection",
+      "source_widget": "WebCommunityBoardProjection",
+      "substitutions": ["controller/provider state replaced by approved deterministic fixture"]
+    },
+    {
+      "fixture_id": "web-community-qna",
+      "capture_scope": "body_projection",
+      "source_widget": "WebCommunityBoardProjection",
+      "substitutions": ["controller/provider state replaced by approved deterministic fixture"]
+    },
+    {
+      "fixture_id": "web-community-feedback",
+      "capture_scope": "body_projection",
+      "source_widget": "WebCommunityBoardProjection",
+      "substitutions": ["controller/provider state replaced by approved deterministic fixture"]
     }
   ],
-  "projection_contract_sha256": "c66d08b6425628a06b27d07e08d648cfb3568d9db7c8d8aca2371172ccf4bde3",
+  "projection_contract_sha256": "106e8d2951f44345611627df3cef5a52eef938ab1dfac117750febaa51fde3ca",
   "visual_matrix": {
     "widths": [320, 600, 840, 1240],
     "themes": ["light", "dark"],

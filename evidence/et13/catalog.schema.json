@@ -18,8 +18,8 @@
     "schema_version": {"const": "leva.et13.catalog.v1"},
     "fixtures": {
       "type": "array",
-      "minItems": 12,
-      "maxItems": 12,
+      "minItems": 15,
+      "maxItems": 15,
       "uniqueItems": true,
       "items": {"$ref": "#/$defs/fixture"}
     },
@@ -28,8 +28,8 @@
     },
     "projection_matrix": {
       "type": "array",
-      "minItems": 12,
-      "maxItems": 12,
+      "minItems": 15,
+      "maxItems": 15,
       "items": {"$ref": "#/$defs/projectionRow"}
     },
     "projection_contract_sha256": {
