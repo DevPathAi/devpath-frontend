@@ -21,7 +21,13 @@ const contentTypes = {
   '.symbols': 'text/plain; charset=utf-8',
 };
 
-export async function serve(distDir) {
+/**
+ * @param {string} distDir 빌드 산출물 디렉터리
+ * @param {{ cacheable?: boolean }} [options] cacheable 이면 HTML 을 제외한 자산에 1년 캐시 헤더를 준다
+ *   (warm 로드 측정용). 기본은 no-store(브라우저 UX 러너: 매 항법이 서버를 다시 친다).
+ */
+export async function serve(distDir, options = {}) {
+  const cacheable = options.cacheable === true;
   const dist = resolve(distDir);
   const index = join(dist, 'index.html');
   const server = createServer(async (req, res) => {
@@ -42,9 +48,10 @@ export async function serve(distDir) {
     }
     try {
       const body = await readFile(file);
+      const isHtml = extname(file) === '.html';
       res.writeHead(200, {
         'content-type': contentTypes[extname(file)] ?? 'application/octet-stream',
-        'cache-control': 'no-store',
+        'cache-control': cacheable && !isHtml ? 'public, max-age=31536000' : 'no-store',
       });
       res.end(body);
     } catch {

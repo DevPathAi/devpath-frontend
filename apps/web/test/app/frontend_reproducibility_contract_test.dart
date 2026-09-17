@@ -218,6 +218,10 @@ List<String> _workflowPinErrors(String source) {
     '$_checkout # v6.1.0',
     '$_flutterAction # v2.23.0',
     '$_uploadArtifact # v4.6.2',
+    // perf-gate(N04): 같은 구성.
+    '$_checkout # v6.1.0',
+    '$_flutterAction # v2.23.0',
+    '$_uploadArtifact # v4.6.2',
   ];
 
   if (uses.length != expectedUses.length ||
@@ -236,8 +240,8 @@ List<String> _workflowPinErrors(String source) {
   if (RegExp(r'\b[a-z0-9-]+-latest\b').hasMatch(source)) {
     errors.add('latest runner labels are forbidden');
   }
-  if (_count(source, 'runs-on: ubuntu-24.04') != 6) {
-    errors.add('all six CI jobs must use ubuntu-24.04');
+  if (_count(source, 'runs-on: ubuntu-24.04') != 7) {
+    errors.add('all seven CI jobs must use ubuntu-24.04');
   }
   final setupBuildxSteps = _actionStepBodies(source, _setupBuildx);
   if (setupBuildxSteps.length != 3 ||

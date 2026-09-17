@@ -1,0 +1,444 @@
+{
+  "schema_version": "leva.perf-measure.v1",
+  "built_from": "6acc146a78b7bea83edc94d06163a82add70d7e9",
+  "renderer": "wasm",
+  "conditions": {
+    "locale": "ko-KR",
+    "profiles": {
+      "mobile": {
+        "cpu_throttle": 4,
+        "download_bps": 625000,
+        "upload_bps": 187500,
+        "latency_ms": 80
+      },
+      "desktop": {
+        "cpu_throttle": 1,
+        "download_bps": 3750000,
+        "upload_bps": 1250000,
+        "latency_ms": 20
+      }
+    }
+  },
+  "routes": [
+    {
+      "route": "/login",
+      "profile": "mobile",
+      "phase": "cold",
+      "samples": 3,
+      "p75": {
+        "fcp_ms": 34012,
+        "ready_ms": 15558.70000000298,
+        "lcp_ms": null,
+        "inp_ms": null,
+        "cls": 0
+      },
+      "transfer_bytes": {
+        "total": 19851811,
+        "js": 82044,
+        "canvaskit_or_wasm": 9117375,
+        "fonts": 10638034,
+        "images": 0,
+        "other": 14358
+      }
+    },
+    {
+      "route": "/login",
+      "profile": "mobile",
+      "phase": "warm",
+      "samples": 3,
+      "p75": {
+        "fcp_ms": 1384,
+        "ready_ms": 1002.4000000059605,
+        "lcp_ms": null,
+        "inp_ms": null,
+        "cls": 0
+      },
+      "transfer_bytes": {
+        "total": 13029,
+        "js": 0,
+        "canvaskit_or_wasm": 0,
+        "fonts": 0,
+        "images": 0,
+        "other": 13029
+      }
+    },
+    {
+      "route": "/dashboard",
+      "profile": "mobile",
+      "phase": "cold",
+      "samples": 3,
+      "p75": {
+        "fcp_ms": 34104,
+        "ready_ms": 15560.29999999702,
+        "lcp_ms": null,
+        "inp_ms": null,
+        "cls": 0
+      },
+      "transfer_bytes": {
+        "total": 19851811,
+        "js": 82044,
+        "canvaskit_or_wasm": 9117375,
+        "fonts": 10638034,
+        "images": 0,
+        "other": 14358
+      }
+    },
+    {
+      "route": "/dashboard",
+      "profile": "mobile",
+      "phase": "warm",
+      "samples": 3,
+      "p75": {
+        "fcp_ms": 1532,
+        "ready_ms": 1273.7000000029802,
+        "lcp_ms": null,
+        "inp_ms": null,
+        "cls": 0
+      },
+      "transfer_bytes": {
+        "total": 13029,
+        "js": 0,
+        "canvaskit_or_wasm": 0,
+        "fonts": 0,
+        "images": 0,
+        "other": 13029
+      }
+    },
+    {
+      "route": "/path",
+      "profile": "mobile",
+      "phase": "cold",
+      "samples": 3,
+      "p75": {
+        "fcp_ms": 34184,
+        "ready_ms": 15559.79999999702,
+        "lcp_ms": null,
+        "inp_ms": null,
+        "cls": 0
+      },
+      "transfer_bytes": {
+        "total": 19851811,
+        "js": 82044,
+        "canvaskit_or_wasm": 9117375,
+        "fonts": 10638034,
+        "images": 0,
+        "other": 14358
+      }
+    },
+    {
+      "route": "/path",
+      "profile": "mobile",
+      "phase": "warm",
+      "samples": 3,
+      "p75": {
+        "fcp_ms": 1412,
+        "ready_ms": 1406.7999999970198,
+        "lcp_ms": null,
+        "inp_ms": null,
+        "cls": 0
+      },
+      "transfer_bytes": {
+        "total": 13029,
+        "js": 0,
+        "canvaskit_or_wasm": 0,
+        "fonts": 0,
+        "images": 0,
+        "other": 13029
+      }
+    },
+    {
+      "route": "/mentor",
+      "profile": "mobile",
+      "phase": "cold",
+      "samples": 3,
+      "p75": {
+        "fcp_ms": 34404,
+        "ready_ms": 15582.90000000596,
+        "lcp_ms": null,
+        "inp_ms": null,
+        "cls": 0
+      },
+      "transfer_bytes": {
+        "total": 19851811,
+        "js": 82044,
+        "canvaskit_or_wasm": 9117375,
+        "fonts": 10638034,
+        "images": 0,
+        "other": 14358
+      }
+    },
+    {
+      "route": "/mentor",
+      "profile": "mobile",
+      "phase": "warm",
+      "samples": 3,
+      "p75": {
+        "fcp_ms": 1368,
+        "ready_ms": 920.7000000029802,
+        "lcp_ms": null,
+        "inp_ms": null,
+        "cls": 0
+      },
+      "transfer_bytes": {
+        "total": 13029,
+        "js": 0,
+        "canvaskit_or_wasm": 0,
+        "fonts": 0,
+        "images": 0,
+        "other": 13029
+      }
+    },
+    {
+      "route": "/community",
+      "profile": "mobile",
+      "phase": "cold",
+      "samples": 3,
+      "p75": {
+        "fcp_ms": 34296,
+        "ready_ms": 15576.20000000298,
+        "lcp_ms": null,
+        "inp_ms": 192,
+        "cls": 0
+      },
+      "transfer_bytes": {
+        "total": 19860926,
+        "js": 82044,
+        "canvaskit_or_wasm": 9117375,
+        "fonts": 10638034,
+        "images": 0,
+        "other": 23473
+      }
+    },
+    {
+      "route": "/community",
+      "profile": "mobile",
+      "phase": "warm",
+      "samples": 3,
+      "p75": {
+        "fcp_ms": 1340,
+        "ready_ms": 1336,
+        "lcp_ms": null,
+        "inp_ms": 160,
+        "cls": 0
+      },
+      "transfer_bytes": {
+        "total": 13029,
+        "js": 0,
+        "canvaskit_or_wasm": 0,
+        "fonts": 0,
+        "images": 0,
+        "other": 13029
+      }
+    },
+    {
+      "route": "/login",
+      "profile": "desktop",
+      "phase": "cold",
+      "samples": 3,
+      "p75": {
+        "fcp_ms": 5972,
+        "ready_ms": 2991.9000000059605,
+        "lcp_ms": null,
+        "inp_ms": null,
+        "cls": 0
+      },
+      "transfer_bytes": {
+        "total": 19851811,
+        "js": 82044,
+        "canvaskit_or_wasm": 9117375,
+        "fonts": 10638034,
+        "images": 0,
+        "other": 14358
+      }
+    },
+    {
+      "route": "/login",
+      "profile": "desktop",
+      "phase": "warm",
+      "samples": 3,
+      "p75": {
+        "fcp_ms": 476,
+        "ready_ms": 262.29999999701977,
+        "lcp_ms": null,
+        "inp_ms": null,
+        "cls": 0
+      },
+      "transfer_bytes": {
+        "total": 13029,
+        "js": 0,
+        "canvaskit_or_wasm": 0,
+        "fonts": 0,
+        "images": 0,
+        "other": 13029
+      }
+    },
+    {
+      "route": "/dashboard",
+      "profile": "desktop",
+      "phase": "cold",
+      "samples": 3,
+      "p75": {
+        "fcp_ms": 6044,
+        "ready_ms": 2991.699999988079,
+        "lcp_ms": null,
+        "inp_ms": 176,
+        "cls": 0
+      },
+      "transfer_bytes": {
+        "total": 19851811,
+        "js": 82044,
+        "canvaskit_or_wasm": 9117375,
+        "fonts": 10638034,
+        "images": 0,
+        "other": 14358
+      }
+    },
+    {
+      "route": "/dashboard",
+      "profile": "desktop",
+      "phase": "warm",
+      "samples": 3,
+      "p75": {
+        "fcp_ms": 444,
+        "ready_ms": 191.59999999403954,
+        "lcp_ms": null,
+        "inp_ms": 224,
+        "cls": 0
+      },
+      "transfer_bytes": {
+        "total": 13029,
+        "js": 0,
+        "canvaskit_or_wasm": 0,
+        "fonts": 0,
+        "images": 0,
+        "other": 13029
+      }
+    },
+    {
+      "route": "/path",
+      "profile": "desktop",
+      "phase": "cold",
+      "samples": 3,
+      "p75": {
+        "fcp_ms": 6028,
+        "ready_ms": 2984.2999999970198,
+        "lcp_ms": null,
+        "inp_ms": 120,
+        "cls": 0
+      },
+      "transfer_bytes": {
+        "total": 19851811,
+        "js": 82044,
+        "canvaskit_or_wasm": 9117375,
+        "fonts": 10638034,
+        "images": 0,
+        "other": 14358
+      }
+    },
+    {
+      "route": "/path",
+      "profile": "desktop",
+      "phase": "warm",
+      "samples": 3,
+      "p75": {
+        "fcp_ms": 440,
+        "ready_ms": 188.20000000298023,
+        "lcp_ms": null,
+        "inp_ms": 224,
+        "cls": 0
+      },
+      "transfer_bytes": {
+        "total": 13029,
+        "js": 0,
+        "canvaskit_or_wasm": 0,
+        "fonts": 0,
+        "images": 0,
+        "other": 13029
+      }
+    },
+    {
+      "route": "/mentor",
+      "profile": "desktop",
+      "phase": "cold",
+      "samples": 3,
+      "p75": {
+        "fcp_ms": 6012,
+        "ready_ms": 2991.7999999970198,
+        "lcp_ms": null,
+        "inp_ms": null,
+        "cls": 0
+      },
+      "transfer_bytes": {
+        "total": 19851811,
+        "js": 82044,
+        "canvaskit_or_wasm": 9117375,
+        "fonts": 10638034,
+        "images": 0,
+        "other": 14358
+      }
+    },
+    {
+      "route": "/mentor",
+      "profile": "desktop",
+      "phase": "warm",
+      "samples": 3,
+      "p75": {
+        "fcp_ms": 436,
+        "ready_ms": 170.6000000089407,
+        "lcp_ms": null,
+        "inp_ms": null,
+        "cls": 0
+      },
+      "transfer_bytes": {
+        "total": 13029,
+        "js": 0,
+        "canvaskit_or_wasm": 0,
+        "fonts": 0,
+        "images": 0,
+        "other": 13029
+      }
+    },
+    {
+      "route": "/community",
+      "profile": "desktop",
+      "phase": "cold",
+      "samples": 3,
+      "p75": {
+        "fcp_ms": 6100,
+        "ready_ms": 3008.2999999970198,
+        "lcp_ms": null,
+        "inp_ms": 40,
+        "cls": 0
+      },
+      "transfer_bytes": {
+        "total": 19860926,
+        "js": 82044,
+        "canvaskit_or_wasm": 9117375,
+        "fonts": 10638034,
+        "images": 0,
+        "other": 23473
+      }
+    },
+    {
+      "route": "/community",
+      "profile": "desktop",
+      "phase": "warm",
+      "samples": 3,
+      "p75": {
+        "fcp_ms": 488,
+        "ready_ms": 189.40000000596046,
+        "lcp_ms": null,
+        "inp_ms": 264,
+        "cls": 0
+      },
+      "transfer_bytes": {
+        "total": 13029,
+        "js": 0,
+        "canvaskit_or_wasm": 0,
+        "fonts": 0,
+        "images": 0,
+        "other": 13029
+      }
+    }
+  ]
+}
