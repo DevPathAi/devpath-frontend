@@ -49,6 +49,23 @@ abstract final class DpTheme {
       splashFactory: InkSparkle.splashFactory,
       dividerColor: c.border,
       dividerTheme: DividerThemeData(color: c.border, thickness: 1),
+      // 데스크톱/웹 데스크톱 기본 밀도(compact)는 버튼을 44px 아래로 줄인다.
+      // 접근성 터치 타깃을 플랫폼과 무관하게 지키기 위해 표준 밀도로 고정한다.
+      visualDensity: VisualDensity.standard,
+      // SegmentedButton 은 세그먼트에 minimumSize 를 전달하지 않는다(segmentStyleFor).
+      // 세로 padding 으로 44px 을 확보하고, 탭 타깃은 플랫폼과 무관하게 padded 로 둔다.
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        style: ButtonStyle(
+          padding: const WidgetStatePropertyAll(
+            EdgeInsets.symmetric(
+              horizontal: DpSpacing.lg,
+              vertical: DpSpacing.md,
+            ),
+          ),
+          tapTargetSize: MaterialTapTargetSize.padded,
+          textStyle: controlText,
+        ),
+      ),
       filledButtonTheme: FilledButtonThemeData(
         style: ButtonStyle(
           minimumSize: const WidgetStatePropertyAll(Size(64, 52)),

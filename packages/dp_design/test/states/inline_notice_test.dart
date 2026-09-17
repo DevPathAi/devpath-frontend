@@ -1,5 +1,6 @@
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Widget _host(Widget child, {double width = 800}) => MaterialApp(
@@ -14,7 +15,7 @@ Widget _host(Widget child, {double width = 800}) => MaterialApp(
 void _noop() {}
 
 void main() {
-  testWidgets('DpInlineNotice는 메시지를 liveRegion으로 알린다', (tester) async {
+  testWidgets('DpInlineNotice는 메시지를 alert 라이브 리전으로 알린다', (tester) async {
     await tester.pumpWidget(
       _host(const DpInlineNotice(message: '완료를 저장하지 못했어요.')),
     );
@@ -22,7 +23,7 @@ void main() {
     final node = tester.getSemantics(
       find.byKey(const ValueKey('dp-inline-notice')),
     );
-    expect(node.flagsCollection.isLiveRegion, isTrue);
+    expect(node.role, SemanticsRole.alert);
     expect(find.byType(TextButton), findsNothing);
   });
 
