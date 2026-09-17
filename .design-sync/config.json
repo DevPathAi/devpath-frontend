@@ -1,0 +1,9 @@
+{
+  "projectId": "19a7b5ca-6f2b-4d14-b291-ac9e47a31855",
+  "pkg": "leva-design-tokens",
+  "globalName": "Leva",
+  "shape": "package",
+  "readmeHeader": ".design-sync/conventions.md",
+  "guidelinesGlob": ["DESIGN.md"],
+  "buildCmd": "py <scratch>/build_ds_bundle.py after `flutter test packages/dp_design/test/theme/dp_semantic_tokens_dump_test.dart` (off-script tokens-only layout; see .design-sync/NOTES.md)"
+}
