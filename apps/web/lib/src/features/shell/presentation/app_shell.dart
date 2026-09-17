@@ -41,7 +41,7 @@ const List<ShellDestination> kShellDestinations = [
 ];
 
 /// 모바일 하단 바는 네 개 핵심 목적지를 유지한다. 세 게시판은 커뮤니티
-/// 화면의 로컬 내비게이션으로 노출하고 기본 진입은 자유게시판으로 고정한다.
+/// 화면의 제목 메뉴(`CommunityBoardHeader`)로 노출하고 기본 진입은 자유게시판으로 고정한다.
 const List<ShellDestination> kCompactShellDestinations = [
   (path: '/dashboard', icon: DpIcons.dashboard, label: '오늘', section: '학습'),
   (path: '/path', icon: DpIcons.path, label: '학습 경로', section: '학습'),

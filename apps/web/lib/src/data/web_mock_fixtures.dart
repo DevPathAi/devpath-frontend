@@ -37,6 +37,43 @@ List<CommunityPostSummary> mockCommunityPosts(String boardType) {
   ].where((post) => post.boardType == boardType).toList();
 }
 
+/// `GET /community/posts` 원본(COM-001) — 실계약: bare 배열(PostSummaryView), 페이지네이션 없음.
+/// boardType·replyCount(QNA=답변/일반=댓글) 포함. 최신순.
+const List<Map<String, Object?>> _communityPostFixtures = [
+  {
+    'id': 1,
+    'boardType': 'QNA',
+    'title': 'async/await가 헷갈려요',
+    'authorId': 42,
+    'solved': true,
+    'upvoteCount': 3,
+    'replyCount': 2,
+    'excerpt':
+        'async/await는 Future를 순차적으로 다루는 문법입니다. 이벤트 루프와 마이크로태스크 큐를 이해하면 동작이 또렷해져요…',
+  },
+  {
+    'id': 10,
+    'boardType': 'FREE',
+    'title': '오늘 배운 것 공유',
+    'authorId': 8,
+    'solved': false,
+    'upvoteCount': 5,
+    'replyCount': 4,
+    'excerpt':
+        '오늘은 Riverpod의 Notifier와 AsyncNotifier 차이를 정리했습니다. 상태 복원과 자동 폐기(autoDispose)까지…',
+  },
+  {
+    'id': 20,
+    'boardType': 'FEEDBACK',
+    'title': '제 코드 리뷰 부탁해요',
+    'authorId': 17,
+    'solved': false,
+    'upvoteCount': 1,
+    'replyCount': 1,
+    'excerpt': '로그인 폼 검증 로직 리뷰 부탁드립니다. 특히 IME 전각 처리와 디바운스 부분이 고민입니다.',
+  },
+];
+
 final Map<String, MockFixture> webMockFixtures = {
   // ④ 오류 신고·문의 접수. 목 모드 기본값이 true 라 이 픽스처가 없으면 제보가 404로 실패한다.
   'POST /support/requests': (201, {'id': 42}),
@@ -240,45 +277,17 @@ final Map<String, MockFixture> webMockFixtures = {
       'completedAt': '2026-06-21T10:00:00Z',
     },
   ),
-  // 커뮤니티 통합 피드(COM-001) — 실계약: bare 배열(PostSummaryView), 페이지네이션 없음.
-  // 전 보드(QNA/FREE/FEEDBACK) 혼합. boardType·replyCount(QNA=답변/일반=댓글) 포함.
-  'GET /community/posts': (
-    200,
-    [
-      {
-        'id': 1,
-        'boardType': 'QNA',
-        'title': 'async/await가 헷갈려요',
-        'authorId': 42,
-        'solved': true,
-        'upvoteCount': 3,
-        'replyCount': 2,
-        'excerpt':
-            'async/await는 Future를 순차적으로 다루는 문법입니다. 이벤트 루프와 마이크로태스크 큐를 이해하면 동작이 또렷해져요…',
-      },
-      {
-        'id': 10,
-        'boardType': 'FREE',
-        'title': '오늘 배운 것 공유',
-        'authorId': 8,
-        'solved': false,
-        'upvoteCount': 5,
-        'replyCount': 4,
-        'excerpt':
-            '오늘은 Riverpod의 Notifier와 AsyncNotifier 차이를 정리했습니다. 상태 복원과 자동 폐기(autoDispose)까지…',
-      },
-      {
-        'id': 20,
-        'boardType': 'FEEDBACK',
-        'title': '제 코드 리뷰 부탁해요',
-        'authorId': 17,
-        'solved': false,
-        'upvoteCount': 1,
-        'replyCount': 1,
-        'excerpt': '로그인 폼 검증 로직 리뷰 부탁드립니다. 특히 IME 전각 처리와 디바운스 부분이 고민입니다.',
-      },
-    ],
-  ),
+  // 커뮤니티 목록. 쿼리 없는 호출은 전 보드 혼합, 게시판 페이지가 보내는 `?board=` 호출은
+  // 백엔드처럼 그 게시판 글만 돌려준다(행에 게시판 배지가 없어 섞이면 구분할 수 없다).
+  'GET /community/posts': (200, _communityPostFixtures),
+  for (final board in const ['FREE', 'QNA', 'FEEDBACK'])
+    'GET /community/posts?board=$board': (
+      200,
+      [
+        for (final post in _communityPostFixtures)
+          if (post['boardType'] == board) post,
+      ],
+    ),
   // 일반 게시글(FREE) 상세 — PostDetailView(댓글 스레드).
   'GET /community/posts/10': (
     200,

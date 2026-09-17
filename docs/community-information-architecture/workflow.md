@@ -72,7 +72,7 @@ git status --short --branch
 | 항목 | 계약 |
 |---|---|
 | desktop 계층 | `커뮤니티 → 자유게시판 / Q/A / 피드백` |
-| compact 계층 | 하단 `커뮤니티` 1개 + 화면 내부 3개 세그먼트 |
+| compact 계층 | 하단 `커뮤니티` 1개 + 페이지 제목 메뉴(3개 게시판) |
 | 기본 board | `FREE` |
 | 허용 board | `FREE`, `QNA`, `FEEDBACK` |
 | 제거할 사용자 선택 | `ALL` 또는 `전체` |
@@ -100,7 +100,7 @@ rg -n "kShellDestinations|CommunityBoard|board=|전체|QA|자유|Q/A|자유게�
 
 1. `kShellDestinations`가 커뮤니티를 몇 개 목적지로 표현하는가?
 2. compact가 desktop 목적지 배열을 재사용하는가?
-3. `CommunityBoard.all`이 사용자 세그먼트에 노출되는가?
+3. `CommunityBoard.all`이 제목 메뉴에 노출되는가?
 4. `initialBoard`가 null이거나 잘못됐을 때 무엇을 선택하는가?
 5. 상세·작성 경로가 board query를 보존하는가?
 6. 브레드크럼이 경로의 현재 게시판을 표시하는가?
@@ -274,7 +274,7 @@ Pop-Location
 4. `didUpdateWidget`에서 board/query 변경을 각각 계산하고 필요한 호출만 수행한다.
 5. `activeBoard`가 legacy `all` 상태를 만나도 `_entryBoard`를 사용하게 한다.
 6. H1과 설명을 board별 switch로 만든다.
-7. 세그먼트는 `CommunityBoard.all`을 필터링한다.
+7. 제목 메뉴는 `kCommunityBoards`(`all` 제외)만 노출한다.
 8. 전환 시 `/community?board=${board.value}`로 이동한다.
 9. 검색 query 변경은 현재 board를 보존하고 `context.replace`를 사용한다.
 10. 일반 글 상세 링크에 item의 `boardType` query를 포함한다.
@@ -282,7 +282,7 @@ Pop-Location
 ### 6.5 제품 카피와 접근성 확인
 
 - label은 `자유게시판`, `Q/A`, `피드백`으로 정확히 통일한다.
-- 선택 상태는 색만이 아니라 Material `SegmentedButton`의 selected semantics로 전달한다.
+- 선택 상태는 색만이 아니라 H1 텍스트와 제목 메뉴 항목의 체크 표시로 전달한다.
 - compact의 각 터치 목표는 44px 이상이어야 한다.
 - `CustomScrollView.semanticChildCount`는 광고/더 보기 버튼을 제외한 콘텐츠 수다.
 - H1은 `DpPageHeader`를 유지하고 별도 AppBar 제목을 추가하지 않는다.
@@ -369,7 +369,7 @@ git status --short
 1. 로그인 상태에서 각 URL로 직접 이동한다.
 2. 페이지가 안정될 때까지 기다린다.
 3. URL, H1, 설명, 선택 상태, breadcrumb가 같은 board인지 읽는다.
-4. FREE → QNA → FEEDBACK을 사이드바 또는 세그먼트로 전환한다.
+4. FREE → QNA → FEEDBACK을 사이드바(레일) 또는 compact 제목 메뉴로 전환한다.
 5. 새로고침 후 선택이 유지되는지 확인한다.
 6. 글 행이 있으면 상세 진입 후 breadcrumb로 복귀한다.
 7. console error와 network failure를 확인한다.

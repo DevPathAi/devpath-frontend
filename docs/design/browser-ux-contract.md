@@ -17,9 +17,9 @@
 |---|---|---|---|
 | `deep-link-returns` | 390, 1440 | `/community?board=QNA` 진입이 세션 부트스트랩을 지나 그대로 남고 H1 이 `Q/A` | 다른 경로 착지 · H1 불일치 |
 | `refresh-keeps-board` | 768 | `/community?board=FEEDBACK` 새로고침 후 URL·H1 유지 | 불일치 |
-| `back-forward-boards` | 1024 | 자유게시판→Q/A→피드백 뒤 back×2·forward×1 이 URL 과 H1 을 함께 되돌림 | 단계별 불일치 |
+| `back-forward-boards` | 390 | compact 제목 메뉴(`게시판 바꾸기`)로 자유게시판→Q/A→피드백 뒤 back×2·forward×1 이 URL 과 H1 을 함께 되돌림. 페이지 안 게시판 세그먼트는 2026-09-17 제거 — 본문에서 게시판을 옮기는 수단은 compact 제목 메뉴뿐 | 단계별 불일치 |
 | `keyboard-traversal` | 1440 | `/community` 에서 Tab 순회 순서가 `expectations.json` 의 실측 고정값과 일치 | 순서 불일치 · 기대값 미기록 |
-| `dialog-focus-return` | 1024 | 글 작성 버튼 Enter → 모달 시트(Dismiss barrier) 등장 → Escape 로 닫힘 → focus 가 여는 버튼으로 복귀 | 시트 없음 · 미닫힘 · focus 미복귀 |
+| `dialog-focus-return` | 1024 | 정렬 버튼(`최신순`) Enter → 정렬 메뉴 등장 → Escape 로 닫힘 → focus 가 여는 버튼으로 복귀. 작성 버튼은 시트 없이 작성 화면으로 직행하므로 같은 화면의 메뉴 오버레이로 잰다 | 메뉴 없음 · 미닫힘 · focus 미복귀 |
 | `overflow-and-targets` | 390/768/1024/1440 × 100/200% | 8개 라우트에서 `scrollWidth ≤ innerWidth`; 390·100% 에서 모든 `role=button` 이 44×44 이상 | overflow · 작은 타깃 |
 | `reduced-motion-parity` | 768 | `/dashboard` `/community` `/path` 의 시맨틱 라벨 집합이 reduced-motion 에서도 동일 | 라벨 손실 |
 | `axe` | 390 light · 1240 dark | 8개 라우트 axe(wcag2a/2aa/21a/21aa/best-practice) | critical/serious ≥ 1 |
