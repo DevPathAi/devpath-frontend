@@ -1,0 +1,13 @@
+{
+  "name": "leva-browser-ux-runner",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "axe-core": "4.10.3",
+    "playwright": "1.55.0"
+  }
+}

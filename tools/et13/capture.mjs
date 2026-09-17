@@ -199,6 +199,7 @@ async function main() {
     });
     const catalog = JSON.parse(await readFile(catalogPath, 'utf8'));
     const summaries = [];
+    let expectedCaseCount = 0;
     async function openValidatedPage(entry) {
       const pageStartedAt = Date.now();
       const context = await browser.newContext({
@@ -381,7 +382,7 @@ async function main() {
     const webHostedFixtures = catalog.fixtures.filter(
       (fixture) => fixture.distribution === 'web',
     );
-    if (webHostedFixtures.length !== 8) fail('browser smoke requires 8 web-hosted fixtures');
+    if (webHostedFixtures.length !== 11) fail('browser smoke requires 11 web-hosted fixtures');
     for (const fixture of webHostedFixtures) {
       for (const theme of ['light', 'dark']) {
         const smokeId = `${fixture.id}--browser-smoke--w320--${theme}--text200`;
@@ -422,6 +423,7 @@ async function main() {
           'utf8',
         ),
       ).cases;
+      expectedCaseCount += cases.length;
       for (const entry of cases) {
         const { context, page, assertClean } = await openValidatedPage(entry);
 
@@ -506,7 +508,9 @@ async function main() {
     };
     await mkdir(resolve(outputRoot, 'artifacts/et13'), { recursive: true });
     writeFileSync(resolve(outputRoot, 'artifacts/et13/capture-summary.v1.json'), pretty(summary));
-    process.stdout.write(`ET13 browser capture: ${summaries.length}/120 passed\n`);
+    process.stdout.write(
+      `ET13 browser capture: ${summaries.length}/${expectedCaseCount} passed\n`,
+    );
   } finally {
     if (browser) await browser.close();
     await Promise.all(

@@ -26,16 +26,24 @@ class LoginPage extends ConsumerWidget {
       tooltip: '테마 전환',
       onPressed: () => ref.read(themeModeProvider.notifier).toggle(),
     );
-    final access = _LoginAccessPanel(
-      error: error,
-      useMock: useMock,
-      onGithub: () => useMock
-          ? ref.read(authControllerProvider.notifier).bootstrapFromCallback()
-          : ref.read(authControllerProvider.notifier).login(),
-      onGoogle: () => useMock
-          ? ref.read(authControllerProvider.notifier).bootstrapFromCallback()
-          : ref.read(authControllerProvider.notifier).login(provider: 'google'),
-    );
+    final access = auth is AuthLoading
+        ? const _LoginSessionCheck()
+        : _LoginAccessPanel(
+            error: error,
+            useMock: useMock,
+            onGithub: () => useMock
+                ? ref
+                      .read(authControllerProvider.notifier)
+                      .bootstrapFromCallback()
+                : ref.read(authControllerProvider.notifier).login(),
+            onGoogle: () => useMock
+                ? ref
+                      .read(authControllerProvider.notifier)
+                      .bootstrapFromCallback()
+                : ref
+                      .read(authControllerProvider.notifier)
+                      .login(provider: 'google'),
+          );
 
     return Scaffold(
       body: LayoutBuilder(
@@ -75,6 +83,18 @@ class LoginPage extends ConsumerWidget {
   }
 }
 
+class _LoginSessionCheck extends StatelessWidget {
+  const _LoginSessionCheck();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    key: const ValueKey('login-session-check'),
+    constraints: const BoxConstraints(maxWidth: 480),
+    padding: const EdgeInsets.all(DpSpacing.xl),
+    child: const DpLoading(label: '세션을 확인하는 중'),
+  );
+}
+
 class _LoginAccessPanel extends StatelessWidget {
   const _LoginAccessPanel({
     required this.error,
@@ -111,20 +131,7 @@ class _LoginAccessPanel extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (error != null) ...[
-                  Container(
-                    padding: const EdgeInsets.all(DpSpacing.lg),
-                    decoration: BoxDecoration(
-                      color: c.danger.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(DpRadius.input),
-                    ),
-                    child: Text(
-                      error!,
-                      textAlign: TextAlign.center,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodySmall?.copyWith(color: c.danger),
-                    ),
-                  ),
+                  DpInlineNotice(message: error!),
                   const SizedBox(height: DpSpacing.lg),
                 ],
                 FilledButton.icon(

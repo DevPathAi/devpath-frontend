@@ -227,6 +227,61 @@ void main() {
     expect(retryCalls, 1);
   });
 
+  testWidgets('stale 미션 실패와 상세 불일치는 인라인 알림으로 표시된다', (tester) async {
+    await tester.pumpWidget(
+      _host(
+        missionState: CurrentMissionState(
+          mission: _availableMission(),
+          isStale: true,
+          failureKind: CurrentMissionFailureKind.refresh,
+          failureMessage: '네트워크 오류',
+        ),
+        plan: _path(pathId: 202),
+      ),
+    );
+
+    final notices = find.byKey(const ValueKey('dp-inline-notice'));
+    expect(notices, findsNWidgets(2));
+    expect(find.text('현재 미션과 경로 상세가 아직 맞지 않아요.'), findsOneWidget);
+    expect(find.text('마지막으로 확인한 미션을 표시하고 있어요.'), findsOneWidget);
+  });
+
+  testWidgets('390px Path 는 행동 → 완료 조건 → 진행 → 다음 잠금 해제 순서로 쌓인다', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      _host(
+        missionState: CurrentMissionState(mission: _availableMission()),
+        plan: _path(),
+      ),
+    );
+    final action = tester.getTopLeft(find.text('미션 열기'));
+    final criterion = tester.getTopLeft(find.textContaining('완료 조건 ·'));
+    final progress = tester.getTopLeft(find.textContaining('미션 완료'));
+    final unlock = tester.getTopLeft(find.textContaining('다음 잠금 해제 ·'));
+    expect(action.dy, lessThan(criterion.dy));
+    expect(criterion.dy, lessThan(progress.dy));
+    expect(progress.dy, lessThan(unlock.dy));
+  });
+
+  testWidgets('1240px Path 는 미션과 로드맵 보조 맥락을 2열로 놓는다', (tester) async {
+    tester.view.physicalSize = const Size(1240, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      _host(
+        missionState: CurrentMissionState(mission: _availableMission()),
+        plan: _path(),
+      ),
+    );
+    final mission = tester.getTopLeft(find.text('미션 열기'));
+    final unlock = tester.getTopLeft(find.textContaining('다음 잠금 해제 ·'));
+    expect(unlock.dx, greaterThan(mission.dx));
+  });
+
   testWidgets('320px와 200% 글자에서도 primary action 하나로 overflow 없이 읽힌다', (
     tester,
   ) async {

@@ -114,6 +114,8 @@ class DpAppShell extends StatelessWidget {
 
     return Scaffold(
       body: FocusTraversalGroup(
+        // 본문 검색창이 레일 항목보다 위에 놓여도 전역 목적지(레일)를 먼저 순회한다.
+        policy: WidgetOrderTraversalPolicy(),
         child: Row(
           children: [
             DpNavRail(

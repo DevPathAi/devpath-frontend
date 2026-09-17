@@ -385,6 +385,13 @@ void main() {
     expect(find.text('Future/async-await 정리'), findsOneWidget);
     expect(find.text('저장 지연'), findsOneWidget);
     expect(find.text('진행률 저장 다시 시도'), findsOneWidget);
+    // 부분 실패는 본문을 유지한 채 공용 인라인 알림으로 표현된다.
+    final notice = find.byKey(const ValueKey('dp-inline-notice'));
+    expect(notice, findsOneWidget);
+    expect(
+      find.descendant(of: notice, matching: find.text('진행률 저장 다시 시도')),
+      findsOneWidget,
+    );
 
     await tester.ensureVisible(find.text('진행률 저장 다시 시도'));
     await tester.pumpAndSettle();

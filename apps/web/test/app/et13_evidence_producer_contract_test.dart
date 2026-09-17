@@ -64,6 +64,28 @@ void main() {
     expect(capture, contains("'wcag22aa'"));
     expect(capture, contains('page.screenshot'));
     expect(capture, contains('browser-smoke'));
+    expect(
+      capture,
+      contains(
+        "if (webHostedFixtures.length !== 11) "
+        "fail('browser smoke requires 11 web-hosted fixtures');",
+      ),
+      reason:
+          'browser smoke must pin the same web-distribution fixture count as '
+          'tools/et13_evidence.dart expectedDistributions (web: 11)',
+    );
+    final tool = File('../../tools/et13_evidence.dart').readAsStringSync();
+    expect(
+      tool,
+      contains('_visualCaseCount + _a11yCaseCount'),
+      reason:
+          'the capture summary total must be derived from the fixture list; '
+          'the old literal 120 (96 visual + 24 a11y) collided with the new '
+          'visual count and only failed in CI',
+    );
+    expect(tool, isNot(contains("summary['case_count'], 120")));
+    expect(tool, isNot(contains('exactly 120 ordered cases')));
+    expect(capture, isNot(contains('/120 passed')));
     expect(capture, contains('pixel-stable across two captures'));
     expect(capture, contains('PNG axes differ from its catalog profile'));
     expect(capture, contains("page.on('requestfailed'"));
@@ -287,7 +309,7 @@ void main() {
       'case_catalog_schema_version': 'leva.et13.a11y-cases.v1',
       'projection_contract_sha256': catalog['projection_contract_sha256'],
       'fixture_ids': generated['fixture_ids'],
-      'case_count': 24,
+      'case_count': 30,
       'surface_case_counts': generated['surface_case_counts'],
       'capture_surface': 'flutter_web_release_projection',
       'device_evidence': false,
@@ -303,7 +325,7 @@ void main() {
       'case_catalog_schema_version': binding['case_catalog_schema_version'],
       'projection_contract_sha256': binding['projection_contract_sha256'],
       'fixture_ids': binding['fixture_ids'],
-      'case_count': 24,
+      'case_count': 30,
       'surface_case_counts': binding['surface_case_counts'],
       'capture_surface': binding['capture_surface'],
       'device_evidence': false,
@@ -404,7 +426,7 @@ void main() {
     );
   });
 
-  test('approved baseline bundle is the exact review-bound 98-file set', () {
+  test('approved baseline bundle is the exact review-bound 122-file set', () {
     final root = Directory.systemTemp.createTempSync('et13-approved-bundle-');
     addTearDown(() => root.deleteSync(recursive: true));
     final catalogPath = '../../evidence/et13/catalog.v1.json';
@@ -440,7 +462,7 @@ void main() {
       'case_catalog_schema_version': 'leva.et13.visual-cases.v1',
       'projection_contract_sha256': catalog['projection_contract_sha256'],
       'fixture_ids': generated['fixture_ids'],
-      'case_count': 96,
+      'case_count': 120,
       'surface_case_counts': generated['surface_case_counts'],
       'capture_surface': 'flutter_web_release_projection',
       'device_evidence': false,
@@ -467,7 +489,7 @@ void main() {
           .convert(reviewFile.readAsBytesSync())
           .toString(),
       'fixture_ids': generated['fixture_ids'],
-      'case_count': 96,
+      'case_count': 120,
       'candidate_set_sha256': et13.visualArtifactSetSha(
         root.path,
         generatedCatalogPath: generatedPath,

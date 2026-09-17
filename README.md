@@ -53,3 +53,4 @@ cd apps/mobile && flutter run
 - Git 규칙: [documents/09_Git_규칙_정의서](https://github.com/DevPathAi/documents/blob/main/09_Git_규칙_정의서.md)
 - 워크플로우 현황: [workflow-dashboard](https://devpathai.github.io/workflow-dashboard/)
 - 로컬 계약과 이력: [`DESIGN.md`](./DESIGN.md) · [`TODOS.md`](./TODOS.md) · [`HANDOFF.md`](./HANDOFF.md) · [`melos_README.md`](./melos_README.md)
+- 커뮤니티 IA·React급 Flutter Web 작업 기록: [`docs/community-information-architecture/`](./docs/community-information-architecture/README.md)

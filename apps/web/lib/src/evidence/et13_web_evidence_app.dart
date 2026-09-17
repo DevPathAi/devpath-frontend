@@ -5,6 +5,8 @@ import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 
 import '../data/web_mock_fixtures.dart';
+import '../features/community/presentation/web_community_board_projection.dart';
+import '../features/community/state/community_state.dart';
 import '../features/content/presentation/content_page.dart';
 import '../features/dashboard/application/current_mission_controller.dart';
 import '../features/dashboard/presentation/widgets/today_mission_section.dart';
@@ -14,6 +16,8 @@ import '../features/review/presentation/review_panel.dart';
 import '../features/sandbox/presentation/monaco_editor_view.dart';
 import '../features/sandbox/presentation/sandbox_layout.dart';
 
+export '../features/community/presentation/web_community_board_projection.dart'
+    show WebCommunityBoardProjection;
 export '../features/content/presentation/content_page.dart'
     show WebContentProjection;
 export '../features/dashboard/presentation/widgets/today_mission_section.dart'
@@ -46,6 +50,9 @@ class Et13WebEvidenceApp extends StatefulWidget {
     'web-mentor-context-preview',
     'dp-design-mission-ledger',
     'dp-design-context-payload-preview',
+    'web-community-free',
+    'web-community-qna',
+    'web-community-feedback',
   ];
 
   final String fixtureId;
@@ -198,6 +205,30 @@ Widget buildEt13WebFixture(String fixtureId, {VoidCallback? onWorkspaceReady}) {
       body: SingleChildScrollView(
         padding: EdgeInsets.all(DpSpacing.lg),
         child: DpEt13ContextPayloadPreviewFixture(),
+      ),
+    ),
+    'web-community-free' => Scaffold(
+      body: WebCommunityBoardProjection(
+        board: CommunityBoard.free,
+        posts: mockCommunityPosts('FREE'),
+        onOpenPost: (_) {},
+        onCompose: () {},
+      ),
+    ),
+    'web-community-qna' => Scaffold(
+      body: WebCommunityBoardProjection(
+        board: CommunityBoard.qna,
+        posts: mockCommunityPosts('QNA'),
+        onOpenPost: (_) {},
+        onCompose: () {},
+      ),
+    ),
+    'web-community-feedback' => Scaffold(
+      body: WebCommunityBoardProjection(
+        board: CommunityBoard.feedback,
+        posts: mockCommunityPosts('FEEDBACK'),
+        onOpenPost: (_) {},
+        onCompose: () {},
       ),
     ),
     _ => throw ArgumentError.value(

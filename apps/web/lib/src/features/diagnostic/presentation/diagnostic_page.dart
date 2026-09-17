@@ -788,23 +788,8 @@ class _FailureBanner extends StatelessWidget {
   final DiagnosticFailure failure;
 
   @override
-  Widget build(BuildContext context) => Semantics(
-    liveRegion: true,
-    child: Container(
-      padding: const EdgeInsets.all(DpSpacing.md),
-      decoration: BoxDecoration(
-        color: context.dpColors.danger.withValues(alpha: 0.08),
-        border: Border.all(
-          color: context.dpColors.danger.withValues(alpha: 0.35),
-        ),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        failure.message,
-        style: TextStyle(color: context.dpColors.danger),
-      ),
-    ),
-  );
+  Widget build(BuildContext context) =>
+      DpInlineNotice(message: failure.message);
 }
 
 class _StageLoading extends StatelessWidget {
@@ -813,12 +798,5 @@ class _StageLoading extends StatelessWidget {
   final String label;
 
   @override
-  Widget build(BuildContext context) => Column(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      const CircularProgressIndicator(),
-      const SizedBox(height: DpSpacing.md),
-      Text(label),
-    ],
-  );
+  Widget build(BuildContext context) => DpLoading(label: label);
 }

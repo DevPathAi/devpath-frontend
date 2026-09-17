@@ -80,60 +80,90 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
         missionOutcome == CurrentMissionOutcome.available ||
         missionOutcome == CurrentMissionOutcome.pathCompleted;
 
+    final missionSection = TodayMissionSection(
+      state: missionState,
+      onRetry: () => unawaited(
+        ref
+            .read(currentMissionControllerProvider.notifier)
+            .invalidateAndRefetch(),
+      ),
+      onOpenPath: () => context.go('/path'),
+      onOpenContent: (workspaceKey) =>
+          context.push(workspaceKey.contentLocation),
+      onCompleteContentless: (taskId) => unawaited(
+        ref
+            .read(currentMissionControllerProvider.notifier)
+            .completeContentlessTask(taskId),
+      ),
+    );
+    final (supportingKey, supportingSection) = switch (s) {
+      DashLoading() => (
+        const ValueKey('today-metrics-loading'),
+        const Padding(
+              padding: EdgeInsets.all(DpSpacing.lg),
+              child: DpLoading(label: '보조 학습 지표를 불러오는 중'),
+            )
+            as Widget,
+      ),
+      DashFailed(:final message) => (
+        const ValueKey('today-metrics-error'),
+        Padding(
+          padding: const EdgeInsets.all(DpSpacing.lg),
+          child: _SupportingMetricsError(
+            message: message,
+            onRetry: () => unawaited(
+              ref.read(dashboardControllerProvider.notifier).load(),
+            ),
+          ),
+        ),
+      ),
+      DashLoaded(:final summary) => (
+        const ValueKey('today-metrics-section'),
+        DashboardBody.supportingContent(context, summary),
+      ),
+    };
+    // expanded/large: 미션(다음 행동)과 보조 맥락을 2열로, 그 외는 1열 문서형.
+    final wide = switch (context.windowClass) {
+      DpWindowClass.expanded || DpWindowClass.large => true,
+      _ => false,
+    };
+
     return Scaffold(
       body: CustomScrollView(
         slivers: [
-          const SliverToBoxAdapter(
-            child: DpPageHeader(
-              title: '오늘',
-              description: '지금 완료할 한 가지 미션부터 시작합니다',
-            ),
-          ),
-          SliverToBoxAdapter(
-            key: const ValueKey('today-mission-section'),
-            child: TodayMissionSection(
-              state: missionState,
-              onRetry: () => unawaited(
-                ref
-                    .read(currentMissionControllerProvider.notifier)
-                    .invalidateAndRefetch(),
-              ),
-              onOpenPath: () => context.go('/path'),
-              onOpenContent: (workspaceKey) =>
-                  context.push(workspaceKey.contentLocation),
-              onCompleteContentless: (taskId) => unawaited(
-                ref
-                    .read(currentMissionControllerProvider.notifier)
-                    .completeContentlessTask(taskId),
-              ),
-            ),
-          ),
-          if (showSupporting) ...[
-            switch (s) {
-              DashLoading() => const SliverToBoxAdapter(
-                key: ValueKey('today-metrics-loading'),
-                child: Padding(
-                  padding: EdgeInsets.all(DpSpacing.lg),
-                  child: DpLoading(label: '보조 학습 지표를 불러오는 중'),
-                ),
-              ),
-              DashFailed(:final message) => SliverToBoxAdapter(
-                key: const ValueKey('today-metrics-error'),
-                child: Padding(
-                  padding: const EdgeInsets.all(DpSpacing.lg),
-                  child: _SupportingMetricsError(
-                    message: message,
-                    onRetry: () => unawaited(
-                      ref.read(dashboardControllerProvider.notifier).load(),
+          const SliverToBoxAdapter(child: DpPageHeader(title: '오늘')),
+          if (showSupporting && wide)
+            SliverToBoxAdapter(
+              key: const ValueKey('today-two-column'),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: KeyedSubtree(
+                      key: const ValueKey('today-mission-section'),
+                      child: missionSection,
                     ),
                   ),
-                ),
+                  Expanded(
+                    flex: 2,
+                    child: KeyedSubtree(
+                      key: supportingKey,
+                      child: supportingSection,
+                    ),
+                  ),
+                ],
               ),
-              DashLoaded(:final summary) => SliverToBoxAdapter(
-                key: const ValueKey('today-metrics-section'),
-                child: DashboardBody.supportingContent(context, summary),
-              ),
-            },
+            )
+          else ...[
+            SliverToBoxAdapter(
+              key: const ValueKey('today-mission-section'),
+              child: missionSection,
+            ),
+            if (showSupporting)
+              SliverToBoxAdapter(key: supportingKey, child: supportingSection),
+          ],
+          if (showSupporting)
             const SliverToBoxAdapter(
               key: ValueKey('today-ad-section'),
               child: Padding(
@@ -146,7 +176,6 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                 child: AdSlotWidget(slot: 'DASHBOARD_TOP'),
               ),
             ),
-          ],
         ],
       ),
     );
@@ -205,18 +234,10 @@ class _SupportingMetricsError extends StatelessWidget {
   final VoidCallback onRetry;
 
   @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      Expanded(
-        child: Text(
-          '보조 학습 지표를 불러오지 못했어요. $message',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: context.dpColors.textSecondary,
-          ),
-        ),
-      ),
-      const SizedBox(width: DpSpacing.sm),
-      TextButton(onPressed: onRetry, child: const Text('지표 다시 보기')),
-    ],
+  Widget build(BuildContext context) => DpInlineNotice(
+    message: '보조 학습 지표를 불러오지 못했어요. $message',
+    tone: DpInlineNoticeTone.warning,
+    actionLabel: '지표 다시 보기',
+    onAction: onRetry,
   );
 }

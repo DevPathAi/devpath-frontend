@@ -50,4 +50,45 @@ void main() {
     expect(decoration.border!.top.width, 2);
     expect(decoration.border!.top.color, DpColors.light.primaryText);
   });
+
+  testWidgets('카드는 Tab 정지가 하나뿐이고 Enter 로 onTap 을 호출한다', (tester) async {
+    final taps = <String>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: DpTheme.light(),
+        home: Scaffold(
+          body: Column(
+            children: [
+              DpInteractiveCard(
+                key: const Key('card-1'),
+                onTap: () => taps.add('1'),
+                child: const Text('첫 카드'),
+              ),
+              DpInteractiveCard(
+                key: const Key('card-2'),
+                onTap: () => taps.add('2'),
+                child: const Text('둘째 카드'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pump();
+    final focusContext = FocusManager.instance.primaryFocus!.context!;
+    expect(
+      find.ancestor(
+        of: find.byElementPredicate((element) => element == focusContext),
+        matching: find.byKey(const Key('card-2')),
+      ),
+      findsOneWidget,
+      reason: '두 번째 Tab 은 두 번째 카드에 닿아야 한다(카드당 정지 1개)',
+    );
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+    expect(taps, ['2']);
+  });
 }

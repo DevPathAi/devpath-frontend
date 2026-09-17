@@ -539,4 +539,47 @@ void main() {
       semantics.dispose();
     },
   );
+
+  testWidgets('문항 준비 중에는 라벨 있는 접근 가능한 로딩을 보인다', (tester) async {
+    final controller = _FixedDiagnosticController(
+      const DiagnosticState(
+        phase: DiagnosticContinuationPhase.questions,
+        track: 'BACKEND_SPRING',
+        busy: true,
+      ),
+    );
+    await tester.pumpWidget(_host(controller));
+    await tester.pump();
+    expect(find.bySemanticsLabel('다음 문항을 불러오고 있어요'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+  });
+
+  testWidgets('답변 실패는 인라인 알림으로 표시되고 문항은 유지된다', (tester) async {
+    final controller = _FixedDiagnosticController(
+      const DiagnosticState(
+        phase: DiagnosticContinuationPhase.questions,
+        track: 'BACKEND_SPRING',
+        nextQuestion: NextQuestion(
+          question: AssessmentQuestion(
+            id: 1,
+            type: 'MCQ',
+            content: 'Spring Bean의 기본 스코프는?',
+            bloomLevel: 'REMEMBER',
+            difficulty: 0.3,
+          ),
+          index: 3,
+          total: 15,
+        ),
+        failure: DiagnosticFailure(
+          DiagnosticFailureKind.answer,
+          '답변을 저장하지 못했어요.',
+        ),
+      ),
+    );
+    await tester.pumpWidget(_host(controller));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('dp-inline-notice')), findsOneWidget);
+    expect(find.text('답변을 저장하지 못했어요.'), findsOneWidget);
+    expect(find.text('Spring Bean의 기본 스코프는?'), findsOneWidget);
+  });
 }

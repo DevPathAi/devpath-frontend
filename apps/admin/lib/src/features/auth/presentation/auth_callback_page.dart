@@ -27,10 +27,7 @@ class _S extends ConsumerState<AdminAuthCallbackPage> {
   Widget build(BuildContext context) => AdminAccessFrame(
     title: '관리자 세션 확인 중',
     description: '로그인 정보를 안전하게 확인하고 있습니다.',
-    child: Semantics(
-      liveRegion: true,
-      label: '관리자 세션 확인 중',
-      child: const DpLoading(label: '잠시만 기다려 주세요'),
-    ),
+    // DpLoading 은 status 라이브 리전(역할)이라 바깥 liveRegion 을 겹치면 Flutter 가 단언한다.
+    child: const DpLoading(label: '잠시만 기다려 주세요'),
   );
 }

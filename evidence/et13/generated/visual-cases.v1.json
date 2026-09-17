@@ -1,8 +1,8 @@
 {
   "schema_version": "leva.et13.visual-cases.v1",
   "case_catalog_version": "leva.et13.catalog.v1",
-  "catalog_sha256": "fa9067a499793499f67bf4db49184e58727706ee7013d624168fc7ef811d981f",
-  "projection_contract_sha256": "c66d08b6425628a06b27d07e08d648cfb3568d9db7c8d8aca2371172ccf4bde3",
+  "catalog_sha256": "0a37e29c3ee5decf3b24bccfbb997a3329ebfa0ddf65030fe0c80e79bf1e2c75",
+  "projection_contract_sha256": "106e8d2951f44345611627df3cef5a52eef938ab1dfac117750febaa51fde3ca",
   "projection_matrix": [
     {
       "fixture_id": "web-today-available",
@@ -103,6 +103,30 @@
       "substitutions": [
         "hosted by the Flutter Web production distribution"
       ]
+    },
+    {
+      "fixture_id": "web-community-free",
+      "capture_scope": "body_projection",
+      "source_widget": "WebCommunityBoardProjection",
+      "substitutions": [
+        "controller/provider state replaced by approved deterministic fixture"
+      ]
+    },
+    {
+      "fixture_id": "web-community-qna",
+      "capture_scope": "body_projection",
+      "source_widget": "WebCommunityBoardProjection",
+      "substitutions": [
+        "controller/provider state replaced by approved deterministic fixture"
+      ]
+    },
+    {
+      "fixture_id": "web-community-feedback",
+      "capture_scope": "body_projection",
+      "source_widget": "WebCommunityBoardProjection",
+      "substitutions": [
+        "controller/provider state replaced by approved deterministic fixture"
+      ]
     }
   ],
   "fixture_ids": [
@@ -117,11 +141,14 @@
     "mobile-today-available",
     "mobile-content-reading",
     "dp-design-mission-ledger",
-    "dp-design-context-payload-preview"
+    "dp-design-context-payload-preview",
+    "web-community-free",
+    "web-community-qna",
+    "web-community-feedback"
   ],
-  "case_count": 96,
+  "case_count": 120,
   "surface_case_counts": {
-    "web": 48,
+    "web": 72,
     "admin": 16,
     "mobile": 16,
     "dp_design": 16
@@ -2366,6 +2393,558 @@
       "timezone": "UTC",
       "reduced_motion": true,
       "artifact_path": "visual/dp_design/dp-design-context-payload-preview--visual--w1240--dark.png"
+    },
+    {
+      "case_id": "web-community-free--visual--w320--light",
+      "fixture_id": "web-community-free",
+      "owner": "web",
+      "distribution": "web",
+      "route": "/?fixture=web-community-free",
+      "ready_semantics_label": "ET13_READY:web-community-free",
+      "surface_label": "web-community-free",
+      "capture_scope": "body_projection",
+      "source_widget": "WebCommunityBoardProjection",
+      "substitutions": [
+        "controller/provider state replaced by approved deterministic fixture"
+      ],
+      "width": 320,
+      "height": 900,
+      "device_pixel_ratio": 1,
+      "theme": "light",
+      "text_scale_percent": 100,
+      "locale": "ko-KR",
+      "timezone": "UTC",
+      "reduced_motion": true,
+      "artifact_path": "visual/web/web-community-free--visual--w320--light.png"
+    },
+    {
+      "case_id": "web-community-free--visual--w320--dark",
+      "fixture_id": "web-community-free",
+      "owner": "web",
+      "distribution": "web",
+      "route": "/?fixture=web-community-free",
+      "ready_semantics_label": "ET13_READY:web-community-free",
+      "surface_label": "web-community-free",
+      "capture_scope": "body_projection",
+      "source_widget": "WebCommunityBoardProjection",
+      "substitutions": [
+        "controller/provider state replaced by approved deterministic fixture"
+      ],
+      "width": 320,
+      "height": 900,
+      "device_pixel_ratio": 1,
+      "theme": "dark",
+      "text_scale_percent": 100,
+      "locale": "ko-KR",
+      "timezone": "UTC",
+      "reduced_motion": true,
+      "artifact_path": "visual/web/web-community-free--visual--w320--dark.png"
+    },
+    {
+      "case_id": "web-community-free--visual--w600--light",
+      "fixture_id": "web-community-free",
+      "owner": "web",
+      "distribution": "web",
+      "route": "/?fixture=web-community-free",
+      "ready_semantics_label": "ET13_READY:web-community-free",
+      "surface_label": "web-community-free",
+      "capture_scope": "body_projection",
+      "source_widget": "WebCommunityBoardProjection",
+      "substitutions": [
+        "controller/provider state replaced by approved deterministic fixture"
+      ],
+      "width": 600,
+      "height": 900,
+      "device_pixel_ratio": 1,
+      "theme": "light",
+      "text_scale_percent": 100,
+      "locale": "ko-KR",
+      "timezone": "UTC",
+      "reduced_motion": true,
+      "artifact_path": "visual/web/web-community-free--visual--w600--light.png"
+    },
+    {
+      "case_id": "web-community-free--visual--w600--dark",
+      "fixture_id": "web-community-free",
+      "owner": "web",
+      "distribution": "web",
+      "route": "/?fixture=web-community-free",
+      "ready_semantics_label": "ET13_READY:web-community-free",
+      "surface_label": "web-community-free",
+      "capture_scope": "body_projection",
+      "source_widget": "WebCommunityBoardProjection",
+      "substitutions": [
+        "controller/provider state replaced by approved deterministic fixture"
+      ],
+      "width": 600,
+      "height": 900,
+      "device_pixel_ratio": 1,
+      "theme": "dark",
+      "text_scale_percent": 100,
+      "locale": "ko-KR",
+      "timezone": "UTC",
+      "reduced_motion": true,
+      "artifact_path": "visual/web/web-community-free--visual--w600--dark.png"
+    },
+    {
+      "case_id": "web-community-free--visual--w840--light",
+      "fixture_id": "web-community-free",
+      "owner": "web",
+      "distribution": "web",
+      "route": "/?fixture=web-community-free",
+      "ready_semantics_label": "ET13_READY:web-community-free",
+      "surface_label": "web-community-free",
+      "capture_scope": "body_projection",
+      "source_widget": "WebCommunityBoardProjection",
+      "substitutions": [
+        "controller/provider state replaced by approved deterministic fixture"
+      ],
+      "width": 840,
+      "height": 900,
+      "device_pixel_ratio": 1,
+      "theme": "light",
+      "text_scale_percent": 100,
+      "locale": "ko-KR",
+      "timezone": "UTC",
+      "reduced_motion": true,
+      "artifact_path": "visual/web/web-community-free--visual--w840--light.png"
+    },
+    {
+      "case_id": "web-community-free--visual--w840--dark",
+      "fixture_id": "web-community-free",
+      "owner": "web",
+      "distribution": "web",
+      "route": "/?fixture=web-community-free",
+      "ready_semantics_label": "ET13_READY:web-community-free",
+      "surface_label": "web-community-free",
+      "capture_scope": "body_projection",
+      "source_widget": "WebCommunityBoardProjection",
+      "substitutions": [
+        "controller/provider state replaced by approved deterministic fixture"
+      ],
+      "width": 840,
+      "height": 900,
+      "device_pixel_ratio": 1,
+      "theme": "dark",
+      "text_scale_percent": 100,
+      "locale": "ko-KR",
+      "timezone": "UTC",
+      "reduced_motion": true,
+      "artifact_path": "visual/web/web-community-free--visual--w840--dark.png"
+    },
+    {
+      "case_id": "web-community-free--visual--w1240--light",
+      "fixture_id": "web-community-free",
+      "owner": "web",
+      "distribution": "web",
+      "route": "/?fixture=web-community-free",
+      "ready_semantics_label": "ET13_READY:web-community-free",
+      "surface_label": "web-community-free",
+      "capture_scope": "body_projection",
+      "source_widget": "WebCommunityBoardProjection",
+      "substitutions": [
+        "controller/provider state replaced by approved deterministic fixture"
+      ],
+      "width": 1240,
+      "height": 900,
+      "device_pixel_ratio": 1,
+      "theme": "light",
+      "text_scale_percent": 100,
+      "locale": "ko-KR",
+      "timezone": "UTC",
+      "reduced_motion": true,
+      "artifact_path": "visual/web/web-community-free--visual--w1240--light.png"
+    },
+    {
+      "case_id": "web-community-free--visual--w1240--dark",
+      "fixture_id": "web-community-free",
+      "owner": "web",
+      "distribution": "web",
+      "route": "/?fixture=web-community-free",
+      "ready_semantics_label": "ET13_READY:web-community-free",
+      "surface_label": "web-community-free",
+      "capture_scope": "body_projection",
+      "source_widget": "WebCommunityBoardProjection",
+      "substitutions": [
+        "controller/provider state replaced by approved deterministic fixture"
+      ],
+      "width": 1240,
+      "height": 900,
+      "device_pixel_ratio": 1,
+      "theme": "dark",
+      "text_scale_percent": 100,
+      "locale": "ko-KR",
+      "timezone": "UTC",
+      "reduced_motion": true,
+      "artifact_path": "visual/web/web-community-free--visual--w1240--dark.png"
+    },
+    {
+      "case_id": "web-community-qna--visual--w320--light",
+      "fixture_id": "web-community-qna",
+      "owner": "web",
+      "distribution": "web",
+      "route": "/?fixture=web-community-qna",
+      "ready_semantics_label": "ET13_READY:web-community-qna",
+      "surface_label": "web-community-qna",
+      "capture_scope": "body_projection",
+      "source_widget": "WebCommunityBoardProjection",
+      "substitutions": [
+        "controller/provider state replaced by approved deterministic fixture"
+      ],
+      "width": 320,
+      "height": 900,
+      "device_pixel_ratio": 1,
+      "theme": "light",
+      "text_scale_percent": 100,
+      "locale": "ko-KR",
+      "timezone": "UTC",
+      "reduced_motion": true,
+      "artifact_path": "visual/web/web-community-qna--visual--w320--light.png"
+    },
+    {
+      "case_id": "web-community-qna--visual--w320--dark",
+      "fixture_id": "web-community-qna",
+      "owner": "web",
+      "distribution": "web",
+      "route": "/?fixture=web-community-qna",
+      "ready_semantics_label": "ET13_READY:web-community-qna",
+      "surface_label": "web-community-qna",
+      "capture_scope": "body_projection",
+      "source_widget": "WebCommunityBoardProjection",
+      "substitutions": [
+        "controller/provider state replaced by approved deterministic fixture"
+      ],
+      "width": 320,
+      "height": 900,
+      "device_pixel_ratio": 1,
+      "theme": "dark",
+      "text_scale_percent": 100,
+      "locale": "ko-KR",
+      "timezone": "UTC",
+      "reduced_motion": true,
+      "artifact_path": "visual/web/web-community-qna--visual--w320--dark.png"
+    },
+    {
+      "case_id": "web-community-qna--visual--w600--light",
+      "fixture_id": "web-community-qna",
+      "owner": "web",
+      "distribution": "web",
+      "route": "/?fixture=web-community-qna",
+      "ready_semantics_label": "ET13_READY:web-community-qna",
+      "surface_label": "web-community-qna",
+      "capture_scope": "body_projection",
+      "source_widget": "WebCommunityBoardProjection",
+      "substitutions": [
+        "controller/provider state replaced by approved deterministic fixture"
+      ],
+      "width": 600,
+      "height": 900,
+      "device_pixel_ratio": 1,
+      "theme": "light",
+      "text_scale_percent": 100,
+      "locale": "ko-KR",
+      "timezone": "UTC",
+      "reduced_motion": true,
+      "artifact_path": "visual/web/web-community-qna--visual--w600--light.png"
+    },
+    {
+      "case_id": "web-community-qna--visual--w600--dark",
+      "fixture_id": "web-community-qna",
+      "owner": "web",
+      "distribution": "web",
+      "route": "/?fixture=web-community-qna",
+      "ready_semantics_label": "ET13_READY:web-community-qna",
+      "surface_label": "web-community-qna",
+      "capture_scope": "body_projection",
+      "source_widget": "WebCommunityBoardProjection",
+      "substitutions": [
+        "controller/provider state replaced by approved deterministic fixture"
+      ],
+      "width": 600,
+      "height": 900,
+      "device_pixel_ratio": 1,
+      "theme": "dark",
+      "text_scale_percent": 100,
+      "locale": "ko-KR",
+      "timezone": "UTC",
+      "reduced_motion": true,
+      "artifact_path": "visual/web/web-community-qna--visual--w600--dark.png"
+    },
+    {
+      "case_id": "web-community-qna--visual--w840--light",
+      "fixture_id": "web-community-qna",
+      "owner": "web",
+      "distribution": "web",
+      "route": "/?fixture=web-community-qna",
+      "ready_semantics_label": "ET13_READY:web-community-qna",
+      "surface_label": "web-community-qna",
+      "capture_scope": "body_projection",
+      "source_widget": "WebCommunityBoardProjection",
+      "substitutions": [
+        "controller/provider state replaced by approved deterministic fixture"
+      ],
+      "width": 840,
+      "height": 900,
+      "device_pixel_ratio": 1,
+      "theme": "light",
+      "text_scale_percent": 100,
+      "locale": "ko-KR",
+      "timezone": "UTC",
+      "reduced_motion": true,
+      "artifact_path": "visual/web/web-community-qna--visual--w840--light.png"
+    },
+    {
+      "case_id": "web-community-qna--visual--w840--dark",
+      "fixture_id": "web-community-qna",
+      "owner": "web",
+      "distribution": "web",
+      "route": "/?fixture=web-community-qna",
+      "ready_semantics_label": "ET13_READY:web-community-qna",
+      "surface_label": "web-community-qna",
+      "capture_scope": "body_projection",
+      "source_widget": "WebCommunityBoardProjection",
+      "substitutions": [
+        "controller/provider state replaced by approved deterministic fixture"
+      ],
+      "width": 840,
+      "height": 900,
+      "device_pixel_ratio": 1,
+      "theme": "dark",
+      "text_scale_percent": 100,
+      "locale": "ko-KR",
+      "timezone": "UTC",
+      "reduced_motion": true,
+      "artifact_path": "visual/web/web-community-qna--visual--w840--dark.png"
+    },
+    {
+      "case_id": "web-community-qna--visual--w1240--light",
+      "fixture_id": "web-community-qna",
+      "owner": "web",
+      "distribution": "web",
+      "route": "/?fixture=web-community-qna",
+      "ready_semantics_label": "ET13_READY:web-community-qna",
+      "surface_label": "web-community-qna",
+      "capture_scope": "body_projection",
+      "source_widget": "WebCommunityBoardProjection",
+      "substitutions": [
+        "controller/provider state replaced by approved deterministic fixture"
+      ],
+      "width": 1240,
+      "height": 900,
+      "device_pixel_ratio": 1,
+      "theme": "light",
+      "text_scale_percent": 100,
+      "locale": "ko-KR",
+      "timezone": "UTC",
+      "reduced_motion": true,
+      "artifact_path": "visual/web/web-community-qna--visual--w1240--light.png"
+    },
+    {
+      "case_id": "web-community-qna--visual--w1240--dark",
+      "fixture_id": "web-community-qna",
+      "owner": "web",
+      "distribution": "web",
+      "route": "/?fixture=web-community-qna",
+      "ready_semantics_label": "ET13_READY:web-community-qna",
+      "surface_label": "web-community-qna",
+      "capture_scope": "body_projection",
+      "source_widget": "WebCommunityBoardProjection",
+      "substitutions": [
+        "controller/provider state replaced by approved deterministic fixture"
+      ],
+      "width": 1240,
+      "height": 900,
+      "device_pixel_ratio": 1,
+      "theme": "dark",
+      "text_scale_percent": 100,
+      "locale": "ko-KR",
+      "timezone": "UTC",
+      "reduced_motion": true,
+      "artifact_path": "visual/web/web-community-qna--visual--w1240--dark.png"
+    },
+    {
+      "case_id": "web-community-feedback--visual--w320--light",
+      "fixture_id": "web-community-feedback",
+      "owner": "web",
+      "distribution": "web",
+      "route": "/?fixture=web-community-feedback",
+      "ready_semantics_label": "ET13_READY:web-community-feedback",
+      "surface_label": "web-community-feedback",
+      "capture_scope": "body_projection",
+      "source_widget": "WebCommunityBoardProjection",
+      "substitutions": [
+        "controller/provider state replaced by approved deterministic fixture"
+      ],
+      "width": 320,
+      "height": 900,
+      "device_pixel_ratio": 1,
+      "theme": "light",
+      "text_scale_percent": 100,
+      "locale": "ko-KR",
+      "timezone": "UTC",
+      "reduced_motion": true,
+      "artifact_path": "visual/web/web-community-feedback--visual--w320--light.png"
+    },
+    {
+      "case_id": "web-community-feedback--visual--w320--dark",
+      "fixture_id": "web-community-feedback",
+      "owner": "web",
+      "distribution": "web",
+      "route": "/?fixture=web-community-feedback",
+      "ready_semantics_label": "ET13_READY:web-community-feedback",
+      "surface_label": "web-community-feedback",
+      "capture_scope": "body_projection",
+      "source_widget": "WebCommunityBoardProjection",
+      "substitutions": [
+        "controller/provider state replaced by approved deterministic fixture"
+      ],
+      "width": 320,
+      "height": 900,
+      "device_pixel_ratio": 1,
+      "theme": "dark",
+      "text_scale_percent": 100,
+      "locale": "ko-KR",
+      "timezone": "UTC",
+      "reduced_motion": true,
+      "artifact_path": "visual/web/web-community-feedback--visual--w320--dark.png"
+    },
+    {
+      "case_id": "web-community-feedback--visual--w600--light",
+      "fixture_id": "web-community-feedback",
+      "owner": "web",
+      "distribution": "web",
+      "route": "/?fixture=web-community-feedback",
+      "ready_semantics_label": "ET13_READY:web-community-feedback",
+      "surface_label": "web-community-feedback",
+      "capture_scope": "body_projection",
+      "source_widget": "WebCommunityBoardProjection",
+      "substitutions": [
+        "controller/provider state replaced by approved deterministic fixture"
+      ],
+      "width": 600,
+      "height": 900,
+      "device_pixel_ratio": 1,
+      "theme": "light",
+      "text_scale_percent": 100,
+      "locale": "ko-KR",
+      "timezone": "UTC",
+      "reduced_motion": true,
+      "artifact_path": "visual/web/web-community-feedback--visual--w600--light.png"
+    },
+    {
+      "case_id": "web-community-feedback--visual--w600--dark",
+      "fixture_id": "web-community-feedback",
+      "owner": "web",
+      "distribution": "web",
+      "route": "/?fixture=web-community-feedback",
+      "ready_semantics_label": "ET13_READY:web-community-feedback",
+      "surface_label": "web-community-feedback",
+      "capture_scope": "body_projection",
+      "source_widget": "WebCommunityBoardProjection",
+      "substitutions": [
+        "controller/provider state replaced by approved deterministic fixture"
+      ],
+      "width": 600,
+      "height": 900,
+      "device_pixel_ratio": 1,
+      "theme": "dark",
+      "text_scale_percent": 100,
+      "locale": "ko-KR",
+      "timezone": "UTC",
+      "reduced_motion": true,
+      "artifact_path": "visual/web/web-community-feedback--visual--w600--dark.png"
+    },
+    {
+      "case_id": "web-community-feedback--visual--w840--light",
+      "fixture_id": "web-community-feedback",
+      "owner": "web",
+      "distribution": "web",
+      "route": "/?fixture=web-community-feedback",
+      "ready_semantics_label": "ET13_READY:web-community-feedback",
+      "surface_label": "web-community-feedback",
+      "capture_scope": "body_projection",
+      "source_widget": "WebCommunityBoardProjection",
+      "substitutions": [
+        "controller/provider state replaced by approved deterministic fixture"
+      ],
+      "width": 840,
+      "height": 900,
+      "device_pixel_ratio": 1,
+      "theme": "light",
+      "text_scale_percent": 100,
+      "locale": "ko-KR",
+      "timezone": "UTC",
+      "reduced_motion": true,
+      "artifact_path": "visual/web/web-community-feedback--visual--w840--light.png"
+    },
+    {
+      "case_id": "web-community-feedback--visual--w840--dark",
+      "fixture_id": "web-community-feedback",
+      "owner": "web",
+      "distribution": "web",
+      "route": "/?fixture=web-community-feedback",
+      "ready_semantics_label": "ET13_READY:web-community-feedback",
+      "surface_label": "web-community-feedback",
+      "capture_scope": "body_projection",
+      "source_widget": "WebCommunityBoardProjection",
+      "substitutions": [
+        "controller/provider state replaced by approved deterministic fixture"
+      ],
+      "width": 840,
+      "height": 900,
+      "device_pixel_ratio": 1,
+      "theme": "dark",
+      "text_scale_percent": 100,
+      "locale": "ko-KR",
+      "timezone": "UTC",
+      "reduced_motion": true,
+      "artifact_path": "visual/web/web-community-feedback--visual--w840--dark.png"
+    },
+    {
+      "case_id": "web-community-feedback--visual--w1240--light",
+      "fixture_id": "web-community-feedback",
+      "owner": "web",
+      "distribution": "web",
+      "route": "/?fixture=web-community-feedback",
+      "ready_semantics_label": "ET13_READY:web-community-feedback",
+      "surface_label": "web-community-feedback",
+      "capture_scope": "body_projection",
+      "source_widget": "WebCommunityBoardProjection",
+      "substitutions": [
+        "controller/provider state replaced by approved deterministic fixture"
+      ],
+      "width": 1240,
+      "height": 900,
+      "device_pixel_ratio": 1,
+      "theme": "light",
+      "text_scale_percent": 100,
+      "locale": "ko-KR",
+      "timezone": "UTC",
+      "reduced_motion": true,
+      "artifact_path": "visual/web/web-community-feedback--visual--w1240--light.png"
+    },
+    {
+      "case_id": "web-community-feedback--visual--w1240--dark",
+      "fixture_id": "web-community-feedback",
+      "owner": "web",
+      "distribution": "web",
+      "route": "/?fixture=web-community-feedback",
+      "ready_semantics_label": "ET13_READY:web-community-feedback",
+      "surface_label": "web-community-feedback",
+      "capture_scope": "body_projection",
+      "source_widget": "WebCommunityBoardProjection",
+      "substitutions": [
+        "controller/provider state replaced by approved deterministic fixture"
+      ],
+      "width": 1240,
+      "height": 900,
+      "device_pixel_ratio": 1,
+      "theme": "dark",
+      "text_scale_percent": 100,
+      "locale": "ko-KR",
+      "timezone": "UTC",
+      "reduced_motion": true,
+      "artifact_path": "visual/web/web-community-feedback--visual--w1240--dark.png"
     }
   ]
 }

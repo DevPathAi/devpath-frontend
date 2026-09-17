@@ -770,3 +770,136 @@ jobs:
           path: ${{ runner.temp }}/leva-admin.registry.json
           if-no-files-found: error
           retention-days: 30
+
+  # N03: 실제 Chromium 에서 브라우저 UX·접근성 계약(deep link · 새로고침 · back/forward ·
+  # 키보드 순회 · focus 복귀 · overflow · 44px 타깃 · reduced-motion · axe)을 검증한다.
+  # mock 릴리스 빌드를 루프백으로 서빙하고 외부 네트워크는 차단한다(ET13 와 같은 핀 이미지).
+  browser-ux:
+    runs-on: ubuntu-24.04
+    env:
+      RENDERER_IMAGE: mcr.microsoft.com/playwright:v1.55.0-noble@sha256:ffc33305f7b4b04057ae4a0caa70aad4fde87454fb403a1a22e7f931707dfcf9
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: '3.44.1'
+          channel: stable
+          cache: true
+      - name: Resolve and bootstrap locked workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          lock_sha256_before="$(sha256sum pubspec.lock | awk '{print $1}')"
+          dart pub get --enforce-lockfile
+          dart run melos bootstrap --enforce-lockfile
+          test "$(sha256sum pubspec.lock | awk '{print $1}')" = "${lock_sha256_before}"
+      - name: Build onboarded mock web release
+        shell: bash
+        working-directory: apps/web
+        run: |
+          set -euo pipefail
+          flutter build web --release --no-pub --no-web-resources-cdn \
+            --dart-define=USE_MOCK=true \
+            --dart-define=MISSION_SPINE_ENABLED=true \
+            --dart-define=MOCK_PROFILE=onboarded \
+            --dart-define=HOME_BASE_URL=http://127.0.0.1:1
+      - name: Unit-test the runner
+        run: node --test tools/browser_ux/run.test.mjs
+      - name: Install pinned runner dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull --platform linux/amd64 "${RENDERER_IMAGE}"
+          docker run --rm --platform linux/amd64 \
+            -v "${GITHUB_WORKSPACE}:/work" \
+            -w /work/tools/browser_ux \
+            "${RENDERER_IMAGE}" \
+            npm ci --ignore-scripts --no-audit --no-fund
+      - name: Run browser UX and accessibility gate without network
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --platform linux/amd64 --network none --ipc=host \
+            -v "${GITHUB_WORKSPACE}:/work" \
+            -w /work/tools/browser_ux \
+            "${RENDERER_IMAGE}" \
+            node run.mjs \
+              --dist=/work/apps/web/build/web \
+              --out=/work/evidence/browser-ux/latest.json \
+              --built-from="${GITHUB_SHA}"
+      - name: Preserve browser UX report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: leva-browser-ux-${{ github.sha }}-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: evidence/browser-ux/latest.json
+          if-no-files-found: warn
+          retention-days: 30
+
+  # N04: mock 릴리스 빌드의 Core Web Vitals 근사치(ready/LCP·INP·CLS)와 초기 전송량을
+  # 고정 조건(CPU 4×·느린 네트워크)에서 재고 perf/baseline.json 대비 +5% 회귀와 절대 예산을 게이트로 건다.
+  perf-gate:
+    runs-on: ubuntu-24.04
+    env:
+      RENDERER_IMAGE: mcr.microsoft.com/playwright:v1.55.0-noble@sha256:ffc33305f7b4b04057ae4a0caa70aad4fde87454fb403a1a22e7f931707dfcf9
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: '3.44.1'
+          channel: stable
+          cache: true
+      - name: Resolve and bootstrap locked workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          lock_sha256_before="$(sha256sum pubspec.lock | awk '{print $1}')"
+          dart pub get --enforce-lockfile
+          dart run melos bootstrap --enforce-lockfile
+          test "$(sha256sum pubspec.lock | awk '{print $1}')" = "${lock_sha256_before}"
+      - name: Build onboarded mock web release (CanvasKit)
+        shell: bash
+        working-directory: apps/web
+        run: |
+          set -euo pipefail
+          flutter build web --release --no-pub --no-web-resources-cdn \
+            --dart-define=USE_MOCK=true \
+            --dart-define=MISSION_SPINE_ENABLED=true \
+            --dart-define=MOCK_PROFILE=onboarded \
+            --dart-define=HOME_BASE_URL=http://127.0.0.1:1
+      - name: Unit-test the measurer and gate
+        run: node --test tools/perf/measure.test.mjs tools/perf/gate.test.mjs
+      - name: Install pinned measurer dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull --platform linux/amd64 "${RENDERER_IMAGE}"
+          docker run --rm --platform linux/amd64 \
+            -v "${GITHUB_WORKSPACE}:/work" \
+            -w /work/tools/perf \
+            "${RENDERER_IMAGE}" \
+            npm ci --ignore-scripts --no-audit --no-fund
+      - name: Measure without network
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --platform linux/amd64 --network none --ipc=host \
+            -v "${GITHUB_WORKSPACE}:/work" \
+            -w /work/tools/perf \
+            "${RENDERER_IMAGE}" \
+            node measure.mjs \
+              --dist=/work/apps/web/build/web \
+              --renderer=canvaskit \
+              --runs=5 \
+              --out=/work/evidence/perf/latest.json \
+              --built-from="${GITHUB_SHA}"
+      - name: Gate against budget and baseline
+        run: node tools/perf/gate.mjs --report=evidence/perf/latest.json --baseline=perf/baseline.json --budget=perf/budget.json
+      - name: Preserve perf report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: leva-perf-${{ github.sha }}-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: evidence/perf/latest.json
+          if-no-files-found: warn
+          retention-days: 30

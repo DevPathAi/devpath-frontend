@@ -1,3 +1,4 @@
+import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -84,6 +85,6 @@ class _AuthCallbackPageState extends ConsumerState<AuthCallbackPage> {
         ),
       );
     }
-    return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    return const Scaffold(body: DpLoading(label: '로그인을 확인하는 중'));
   }
 }

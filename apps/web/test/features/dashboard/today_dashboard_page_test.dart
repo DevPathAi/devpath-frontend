@@ -730,4 +730,93 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('보조 지표 실패는 인라인 알림 + 재시도로 표시되고 Today primary는 유지된다', (
+    tester,
+  ) async {
+    await _pumpDashboard(
+      tester,
+      enabled: true,
+      missionApi: _DashboardMissionApi([Future.value(_mission('AVAILABLE'))]),
+      dashboardClient: _QueuedDashboardClient([
+        Future.value({
+          'streakDays': 'raw-sensitive-dashboard-payload',
+          'progressPercent': 62,
+          'nextTaskTitle': 'legacy next task',
+          'badges': <String>[],
+        }),
+        Future.value({
+          'streakDays': 7,
+          'progressPercent': 62,
+          'nextTaskTitle': 'legacy next task',
+          'badges': <String>[],
+          'completedContentCount': 12,
+        }),
+      ]),
+    );
+    await tester.pump();
+    expect(find.text('JPA 트랜잭션 경계 읽기'), findsOneWidget);
+    final notice = find.byKey(const ValueKey('dp-inline-notice'));
+    expect(notice, findsOneWidget);
+    expect(
+      find.descendant(of: notice, matching: find.text('지표 다시 보기')),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('지표 다시 보기'));
+    await tester.pump();
+    await tester.pump();
+    expect(find.byKey(const ValueKey('today-metrics-section')), findsOneWidget);
+  });
+
+  testWidgets('390px Today 는 행동 → 완료 조건 → 진행 → 보조 순서로 쌓이고 도넛·배지가 없다', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await _pumpDashboard(
+      tester,
+      enabled: true,
+      missionApi: _DashboardMissionApi([Future.value(_mission('AVAILABLE'))]),
+      dashboardClient: _DashboardClient(),
+    );
+    await tester.pump();
+
+    final action = tester.getTopLeft(find.text('미션 열기'));
+    final criterion = tester.getTopLeft(find.textContaining('완료 조건 ·'));
+    final progress = tester.getTopLeft(find.textContaining('이번 주 0/1 미션 완료'));
+    expect(action.dy, lessThan(criterion.dy));
+    expect(criterion.dy, lessThan(progress.dy));
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('weekly-activity-card')),
+      240,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.byKey(const Key('weekly-activity-card')), findsOneWidget);
+    expect(find.text('62%'), findsNothing); // 진행률 도넛 제거
+    expect(find.textContaining('첫 경로'), findsNothing); // 배지 스트립 제거
+    expect(find.text('지금 완료할 한 가지 미션부터 시작합니다'), findsNothing);
+  });
+
+  testWidgets('1240px Today 는 미션과 보조 레일을 2열로 놓는다', (tester) async {
+    tester.view.physicalSize = const Size(1240, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await _pumpDashboard(
+      tester,
+      enabled: true,
+      missionApi: _DashboardMissionApi([Future.value(_mission('AVAILABLE'))]),
+      dashboardClient: _DashboardClient(),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    final mission = tester.getTopLeft(find.text('JPA 트랜잭션 경계 읽기'));
+    final rail = tester.getTopLeft(
+      find.byKey(const Key('weekly-activity-card')),
+    );
+    expect(rail.dx, greaterThan(mission.dx));
+    expect((rail.dy - mission.dy).abs(), lessThan(120));
+    expect(find.byKey(const Key('progress-trend-card')), findsOneWidget);
+  });
 }

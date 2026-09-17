@@ -114,9 +114,9 @@ class _PathPageState extends ConsumerState<PathPage> {
           SliverToBoxAdapter(
             child: DpPageHeader(
               title: '학습 경로',
-              description: missionSpineEnabled
-                  ? '현재 미션을 먼저 보고, 필요할 때 12주 계획을 펼쳐보세요'
-                  : '진단 결과로 만든 12주 계획입니다',
+              // 미션 헤더가 현재 미션·완료 조건·근거를 직접 말하므로 flag ON 에서는
+              // 설명 문구를 중복하지 않는다.
+              description: missionSpineEnabled ? null : '진단 결과로 만든 12주 계획입니다',
             ),
           ),
           bodySliver,
