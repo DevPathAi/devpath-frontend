@@ -56,5 +56,8 @@ test('measureNavigation: 모든 Playwright 대기에 명시적 타임아웃이 �
   const { readFile } = await import('node:fs/promises');
   const src = await readFile(new URL('./measure.mjs', import.meta.url), 'utf8');
   assert.doesNotMatch(src, /waitForLoadState\('networkidle'\)/);
-  assert.match(src, /waitForLoadState\('networkidle', \{ timeout: READY_TIMEOUT_MS \}\)/);
+  // 2차 CI 실측(run 35174425725 후속, 릴리스 PR #213): networkidle 은 120s 로도 안 온다 —
+  // 차단된 외부 호스트로의 반복 요청 때문. 루프백 요청만 보는 quiet() 로 판정한다.
+  assert.doesNotMatch(src, /waitForLoadState\('networkidle'/);
+  assert.match(src, /await net\.quiet\(\{ idleMs: 1000, timeout: READY_TIMEOUT_MS \}\)/);
 });

@@ -11,7 +11,7 @@
 
 - 빌드: `flutter build web --release --no-pub --no-web-resources-cdn --dart-define=USE_MOCK=true --dart-define=MISSION_SPINE_ENABLED=true --dart-define=MOCK_PROFILE=onboarded --dart-define=HOME_BASE_URL=http://127.0.0.1:1` (CanvasKit) / 같은 인자 + `--wasm` (wasm A/B).
 - 서빙: 루프백 정적 서버, HTML 제외 자산은 `max-age=31536000`(warm 은 같은 컨텍스트의 두 번째 항법 = 브라우저 캐시 사용). 루프백 이외 요청 차단.
-- 표본: 기준선은 라우트 × 프로파일 × cold/warm 각 3회(p75 = nearest-rank, 표본 3 이면 최댓값), CI `perf-gate` 는 5회(p75 = 4번째 값). 전송량은 결정적이라 표본 수와 무관하게 비교 가능하다. 모든 Playwright 대기는 명시적 타임아웃(120 s)을 쓴다 — `networkidle` 은 Slow 4G 에서 폰트 다운로드 때문에 기본 30 s 를 넘긴다(CI 실측 run 35174425725).
+- 표본: 기준선은 라우트 × 프로파일 × cold/warm 각 3회(p75 = nearest-rank, 표본 3 이면 최댓값), CI `perf-gate` 는 5회(p75 = 4번째 값). 전송량은 결정적이라 표본 수와 무관하게 비교 가능하다. 모든 대기는 명시적 타임아웃(120 s)을 쓴다. 전송 완료 판정은 Playwright `networkidle` 이 아니라 **루프백 요청만 보는 `net.quiet()`**(1 s 무요청)이다 — `networkidle` 은 Slow 4G 에서 기본 30 s 를 넘겼고(run 35174425725), 120 s 로 늘려도 릴리스 PR #213 에서 다시 만료됐다. 차단된 외부 호스트(CanvasKit 기본 Roboto `fonts.gstatic.com`, AdSense `pagead2`, `HOME_BASE_URL`)로의 요청은 전송량과 무관하므로 판정에서 뺀다. 초과 시 진행 중·최근 요청을 오류에 담고, 매 run 로그에 호스트별 요청 수와 외부 URL 을 남긴다.
 - 지표: `fcp_ms`(브라우저 first-contentful-paint), `ready_ms`(Flutter 시맨틱스 플레이스홀더가 붙는 시점 = 첫 상호작용 가능; CanvasKit 은 `<canvas>` 라 브라우저 LCP 후보가 없어 LCP 대용), `lcp_ms`(있으면), `inp_ms`(라우트 주 행동 클릭의 event duration 최댓값), `cls`. `null` 은 측정 불가이며 0 으로 적지 않는다.
 - 전송량: CDP `Network.loadingFinished` 의 `encodedDataLength` 합. 종류: js / canvaskit_or_wasm / fonts / images / other.
 
