@@ -49,9 +49,12 @@
 | N03 브라우저 UX·a11y | 완료 | [#208](https://github.com/DevPathAi/devpath-frontend/pull/208) | `c375b36b` | `docs/design/browser-ux-contract.md` |
 | N04 성능 기준선 | 완료 | [#209](https://github.com/DevPathAi/devpath-frontend/pull/209) | `c370c73e` | `docs/design/perf-baseline.md` |
 | N06 ET13 커뮤니티 fixture | 완료 | [#210](https://github.com/DevPathAi/devpath-frontend/pull/210) | `fa778c2d` | `docs/design/et13-community-fixtures.md` |
+| perf 측정기 timeout/quiet 수정 | 완료 | [#212](https://github.com/DevPathAi/devpath-frontend/pull/212) · [#214](https://github.com/DevPathAi/devpath-frontend/pull/214) | `9687b05e` · `87d43932` | `docs/design/perf-baseline.md` |
+| **릴리스 `develop` → `main`** | **완료** | [#213](https://github.com/DevPathAi/devpath-frontend/pull/213) | main `d10ee171` | §6.5 |
+| 후속 1 폰트 다이어트 | 완료(develop, main 미릴리스) | [#215](https://github.com/DevPathAi/devpath-frontend/pull/215) | `d5d3ee8b` | `docs/design/font-diet.md` |
 
-이 다섯 PR은 모두 `origin/develop` 기반이며 `main`에는 아직 릴리스되지 않았다(프론트엔드는 `main` push에서만 배포된다).
-다음 릴리스 PR(`develop` → `main`)은 새 CI job `browser-ux`·`perf-gate`와 ET13 catalog 15 fixture를 함께 실어 나른다.
+N02~N06·측정기 수정·문서(#205~#212)는 릴리스 PR #213으로 `main`에 들어갔다(§6.5). 폰트 다이어트 #215는 그 뒤 `develop`에 머지돼 아직 `main`에 없다.
+`main` push CI가 이미지 digest를 만들었지만 **운영 승격(GitOps candidate → promotion → landing-last)은 하지 않았다** — 새 15 fixture catalog의 ET13 baseline 승인(사람, `et13-baseline-approval.yml`)과 durable Cloudflare token(N01)이 선행돼야 한다.
 
 ### 1.4 이 문서 작업 상태
 
@@ -187,7 +190,7 @@ untracked: CODEX.md
 |---|---|
 | `community_information_architecture_test.dart` | 노출 게시판 정확한 순서·명칭, shell 목적지, breadcrumb |
 | `community_navigation_hierarchy_test.dart` | desktop 세 목적지, URL별 index, compact 네 목적지 |
-| `community_home_page_test.dart` | 기본 FREE, query 진입·변경, 세그먼트, 목록·빈 상태·CTA |
+| `community_home_page_test.dart` | 기본 FREE, query 진입·변경, compact 제목 메뉴, 정렬, 목록·게시판별 빈 상태·CTA 직행 |
 | `app_shell_breadcrumb_test.dart` | 홈/상세/작성 계층과 경로 match 순서 |
 | `app_shell_view_test.dart` | 폭별 shell, callback, 선택 상태, chrome |
 | `dp_app_shell_adaptive_destinations_test.dart` | compact 전용 목적지와 null selection |
@@ -206,6 +209,25 @@ mission_on: sha256:a204810fb509a9e68090b078d5720a23aab1feba53625943de038290733f8
 mission_off: sha256:ff158b7fadf6df4d233e4230d6fd2b4a98a3d5e11fb3607aa093f4f26d4366e8
 prior: sha256:27daf697da46c2a6e3d5c48675b3f8f1de3925906a1c9ec0e01be5cfe5914c16
 ```
+
+### 6.1.5 2026-09-17 큐 릴리스 (PR #213)
+
+```text
+repository: DevPathAi/devpath-frontend
+source: d10ee171f8170a549fddfe66aa7ce057044bd562
+merged_at: 2026-09-17T05:27:11Z
+web mission_on: sha256:6694a478f701677582c3a3830c32858ae6925508a99883ed43fc81cfc393b49f
+web mission_off: sha256:8ed407a2fdea999c6d578034d84eab81805c4e1240876631fe594404c9824033
+admin: sha256:ce6a42de352e81010dd2a8454d9dc78bc9a071daac804606aa7fc7fa2b824b61
+```
+
+| 목적 | Run | 상태 |
+|---|---|---|
+| Frontend CI (analyze-test·browser-ux·web-image on/off·admin-image·release contract) | [35185793974](https://github.com/DevPathAi/devpath-frontend/actions/runs/35185793974) | 이미지·계약 success (perf-gate는 별도 확인) |
+| ET13 evidence (diagnostic) | [35185793946](https://github.com/DevPathAi/devpath-frontend/actions/runs/35185793946) | success |
+| Mobile CI | [35185793954](https://github.com/DevPathAi/devpath-frontend/actions/runs/35185793954) | success |
+
+release_id·GitOps candidate·sealed·promotion·landing-last은 **미수행**. 수행 시 §10의 후보 값에 위 digest와 source를 쓰고, ET13 baseline은 15 fixture로 새로 승인해야 한다.
 
 ### 6.2 GitOps
 
@@ -374,7 +396,8 @@ FREE/QNA/FEEDBACK 세 운영 화면을 전용 fixture로 직접 봉인하지는 
 
 ### 9.6 후속 과제 (큐 완주 뒤 남은 것)
 
-1. 폰트 10.4 MB: Pretendard 한글 서브셋 woff2·필요 weight만, D2Coding 은 샌드박스 진입 시 지연 로드(N04 실측 근거).
+0. **(새로 실측, 결정 필요) 운영 nginx 가 모든 자산을 무압축·`Cache-Control` 없이 서빙한다** — `main.dart.js` 5.97 MB·`canvaskit.wasm` 7.2 MB·폰트가 raw 로 내려간다. `apps/web/nginx.conf` 사전 압축(`gzip_static`/brotli)+ETag 캐시 헤더는 cold 17 MB → 약 6–7 MB 로, 폰트 서브셋보다 크다. `web-image-release-contract`·perf 측정기(압축 서빙 재현)와 함께 바꿔야 한다. 상세 `docs/design/font-diet.md`.
+1. ~~폰트 10.4 MB~~ 완료: 한국어 웹 서브셋 + D2Coding 지연 로드(`docs/design/font-diet.md`, `tools/fonts/`). cold fonts 10.4 → 5.6 MB. 변수 폰트·woff2 는 실측 기각.
 2. 렌더러 전략: wasm A/B(전송 −12%, ready −27%/−21%) 근거로 결정. 운영 빌드의 gstatic CDN 캐시 효과는 별도 측정.
 3. `main.dart.js` 5.7 MB: deferred loading 후보(샌드박스·Monaco·에디터).
 4. 위 셋 반영 뒤 `perf/budget.json` `enforce_absolute: true`(기준선을 낮춰 맞추지 않는다).
@@ -451,6 +474,6 @@ FREE/QNA/FEEDBACK 세 운영 화면을 전용 fixture로 직접 봉인하지는 
 커뮤니티 요구사항은 “아직 검토 중”이 아니라 운영 완료 상태다. 2026-09-17 후속 세션에서 React급 품질
 기준(상태 matrix·Today/Path 위계·브라우저 UX/a11y 게이트·성능 게이트·ET13 커뮤니티 fixture)도 develop에
 전부 들어갔다(§1.3). 다음 세션은 같은 것을 다시 만들지 말고, (1) Cloudflare durable token 인간 단계를
-끝내고, (2) §9.6 후속 과제 중 폰트 서브셋부터 시작하며, (3) 다음 `develop` → `main` 릴리스에 새 CI job과
-catalog 15 fixture가 함께 실리는지 확인한다. 커뮤니티 구현은 adaptive navigation과 URL-state 동기화의
+끝내고, (2) §9.6 후속 과제 0(운영 nginx 압축·캐시 헤더, 결정 필요)을 정하며, (3) 릴리스 #213(main `d10ee171`)의
+운영 승격은 ET13 baseline 승인과 함께 별도 캠페인으로 진행한다. 폰트 다이어트(#215)는 develop에만 있다. 커뮤니티 구현은 adaptive navigation과 URL-state 동기화의
 참조 구현으로 계속 사용한다.

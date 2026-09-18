@@ -21,6 +21,9 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  # D2Coding 은 FontManifest(시작 시 로드)가 아니라 DpCodeFont 가 지연 로드한다.
+  assets:
+    - fonts/D2Coding.ttf
   fonts:
     - family: Pretendard
       fonts:
@@ -31,6 +34,3 @@ flutter:
           weight: 600
         - asset: fonts/Pretendard-Bold.otf
           weight: 700
-    - family: D2Coding
-      fonts:
-        - asset: fonts/D2Coding.ttf

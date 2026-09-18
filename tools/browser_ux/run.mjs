@@ -242,15 +242,18 @@ export async function run(options) {
     }
 
     // 3. board 전환 뒤 back/forward 가 URL 과 H1 을 함께 되돌린다.
+    //    페이지 안 게시판 세그먼트는 없다 — compact 의 제목 메뉴가 본문에서 게시판을 옮기는 유일한 수단이다.
     if (wants('back-forward-boards')) {
-      await scenario(scenarios, { id: 'back-forward-boards', width: 1024, text_scale: 100, reduced_motion: false }, async () => {
-        const { context, page } = await openPage(browser, server.base, { width: 1024 });
+      await scenario(scenarios, { id: 'back-forward-boards', width: 390, text_scale: 100, reduced_motion: false }, async () => {
+        const { context, page } = await openPage(browser, server.base, { width: 390 });
         try {
           await goto(page, server.base, '/community');
           const trail = [];
           const record = async (step) => trail.push({ step, location: location(page), headings: await headings(page) });
           await record('start');
           for (const [label, expectedQuery] of [['Q/A', 'board=QNA'], ['피드백', 'board=FEEDBACK']]) {
+            await page.getByRole('button', { name: '게시판 바꾸기', exact: true }).first().click();
+            // Flutter Web 은 MenuItemButton 을 role=menuitem 이 아니라 button 으로 낸다(실측).
             await page.getByRole('button', { name: label, exact: true }).first().click();
             await page.waitForURL((url) => url.search.includes(expectedQuery), { timeout: READY_TIMEOUT_MS });
             await page.waitForTimeout(300);
@@ -310,30 +313,29 @@ export async function run(options) {
       });
     }
 
-    // 5. 시트/다이얼로그 닫힘 후 focus 가 여는 버튼으로 복귀.
+    // 5. 오버레이(메뉴) 닫힘 후 focus 가 여는 버튼으로 복귀.
+    //    커뮤니티의 작성 버튼은 시트 없이 작성 화면으로 직행하므로, 같은 화면의 정렬 메뉴로 잰다.
     if (wants('dialog-focus-return')) {
       await scenario(scenarios, { id: 'dialog-focus-return', width: 1024, text_scale: 100, reduced_motion: false }, async () => {
         const { context, page } = await openPage(browser, server.base, { width: 1024 });
         try {
           await goto(page, server.base, '/community');
-          const opener = page.getByRole('button', { name: /글 작성|질문하기/ }).first();
+          const opener = page.getByRole('button', { name: '최신순', exact: true }).first();
           await opener.focus();
           const openerLabel = (await opener.getAttribute('aria-label')) ?? (await opener.textContent())?.trim();
           await page.keyboard.press('Enter');
           await page.waitForTimeout(600);
-          // Flutter Web 의 모달 시트는 role=dialog 를 내지 않고 modal barrier 를
-          // 'Dismiss' 버튼으로 노출한다(실측). 시트 등장은 그 버튼으로 판정한다.
-          const sheets = await page.getByRole('button', { name: 'Dismiss', exact: true }).count();
-          const dialogRoles = await page.getByRole('dialog').count();
+          const item = page.getByRole('button', { name: '추천순', exact: true });
+          const opened = await item.count();
           await page.keyboard.press('Escape');
           await page.waitForTimeout(600);
-          const closed = await page.getByRole('button', { name: 'Dismiss', exact: true }).count();
+          const closed = await item.count();
           const active = await activeElement(page);
           const failures = [];
-          if (sheets === 0) failures.push('no modal sheet (Dismiss barrier) appeared after Enter');
-          if (closed !== 0) failures.push('sheet did not close on Escape');
+          if (opened === 0) failures.push('sort menu did not open on Enter');
+          if (closed !== 0) failures.push('sort menu did not close on Escape');
           if ((active?.label ?? '') !== openerLabel) failures.push(`focus on ${JSON.stringify(active)} not ${openerLabel}`);
-          return { opener: openerLabel, sheets, dialog_roles: dialogRoles, active, failures };
+          return { opener: openerLabel, opened, closed, active, failures };
         } finally {
           await context.close();
         }

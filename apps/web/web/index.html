@@ -95,6 +95,18 @@
   <link rel="icon" type="image/png" href="favicon.png"/>
 
   <title>Leva — 학습 로드맵</title>
+  <!-- 부팅 스플래시: main.dart.js 와 CanvasKit 이 내려오는 동안(데이터센터 회선에서도 1초 넘게)
+       흰 화면 대신 브랜드 마크를 보인다. Flutter host(뒤에 body 에 붙는 fixed 요소)가 위에 그려지고,
+       첫 프레임 이벤트에서 DOM 에서 제거한다. 외부 요청 없음(ET13 fixture 라우트 계약). -->
+  <style>
+    #leva-boot { position: fixed; inset: 0; z-index: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 14px; background: #F5F6FB; color: #4338CA;
+      font: 500 14px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif; }
+    .leva-boot__mark { width: 44px; height: 44px; border-radius: 12px; background: #5653E7;
+      animation: leva-boot-pulse 1.2s ease-in-out infinite; }
+    @keyframes leva-boot-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .55; transform: scale(.92); } }
+    @media (prefers-reduced-motion: reduce) { .leva-boot__mark { animation: none; } }
+  </style>
   <link rel="manifest" href="manifest.json">
 
   <!-- 구글 애드센스. 퍼블리셔 ID는 공개 값이며 심사 크롤러가 <head>에서 찾아야 한다.
@@ -114,6 +126,16 @@
   </script>
 </head>
 <body>
+  <div id="leva-boot" role="status" aria-live="polite" aria-label="레바를 불러오는 중">
+    <div class="leva-boot__mark" aria-hidden="true"></div>
+    <p>불러오는 중…</p>
+  </div>
+  <script>
+    window.addEventListener('flutter-first-frame', function () {
+      var splash = document.getElementById('leva-boot');
+      if (splash) splash.remove();
+    }, { once: true });
+  </script>
   <!--
     You can customize the "flutter_bootstrap.js" script.
     This is useful to provide a custom configuration to the Flutter loader

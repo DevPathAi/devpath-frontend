@@ -67,7 +67,9 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
 
     final nextQuery = widget.initialQuery?.trim() ?? '';
     final search = ref.read(communitySearchControllerProvider);
-    final queryChanged = search.query != nextQuery;
+    // 검색은 게시판 범위라, 검색어가 같아도 게시판이 바뀌면 다시 조회한다.
+    final queryChanged =
+        search.query != nextQuery || (boardChanged && nextQuery.isNotEmpty);
     if (!boardChanged && !queryChanged) return;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -100,59 +102,21 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
     context.replace(uri.toString());
   }
 
-  /// FAB 스피드다이얼 — Q/A 질문/자유게시판 글/피드백 요청 3종 작성 진입.
-  void _openComposeSheet(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(DpIcons.mentor),
-              title: const Text('질문하기'),
-              subtitle: const Text('Q/A에 질문을 올려요'),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                context.go('/community/new');
-              },
-            ),
-            ListTile(
-              leading: const Icon(DpIcons.community),
-              title: const Text('자유게시판'),
-              subtitle: const Text('자유롭게 이야기를 나눠요'),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                context.go('/community/new/post?board=FREE');
-              },
-            ),
-            ListTile(
-              leading: const Icon(DpIcons.thumbUp),
-              title: const Text('피드백 요청'),
-              subtitle: const Text('내 코드/프로젝트 리뷰를 요청해요'),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                context.go('/community/new/post?board=FEEDBACK');
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final s = ref.watch(communityControllerProvider);
     final notifier = ref.read(communityControllerProvider.notifier);
     final search = ref.watch(communitySearchControllerProvider);
     final activeBoard = s.board == CommunityBoard.all ? _entryBoard : s.board;
+    final posts = s.visiblePosts;
+    // 게시판마다 독립 페이지라 작성도 고르는 단계 없이 이 게시판의 작성 화면으로 간다.
+    void compose() => context.go(activeBoard.composePath);
 
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _openComposeSheet(context),
+        onPressed: compose,
         icon: const Icon(DpIcons.edit),
-        label: Text(activeBoard == CommunityBoard.qna ? '질문하기' : '글 작성'),
+        label: Text(activeBoard.composeLabel),
       ),
       body: CustomScrollView(
         // 스크린리더가 「N개 중 M번째」를 읽을 수 있게 목록 항목 수를 알린다.
@@ -162,56 +126,60 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
         // 「더 보기」 버튼은 itemCount에는 들어가지만 목록 항목이 아니다.
         // 틀린 개수는 없는 것보다 나쁘다.
         semanticChildCount: search.phase == CommunitySearchPhase.idle
-            ? s.posts.length
+            ? posts.length
             : search.items.length,
         slivers: [
           SliverToBoxAdapter(
-            child: DpPageHeader(
-              title: activeBoard.label,
-              description: WebCommunityBoardProjection.descriptionFor(
-                activeBoard,
+            child: CommunityBoardHeader(
+              board: activeBoard,
+              // 셸의 게시판 목적지와 같은 URL 로 간다 — 게시판·검색 상태는
+              // `didUpdateWidget` 이 URL 에서 다시 맞춘다(이동 경로가 하나).
+              // 검색 중이면 검색어를 들고 가 새 게시판에서 같은 검색을 잇는다.
+              onSelectBoard: (board) => context.go(
+                Uri(
+                  path: '/community',
+                  queryParameters: {
+                    'board': board.value,
+                    if (search.query.isNotEmpty) 'q': search.query,
+                  },
+                ).toString(),
               ),
             ),
           ),
           PinnedHeaderSliver(
             child: ColoredBox(
               color: Theme.of(context).scaffoldBackgroundColor,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      DpSpacing.lg,
-                      DpSpacing.md,
-                      DpSpacing.lg,
-                      0,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  DpSpacing.lg,
+                  DpSpacing.md,
+                  DpSpacing.lg,
+                  DpSpacing.sm,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: CommunitySearchBar(
+                        // 힌트가 게시판을 따라 바뀌어도 입력 상태는 유지한다.
+                        initialQuery: widget.initialQuery ?? '',
+                        hintText: activeBoard.searchHint,
+                        onChangedDebounced: (q) =>
+                            _onQueryChanged(q, activeBoard),
+                      ),
                     ),
-                    child: CommunitySearchBar(
-                      initialQuery: widget.initialQuery ?? '',
-                      onChangedDebounced: (q) =>
-                          _onQueryChanged(q, activeBoard),
+                    const SizedBox(width: DpSpacing.sm),
+                    CommunitySortMenu(
+                      current: s.sort,
+                      enabled: search.phase == CommunitySearchPhase.idle,
+                      onSelect: notifier.selectSort,
                     ),
-                  ),
-                  CommunityBoardFilterBar(
-                    current: activeBoard,
-                    onSelect: (board) {
-                      _entryBoard = board;
-                      notifier.selectBoard(board);
-                      // 검색 중이면 같은 검색어를 새 보드로 다시 조회한다.
-                      if (search.phase != CommunitySearchPhase.idle) {
-                        ref
-                            .read(communitySearchControllerProvider.notifier)
-                            .search(search.query, board: board.value);
-                      }
-                      context.go('/community?board=${board.value}');
-                    },
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
           ...search.phase == CommunitySearchPhase.idle
-              ? _bodySlivers(context, s, notifier)
+              ? _bodySlivers(context, s, posts, notifier, activeBoard, compose)
               : _searchSlivers(context, search, activeBoard),
         ],
       ),
@@ -294,24 +262,17 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
   Widget _searchRow(BuildContext context, CommunitySearchItem item) {
     final c = context.dpColors;
     final isQna = item.boardType == 'QNA';
-    final accent = switch (item.boardType) {
-      'FREE' => c.border,
-      'FEEDBACK' => c.chart4,
-      _ => c.primary,
-    };
-    final label = switch (item.boardType) {
-      'FREE' => '자유게시판',
-      'FEEDBACK' => '피드백',
-      _ => 'Q/A',
-    };
     // 본문 매칭이 없으면 highlight 가 비어 오므로 excerpt 로 폴백한다.
     final body = item.highlight.isNotEmpty ? item.highlight : item.excerpt;
     return DpListRow(
-      accentColor: accent,
+      accentColor: communityRowAccent(
+        c,
+        boardType: item.boardType,
+        solved: item.solved,
+      ),
       title: item.title,
       subtitle: body.isEmpty ? null : SearchHighlightText(body),
       badges: [
-        CommunityBadgeChip(label),
         if (isQna && item.solved) CommunityBadgeChip('✓ 해결됨', tone: c.success),
       ],
       trailing: Text(
@@ -329,7 +290,10 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
   List<Widget> _bodySlivers(
     BuildContext context,
     CommunityState s,
+    List<CommunityPostSummary> posts,
     CommunityController notifier,
+    CommunityBoard board,
+    VoidCallback onCompose,
   ) {
     switch (s.phase) {
       case CommunityPhase.loading:
@@ -344,22 +308,16 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
           ),
         ];
       case CommunityPhase.loaded:
-        if (s.posts.isEmpty) {
+        if (posts.isEmpty) {
           return [
             SliverFillRemaining(
-              child: DpEmpty(
-                icon: DpIcons.community,
-                title: '아직 글이 없어요',
-                message: '첫 글을 남겨보세요.',
-                actionLabel: '글 작성',
-                onAction: () => _openComposeSheet(context),
-              ),
+              child: CommunityBoardEmpty(board: board, onCompose: onCompose),
             ),
           ];
         }
         const feedAdAt = 5; // 5번째 게시글(인덱스 4) 뒤
-        final showAd = s.posts.length >= feedAdAt;
-        final count = s.posts.length + (showAd ? 1 : 0);
+        final showAd = posts.length >= feedAdAt;
+        final count = posts.length + (showAd ? 1 : 0);
         return [
           SliverPadding(
             padding: const EdgeInsets.all(DpSpacing.lg),
@@ -370,7 +328,7 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
                 if (showAd && i == feedAdAt) {
                   return const AdSlotWidget(slot: 'COMMUNITY_FEED');
                 }
-                final p = s.posts[(showAd && i > feedAdAt) ? i - 1 : i];
+                final p = posts[(showAd && i > feedAdAt) ? i - 1 : i];
                 return CommunityPostRow(
                   post: p,
                   onTap: () => context.go(

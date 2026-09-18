@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:dp_core/dp_core.dart';
@@ -12,6 +14,7 @@ MonacoHandle createMonacoHandle({
   VoidCallback? onReady,
   VoidCallback? onEscape,
 }) {
+  unawaited(DpCodeFont.ensureLoaded());
   onReady?.call();
   return _StubHandle(initialCode);
 }

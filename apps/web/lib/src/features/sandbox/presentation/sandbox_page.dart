@@ -54,6 +54,7 @@ class _SandboxPageState extends ConsumerState<SandboxPage> {
   @override
   void initState() {
     super.initState();
+    unawaited(DpCodeFont.ensureLoaded());
     if (widget.workspaceKey != null) {
       _pageOwnerKey = ref.read(currentMissionOwnerKeyProvider);
     }

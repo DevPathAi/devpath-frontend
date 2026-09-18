@@ -39,12 +39,19 @@ export function evaluate(current, baseline, budget, { warnings = [] } = {}) {
     const base = baseRows.get(id);
     if (!base) continue;
     const limit = budget.transfer_regression_pct_max;
+    // 퍼센트만 보면 warm(13 KB) 같은 작은 총량에서 1 KB 변화도 회귀로 잡힌다(PR #217 실측).
+    // 바닥(transfer_regression_min_bytes) 이하의 절대 증가는 회귀로 보지 않는다.
+    const floor = budget.transfer_regression_min_bytes ?? 0;
     const totalPct = pct(bytes.total, base.transfer_bytes.total);
-    if (totalPct > limit) violations.push(`${id} transfer total +${totalPct.toFixed(2)}% > ${limit}%`);
+    if (totalPct > limit && bytes.total - base.transfer_bytes.total > floor) {
+      violations.push(`${id} transfer total +${totalPct.toFixed(2)}% > ${limit}%`);
+    }
     const codeNow = bytes.js + bytes.canvaskit_or_wasm;
     const codeBase = base.transfer_bytes.js + base.transfer_bytes.canvaskit_or_wasm;
     const codePct = pct(codeNow, codeBase);
-    if (codePct > limit) violations.push(`${id} transfer js+renderer +${codePct.toFixed(2)}% > ${limit}%`);
+    if (codePct > limit && codeNow - codeBase > floor) {
+      violations.push(`${id} transfer js+renderer +${codePct.toFixed(2)}% > ${limit}%`);
+    }
   }
   return violations;
 }
