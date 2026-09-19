@@ -10,8 +10,7 @@
 devpath-frontend/
 ├── apps/
 │   ├── web/      # 사용자 앱 (Flutter Web · 학습 경로·AI 멘토 접근·Home 공지)
-│   ├── admin/    # 관리자 콘솔 (Flutter Web · 콘텐츠·FinOps·지원 요청)
-│   └── mobile/   # 모바일 앱 (Flutter · 대시·퀵 캡처)
+│   └── admin/    # 관리자 콘솔 (Flutter Web · 콘텐츠·FinOps·지원 요청)
 └── packages/
     ├── dp_core/    # 도메인·데이터 계층 (순수 Dart · API·SSE·모델·목)
     └── dp_design/  # 디자인 시스템 (Flutter · Material 3 토큰, SSoT=DESIGN.md)
@@ -20,8 +19,9 @@ devpath-frontend/
 | 영역 | 스택 |
 |------|------|
 | web / admin | Flutter Web · Dart · Riverpod 3 · go_router · (Sandbox: Monaco Editor) |
-| mobile | Flutter · Dart · Riverpod 3 · go_router · (캐시: drift) |
 | 공용 | dp_core(dio·SSE·freezed 모델·목 어댑터) · dp_design(테마·상태 위젯) |
+
+> 모바일 앱은 별도 레포 [DevPathAi/devpath-mobile](https://github.com/DevPathAi/devpath-mobile)(`dp_design` 포크 + `dp_core` 커밋 핀)가 소유한다.
 
 ## 실행
 
@@ -40,7 +40,6 @@ dart run melos run format   # 적용: dart run melos run fix
 
 ```bash
 cd apps/web && flutter run -d chrome    # admin 동일
-cd apps/mobile && flutter run
 ```
 
 ## 환경 변수

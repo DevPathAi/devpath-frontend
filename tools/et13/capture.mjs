@@ -162,7 +162,6 @@ async function main() {
   const roots = {
     web: required(parsed, 'web-root'),
     admin: required(parsed, 'admin-root'),
-    mobile: required(parsed, 'mobile-root'),
   };
   const buildMarker = JSON.parse(await readFile(buildMarkerPath, 'utf8'));
   if (buildMarker.source_sha !== sourceSha) fail('build marker source SHA drifted');
@@ -177,7 +176,7 @@ async function main() {
       }
     }
   }
-  const ports = { web: 4173, admin: 4174, mobile: 4175 };
+  const ports = { web: 4173, admin: 4174 };
   const servers = new Map();
   let browser;
   try {

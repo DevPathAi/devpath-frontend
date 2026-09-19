@@ -13,7 +13,6 @@ void main() {
   final dartDirs = [
     Directory('lib'),
     Directory('../admin/lib'),
-    Directory('../mobile/lib'),
     Directory('../../packages/dp_design/lib'),
     Directory('../../packages/dp_core/lib'),
   ].where((d) => d.existsSync());
@@ -49,8 +48,6 @@ void main() {
     File('web/index.html'),
     File('../admin/web/manifest.json'),
     File('../admin/web/index.html'),
-    File('../mobile/web/manifest.json'),
-    File('../mobile/web/index.html'),
   ].where((f) => f.existsSync());
 
   final webForbidden = RegExp(

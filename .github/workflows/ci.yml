@@ -40,6 +40,11 @@ jobs:
         run: dart run melos run test
       - name: Validate immutable registry client
         run: node --test tools/immutable_registry.test.mjs
+      - name: Validate Mission Spine evidence tools
+        run: >-
+          node --test
+          tools/mission_spine_manual_at_evidence.test.mjs
+          tools/mission_spine_protected_approval.test.mjs
 
   # ET1 contract proof: build and run both compiled identities locally in CI.
   # Publishing, exact-digest promotion, deployment and rollback belong to ET10.

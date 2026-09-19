@@ -23,6 +23,17 @@ visual matrix(320/600/840/1240 × light/dark)가 compact 와 desktop 을 모두 
 | web surface case | 48 / 12 | 72 / 18 |
 | `projection_contract_sha256` | `c66d08b6…4bde3` | `106e8d29…de3ca` |
 
+> **2026-09-19 — 모바일 distribution 제거.** 네이티브 모바일 앱이 `DevPathAi/devpath-mobile` 로 분리되면서
+> `mobile` distribution 과 fixture 2종(`mobile-today-available`, `mobile-content-reading`)을 뺐다.
+> 현재 값: **13 fixture · visual 104 · a11y 26** · web surface 72 / 18 그대로 · browser smoke 는 웹 호스팅 fixture
+> 11개라 22 그대로 · 원시 리뷰 아티팩트 184 파일 · `projection_contract_sha256` `158fdc88…35b78` ·
+> build marker 는 web·admin 두 distribution 만 묶는다.
+> 이때 같은 계열의 낡은 리터럴 셋이 더 드러났다: 5개 스키마의 `case_count`/`passed_case_count`(96·24)와
+> web surface 수(48·12)가 위 표의 "12" 열 값으로 남아 `minItems` 120 과 모순이었고,
+> `tools/et13_baseline_updater.dart` 가 `'case_count': 96` 으로 15-fixture candidate 를 전부 거부했으며,
+> producer 계약 테스트가 `case_count` 120/30 을 리터럴로 썼다. 전부 생성 카탈로그에서 파생하도록 바꿨다.
+> gitops `validate_release_manifest.py` 는 이 카탈로그를 미러로 고정하므로 같은 값으로 갱신해야 승격이 통과한다.
+
 `tools/et13_evidence.dart` 의 case 수는 이제 `_fixtureIds.length` 에서 파생된다(`_visualCaseCount`, `_a11yCaseCount`) — 다음 fixture 추가는 id 목록·카탈로그·스키마 prefixItems·계약 테스트, 그리고 `tools/et13/capture.mjs` 의 web 배포 fixture 수 핀(현재 11 — producer 계약 테스트가 `expectedDistributions` 와 같은 값인지 대조)을 바꾸면 된다. 이 핀은 첫 PR CI 의 `produce-atomic-pair` 가 `browser smoke requires 8 web-hosted fixtures` 로 실패해 드러났고(로컬 게이트가 대조하지 않던 구멍), 계약 테스트로 막았다. 같은 PR 의 두 번째 CI 는 `captureSummary.case_count must be 120; found 150` 로 실패했다: 도구가 캡처 요약 총합(visual+a11y) 을 120(=96+24) 으로 하드코딩했는데 새 visual 수 120 과 우연히 같아 로컬 검사에 걸리지 않았다. 총합도 `_visualCaseCount + _a11yCaseCount` 로 파생시키고 producer 계약 테스트가 리터럴 부재를 대조한다. 5개 스키마(`catalog`·`evidence`·`manifest`·`generated-cases`·`baseline-approval`)의 `prefixItems`/`minItems`/`maxItems` 를 함께 갱신했고, 생성 카탈로그는 `dart run tools/et13_evidence.dart generate` 로만 만든다.
 
 ## 투영 위젯

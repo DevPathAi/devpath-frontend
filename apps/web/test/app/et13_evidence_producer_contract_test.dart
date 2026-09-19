@@ -86,6 +86,14 @@ void main() {
     expect(tool, isNot(contains("summary['case_count'], 120")));
     expect(tool, isNot(contains('exactly 120 ordered cases')));
     expect(capture, isNot(contains('/120 passed')));
+    // 승인된 baseline 을 반영하는 updater 도 같은 계열의 리터럴을 갖고 있었다:
+    // `'case_count': 96` 이 12-fixture 시절 값으로 남아 15-fixture candidate 를
+    // 전부 거부했다(2026-09-19 실측). 개수는 생성 카탈로그에서만 읽는다.
+    final updater = File(
+      '../../tools/et13_baseline_updater.dart',
+    ).readAsStringSync();
+    expect(updater, contains("'case_count': generated['case_count'],"));
+    expect(updater, isNot(contains(RegExp(r"'case_count': \d"))));
     expect(capture, contains('pixel-stable across two captures'));
     expect(capture, contains('PNG axes differ from its catalog profile'));
     expect(capture, contains("page.on('requestfailed'"));
@@ -127,7 +135,7 @@ void main() {
   });
 
   test('all release renderers resolve CanvasKit default font offline', () {
-    for (final app in ['web', 'admin', 'mobile']) {
+    for (final app in ['web', 'admin']) {
       final path = '../../apps/$app/web/flutter_bootstrap.js';
       final bootstrap = File(path).readAsStringSync();
       final index = File('../../apps/$app/web/index.html').readAsStringSync();
@@ -309,7 +317,7 @@ void main() {
       'case_catalog_schema_version': 'leva.et13.a11y-cases.v1',
       'projection_contract_sha256': catalog['projection_contract_sha256'],
       'fixture_ids': generated['fixture_ids'],
-      'case_count': 30,
+      'case_count': generated['case_count'],
       'surface_case_counts': generated['surface_case_counts'],
       'capture_surface': 'flutter_web_release_projection',
       'device_evidence': false,
@@ -325,7 +333,7 @@ void main() {
       'case_catalog_schema_version': binding['case_catalog_schema_version'],
       'projection_contract_sha256': binding['projection_contract_sha256'],
       'fixture_ids': binding['fixture_ids'],
-      'case_count': 30,
+      'case_count': generated['case_count'],
       'surface_case_counts': binding['surface_case_counts'],
       'capture_surface': binding['capture_surface'],
       'device_evidence': false,
@@ -426,7 +434,7 @@ void main() {
     );
   });
 
-  test('approved baseline bundle is the exact review-bound 122-file set', () {
+  test('approved baseline bundle is the exact review-bound file set', () {
     final root = Directory.systemTemp.createTempSync('et13-approved-bundle-');
     addTearDown(() => root.deleteSync(recursive: true));
     final catalogPath = '../../evidence/et13/catalog.v1.json';
@@ -462,7 +470,7 @@ void main() {
       'case_catalog_schema_version': 'leva.et13.visual-cases.v1',
       'projection_contract_sha256': catalog['projection_contract_sha256'],
       'fixture_ids': generated['fixture_ids'],
-      'case_count': 120,
+      'case_count': generated['case_count'],
       'surface_case_counts': generated['surface_case_counts'],
       'capture_surface': 'flutter_web_release_projection',
       'device_evidence': false,
@@ -489,7 +497,7 @@ void main() {
           .convert(reviewFile.readAsBytesSync())
           .toString(),
       'fixture_ids': generated['fixture_ids'],
-      'case_count': 120,
+      'case_count': generated['case_count'],
       'candidate_set_sha256': et13.visualArtifactSetSha(
         root.path,
         generatedCatalogPath: generatedPath,
@@ -856,7 +864,6 @@ void main() {
     const entrypoints = <String, String>{
       'web': 'apps/web/lib/et13_evidence_main.dart',
       'admin': 'apps/admin/lib/et13_evidence_main.dart',
-      'mobile': 'apps/mobile/lib/et13_evidence_main.dart',
     };
     final marker = <String, Object?>{
       'schema_version': 'leva.et13.build-marker.v1',

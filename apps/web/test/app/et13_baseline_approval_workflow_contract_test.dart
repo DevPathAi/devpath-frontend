@@ -115,9 +115,49 @@ void main() {
     expect(workflow, contains('run-id: \${{ inputs.raw_run_id }}'));
   });
 
-  test('approved artifact is an exact validated 98-file baseline bundle', () {
+  test('bundle sizes derive from the case catalogs, not from literals', () {
+    // 카탈로그가 12→15 fixture 로 커졌을 때 162·96·98 리터럴이 남아 첫 실행에서
+    // 승인이 죽었다(2026-09-19). 개수는 생성된 case catalog 에서만 읽는다.
+    expect(
+      workflow,
+      contains(
+        "visual_case_count=\"\$(jq -er '.cases | length' \\\n"
+        '            evidence/et13/generated/visual-cases.v1.json)"',
+      ),
+    );
+    expect(
+      workflow,
+      contains(
+        "a11y_case_count=\"\$(jq -er '.cases | length' \\\n"
+        '            evidence/et13/generated/a11y-cases.v1.json)"',
+      ),
+    );
+    expect(workflow, contains('select(.distribution == "web")] | length'));
+    expect(
+      workflow,
+      contains(
+        'expected_raw_file_count="\$((10 + visual_case_count + '
+        'a11y_case_count + web_fixture_count * 4))"',
+      ),
+    );
+    expect(workflow, contains('-eq "\${expected_raw_file_count}"'));
+    expect(
+      workflow,
+      contains('test "\${#visual_paths[@]}" -eq "\${visual_case_count}"'),
+    );
+    expect(workflow, contains('--argjson case_count "\${visual_case_count}"'));
+    expect(workflow, contains('case_count: \$case_count,'));
+    expect(workflow, contains('-eq "\$((visual_case_count + 2))"'));
+    expect(
+      workflow,
+      isNot(contains(RegExp(r'-eq (?:96|98|162)\b'))),
+      reason: 'fixture-count literals must not come back',
+    );
+    expect(workflow, isNot(contains(RegExp(r'case_count: \d'))));
+  });
+
+  test('approved artifact is an exact validated baseline bundle', () {
     expect(workflow, contains("test -z \"\$(find \"\${raw_root}\" -type l"));
-    expect(workflow, contains("test \"\${#visual_paths[@]}\" -eq 96"));
     expect(workflow, contains('review-candidate.v1.json'));
     expect(workflow, contains('baseline-approval.v1.json'));
     expect(workflow, contains('review_candidate_sha256'));
@@ -153,10 +193,6 @@ void main() {
     );
     expect(workflow, contains(r'"${RUNNER_TEMP}/expected-directories.txt"'));
     expect(workflow, contains(r'"${RUNNER_TEMP}/actual-directories.txt"'));
-    expect(
-      workflow,
-      contains('test "\$(wc -l < "\${RUNNER_TEMP}/actual-files.txt")" -eq 98'),
-    );
     expect(workflow, contains('sha256sum --check --strict'));
     expect(
       workflow,
