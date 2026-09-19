@@ -10,11 +10,7 @@ import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import process from 'node:process';
 
-import {
-  frontendRepository,
-  signedMobileWorkflow,
-  validateExactSignedMobileBundle,
-} from './mission_spine_release_evidence.mjs';
+const frontendRepository = 'DevPathAi/devpath-frontend';
 
 export const manualWorkflow =
   '.github/workflows/mission-spine-manual-at-evidence.yml';
@@ -22,8 +18,6 @@ export const manualWorkflow =
 const catalogSchema = 'leva.mission-spine.manual-at-catalog.v1';
 const provenanceSchema =
   'leva.mission-spine.manual-at-test-provenance.v1';
-const signedBindingSchema =
-  'leva.mission-spine.signed-android-build-binding.v2';
 const sha1Pattern = /^(?!0{40}$)[0-9a-f]{40}$/;
 const sha256Pattern = /^(?!0{64}$)[0-9a-f]{64}$/;
 const releaseIdPattern = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
@@ -45,25 +39,6 @@ const laneDefinitions = Object.freeze({
         id: 'nvda-web-next-action-navigation',
         entry: 'next_action',
       }),
-    ]),
-  }),
-  'manual-talkback': Object.freeze({
-    artifactLane: 'talkback',
-    assistiveTechnology: 'TalkBack+Android',
-    surface: 'android',
-    environment: 'manual-at-talkback',
-    jobName: 'Approve manual TalkBack evidence',
-    requiredPlatform: 'android_physical_device',
-    requiredClient: 'native_flutter_android',
-    requiredArtifact: 'candidate_signed_apk',
-    cases: Object.freeze([
-      Object.freeze({ id: 'talkback-android-today-mission-spine', entry: 'today' }),
-      Object.freeze({
-        id: 'talkback-android-next-action-navigation',
-        entry: 'next_action',
-      }),
-      Object.freeze({ id: 'talkback-android-content-reading', entry: 'content' }),
-      Object.freeze({ id: 'talkback-android-offline-status', entry: 'offline_status' }),
     ]),
   }),
 });
@@ -361,23 +336,7 @@ const manualBindingKeys = [
   'provenance_sha256',
 ];
 
-const signedBindingKeys = [
-  'schema_version',
-  'repository',
-  'source_sha',
-  'event',
-  'workflow_path',
-  'workflow_sha256',
-  'workflow_run_id',
-  'run_attempt',
-  'artifact_id',
-  'artifact_name',
-  'artifact_archive_sha256',
-  'build_provenance_file',
-  'build_provenance_sha256',
-  'signed_apk_file',
-  'signed_apk_sha256',
-];
+const qualityInputKeys = ['catalogs', 'frontend_projection_contract'];
 
 function validateCandidate(candidate, {
   catalogs,
@@ -391,6 +350,7 @@ function validateCandidate(candidate, {
   exact(frontend.repository, frontendRepository, 'candidate.frontend.repository');
   exact(sha1(frontend.source_sha, 'candidate.frontend.source_sha'), sourceSha, 'candidate.frontend.source_sha');
   const quality = object(candidate.quality_evidence_inputs, 'candidate.quality_evidence_inputs');
+  exactKeys(quality, qualityInputKeys, 'candidate.quality_evidence_inputs');
   const bindings = object(quality.catalogs, 'candidate catalog bindings');
   exactKeys(bindings, candidateCatalogKeys, 'candidate catalog bindings');
   for (const [lane, local] of Object.entries(catalogs)) {
@@ -407,33 +367,6 @@ function validateCandidate(candidate, {
       `${lane}.provenance_sha256`,
     );
   }
-  const mobile = object(quality.mobile_test_artifacts, 'mobile_test_artifacts');
-  exactKeys(mobile, signedBindingKeys, 'mobile_test_artifacts');
-  exact(mobile.schema_version, signedBindingSchema, 'mobile_test_artifacts.schema_version');
-  exact(mobile.repository, frontendRepository, 'mobile_test_artifacts.repository');
-  exact(mobile.source_sha, sourceSha, 'mobile_test_artifacts.source_sha');
-  exact(mobile.event, 'workflow_dispatch', 'mobile_test_artifacts.event');
-  exact(mobile.workflow_path, signedMobileWorkflow, 'mobile_test_artifacts.workflow_path');
-  sha256(mobile.workflow_sha256, 'mobile_test_artifacts.workflow_sha256');
-  positiveInteger(mobile.workflow_run_id, 'mobile_test_artifacts.workflow_run_id');
-  exact(mobile.run_attempt, 1, 'mobile_test_artifacts.run_attempt');
-  positiveInteger(mobile.artifact_id, 'mobile_test_artifacts.artifact_id');
-  exact(
-    mobile.artifact_name,
-    `${releaseId}-signed-android-build-run-${mobile.workflow_run_id}-attempt-1`,
-    'mobile_test_artifacts.artifact_name',
-  );
-  sha256(mobile.artifact_archive_sha256, 'mobile_test_artifacts.artifact_archive_sha256');
-  exact(mobile.build_provenance_file, 'build-provenance.v2.json', 'mobile_test_artifacts.build_provenance_file');
-  exact(mobile.signed_apk_file, 'mobile/android/leva-release.apk', 'mobile_test_artifacts.signed_apk_file');
-  const distinct = [
-    sha256(mobile.build_provenance_sha256, 'mobile_test_artifacts.build_provenance_sha256'),
-    sha256(mobile.signed_apk_sha256, 'mobile_test_artifacts.signed_apk_sha256'),
-  ];
-  if (new Set(distinct).size !== distinct.length) {
-    fail('mobile_test_artifacts hashes must be distinct');
-  }
-  return mobile;
 }
 
 function validateApproval(value, lane) {
@@ -466,7 +399,7 @@ function validateApproval(value, lane) {
   return value;
 }
 
-const commonEvidenceKeys = [
+const evidenceKeys = [
   'candidate_spec_sha256',
   'status',
   'producer_run_id',
@@ -486,16 +419,6 @@ const commonEvidenceKeys = [
   'approved_by_id',
   'approval_effective_at',
 ];
-
-function evidenceKeys(lane) {
-  if (lane === 'manual-nvda') return commonEvidenceKeys;
-  return [
-    ...commonEvidenceKeys.slice(0, 12),
-    'build_provenance_sha256',
-    'signed_apk_sha256',
-    ...commonEvidenceKeys.slice(12),
-  ];
-}
 
 export function createManualEvidence({
   lane,
@@ -517,7 +440,7 @@ export function createManualEvidence({
     fail('protected approvals require attempt 1 and a fresh workflow_dispatch');
   }
   const catalogs = validateAllManualCatalogs(repositoryRoot);
-  const mobile = validateCandidate(candidate, { catalogs, releaseId, sourceSha });
+  validateCandidate(candidate, { catalogs, releaseId, sourceSha });
   const checkedApproval = validateApproval(approval, lane);
   const local = catalogs[lane];
   const evidence = {
@@ -534,10 +457,6 @@ export function createManualEvidence({
     assistive_technology: definition.assistiveTechnology,
     test_provenance_sha256: local.provenance_sha256,
   };
-  if (lane !== 'manual-nvda') {
-    evidence.build_provenance_sha256 = mobile.build_provenance_sha256;
-    evidence.signed_apk_sha256 = mobile.signed_apk_sha256;
-  }
   Object.assign(evidence, {
     approval_environment: checkedApproval.approval_environment,
     approval_environment_id: checkedApproval.approval_environment_id,
@@ -552,7 +471,6 @@ export function createManualEvidence({
     producerRunId,
     producerRunAttempt,
     catalogs,
-    mobile,
   });
   return evidence;
 }
@@ -560,7 +478,7 @@ export function createManualEvidence({
 function validateEvidence(value, lane, expected) {
   const definition = laneDefinitions[lane];
   const local = expected.catalogs[lane];
-  exactKeys(value, evidenceKeys(lane), `${lane} evidence`);
+  exactKeys(value, evidenceKeys, `${lane} evidence`);
   exact(value.candidate_spec_sha256, expected.candidateSpecSha256, `${lane}.candidate_spec_sha256`);
   exact(value.status, 'passed', `${lane}.status`);
   exact(value.producer_run_id, expected.producerRunId, `${lane}.producer_run_id`);
@@ -585,10 +503,6 @@ function validateEvidence(value, lane, expected) {
     },
     lane,
   );
-  if (lane !== 'manual-nvda') {
-    exact(value.build_provenance_sha256, expected.mobile.build_provenance_sha256, `${lane}.build_provenance_sha256`);
-    exact(value.signed_apk_sha256, expected.mobile.signed_apk_sha256, `${lane}.signed_apk_sha256`);
-  }
 }
 
 function exactPackageDirectory(root, lane) {
@@ -622,10 +536,10 @@ export function validateManualEvidencePackages({
     rootEntries.length !== lanes.length ||
     rootEntries.some((entry) => !entry.isDirectory() || !lanes.includes(entry.name))
   ) {
-    fail('manual package root must contain exactly the two lane directories');
+    fail('manual package root must contain exactly the manual lane directories');
   }
   const catalogs = validateAllManualCatalogs(repositoryRoot);
-  const mobile = validateCandidate(candidate, { catalogs, releaseId, sourceSha });
+  validateCandidate(candidate, { catalogs, releaseId, sourceSha });
   for (const lane of lanes) {
     const evidenceFile = parseJsonFile(
       exactPackageDirectory(packageRoot, lane),
@@ -637,7 +551,6 @@ export function validateManualEvidencePackages({
       producerRunId,
       producerRunAttempt,
       catalogs,
-      mobile,
     });
   }
   return true;
@@ -649,170 +562,13 @@ export function validateManualInputs({
   candidateSpecSha256,
   releaseId,
   sourceSha,
-  signedBundleRoot,
 }) {
   const catalogs = validateAllManualCatalogs(repositoryRoot);
-  const mobile = validateCandidate(candidate, { catalogs, releaseId, sourceSha });
-  const candidateBytesSha = sha256(candidateSpecSha256, 'candidateSpecSha256');
-  const signed = validateExactSignedMobileBundle(signedBundleRoot, {
-    releaseId,
-    sourceSha,
-    workflowSha256: mobile.workflow_sha256,
-    producerRunId: mobile.workflow_run_id,
-    producerRunAttempt: mobile.run_attempt,
-    pubspecLockSha256: rawSha256(readFileSync(join(repositoryRoot, 'pubspec.lock'))),
-  });
-  exact(signed.buildProvenanceSha256, mobile.build_provenance_sha256, 'signed build provenance SHA');
-  exact(signed.signedApkSha256, mobile.signed_apk_sha256, 'signed APK SHA');
-  return { catalogs, mobile, candidateSpecSha256: candidateBytesSha };
-}
-
-function validateRunPath(path, expected) {
-  const allowed = new Set([
-    expected,
-    `${expected}@main`,
-    `${expected}@refs/heads/main`,
-  ]);
-  if (!allowed.has(path)) fail('signed producer run workflow path/ref mismatch');
-}
-
-export function validateSignedMobileArtifactFacts({
-  binding,
-  releaseId,
-  sourceSha,
-  run,
-  branch,
-  artifact,
-  workflowBytes,
-  localWorkflowBytes,
-}) {
-  exact(binding.run_attempt, 1, 'signed producer run_attempt');
-  exact(run.id, binding.workflow_run_id, 'signed producer run.id');
-  exact(run.run_attempt, 1, 'signed producer run.run_attempt');
-  exact(run.event, 'workflow_dispatch', 'signed producer run.event');
-  exact(run.status, 'completed', 'signed producer run.status');
-  exact(run.conclusion, 'success', 'signed producer run.conclusion');
-  exact(run.head_sha, sourceSha, 'signed producer run.head_sha');
-  exact(run.head_branch, 'main', 'signed producer run.head_branch');
-  exact(run.repository?.full_name, frontendRepository, 'signed producer run.repository');
-  exact(run.head_repository?.full_name, frontendRepository, 'signed producer run.head_repository');
-  validateRunPath(run.path, signedMobileWorkflow);
-  exact(branch.name, 'main', 'signed producer protected branch name');
-  exact(branch.commit?.sha, sourceSha, 'signed producer protected branch SHA');
-  exact(branch.protected, true, 'signed producer protected branch policy');
-  exact(artifact.id, binding.artifact_id, 'signed artifact.id');
-  exact(
-    artifact.name,
-    `${releaseId}-signed-android-build-run-${binding.workflow_run_id}-attempt-1`,
-    'signed artifact.name',
-  );
-  exact(artifact.expired, false, 'signed artifact.expired');
-  positiveInteger(artifact.size_in_bytes, 'signed artifact.size_in_bytes');
-  if (artifact.size_in_bytes > 550 * 1024 * 1024) {
-    fail('signed artifact exceeds the 550 MiB archive limit');
-  }
-  exact(artifact.workflow_run?.id, binding.workflow_run_id, 'signed artifact.workflow_run.id');
-  exact(artifact.workflow_run?.head_sha, sourceSha, 'signed artifact.workflow_run.head_sha');
-  const digest = artifact.digest;
-  if (typeof digest !== 'string' || !/^sha256:[0-9a-f]{64}$/.test(digest)) {
-    fail('signed artifact API digest is absent or malformed');
-  }
-  exact(digest.slice(7), binding.artifact_archive_sha256, 'signed artifact archive SHA-256');
-  if (!Buffer.isBuffer(workflowBytes) || workflowBytes.length < 1) {
-    fail('signed producer workflow bytes are absent');
-  }
-  if (!Buffer.isBuffer(localWorkflowBytes) || !workflowBytes.equals(localWorkflowBytes)) {
-    fail('signed producer workflow differs from exact checked source bytes');
-  }
-  exact(rawSha256(workflowBytes), binding.workflow_sha256, 'signed producer workflow SHA-256');
-  return binding;
-}
-
-async function github(path, token, fetchImpl = fetch) {
-  const response = await fetchImpl(`https://api.github.com${path}`, {
-    headers: {
-      Accept: 'application/vnd.github+json',
-      Authorization: `Bearer ${token}`,
-      'X-GitHub-Api-Version': '2022-11-28',
-    },
-    redirect: 'error',
-  });
-  if (!response.ok) fail(`GitHub API ${path} returned HTTP ${response.status}`);
-  return response.json();
-}
-
-async function authenticateSignedArtifact(common, outputPath) {
-  const token = process.env.GITHUB_TOKEN;
-  if (!token) fail('GITHUB_TOKEN is absent');
-  const catalogs = validateAllManualCatalogs(common.repositoryRoot);
-  const binding = validateCandidate(common.candidate, {
+  validateCandidate(candidate, { catalogs, releaseId, sourceSha });
+  return {
     catalogs,
-    releaseId: common.releaseId,
-    sourceSha: common.sourceSha,
-  });
-  const repository = frontendRepository;
-  const run = await github(
-    `/repos/${repository}/actions/runs/${binding.workflow_run_id}/attempts/1`,
-    token,
-  );
-  const branch = await github(`/repos/${repository}/branches/main`, token);
-  const artifact = await github(
-    `/repos/${repository}/actions/artifacts/${binding.artifact_id}`,
-    token,
-  );
-  const encodedWorkflow = signedMobileWorkflow
-    .split('/')
-    .map((part) => encodeURIComponent(part))
-    .join('/');
-  const workflow = await github(
-    `/repos/${repository}/contents/${encodedWorkflow}?ref=${common.sourceSha}`,
-    token,
-  );
-  exact(workflow.type, 'file', 'signed producer workflow.type');
-  exact(workflow.path, signedMobileWorkflow, 'signed producer workflow.path');
-  exact(workflow.encoding, 'base64', 'signed producer workflow.encoding');
-  const workflowBytes = Buffer.from(
-    (workflow.content ?? '').replace(/\s/g, ''),
-    'base64',
-  );
-  const localWorkflowBytes = readFileSync(
-    join(common.repositoryRoot, signedMobileWorkflow),
-  );
-  validateSignedMobileArtifactFacts({
-    binding,
-    releaseId: common.releaseId,
-    sourceSha: common.sourceSha,
-    run,
-    branch,
-    artifact,
-    workflowBytes,
-    localWorkflowBytes,
-  });
-  const result = {
-    signed_run_id: binding.workflow_run_id,
-    signed_run_attempt: binding.run_attempt,
-    signed_artifact_id: binding.artifact_id,
-    signed_artifact_name: binding.artifact_name,
-    signed_artifact_archive_sha256: binding.artifact_archive_sha256,
-    signed_workflow_sha256: binding.workflow_sha256,
+    candidateSpecSha256: sha256(candidateSpecSha256, 'candidateSpecSha256'),
   };
-  if (outputPath) {
-    writeFileSync(outputPath, `${JSON.stringify(result, null, 2)}\n`, {
-      encoding: 'utf8',
-      flag: 'wx',
-    });
-  }
-  if (process.env.GITHUB_OUTPUT) {
-    const { appendFileSync } = await import('node:fs');
-    appendFileSync(
-      process.env.GITHUB_OUTPUT,
-      Object.entries(result)
-        .map(([key, value]) => `${key}=${value}\n`)
-        .join(''),
-      'utf8',
-    );
-  }
-  return result;
 }
 
 function parseOptions(argv) {
@@ -858,17 +614,9 @@ async function cli() {
     sourceSha: required(options, 'source-sha'),
     repositoryRoot: root,
   };
-  if (command === 'authenticate-signed-artifact') {
-    await authenticateSignedArtifact(common, options.get('output'));
-    process.stdout.write('Signed mobile artifact metadata authenticated\n');
-    return;
-  }
   if (command === 'validate-manual-inputs') {
-    validateManualInputs({
-      ...common,
-      signedBundleRoot: required(options, 'signed-root'),
-    });
-    process.stdout.write('Manual AT source and signed inputs valid\n');
+    validateManualInputs(common);
+    process.stdout.write('Manual AT source inputs valid\n');
     return;
   }
   if (command === 'manual-evidence') {
@@ -898,7 +646,7 @@ async function cli() {
     process.stdout.write('Manual AT sanitized packages valid\n');
     return;
   }
-  fail('command must be authenticate-signed-artifact, validate-manual-inputs, manual-evidence, or validate-manual-packages');
+  fail('command must be validate-manual-inputs, manual-evidence, or validate-manual-packages');
 }
 
 if (

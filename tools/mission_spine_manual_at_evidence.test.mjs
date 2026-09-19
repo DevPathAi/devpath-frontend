@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -13,36 +14,65 @@ import {
   createManualEvidence,
   validateAllManualCatalogs,
   validateManualEvidencePackages,
-  validateSignedMobileArtifactFacts,
+  validateManualInputs,
 } from './mission_spine_manual_at_evidence.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const sourceSha = '1234567890abcdef1234567890abcdef12345678';
 const candidateSha256 = '1'.repeat(64);
+const releaseId = 'release-2026-08-17';
 
 const expectedCases = {
   'manual-nvda': [
     'nvda-web-today-mission-spine',
     'nvda-web-next-action-navigation',
   ],
-  'manual-talkback': [
-    'talkback-android-today-mission-spine',
-    'talkback-android-next-action-navigation',
-    'talkback-android-content-reading',
-    'talkback-android-offline-status',
-  ],
 };
 
-function approval(lane) {
-  const suffix = lane.slice('manual-'.length);
-  const title = {
-    nvda: 'NVDA',
-    talkback: 'TalkBack',
-  }[suffix];
+const evidenceKeyOrder = [
+  'candidate_spec_sha256',
+  'status',
+  'producer_run_id',
+  'producer_run_attempt',
+  'repository',
+  'source_sha',
+  'case_catalog_sha256',
+  'case_count',
+  'passed_case_count',
+  'failed_case_count',
+  'assistive_technology',
+  'test_provenance_sha256',
+  'approval_environment',
+  'approval_environment_id',
+  'approval_job_name',
+  'approved_by',
+  'approved_by_id',
+  'approval_effective_at',
+];
+
+const legacySignedBinding = {
+  schema_version: 'leva.mission-spine.signed-android-build-binding.v2',
+  repository: 'DevPathAi/devpath-frontend',
+  source_sha: sourceSha,
+  event: 'workflow_dispatch',
+  workflow_path: '.github/workflows/mission-spine-signed-mobile-build.yml',
+  workflow_sha256: '3'.repeat(64),
+  workflow_run_id: 701,
+  run_attempt: 1,
+  artifact_id: 801,
+  artifact_name: 'release-2026-08-17-signed-android-build-run-701-attempt-1',
+  artifact_archive_sha256: '4'.repeat(64),
+  build_provenance_file: 'build-provenance.v2.json',
+  build_provenance_sha256: '5'.repeat(64),
+  signed_apk_file: 'mobile/android/leva-release.apk',
+  signed_apk_sha256: '6'.repeat(64),
+};
+
+function approval() {
   return {
-    approval_environment: lane.replace('manual-', 'manual-at-'),
-    approval_environment_id: 100 + Object.keys(expectedCases).indexOf(lane),
-    approval_job_name: `Approve manual ${title} evidence`,
+    approval_environment: 'manual-at-nvda',
+    approval_environment_id: 100,
+    approval_job_name: 'Approve manual NVDA evidence',
     approved_by: 'independent-reviewer',
     approved_by_id: 501,
     approval_effective_at: '2025-08-17T01:02:03Z',
@@ -71,7 +101,7 @@ function candidateFromCatalogs(catalogs) {
     $schema: 'https://example.invalid/candidate.schema.json',
     schema_version: 'mission-spine.candidate-spec.v1',
     document_type: 'candidate-spec',
-    release_id: 'release-2026-08-17',
+    release_id: releaseId,
     created_at: '2025-08-17T00:00:00Z',
     gitops: {},
     services: {},
@@ -88,33 +118,29 @@ function candidateFromCatalogs(catalogs) {
     quality_evidence_inputs: {
       catalogs: bindings,
       frontend_projection_contract: {},
-      mobile_test_artifacts: {
-        schema_version: 'leva.mission-spine.signed-android-build-binding.v2',
-        repository: 'DevPathAi/devpath-frontend',
-        source_sha: sourceSha,
-        event: 'workflow_dispatch',
-        workflow_path:
-          '.github/workflows/mission-spine-signed-mobile-build.yml',
-        workflow_sha256: '3'.repeat(64),
-        workflow_run_id: 701,
-        run_attempt: 1,
-        artifact_id: 801,
-        artifact_name:
-          'release-2026-08-17-signed-android-build-run-701-attempt-1',
-        artifact_archive_sha256: '4'.repeat(64),
-        build_provenance_file: 'build-provenance.v2.json',
-        build_provenance_sha256: '5'.repeat(64),
-        signed_apk_file: 'mobile/android/leva-release.apk',
-        signed_apk_sha256: '6'.repeat(64),
-      },
     },
     rollout: {},
   };
 }
 
+function evidenceArguments(candidate, overrides = {}) {
+  return {
+    lane: 'manual-nvda',
+    candidate,
+    candidateSpecSha256: candidateSha256,
+    releaseId,
+    sourceSha,
+    producerRunId: 901,
+    producerRunAttempt: 1,
+    approval: approval(),
+    repositoryRoot: root,
+    ...overrides,
+  };
+}
+
 test('manual catalogs and static provenance have exact reviewed order and bytes', () => {
   const catalogs = validateAllManualCatalogs(root);
-  assert.deepEqual(Object.keys(catalogs), Object.keys(expectedCases));
+  assert.deepEqual(Object.keys(catalogs), ['manual-nvda']);
   for (const [lane, expected] of Object.entries(expectedCases)) {
     assert.deepEqual(catalogs[lane].case_ids, expected);
     assert.equal(catalogs[lane].case_count, expected.length);
@@ -123,118 +149,36 @@ test('manual catalogs and static provenance have exact reviewed order and bytes'
   }
 });
 
-test('manual evidence uses exact lane keys and protected approval identity', () => {
-  const catalogs = validateAllManualCatalogs(root);
-  const candidate = candidateFromCatalogs(catalogs);
-  for (const lane of Object.keys(expectedCases)) {
-    const evidence = createManualEvidence({
-      lane,
-      candidate,
-      candidateSpecSha256: candidateSha256,
-      releaseId: 'release-2026-08-17',
-      sourceSha,
-      producerRunId: 901,
-      producerRunAttempt: 1,
-      approval: approval(lane),
-      repositoryRoot: root,
-    });
-    assert.equal(evidence.status, 'passed');
-    assert.equal(evidence.case_count, expectedCases[lane].length);
-    assert.equal(evidence.passed_case_count, expectedCases[lane].length);
-    assert.equal(evidence.failed_case_count, 0);
-    assert.equal(
-      evidence.approval_environment,
-      lane.replace('manual-', 'manual-at-'),
-    );
-    const commonKeys = [
-      'candidate_spec_sha256',
-      'status',
-      'producer_run_id',
-      'producer_run_attempt',
-      'repository',
-      'source_sha',
-      'case_catalog_sha256',
-      'case_count',
-      'passed_case_count',
-      'failed_case_count',
-      'assistive_technology',
-      'test_provenance_sha256',
-    ];
-    const approvalKeys = [
-      'approval_environment',
-      'approval_environment_id',
-      'approval_job_name',
-      'approved_by',
-      'approved_by_id',
-      'approval_effective_at',
-    ];
-    if (lane === 'manual-nvda') {
-      assert.equal('build_provenance_sha256' in evidence, false);
-      assert.deepEqual(Object.keys(evidence), [...commonKeys, ...approvalKeys]);
-    } else {
-      assert.equal(evidence.build_provenance_sha256, '5'.repeat(64));
-      assert.deepEqual(Object.keys(evidence), [
-        ...commonKeys,
-        'build_provenance_sha256',
-        'signed_apk_sha256',
-        ...approvalKeys,
-      ]);
-    }
-  }
+test('manual NVDA evidence keeps its exact key order and approval identity', () => {
+  const candidate = candidateFromCatalogs(validateAllManualCatalogs(root));
+  const evidence = createManualEvidence(evidenceArguments(candidate));
+  assert.equal(evidence.status, 'passed');
+  assert.equal(evidence.case_count, 2);
+  assert.equal(evidence.passed_case_count, 2);
+  assert.equal(evidence.failed_case_count, 0);
+  assert.equal(evidence.assistive_technology, 'NVDA+Chromium');
+  assert.equal(evidence.approval_environment, 'manual-at-nvda');
+  assert.deepEqual(Object.keys(evidence), evidenceKeyOrder);
 });
 
 test('manual evidence rejects attempt reuse, catalog drift, and unsafe review data', () => {
-  const catalogs = validateAllManualCatalogs(root);
-  const candidate = candidateFromCatalogs(catalogs);
+  const candidate = candidateFromCatalogs(validateAllManualCatalogs(root));
   assert.throws(
-    () =>
-      createManualEvidence({
-        lane: 'manual-nvda',
-        candidate,
-        candidateSpecSha256: candidateSha256,
-        releaseId: 'release-2026-08-17',
-        sourceSha,
-        producerRunId: 901,
-        producerRunAttempt: 2,
-        approval: approval('manual-nvda'),
-        repositoryRoot: root,
-      }),
+    () => createManualEvidence(evidenceArguments(candidate, { producerRunAttempt: 2 })),
     /attempt 1/,
   );
 
   const drift = structuredClone(candidate);
   drift.quality_evidence_inputs.catalogs['manual-nvda'].case_count = 3;
   assert.throws(
-    () =>
-      createManualEvidence({
-        lane: 'manual-nvda',
-        candidate: drift,
-        candidateSpecSha256: candidateSha256,
-        releaseId: 'release-2026-08-17',
-        sourceSha,
-        producerRunId: 901,
-        producerRunAttempt: 1,
-        approval: approval('manual-nvda'),
-        repositoryRoot: root,
-      }),
+    () => createManualEvidence(evidenceArguments(drift)),
     /case_count/,
   );
 
-  const unsafe = approval('manual-nvda');
+  const unsafe = approval();
   unsafe.approved_by = 'data:text/plain,reviewer';
   assert.throws(
-    () =>
-      createManualEvidence({
-        lane: 'manual-nvda',
-        candidate,
-        candidateSpecSha256: candidateSha256,
-        releaseId: 'release-2026-08-17',
-        sourceSha,
-        producerRunId: 901,
-        producerRunAttempt: 1,
-        approval: unsafe,
-        repositoryRoot: root,
-      }),
+    () => createManualEvidence(evidenceArguments(candidate, { approval: unsafe })),
     /approved_by/,
   );
 
@@ -243,71 +187,87 @@ test('manual evidence rejects attempt reuse, catalog drift, and unsafe review da
     repository: 'DevPathAi/devpath-frontend',
   };
   assert.throws(
-    () =>
-      createManualEvidence({
-        lane: 'manual-nvda',
-        candidate: legacyVoiceOver,
-        candidateSpecSha256: candidateSha256,
-        releaseId: 'release-2026-08-17',
-        sourceSha,
-        producerRunId: 901,
-        producerRunAttempt: 1,
-        approval: approval('manual-nvda'),
-        repositoryRoot: root,
-      }),
+    () => createManualEvidence(evidenceArguments(legacyVoiceOver)),
     /candidate catalog bindings/,
   );
 });
 
-test('two manual packages are jointly exact and reject extras', () => {
+test('legacy signed-mobile and TalkBack candidate shapes fail closed', () => {
+  const candidate = candidateFromCatalogs(validateAllManualCatalogs(root));
+
+  const legacySigned = structuredClone(candidate);
+  legacySigned.quality_evidence_inputs.mobile_test_artifacts = legacySignedBinding;
+  assert.throws(
+    () => createManualEvidence(evidenceArguments(legacySigned)),
+    /candidate\.quality_evidence_inputs exact ordered key set mismatch/,
+  );
+
+  const legacyTalkBack = structuredClone(candidate);
+  legacyTalkBack.quality_evidence_inputs.catalogs['manual-talkback'] = {
+    repository: 'DevPathAi/devpath-frontend',
+    source_sha: sourceSha,
+    path: 'tool/release-evidence/catalogs/manual-talkback.v1.json',
+    sha256: '7'.repeat(64),
+    case_count: 4,
+    provenance_sha256: '8'.repeat(64),
+  };
+  assert.throws(
+    () => createManualEvidence(evidenceArguments(legacyTalkBack)),
+    /candidate catalog bindings/,
+  );
+
+  assert.throws(
+    () => createManualEvidence(evidenceArguments(candidate, { lane: 'manual-talkback' })),
+    /unknown manual lane/,
+  );
+});
+
+test('manual inputs validate without any signed bundle', () => {
   const catalogs = validateAllManualCatalogs(root);
   const candidate = candidateFromCatalogs(catalogs);
+  const result = validateManualInputs({
+    repositoryRoot: root,
+    candidate,
+    candidateSpecSha256: candidateSha256,
+    releaseId,
+    sourceSha,
+  });
+  assert.deepEqual(Object.keys(result), ['catalogs', 'candidateSpecSha256']);
+  assert.deepEqual(Object.keys(result.catalogs), ['manual-nvda']);
+  assert.equal(result.candidateSpecSha256, candidateSha256);
+});
+
+test('the single manual package is exact and rejects extras', () => {
+  const candidate = candidateFromCatalogs(validateAllManualCatalogs(root));
   const packageRoot = mkdtempSync(join(tmpdir(), 'manual-at-packages-'));
+  const packageArguments = {
+    packageRoot,
+    candidate,
+    candidateSpecSha256: candidateSha256,
+    releaseId,
+    sourceSha,
+    producerRunId: 901,
+    producerRunAttempt: 1,
+    repositoryRoot: root,
+  };
   try {
-    for (const lane of Object.keys(expectedCases)) {
-      const laneRoot = join(packageRoot, lane);
-      mkdirSync(laneRoot);
-      const evidence = createManualEvidence({
-        lane,
-        candidate,
-        candidateSpecSha256: candidateSha256,
-        releaseId: 'release-2026-08-17',
-        sourceSha,
-        producerRunId: 901,
-        producerRunAttempt: 1,
-        approval: approval(lane),
-        repositoryRoot: root,
-      });
-      writeFileSync(
-        join(laneRoot, 'evidence.json'),
-        `${JSON.stringify(evidence, null, 2)}\n`,
-      );
-    }
-    assert.doesNotThrow(() =>
-      validateManualEvidencePackages({
-        packageRoot,
-        candidate,
-        candidateSpecSha256: candidateSha256,
-        releaseId: 'release-2026-08-17',
-        sourceSha,
-        producerRunId: 901,
-        producerRunAttempt: 1,
-        repositoryRoot: root,
-      }),
+    mkdirSync(join(packageRoot, 'manual-nvda'));
+    writeFileSync(
+      join(packageRoot, 'manual-nvda', 'evidence.json'),
+      `${JSON.stringify(createManualEvidence(evidenceArguments(candidate)), null, 2)}\n`,
     );
+    assert.doesNotThrow(() => validateManualEvidencePackages(packageArguments));
+
+    mkdirSync(join(packageRoot, 'manual-talkback'));
+    assert.throws(
+      () => validateManualEvidencePackages(packageArguments),
+      /exactly the manual lane directories/,
+    );
+    rmSync(join(packageRoot, 'manual-talkback'), { recursive: true });
+
     writeFileSync(join(packageRoot, 'manual-nvda', 'raw-notes.txt'), 'forbidden');
     assert.throws(
-      () =>
-        validateManualEvidencePackages({
-          packageRoot,
-          candidate,
-          candidateSpecSha256: candidateSha256,
-          releaseId: 'release-2026-08-17',
-          sourceSha,
-          producerRunId: 901,
-          producerRunAttempt: 1,
-          repositoryRoot: root,
-        }),
+      () => validateManualEvidencePackages(packageArguments),
       /exactly evidence.json/,
     );
   } finally {
@@ -315,68 +275,11 @@ test('two manual packages are jointly exact and reject extras', () => {
   }
 });
 
-test('signed bundle metadata is attempt-specific, protected, and byte-bound', () => {
-  const catalogs = validateAllManualCatalogs(root);
-  const candidate = candidateFromCatalogs(catalogs);
-  const binding = candidate.quality_evidence_inputs.mobile_test_artifacts;
-  const workflowBytes = Buffer.from('trusted signed workflow\n');
-  binding.workflow_sha256 =
-    '730d931c8cd494ba27b747ade73d3f36b337db80860d911c22a0abe308e68b85';
-  const facts = {
-    binding,
-    releaseId: candidate.release_id,
-    sourceSha,
-    run: {
-      id: 701,
-      run_attempt: 1,
-      event: 'workflow_dispatch',
-      status: 'completed',
-      conclusion: 'success',
-      head_sha: sourceSha,
-      head_branch: 'main',
-      path: '.github/workflows/mission-spine-signed-mobile-build.yml@main',
-      repository: { full_name: 'DevPathAi/devpath-frontend' },
-      head_repository: { full_name: 'DevPathAi/devpath-frontend' },
-    },
-    branch: { name: 'main', commit: { sha: sourceSha }, protected: true },
-    artifact: {
-      id: 801,
-      name: 'release-2026-08-17-signed-android-build-run-701-attempt-1',
-      expired: false,
-      size_in_bytes: 1024,
-      digest: `sha256:${'4'.repeat(64)}`,
-      workflow_run: { id: 701, head_sha: sourceSha },
-    },
-    workflowBytes,
-    localWorkflowBytes: Buffer.from(workflowBytes),
-  };
-  assert.doesNotThrow(() => validateSignedMobileArtifactFacts(facts));
-  const stale = structuredClone({
-    ...facts,
-    workflowBytes: undefined,
-    localWorkflowBytes: undefined,
-  });
-  stale.workflowBytes = workflowBytes;
-  stale.localWorkflowBytes = Buffer.from(workflowBytes);
-  stale.run.run_attempt = 2;
-  assert.throws(
-    () => validateSignedMobileArtifactFacts(stale),
-    /run_attempt/,
+test('the tool source carries no signed-mobile or TalkBack residue', () => {
+  const source = readFileSync(
+    new URL('./mission_spine_manual_at_evidence.mjs', import.meta.url),
+    'utf8',
   );
-  const unprotected = {
-    ...facts,
-    branch: { ...facts.branch, protected: false },
-  };
-  assert.throws(
-    () => validateSignedMobileArtifactFacts(unprotected),
-    /protected branch policy/,
-  );
-  const substituted = {
-    ...facts,
-    localWorkflowBytes: Buffer.from('substituted workflow\n'),
-  };
-  assert.throws(
-    () => validateSignedMobileArtifactFacts(substituted),
-    /differs from exact checked source bytes/,
-  );
+  assert.doesNotMatch(source, /talkback|signed|mobile_test_artifacts|\.apk/i);
+  assert.doesNotMatch(source, /mission_spine_release_evidence/);
 });
