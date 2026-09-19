@@ -16,8 +16,6 @@ const _fixtureIds = <String>[
   'web-mentor-context-preview',
   'admin-kpi-dashboard',
   'admin-support-long-wire',
-  'mobile-today-available',
-  'mobile-content-reading',
   'dp-design-mission-ledger',
   'dp-design-context-payload-preview',
   'web-community-free',
@@ -68,7 +66,7 @@ _visualResultFixture() {
   }
   final document = <String, dynamic>{
     'evidence_mode': 'diagnostic',
-    'case_count': 120,
+    'case_count': 104,
     'surface_case_counts': generated['surface_case_counts'],
     'cases': cases,
   };
@@ -124,7 +122,7 @@ _a11yResultFixture() {
   }
   final document = <String, dynamic>{
     'evidence_mode': 'diagnostic',
-    'case_count': 30,
+    'case_count': 26,
     'surface_case_counts': generated['surface_case_counts'],
     'cases': cases,
   };
@@ -228,7 +226,7 @@ void main() {
     );
   });
 
-  test('approved fixture order and exact 120/30 expansions are immutable', () {
+  test('approved fixture order and exact 104/26 expansions are immutable', () {
     if (!catalogFile.existsSync()) return;
     final catalog = jsonDecode(catalogFile.readAsStringSync()) as Map;
     final fixtures = (catalog['fixtures'] as List).cast<Map>();
@@ -249,8 +247,8 @@ void main() {
       {'width': 320, 'theme': 'light', 'text_scale_percent': 200},
       {'width': 1240, 'theme': 'dark', 'text_scale_percent': 200},
     ]);
-    expect(fixtures.length * 4 * 2, 120);
-    expect(fixtures.length * a11y.length, 30);
+    expect(fixtures.length * 4 * 2, 104);
+    expect(fixtures.length * a11y.length, 26);
   });
 
   test('generated catalogs preserve exact case order and surface counts', () {
@@ -272,18 +270,16 @@ void main() {
     expect(visual['projection_matrix'], a11y['projection_matrix']);
     expect(visual['fixture_ids'], _fixtureIds);
     expect(a11y['fixture_ids'], _fixtureIds);
-    expect(visual['case_count'], 120);
-    expect(a11y['case_count'], 30);
+    expect(visual['case_count'], 104);
+    expect(a11y['case_count'], 26);
     expect(visual['surface_case_counts'], {
       'web': 72,
       'admin': 16,
-      'mobile': 16,
       'dp_design': 16,
     });
     expect(a11y['surface_case_counts'], {
       'web': 18,
       'admin': 4,
-      'mobile': 4,
       'dp_design': 4,
     });
 
@@ -315,7 +311,7 @@ void main() {
       );
       final projectionMatrix = (catalog['projection_matrix'] as List)
           .cast<Map>();
-      expect(projectionMatrix, hasLength(15));
+      expect(projectionMatrix, hasLength(13));
       for (final fixture in fixtures) {
         expect(
           fixture.keys,
@@ -340,16 +336,17 @@ void main() {
           'substitutions': fixture['substitutions'],
         });
       }
-      final mobile = fixtures.where(
-        (fixture) => (fixture['id'] as String).startsWith('mobile-'),
+      // 네이티브 모바일 앱은 DevPathAi/devpath-mobile 로 분리됐다(2026-09-19).
+      // 웹 릴리스 증거 카탈로그에는 모바일 fixture 가 없어야 한다.
+      expect(
+        fixtures.where(
+          (fixture) =>
+              (fixture['id'] as String).startsWith('mobile-') ||
+              fixture['owner'] == 'mobile' ||
+              fixture['distribution'] == 'mobile',
+        ),
+        isEmpty,
       );
-      for (final fixture in mobile) {
-        expect(fixture['capture_scope'], 'body_projection');
-        expect(
-          (fixture['substitutions'] as List).join(' '),
-          contains('native AppBar'),
-        );
-      }
     },
   );
 
@@ -469,10 +466,10 @@ void main() {
           ((laneContract['then'] as Map)['properties'] as Map)['cases'] as Map;
       final a11yCases =
           ((laneContract['else'] as Map)['properties'] as Map)['cases'] as Map;
-      expect(visualCases['minItems'], 120);
-      expect(visualCases['maxItems'], 120);
-      expect(a11yCases['minItems'], 30);
-      expect(a11yCases['maxItems'], 30);
+      expect(visualCases['minItems'], 104);
+      expect(visualCases['maxItems'], 104);
+      expect(a11yCases['minItems'], 26);
+      expect(a11yCases['maxItems'], 26);
       final a11yResultCase =
           ((manifestSchema[r'$defs'] as Map)['a11yCase'] as Map);
       final a11yResultProperties = a11yResultCase['properties'] as Map;
@@ -644,7 +641,7 @@ void main() {
     );
   });
 
-  test('visual result set reconciles all 120 ordered files exactly', () {
+  test('visual result set reconciles all 104 ordered files exactly', () {
     final fixture = _visualResultFixture();
     addTearDown(() => fixture.root.deleteSync(recursive: true));
     expect(

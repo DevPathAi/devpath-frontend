@@ -127,7 +127,7 @@ void main() {
   });
 
   test('all release renderers resolve CanvasKit default font offline', () {
-    for (final app in ['web', 'admin', 'mobile']) {
+    for (final app in ['web', 'admin']) {
       final path = '../../apps/$app/web/flutter_bootstrap.js';
       final bootstrap = File(path).readAsStringSync();
       final index = File('../../apps/$app/web/index.html').readAsStringSync();
@@ -856,7 +856,6 @@ void main() {
     const entrypoints = <String, String>{
       'web': 'apps/web/lib/et13_evidence_main.dart',
       'admin': 'apps/admin/lib/et13_evidence_main.dart',
-      'mobile': 'apps/mobile/lib/et13_evidence_main.dart',
     };
     final marker = <String, Object?>{
       'schema_version': 'leva.et13.build-marker.v1',
