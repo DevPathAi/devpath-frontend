@@ -262,7 +262,7 @@ void main() {
     expect(visual['case_catalog_version'], 'leva.et13.catalog.v1');
     expect(a11y['case_catalog_version'], 'leva.et13.catalog.v1');
     const projectionDigest =
-        '106e8d2951f44345611627df3cef5a52eef938ab1dfac117750febaa51fde3ca';
+        '158fdc882238c9459995c0572536a3cec3704e92bd1b28fa2d80907fc0435b78';
     expect(visual['projection_contract_sha256'], projectionDigest);
     expect(a11y['projection_contract_sha256'], projectionDigest);
     expect(visual.containsKey('projection_contract_version'), isFalse);
@@ -307,7 +307,7 @@ void main() {
       );
       expect(
         catalog['projection_contract_sha256'],
-        '106e8d2951f44345611627df3cef5a52eef938ab1dfac117750febaa51fde3ca',
+        '158fdc882238c9459995c0572536a3cec3704e92bd1b28fa2d80907fc0435b78',
       );
       final projectionMatrix = (catalog['projection_matrix'] as List)
           .cast<Map>();

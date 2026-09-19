@@ -44,7 +44,7 @@
     "case_catalog_sha256": {"$ref": "#/$defs/sha256"},
     "review_candidate_sha256": {"$ref": "#/$defs/sha256"},
     "fixture_ids": {"$ref": "#/$defs/fixtureIds"},
-    "case_count": {"const": 96},
+    "case_count": {"const": 104},
     "candidate_set_sha256": {"$ref": "#/$defs/sha256"},
     "approval_repository": {"const": "DevPathAi/devpath-frontend"},
     "approval_workflow_path": {
@@ -89,8 +89,8 @@
     "positiveInteger": {"type": "integer", "minimum": 1},
     "fixtureIds": {
       "type": "array",
-      "minItems": 15,
-      "maxItems": 15,
+      "minItems": 13,
+      "maxItems": 13,
       "prefixItems": [
         {"const": "web-today-available"},
         {"const": "web-path-current-week"},
@@ -100,8 +100,6 @@
         {"const": "web-mentor-context-preview"},
         {"const": "admin-kpi-dashboard"},
         {"const": "admin-support-long-wire"},
-        {"const": "mobile-today-available"},
-        {"const": "mobile-content-reading"},
         {"const": "dp-design-mission-ledger"},
         {"const": "dp-design-context-payload-preview"},
         {"const": "web-community-free"},
