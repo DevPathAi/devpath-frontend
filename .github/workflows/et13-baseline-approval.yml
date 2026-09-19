@@ -536,6 +536,17 @@ jobs:
           test -z "$(find "${raw_root}" -type l -print -quit)"
           test -z "$(find "${raw_root}" -mindepth 1 ! -type f ! -type d -print -quit)"
 
+          # Counts come from the generated case catalogs so a catalog that
+          # grows (12 -> 15 fixtures) cannot strand a stale literal here.
+          visual_case_count="$(jq -er '.cases | length' \
+            evidence/et13/generated/visual-cases.v1.json)"
+          a11y_case_count="$(jq -er '.cases | length' \
+            evidence/et13/generated/a11y-cases.v1.json)"
+          web_fixture_count="$(jq -er \
+            '[.fixtures[] | select(.distribution == "web")] | length' \
+            evidence/et13/catalog.v1.json)"
+          expected_raw_file_count="$((10 + visual_case_count + a11y_case_count + web_fixture_count * 4))"
+
           {
             printf '%s\n' \
               build-marker.v1.json \
@@ -563,7 +574,8 @@ jobs:
           } | LC_ALL=C sort > "${RUNNER_TEMP}/expected-raw-files.txt"
           find "${raw_root}" -type f -printf '%P\n' | LC_ALL=C sort \
             > "${RUNNER_TEMP}/actual-raw-files.txt"
-          test "$(wc -l < "${RUNNER_TEMP}/expected-raw-files.txt")" -eq 162
+          test "$(wc -l < "${RUNNER_TEMP}/expected-raw-files.txt")" \
+            -eq "${expected_raw_file_count}"
           diff -u \
             "${RUNNER_TEMP}/expected-raw-files.txt" \
             "${RUNNER_TEMP}/actual-raw-files.txt"
@@ -658,11 +670,13 @@ jobs:
           [[ "${APPROVAL_WORKFLOW_SHA256}" =~ ^[0-9a-f]{64}$ ]]
           test ! -e "${approved_root}"
           mkdir -p "${approved_root}"
+          visual_case_count="$(jq -er '.cases | length' \
+            evidence/et13/generated/visual-cases.v1.json)"
           mapfile -t visual_paths < <(
             jq -er '.cases[].artifact_path' \
               evidence/et13/generated/visual-cases.v1.json
           )
-          test "${#visual_paths[@]}" -eq 96
+          test "${#visual_paths[@]}" -eq "${visual_case_count}"
           for path in "${visual_paths[@]}"; do
             install -D -m 0644 \
               "${raw_root}/capture/${path}" \
@@ -696,6 +710,7 @@ jobs:
             --arg case_catalog_sha256 "${case_catalog_sha256}" \
             --arg review_candidate_sha256 "${review_candidate_sha256}" \
             --argjson fixture_ids "${fixture_ids}" \
+            --argjson case_count "${visual_case_count}" \
             --arg candidate_set_sha256 "${candidate_set_sha256}" \
             --arg approval_repository "${GITHUB_REPOSITORY}" \
             --arg approval_workflow_path ".github/workflows/et13-baseline-approval.yml" \
@@ -724,7 +739,7 @@ jobs:
               case_catalog_sha256: $case_catalog_sha256,
               review_candidate_sha256: $review_candidate_sha256,
               fixture_ids: $fixture_ids,
-              case_count: 96,
+              case_count: $case_count,
               candidate_set_sha256: $candidate_set_sha256,
               approval_repository: $approval_repository,
               approval_workflow_path: $approval_workflow_path,
@@ -760,7 +775,10 @@ jobs:
           } | LC_ALL=C sort > "${RUNNER_TEMP}/expected-files.txt"
           find "${approved_root}" -type f -printf '%P\n' | LC_ALL=C sort \
             > "${RUNNER_TEMP}/actual-files.txt"
-          test "$(wc -l < "${RUNNER_TEMP}/actual-files.txt")" -eq 98
+          visual_case_count="$(jq -er '.cases | length' \
+            evidence/et13/generated/visual-cases.v1.json)"
+          test "$(wc -l < "${RUNNER_TEMP}/actual-files.txt")" \
+            -eq "$((visual_case_count + 2))"
           diff -u "${RUNNER_TEMP}/expected-files.txt" "${RUNNER_TEMP}/actual-files.txt"
 
           while IFS= read -r path; do
