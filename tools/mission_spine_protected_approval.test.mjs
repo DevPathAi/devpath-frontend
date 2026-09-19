@@ -26,9 +26,9 @@ const approvalFacts = {
   sourceSha: sha,
   runId: 501,
   runAttempt: 1,
-  environmentName: 'mission-spine-mobile-signing-android',
-  jobName: 'Sign Android release',
-  workflowPath: '.github/workflows/mission-spine-signed-mobile-build.yml',
+  environmentName: 'manual-at-nvda',
+  jobName: 'Approve manual NVDA evidence',
+  workflowPath: '.github/workflows/mission-spine-manual-at-evidence.yml',
   localWorkflowSha256: workflowSha256,
   run: {
     id: 501,
@@ -38,7 +38,7 @@ const approvalFacts = {
     conclusion: null,
     head_sha: sha,
     head_branch: 'main',
-    path: '.github/workflows/mission-spine-signed-mobile-build.yml',
+    path: '.github/workflows/mission-spine-manual-at-evidence.yml',
     repository: { full_name: 'DevPathAi/devpath-frontend' },
     head_repository: { full_name: 'DevPathAi/devpath-frontend' },
     actor: { id: 11, login: 'initiator', type: 'User' },
@@ -52,7 +52,7 @@ const approvalFacts = {
   },
   environment: {
     id: 91,
-    name: 'mission-spine-mobile-signing-android',
+    name: 'manual-at-nvda',
     can_admins_bypass: false,
     deployment_branch_policy: {
       protected_branches: false,
@@ -86,14 +86,14 @@ const approvalFacts = {
       state: 'approved',
       user: { id: 77432570, login: 'VelkaressiaBlutkrone', type: 'User' },
       environments: [
-        { id: 91, name: 'mission-spine-mobile-signing-android' },
+        { id: 91, name: 'manual-at-nvda' },
       ],
     },
   ],
   jobs: {
     jobs: [
       {
-        name: 'Sign Android release',
+        name: 'Approve manual NVDA evidence',
         run_id: 501,
         head_sha: sha,
         started_at: '2025-08-17T01:02:03Z',
@@ -106,9 +106,9 @@ const approvalFacts = {
 test('protected approval binds exact environment, job, workflow, and reviewer', () => {
   const actual = validateProtectedApprovalFacts(approvalFacts);
   assert.deepEqual(actual, {
-    approval_environment: 'mission-spine-mobile-signing-android',
+    approval_environment: 'manual-at-nvda',
     approval_environment_id: 91,
-    approval_job_name: 'Sign Android release',
+    approval_job_name: 'Approve manual NVDA evidence',
     approved_by: 'VelkaressiaBlutkrone',
     approved_by_id: 77432570,
     approval_effective_at: '2025-08-17T01:02:03Z',
@@ -389,6 +389,38 @@ test('ET13 release authentication environment is an exact protected binding', ()
     validateProtectedApprovalFacts(et13).approval_environment,
     et13.environmentName,
   );
+});
+
+test('removed signed-mobile and TalkBack bindings are no longer allowlisted', () => {
+  for (const [workflowPath, environmentName, jobName] of [
+    [
+      '.github/workflows/mission-spine-signed-mobile-build.yml',
+      'mission-spine-mobile-signing-android',
+      'Sign Android release',
+    ],
+    [
+      '.github/workflows/mission-spine-manual-at-evidence.yml',
+      'manual-at-talkback',
+      'Approve manual TalkBack evidence',
+    ],
+  ]) {
+    const removed = structuredClone(approvalFacts);
+    removed.workflowBytes = Buffer.from(approvalFacts.workflowBytes);
+    removed.workflowPath = workflowPath;
+    removed.environmentName = environmentName;
+    removed.jobName = jobName;
+    removed.run.path = workflowPath;
+    removed.environment.name = environmentName;
+    removed.approvals[0].environments = [
+      { id: removed.environment.id, name: environmentName },
+    ];
+    removed.jobs.jobs[0].name = jobName;
+    assert.throws(
+      () => validateProtectedApprovalFacts(removed),
+      /binding is not allowlisted/,
+    );
+  }
+  assert.doesNotMatch(verifierSource, /talkback|signed-mobile|mobile-signing/i);
 });
 
 test('exact GitHub Actions automation may initiate but lookalikes are rejected', () => {
