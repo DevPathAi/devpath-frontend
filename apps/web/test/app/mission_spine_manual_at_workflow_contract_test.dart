@@ -26,34 +26,58 @@ void main() {
   });
 
   test(
-    'manual AT lanes are protected and jointly publish sanitized artifacts',
+    'manual NVDA lane is protected and publishes one sanitized artifact',
     () {
       expect(workflow.existsSync(), isTrue);
       final source = workflow.readAsStringSync().replaceAll('\r\n', '\n');
-      for (final binding in {
-        'manual-at-nvda': 'Approve manual NVDA evidence',
-        'manual-at-talkback': 'Approve manual TalkBack evidence',
-      }.entries) {
-        expect(source, contains('name: ${binding.key}'));
-        expect(source, contains('name: ${binding.value}'));
-      }
+      expect(source, contains('name: manual-at-nvda'));
+      expect(source, contains('name: Approve manual NVDA evidence'));
+      expect(source, contains('\n  publish-manual-nvda:\n'));
+      expect(source, contains('needs: [authenticate-inputs, approve-nvda]'));
       expect(source, contains('protected approvals require attempt 1'));
       expect(source, contains('tools/et13/verify_external_artifact.mjs'));
       expect(source, contains('candidate-source'));
       expect(source, contains('validate-manual-inputs'));
       expect(source, contains('validate-manual-packages'));
-      expect(source, contains('build-provenance.v2.json'));
-      expect(source, contains('mobile/android/leva-release.apk'));
-      expect(source, isNot(contains('manual-at-voiceover')));
-      expect(source, isNot(contains('mobile/ios')));
-      expect(source, isNot(contains('signed_ipa')));
       expect(source, contains('unsealable-manual-at-review'));
       const releaseInput = r'${{ inputs.release_id }}';
-      for (final lane in ['nvda', 'talkback']) {
-        expect(source, contains('$releaseInput-manual-$lane-run-'));
-      }
+      expect(source, contains('$releaseInput-manual-nvda-run-'));
       expect(source, contains('overwrite: false'));
       expect(source, contains('if-no-files-found: error'));
+    },
+  );
+
+  test(
+    'signed-mobile and TalkBack are absent from the web release evidence',
+    () {
+      final source = workflow
+          .readAsStringSync()
+          .replaceAll('\r\n', '\n')
+          .toLowerCase();
+      for (final forbidden in [
+        'talkback',
+        'signed',
+        '.apk',
+        'build-provenance',
+        'mobile/',
+        'voiceover',
+        'signed_ipa',
+        'publish-atomic-pair',
+      ]) {
+        expect(source, isNot(contains(forbidden)), reason: forbidden);
+      }
+      expect(
+        File(
+          '../../.github/workflows/mission-spine-signed-mobile-build.yml',
+        ).existsSync(),
+        isFalse,
+      );
+      expect(
+        File(
+          '../../tool/release-evidence/catalogs/manual-talkback.v1.json',
+        ).existsSync(),
+        isFalse,
+      );
     },
   );
 
