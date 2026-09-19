@@ -90,28 +90,6 @@
       "substitutions": ["live provider and dialog shell replaced by deterministic AlertDialog host"]
     },
     {
-      "id": "mobile-today-available",
-      "owner": "mobile",
-      "distribution": "mobile",
-      "route": "/?fixture=mobile-today-available",
-      "ready_semantics_label": "ET13_READY:mobile-today-available",
-      "surface_label": "mobile-today-available",
-      "capture_scope": "body_projection",
-      "source_widget": "MobileTodayProjection",
-      "substitutions": ["native AppBar and route shell omitted", "controller/provider state replaced by approved deterministic fixture"]
-    },
-    {
-      "id": "mobile-content-reading",
-      "owner": "mobile",
-      "distribution": "mobile",
-      "route": "/?fixture=mobile-content-reading",
-      "ready_semantics_label": "ET13_READY:mobile-content-reading",
-      "surface_label": "mobile-content-reading",
-      "capture_scope": "body_projection",
-      "source_widget": "MobileContentProjection",
-      "substitutions": ["native AppBar and route shell omitted", "periodic dwell timer frozen", "controller/provider state replaced by approved deterministic fixture"]
-    },
-    {
       "id": "dp-design-mission-ledger",
       "owner": "dp_design",
       "distribution": "web",
@@ -218,18 +196,6 @@
       "substitutions": ["live provider and dialog shell replaced by deterministic AlertDialog host"]
     },
     {
-      "fixture_id": "mobile-today-available",
-      "capture_scope": "body_projection",
-      "source_widget": "MobileTodayProjection",
-      "substitutions": ["native AppBar and route shell omitted", "controller/provider state replaced by approved deterministic fixture"]
-    },
-    {
-      "fixture_id": "mobile-content-reading",
-      "capture_scope": "body_projection",
-      "source_widget": "MobileContentProjection",
-      "substitutions": ["native AppBar and route shell omitted", "periodic dwell timer frozen", "controller/provider state replaced by approved deterministic fixture"]
-    },
-    {
       "fixture_id": "dp-design-mission-ledger",
       "capture_scope": "component_projection",
       "source_widget": "DpEt13MissionLedgerFixture",
@@ -260,7 +226,7 @@
       "substitutions": ["controller/provider state replaced by approved deterministic fixture"]
     }
   ],
-  "projection_contract_sha256": "106e8d2951f44345611627df3cef5a52eef938ab1dfac117750febaa51fde3ca",
+  "projection_contract_sha256": "158fdc882238c9459995c0572536a3cec3704e92bd1b28fa2d80907fc0435b78",
   "visual_matrix": {
     "widths": [320, 600, 840, 1240],
     "themes": ["light", "dark"],

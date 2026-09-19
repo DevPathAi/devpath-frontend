@@ -8,7 +8,7 @@ const _visualVersion = 'leva.et13.visual-cases.v1';
 const _a11yVersion = 'leva.et13.a11y-cases.v1';
 const _projectionContractVersion = 'leva.et13.projection-contract.v1';
 const _projectionContractSha256 =
-    '106e8d2951f44345611627df3cef5a52eef938ab1dfac117750febaa51fde3ca';
+    '158fdc882238c9459995c0572536a3cec3704e92bd1b28fa2d80907fc0435b78';
 const _pendingReview = 'pending_external_review';
 const _approved = 'approved';
 const _diagnostic = 'diagnostic';
@@ -32,8 +32,6 @@ const _fixtureIds = <String>[
   'web-mentor-context-preview',
   'admin-kpi-dashboard',
   'admin-support-long-wire',
-  'mobile-today-available',
-  'mobile-content-reading',
   'dp-design-mission-ledger',
   'dp-design-context-payload-preview',
   'web-community-free',
@@ -46,15 +44,9 @@ final int _a11yCaseCount = _fixtureIds.length * 2;
 const _visualSurfaceCounts = <String, int>{
   'web': 72,
   'admin': 16,
-  'mobile': 16,
   'dp_design': 16,
 };
-const _a11ySurfaceCounts = <String, int>{
-  'web': 18,
-  'admin': 4,
-  'mobile': 4,
-  'dp_design': 4,
-};
+const _a11ySurfaceCounts = <String, int>{'web': 18, 'admin': 4, 'dp_design': 4};
 const _commonEvidenceKeys = <String>[
   'candidate_spec_sha256',
   'status',
@@ -413,7 +405,9 @@ Map<String, Object?> validateCatalog({
   }
 
   final fixtures = _array(catalog['fixtures'], r'$catalog.fixtures');
-  if (fixtures.length != 15) _fail('catalog must contain exactly 15 fixtures');
+  if (fixtures.length != _fixtureIds.length) {
+    _fail('catalog must contain exactly ${_fixtureIds.length} fixtures');
+  }
   final owners = <String, int>{};
   final distributions = <String, int>{};
   final actualIds = <String>[];
@@ -474,17 +468,8 @@ Map<String, Object?> validateCatalog({
   if (!_listEquals(actualIds, _fixtureIds)) {
     _fail('fixture order drifted: $actualIds');
   }
-  const expectedOwners = <String, int>{
-    'web': 9,
-    'admin': 2,
-    'mobile': 2,
-    'dp_design': 2,
-  };
-  const expectedDistributions = <String, int>{
-    'web': 11,
-    'admin': 2,
-    'mobile': 2,
-  };
+  const expectedOwners = <String, int>{'web': 9, 'admin': 2, 'dp_design': 2};
+  const expectedDistributions = <String, int>{'web': 11, 'admin': 2};
   if (!_mapEquals(owners, expectedOwners) ||
       !_mapEquals(distributions, expectedDistributions)) {
     _fail('fixture owner/distribution counts drifted');
@@ -1102,13 +1087,12 @@ Map<String, Object?> validateBuildMarkerDocument({
     marker['distributions'],
     'buildMarker.distributions',
   );
-  if (distributions.length != 3) {
-    _fail('build marker must bind exactly three Flutter Web distributions');
+  if (distributions.length != 2) {
+    _fail('build marker must bind exactly two Flutter Web distributions');
   }
   const expected = <String, String>{
     'web': 'apps/web/lib/et13_evidence_main.dart',
     'admin': 'apps/admin/lib/et13_evidence_main.dart',
-    'mobile': 'apps/mobile/lib/et13_evidence_main.dart',
   };
   for (var index = 0; index < distributions.length; index++) {
     final distribution = _object(
@@ -1181,18 +1165,12 @@ Map<String, Object?> writeBuildMarker({
   required String outputPath,
   required String webRoot,
   required String adminRoot,
-  required String mobileRoot,
 }) {
   _validateCleanHead(sourceSha);
-  final roots = <String, String>{
-    'web': webRoot,
-    'admin': adminRoot,
-    'mobile': mobileRoot,
-  };
+  final roots = <String, String>{'web': webRoot, 'admin': adminRoot};
   const entrypoints = <String, String>{
     'web': 'apps/web/lib/et13_evidence_main.dart',
     'admin': 'apps/admin/lib/et13_evidence_main.dart',
-    'mobile': 'apps/mobile/lib/et13_evidence_main.dart',
   };
   final distributions = <Map<String, Object?>>[];
   for (final id in entrypoints.keys) {
@@ -3646,7 +3624,6 @@ void main(List<String> arguments) {
           outputPath: _requiredOption(options, 'output'),
           webRoot: _requiredOption(options, 'web-root'),
           adminRoot: _requiredOption(options, 'admin-root'),
-          mobileRoot: _requiredOption(options, 'mobile-root'),
         );
         stdout.writeln('ET13 build marker: OK');
       case 'candidate':

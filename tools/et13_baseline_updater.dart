@@ -85,7 +85,7 @@ void _validateCandidate({
     'case_catalog_schema_version': 'leva.et13.visual-cases.v1',
     'projection_contract_sha256': catalog['projection_contract_sha256'],
     'fixture_ids': generated['fixture_ids'],
-    'case_count': 96,
+    'case_count': generated['case_count'],
     'surface_case_counts': generated['surface_case_counts'],
     'capture_surface': 'flutter_web_release_projection',
     'device_evidence': false,
