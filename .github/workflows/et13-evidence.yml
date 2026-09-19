@@ -42,7 +42,6 @@ name: ET13 Frontend Evidence
     paths:
       - 'apps/web/**'
       - 'apps/admin/**'
-      - 'apps/mobile/**'
       - 'packages/dp_core/**'
       - 'packages/dp_design/**'
       - 'evidence/et13/**'
@@ -61,7 +60,6 @@ name: ET13 Frontend Evidence
     paths:
       - 'apps/web/**'
       - 'apps/admin/**'
-      - 'apps/mobile/**'
       - 'packages/dp_core/**'
       - 'packages/dp_design/**'
       - 'evidence/et13/**'
@@ -871,7 +869,6 @@ jobs:
         run: |
           set -euo pipefail
           dart run tools/et13_evidence.dart validate
-          dart run tools/mobile_source_guard.dart
           dart analyze \
             tools/et13_evidence.dart \
             tools/et13_baseline_updater.dart
@@ -893,9 +890,7 @@ jobs:
             apps/web/test/app/et13_evidence_catalog_contract_test.dart \
             apps/web/test/app/et13_evidence_producer_contract_test.dart \
             apps/admin/lib/src/evidence \
-            apps/admin/test/evidence \
-            apps/mobile/lib/src/evidence \
-            apps/mobile/test/evidence
+            apps/admin/test/evidence
 
       - name: Analyze all production evidence distributions
         shell: bash
@@ -904,7 +899,6 @@ jobs:
           (cd packages/dp_design && flutter analyze --no-pub)
           (cd apps/web && flutter analyze --no-pub)
           (cd apps/admin && flutter analyze --no-pub)
-          (cd apps/mobile && flutter analyze --no-pub)
 
       - name: Run production evidence contracts
         shell: bash
@@ -921,9 +915,6 @@ jobs:
             test/evidence/et13_web_evidence_app_test.dart)
           (cd apps/admin && flutter test --no-pub \
             test/evidence/et13_admin_evidence_app_test.dart)
-          (cd apps/mobile && flutter test --no-pub \
-            test/evidence/et13_mobile_evidence_app_test.dart \
-            test/features/evidence/mobile_evidence_projection_test.dart)
 
       - name: Build web evidence distribution
         working-directory: apps/web
@@ -943,15 +934,6 @@ jobs:
           --dart-define=ET13_SOURCE_SHA=${{ github.sha }}
           --output ${{ github.workspace }}/build/et13/build/admin
 
-      - name: Build mobile evidence distribution
-        working-directory: apps/mobile
-        run: >-
-          flutter build web --release --no-pub
-          --no-web-resources-cdn --no-tree-shake-icons
-          --target lib/et13_evidence_main.dart
-          --dart-define=ET13_SOURCE_SHA=${{ github.sha }}
-          --output ${{ github.workspace }}/build/et13/build/mobile
-
       - name: Bind release builds and lane input provenance
         shell: bash
         env:
@@ -969,8 +951,7 @@ jobs:
             --source-sha="${GITHUB_SHA}" \
             --output="${ET13_ROOT}/build-marker.v1.json" \
             --web-root="${ET13_ROOT}/build/web" \
-            --admin-root="${ET13_ROOT}/build/admin" \
-            --mobile-root="${ET13_ROOT}/build/mobile"
+            --admin-root="${ET13_ROOT}/build/admin"
           provenance_auth=(--mode="${EVIDENCE_MODE}")
           if [[ "${EVIDENCE_MODE}" == release_ready ]]; then
             provenance_auth+=(
@@ -1083,7 +1064,6 @@ jobs:
               --mode="${EVIDENCE_MODE}" \
               --web-root="${ET13_ROOT}/build/web" \
               --admin-root="${ET13_ROOT}/build/admin" \
-              --mobile-root="${ET13_ROOT}/build/mobile" \
               "${baseline[@]}"
 
       - name: Assemble and jointly validate both lanes

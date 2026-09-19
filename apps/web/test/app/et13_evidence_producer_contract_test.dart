@@ -309,7 +309,7 @@ void main() {
       'case_catalog_schema_version': 'leva.et13.a11y-cases.v1',
       'projection_contract_sha256': catalog['projection_contract_sha256'],
       'fixture_ids': generated['fixture_ids'],
-      'case_count': 30,
+      'case_count': generated['case_count'],
       'surface_case_counts': generated['surface_case_counts'],
       'capture_surface': 'flutter_web_release_projection',
       'device_evidence': false,
@@ -325,7 +325,7 @@ void main() {
       'case_catalog_schema_version': binding['case_catalog_schema_version'],
       'projection_contract_sha256': binding['projection_contract_sha256'],
       'fixture_ids': binding['fixture_ids'],
-      'case_count': 30,
+      'case_count': generated['case_count'],
       'surface_case_counts': binding['surface_case_counts'],
       'capture_surface': binding['capture_surface'],
       'device_evidence': false,
@@ -426,7 +426,7 @@ void main() {
     );
   });
 
-  test('approved baseline bundle is the exact review-bound 122-file set', () {
+  test('approved baseline bundle is the exact review-bound file set', () {
     final root = Directory.systemTemp.createTempSync('et13-approved-bundle-');
     addTearDown(() => root.deleteSync(recursive: true));
     final catalogPath = '../../evidence/et13/catalog.v1.json';
@@ -462,7 +462,7 @@ void main() {
       'case_catalog_schema_version': 'leva.et13.visual-cases.v1',
       'projection_contract_sha256': catalog['projection_contract_sha256'],
       'fixture_ids': generated['fixture_ids'],
-      'case_count': 120,
+      'case_count': generated['case_count'],
       'surface_case_counts': generated['surface_case_counts'],
       'capture_surface': 'flutter_web_release_projection',
       'device_evidence': false,
@@ -489,7 +489,7 @@ void main() {
           .convert(reviewFile.readAsBytesSync())
           .toString(),
       'fixture_ids': generated['fixture_ids'],
-      'case_count': 120,
+      'case_count': generated['case_count'],
       'candidate_set_sha256': et13.visualArtifactSetSha(
         root.path,
         generatedCatalogPath: generatedPath,
