@@ -13,7 +13,7 @@
 ## 구조
 - `packages/dp_core` — 도메인·데이터(UI 없음, 순수 Dart)
 - `packages/dp_design` — 디자인 시스템(Material 3, 토큰 SSoT=DESIGN.md)
-- `apps/{web,admin,mobile}` — Flutter 앱
+- `apps/{web,admin}` — Flutter 앱(모바일은 `DevPathAi/devpath-mobile` 레포)
 - 마케팅 홈페이지는 별도 `devpath-home-page` 저장소에 있으며 이 workspace의 멤버가 아니다.
 
 설정은 루트 `pubspec.yaml`의 `workspace:` + `melos:` 키(melos 7.x).

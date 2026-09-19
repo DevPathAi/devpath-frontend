@@ -10,7 +10,6 @@ workspace:
   - packages/dp_design
   - apps/web
   - apps/admin
-  - apps/mobile
 
 dev_dependencies:
   melos: ^7.0.0

@@ -1,6 +1,6 @@
 # CLAUDE.md — devpath-frontend
 
-> 프론트엔드 모노레포(Flutter): `apps/web`·`apps/admin`(Flutter Web) + `apps/mobile`(Flutter 앱) + 공용 패키지 `packages/dp_core`(순수 Dart)·`packages/dp_design`(디자인 시스템). **Dart pub workspaces + melos 7**로 단일 해석.
+> 프론트엔드 모노레포(Flutter): `apps/web`·`apps/admin`(Flutter Web) + 공용 패키지 `packages/dp_core`(순수 Dart)·`packages/dp_design`(디자인 시스템). **Dart pub workspaces + melos 7**로 단일 해석.
 
 ## 🚫 절대 조건 — 모든 작업에 예외 없이 적용
 
@@ -51,13 +51,13 @@
 
 ## 빌드·테스트 (모노레포 루트에서 melos로 실행)
 
-> 구조: **Dart pub workspaces + melos 7**. 멤버 = `packages/dp_core`(순수 Dart)·`packages/dp_design`(Flutter 디자인 시스템) + `apps/{web,admin,mobile}`(Flutter). `web`·`admin`은 **Flutter Web**. 설정은 루트 `pubspec.yaml`의 `workspace:`+`melos:` 키(과거 `melos.yaml` 대체). 사용법 요약은 `melos_README.md`.
+> 구조: **Dart pub workspaces + melos 7**. 멤버 = `packages/dp_core`(순수 Dart)·`packages/dp_design`(Flutter 디자인 시스템) + `apps/{web,admin}`(Flutter). 모바일 앱은 별도 레포 [DevPathAi/devpath-mobile](https://github.com/DevPathAi/devpath-mobile)(`dp_design` 포크 + `dp_core` 커밋 핀). `web`·`admin`은 **Flutter Web**. 설정은 루트 `pubspec.yaml`의 `workspace:`+`melos:` 키(과거 `melos.yaml` 대체). 사용법 요약은 `melos_README.md`.
 
 - 의존성 동기화: `dart pub get --enforce-lockfile` 후 `dart run melos bootstrap --enforce-lockfile`
 - 정적 분석: `dart run melos run analyze` (Flutter=`flutter analyze`, 순수 Dart=`dart analyze`)
 - 테스트: `dart run melos run test` (Flutter=`flutter test --exclude-tags golden`, 순수 Dart=`dart test`)
 - 포맷: `dart run melos run format`(CI 게이트, `dart format --set-exit-if-changed .`) / 적용 `dart run melos run fix`
-- 단일 앱 실행: `cd apps/web && flutter run -d chrome`(admin 동일) · `cd apps/mobile && flutter run`
+- 단일 앱 실행: `cd apps/web && flutter run -d chrome`(admin 동일)
 - melos 호출: global activation을 사용하지 않는다. 커밋된 `pubspec.lock`의 Melos를 `dart run melos <cmd>`로 실행한다.
 
 테스트는 **Flutter 테스트 스택**으로 작성한다(`flutter_test` + `flutter_riverpod`의 `ProviderContainer`/위젯 테스트). 실패 테스트를 먼저 쓰고 `dart run melos run test`로 통과를 눈으로 확인한다(절대 조건 2). 위젯 테스트의 폭 의존은 `tester.view.physicalSize`, `context.dpColors`를 쓰는 위젯엔 `theme: DpTheme.light()`를 준다.

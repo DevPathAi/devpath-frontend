@@ -15,11 +15,6 @@ npm-debug.log*
 !.vscode/extensions.json
 *.iml
 
-# Flutter (mobile)
-apps/mobile/.dart_tool/
-apps/mobile/.flutter-plugins
-apps/mobile/.flutter-plugins-dependencies
-apps/mobile/build/
 
 # Dart pub workspace 루트 산출물 (E2 — melos bootstrap이 루트에 생성)
 /.dart_tool/
