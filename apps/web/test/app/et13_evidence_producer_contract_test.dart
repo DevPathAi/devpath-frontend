@@ -86,6 +86,14 @@ void main() {
     expect(tool, isNot(contains("summary['case_count'], 120")));
     expect(tool, isNot(contains('exactly 120 ordered cases')));
     expect(capture, isNot(contains('/120 passed')));
+    // 승인된 baseline 을 반영하는 updater 도 같은 계열의 리터럴을 갖고 있었다:
+    // `'case_count': 96` 이 12-fixture 시절 값으로 남아 15-fixture candidate 를
+    // 전부 거부했다(2026-09-19 실측). 개수는 생성 카탈로그에서만 읽는다.
+    final updater = File(
+      '../../tools/et13_baseline_updater.dart',
+    ).readAsStringSync();
+    expect(updater, contains("'case_count': generated['case_count'],"));
+    expect(updater, isNot(contains(RegExp(r"'case_count': \d"))));
     expect(capture, contains('pixel-stable across two captures'));
     expect(capture, contains('PNG axes differ from its catalog profile'));
     expect(capture, contains("page.on('requestfailed'"));
