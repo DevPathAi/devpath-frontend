@@ -17,7 +17,7 @@ const _captureSurface = 'flutter_web_release_projection';
 const _externalAccessibilityStatus = 'not_satisfied';
 const _a11yStandard = 'WCAG 2.2 AA';
 const _workspaceLockSha =
-    '0314570cb0955aab626fa61191b419c06b6f2cb06736827b48a1e88f252a34e4';
+    '30d70407b77c72367b4a654200fa2f41f5d312f6e6ba5016b7328ed828c066ec';
 const _rendererImage =
     'mcr.microsoft.com/playwright:v1.55.0-noble@sha256:'
     'ffc33305f7b4b04057ae4a0caa70aad4fde87454fb403a1a22e7f931707dfcf9';

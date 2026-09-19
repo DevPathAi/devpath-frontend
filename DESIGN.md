@@ -1,12 +1,12 @@
 # DESIGN.md — Leva 프론트엔드 디자인 시스템
 
-> 대상: `dp_design`(Material 3) 공용 디자인 시스템 + web/admin/mobile 앱.
+> 대상: `dp_design`(Material 3) 공용 디자인 시스템 + web/admin 앱. (모바일 앱은 `DevPathAi/devpath-mobile` 레포가 분리 시점의 `dp_design` 포크를 소유한다 — 색·타이포만 공통 브랜드로 남는다.)
 > 출처: 승인된 Mission Spine / Mission Ledger 디자인·엔지니어링 계약(2026-08-15).
 > 역할: `packages/dp_design/lib/src/theme/`가 token **값과 typed mapping의 SSoT**이고, 이 문서는 **의도와 허용 사용 규칙의 SSoT**다. 표의 값은 코드를 mirror하며 모든 화면 디자인은 이 사용 규칙에 정렬한다.
 
 ## 0. 분류 & 원칙
 
-- **앱 셸(web/admin/mobile)** = APP UI: 차분한 surface 위계, 강한 타이포, 적은 색, 최소 chrome. 카드는 "카드가 곧 인터랙션"일 때만.
+- **앱 셸(web/admin)** = APP UI: 차분한 surface 위계, 강한 타이포, 적은 색, 최소 chrome. 카드는 "카드가 곧 인터랙션"일 때만.
 - **landing(vanilla HTML/CSS)** = MARKETING: 별도 표현형 디자인이며 versioned semantic token manifest만 mirror한다. Flutter package를 import하거나 token 값을 별도로 정하지 않는다.
 - 보편 규칙: CSS/토큰 변수로 색 정의 · 기본 폰트 스택 금지 · 섹션당 한 가지 일 · 카드는 존재 이유 증명 · 본문 ≥16px & 대비 ≥4.5:1.
 
@@ -259,8 +259,7 @@ Primary action hover는 `primary` 위에 `onPrimary` 8% overlay를 합성한 같
   레이블처럼 **읽어야 하는 텍스트**는 전용 토큰(`railFaint`, ≥4.5:1)을 쓴다.
 - **셸을 쓰는 화면은 `AppBar`를 만들지 않는다.** 제목 3중 노출(앱바 제목 + 브레드크럼 + 본문 제목)을
   막기 위해 화면은 `DpPageHeader`로만 제목을 낸다. `Scaffold` 자체는 화면이 계속 쓸 수 있으나
-  `backgroundColor`를 별도로 지정하면 크롬바 아래 색이 셸과 어긋나므로 지정하지 않는다. (`DpAppShell`을
-  쓰지 않는 `apps/mobile`은 이 규칙 밖이다 — 기존 `Scaffold.appBar`를 그대로 쓴다.)
+  `backgroundColor`를 별도로 지정하면 크롬바 아래 색이 셸과 어긋나므로 지정하지 않는다.
 
 ### 9.1 페이지 헤더의 스크롤 거동
 

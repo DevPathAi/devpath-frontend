@@ -25,8 +25,6 @@ const _nginxRuntime =
 const _flutterArchiveSha =
     '287937458126a53284ed112c8c7dbc647bea2d09ab65d46e2d5cf94e901aac69';
 const _flutterRevision = '924134a44c189315be2148659913dda1671cbe99';
-const _gradleDistributionSha =
-    'b84e04fa845fecba48551f425957641074fcc00a88a84d2aae5808743b35fc85';
 const _flutterVersion = '3.44.1';
 const _dartVersion = '3.12.1';
 const _melosVersion = '7.8.1';
@@ -316,7 +314,6 @@ void main() {
   late String workflow;
   late String webDockerfile;
   late String adminDockerfile;
-  late String gradleWrapper;
   late String workspaceLock;
   late String workspacePubspec;
 
@@ -326,9 +323,6 @@ void main() {
     ).readAsStringSync().replaceAll('\r\n', '\n');
     webDockerfile = File('Dockerfile').readAsStringSync();
     adminDockerfile = File('../admin/Dockerfile').readAsStringSync();
-    gradleWrapper = File(
-      '../mobile/android/gradle/wrapper/gradle-wrapper.properties',
-    ).readAsStringSync();
     workspaceLock = File(
       '../../pubspec.lock',
     ).readAsStringSync().replaceAll('\r\n', '\n');
@@ -467,12 +461,5 @@ void main() {
     expect(_dockerfilePinErrors(baseDrift), isNotEmpty);
     expect(_dockerfilePinErrors(archiveDrift), isNotEmpty);
     expect(_dockerfilePinErrors(lockAssertionDrift), isNotEmpty);
-  });
-
-  test('Gradle wrapper distribution is checksum locked', () {
-    expect(
-      gradleWrapper,
-      contains('distributionSha256Sum=$_gradleDistributionSha'),
-    );
   });
 }
