@@ -53,3 +53,7 @@ cd apps/web && flutter run -d chrome    # admin 동일
 - 워크플로우 현황: [workflow-dashboard](https://devpathai.github.io/workflow-dashboard/)
 - 로컬 계약과 이력: [`DESIGN.md`](./DESIGN.md) · [`TODOS.md`](./TODOS.md) · [`HANDOFF.md`](./HANDOFF.md) · [`melos_README.md`](./melos_README.md)
 - 커뮤니티 IA·React급 Flutter Web 작업 기록: [`docs/community-information-architecture/`](./docs/community-information-architecture/README.md)
+
+## 릴리스 증거 재빌드 기록
+
+- 2026-09-23: 릴리스 계약은 후보 웹 이미지가 현재 운영 이미지와 달라야 한다(`rollback.prior_digest` = 운영 = base 웹, 후보와 구별). 제품 소스 변경 없이 홈 파이프라인 수정(Pages Functions 를 봉인 dist 에)과 gateway CORS 픽스를 실어 나르기 위해, 코드 변경 없이 새 `main` 커밋으로 web/admin 이미지와 ET13 증거를 재빌드했다(캠페인 `ms-20260923-home-functions-gateway-cors-r2`).
