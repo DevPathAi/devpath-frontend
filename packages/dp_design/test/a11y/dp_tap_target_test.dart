@@ -1,5 +1,4 @@
 import 'package:dp_design/dp_design.dart';
-import 'package:dp_design/src/a11y/dp_tap_target.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -32,9 +31,9 @@ void main() {
 
   test('기본 minSize 는 DpDensity.minTarget(24) 이다', () {
     final target = DpTapTarget(
-      child: const SizedBox(),
       onTap: () {},
       semanticLabel: '닫기',
+      child: const SizedBox(),
     );
     expect(target.minSize, DpDensity.minTarget);
   });

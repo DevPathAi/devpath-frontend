@@ -33,6 +33,6 @@ void main() {
     expect(taller.contentMaxWidth, AppTokens.standard.contentMaxWidth);
     final lerped = AppTokens.standard.lerp(taller, 1);
     expect(lerped, isA<AppTokens>());
-    expect((lerped as AppTokens).headerHeight, 64);
+    expect(lerped.headerHeight, 64);
   });
 }
