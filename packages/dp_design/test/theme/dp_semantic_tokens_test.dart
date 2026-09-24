@@ -75,29 +75,29 @@ void main() {
           DpColors.light.textFaint,
           DpColors.dark.textFaint,
         ),
-        DpSemanticColorRole.railBg: (
-          DpColors.light.railBg,
-          DpColors.dark.railBg,
+        DpSemanticColorRole.headerBg: (
+          DpColors.light.headerBg,
+          DpColors.dark.headerBg,
         ),
-        DpSemanticColorRole.railText: (
-          DpColors.light.railText,
-          DpColors.dark.railText,
+        DpSemanticColorRole.headerText: (
+          DpColors.light.headerText,
+          DpColors.dark.headerText,
         ),
-        DpSemanticColorRole.railMuted: (
-          DpColors.light.railMuted,
-          DpColors.dark.railMuted,
+        DpSemanticColorRole.headerMuted: (
+          DpColors.light.headerMuted,
+          DpColors.dark.headerMuted,
         ),
-        DpSemanticColorRole.railFaint: (
-          DpColors.light.railFaint,
-          DpColors.dark.railFaint,
+        DpSemanticColorRole.headerFaint: (
+          DpColors.light.headerFaint,
+          DpColors.dark.headerFaint,
         ),
-        DpSemanticColorRole.railActive: (
-          DpColors.light.railActive,
-          DpColors.dark.railActive,
+        DpSemanticColorRole.headerActive: (
+          DpColors.light.headerActive,
+          DpColors.dark.headerActive,
         ),
-        DpSemanticColorRole.railBorder: (
-          DpColors.light.railBorder,
-          DpColors.dark.railBorder,
+        DpSemanticColorRole.headerBorder: (
+          DpColors.light.headerBorder,
+          DpColors.dark.headerBorder,
         ),
         DpSemanticColorRole.success: (
           DpColors.light.success,

@@ -73,12 +73,12 @@ enum DpSemanticColorRole {
   textPrimary,
   textSecondary,
   textFaint,
-  railBg,
-  railText,
-  railMuted,
-  railFaint,
-  railActive,
-  railBorder,
+  headerBg,
+  headerText,
+  headerMuted,
+  headerFaint,
+  headerActive,
+  headerBorder,
   success,
   warning,
   danger,
@@ -113,12 +113,12 @@ extension DpSemanticColorRoleX on DpSemanticColorRole {
     DpSemanticColorRole.textPrimary => colors.textPrimary,
     DpSemanticColorRole.textSecondary => colors.textSecondary,
     DpSemanticColorRole.textFaint => colors.textFaint,
-    DpSemanticColorRole.railBg => colors.railBg,
-    DpSemanticColorRole.railText => colors.railText,
-    DpSemanticColorRole.railMuted => colors.railMuted,
-    DpSemanticColorRole.railFaint => colors.railFaint,
-    DpSemanticColorRole.railActive => colors.railActive,
-    DpSemanticColorRole.railBorder => colors.railBorder,
+    DpSemanticColorRole.headerBg => colors.headerBg,
+    DpSemanticColorRole.headerText => colors.headerText,
+    DpSemanticColorRole.headerMuted => colors.headerMuted,
+    DpSemanticColorRole.headerFaint => colors.headerFaint,
+    DpSemanticColorRole.headerActive => colors.headerActive,
+    DpSemanticColorRole.headerBorder => colors.headerBorder,
     DpSemanticColorRole.success => colors.success,
     DpSemanticColorRole.warning => colors.warning,
     DpSemanticColorRole.danger => colors.danger,
@@ -164,12 +164,12 @@ extension DpSemanticColorRoleX on DpSemanticColorRole {
       DpSemanticTokenUsage.secondaryText,
     },
     DpSemanticColorRole.textFaint => const {DpSemanticTokenUsage.metadata},
-    DpSemanticColorRole.railBg ||
-    DpSemanticColorRole.railText ||
-    DpSemanticColorRole.railMuted ||
-    DpSemanticColorRole.railFaint ||
-    DpSemanticColorRole.railActive ||
-    DpSemanticColorRole.railBorder => const {DpSemanticTokenUsage.navigation},
+    DpSemanticColorRole.headerBg ||
+    DpSemanticColorRole.headerText ||
+    DpSemanticColorRole.headerMuted ||
+    DpSemanticColorRole.headerFaint ||
+    DpSemanticColorRole.headerActive ||
+    DpSemanticColorRole.headerBorder => const {DpSemanticTokenUsage.navigation},
     DpSemanticColorRole.success => const {
       DpSemanticTokenUsage.success,
       DpSemanticTokenUsage.earnedCompletion,

@@ -27,12 +27,12 @@ class DpColors extends ThemeExtension<DpColors> {
     required this.textPrimary,
     required this.textSecondary,
     required this.textFaint,
-    required this.railBg,
-    required this.railText,
-    required this.railMuted,
-    required this.railFaint,
-    required this.railActive,
-    required this.railBorder,
+    required this.headerBg,
+    required this.headerText,
+    required this.headerMuted,
+    required this.headerFaint,
+    required this.headerActive,
+    required this.headerBorder,
     required this.success,
     required this.warning,
     required this.danger,
@@ -76,14 +76,16 @@ class DpColors extends ThemeExtension<DpColors> {
   final Color textFaint;
 
   /// 사이드바 전용. 본문과 다른 위계를 갖는다.
-  final Color railBg;
-  final Color railText;
-  final Color railMuted;
+  /// 어두운 헤더(계약 2.0.0 — 2026-09-19 §5.4-2 에서 다크 레일 색 `rail*` 을 값 그대로 승계).
+  /// P2 까지는 admin 의 DpNavRail 도 같은 토큰을 쓴다.
+  final Color headerBg;
+  final Color headerText;
+  final Color headerMuted;
 
   /// 사이드바 섹션 레이블.
-  final Color railFaint;
-  final Color railActive;
-  final Color railBorder;
+  final Color headerFaint;
+  final Color headerActive;
+  final Color headerBorder;
 
   final Color success;
 
@@ -127,12 +129,12 @@ class DpColors extends ThemeExtension<DpColors> {
     textPrimary: Color(0xFF171923),
     textSecondary: Color(0xFF5E6472),
     textFaint: Color(0xFF818998),
-    railBg: Color(0xFF11131B),
-    railText: Color(0xFFF5F7FB),
-    railMuted: Color(0xFFB7BDCA),
-    railFaint: Color(0xFF959DAD),
-    railActive: Color(0xFF272B3F),
-    railBorder: Color(0xFF2A2F3C),
+    headerBg: Color(0xFF11131B),
+    headerText: Color(0xFFF5F7FB),
+    headerMuted: Color(0xFFB7BDCA),
+    headerFaint: Color(0xFF959DAD),
+    headerActive: Color(0xFF272B3F),
+    headerBorder: Color(0xFF2A2F3C),
     success: Color(0xFF137A48),
     warning: Color(0xFF9A5B00),
     danger: Color(0xFFC12C36),
@@ -162,12 +164,12 @@ class DpColors extends ThemeExtension<DpColors> {
     textPrimary: Color(0xFFF4F5F8),
     textSecondary: Color(0xFFB6BCC8),
     textFaint: Color(0xFF858C99),
-    railBg: Color(0xFF090B10),
-    railText: Color(0xFFF4F5F8),
-    railMuted: Color(0xFFB6BCC8),
-    railFaint: Color(0xFF929AA8),
-    railActive: Color(0xFF23263B),
-    railBorder: Color(0xFF292D38),
+    headerBg: Color(0xFF090B10),
+    headerText: Color(0xFFF4F5F8),
+    headerMuted: Color(0xFFB6BCC8),
+    headerFaint: Color(0xFF929AA8),
+    headerActive: Color(0xFF23263B),
+    headerBorder: Color(0xFF292D38),
     success: Color(0xFF5DD39E),
     warning: Color(0xFFF6C177),
     danger: Color(0xFFFF7B84),
@@ -198,12 +200,12 @@ class DpColors extends ThemeExtension<DpColors> {
     Color? textPrimary,
     Color? textSecondary,
     Color? textFaint,
-    Color? railBg,
-    Color? railText,
-    Color? railMuted,
-    Color? railFaint,
-    Color? railActive,
-    Color? railBorder,
+    Color? headerBg,
+    Color? headerText,
+    Color? headerMuted,
+    Color? headerFaint,
+    Color? headerActive,
+    Color? headerBorder,
     Color? success,
     Color? warning,
     Color? danger,
@@ -231,12 +233,12 @@ class DpColors extends ThemeExtension<DpColors> {
     textPrimary: textPrimary ?? this.textPrimary,
     textSecondary: textSecondary ?? this.textSecondary,
     textFaint: textFaint ?? this.textFaint,
-    railBg: railBg ?? this.railBg,
-    railText: railText ?? this.railText,
-    railMuted: railMuted ?? this.railMuted,
-    railFaint: railFaint ?? this.railFaint,
-    railActive: railActive ?? this.railActive,
-    railBorder: railBorder ?? this.railBorder,
+    headerBg: headerBg ?? this.headerBg,
+    headerText: headerText ?? this.headerText,
+    headerMuted: headerMuted ?? this.headerMuted,
+    headerFaint: headerFaint ?? this.headerFaint,
+    headerActive: headerActive ?? this.headerActive,
+    headerBorder: headerBorder ?? this.headerBorder,
     success: success ?? this.success,
     warning: warning ?? this.warning,
     danger: danger ?? this.danger,
@@ -270,12 +272,12 @@ class DpColors extends ThemeExtension<DpColors> {
       textPrimary: m(textPrimary, other.textPrimary),
       textSecondary: m(textSecondary, other.textSecondary),
       textFaint: m(textFaint, other.textFaint),
-      railBg: m(railBg, other.railBg),
-      railText: m(railText, other.railText),
-      railMuted: m(railMuted, other.railMuted),
-      railFaint: m(railFaint, other.railFaint),
-      railActive: m(railActive, other.railActive),
-      railBorder: m(railBorder, other.railBorder),
+      headerBg: m(headerBg, other.headerBg),
+      headerText: m(headerText, other.headerText),
+      headerMuted: m(headerMuted, other.headerMuted),
+      headerFaint: m(headerFaint, other.headerFaint),
+      headerActive: m(headerActive, other.headerActive),
+      headerBorder: m(headerBorder, other.headerBorder),
       success: m(success, other.success),
       warning: m(warning, other.warning),
       danger: m(danger, other.danger),

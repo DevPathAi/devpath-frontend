@@ -81,7 +81,7 @@ void main() {
 
   // 3단계(DpRailBrand)부터는 앱이 Text를 직접 만들지 않는다 — brand:에
   // DpRailBrand(mark:, wordmark:)를 넘기면 워드마크 Text는 DpNavRail 내부에서
-  // color: c.railText를 명시해 만들어진다(dp_nav_rail.dart). 즉 이 회귀는
+  // color: c.headerText를 명시해 만들어진다(dp_nav_rail.dart). 즉 이 회귀는
   // 이제 dp_design 쪽에서 구조적으로 막혀 있다(dp_rail_brand_test.dart·
   // dp_nav_rail_test.dart). 여기서는 admin 셸이 실제로 DpRailBrand를 통해
   // 배선했는지(과거처럼 raw Text/Widget을 brand:에 직접 넘기는 회귀가
@@ -97,7 +97,7 @@ void main() {
     return effective.color;
   }
 
-  testWidgets('레일 브랜드 텍스트의 실효 색은 라이트에서 railText다(레일 배경에 묻히지 않음)', (
+  testWidgets('레일 브랜드 텍스트의 실효 색은 라이트에서 headerText다(레일 배경에 묻히지 않음)', (
     tester,
   ) async {
     _setWidth(tester, 1400);
@@ -111,14 +111,14 @@ void main() {
     );
     expect(
       effectiveTextColor(tester, finder),
-      DpColors.light.railText,
+      DpColors.light.headerText,
       reason:
           'titleSmall이 이미 textPrimary를 품고 있어 color를 명시하지 않으면 '
-          'railText 대신 textPrimary로 렌더돼 라이트에서 railBg와 같은 색이 된다',
+          'headerText 대신 textPrimary로 렌더돼 라이트에서 headerBg와 같은 색이 된다',
     );
   });
 
-  testWidgets('레일 브랜드 텍스트의 실효 색은 다크에서도 railText다', (tester) async {
+  testWidgets('레일 브랜드 텍스트의 실효 색은 다크에서도 headerText다', (tester) async {
     _setWidth(tester, 1400);
     await tester.pumpWidget(
       MaterialApp(
@@ -131,6 +131,6 @@ void main() {
       of: find.byType(DpNavRail),
       matching: find.text('운영 콘솔'),
     );
-    expect(effectiveTextColor(tester, finder), DpColors.dark.railText);
+    expect(effectiveTextColor(tester, finder), DpColors.dark.headerText);
   });
 }
