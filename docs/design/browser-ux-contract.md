@@ -20,7 +20,7 @@
 | `back-forward-boards` | 390 | compact 제목 메뉴(`게시판 바꾸기`)로 자유게시판→Q/A→피드백 뒤 back×2·forward×1 이 URL 과 H1 을 함께 되돌림. 페이지 안 게시판 세그먼트는 2026-09-17 제거 — 본문에서 게시판을 옮기는 수단은 compact 제목 메뉴뿐 | 단계별 불일치 |
 | `keyboard-traversal` | 1440 | `/community` 에서 Tab 순회 순서가 `expectations.json` 의 실측 고정값과 일치 | 순서 불일치 · 기대값 미기록 |
 | `dialog-focus-return` | 1024 | 정렬 버튼(`최신순`) Enter → 정렬 메뉴 등장 → Escape 로 닫힘 → focus 가 여는 버튼으로 복귀. 작성 버튼은 시트 없이 작성 화면으로 직행하므로 같은 화면의 메뉴 오버레이로 잰다 | 메뉴 없음 · 미닫힘 · focus 미복귀 |
-| `overflow-and-targets` | 390/768/1024/1440 × 100/200% | 8개 라우트에서 `scrollWidth ≤ innerWidth`; 390·100% 에서 모든 `role=button` 이 44×44 이상 | overflow · 작은 타깃 |
+| `overflow-and-targets` | 390/768/1024/1440 × 100/200% | 8개 라우트에서 `scrollWidth ≤ innerWidth`; 390·100% 에서 모든 `role=button` 이 24×24 이상(WCAG 2.2 AA 2.5.8; 계약 2.0.0 의 DpDensity.minTarget) | overflow · 작은 타깃 |
 | `reduced-motion-parity` | 768 | `/dashboard` `/community` `/path` 의 시맨틱 라벨 집합이 reduced-motion 에서도 동일 | 라벨 손실 |
 | `axe` | 390 light · 1240 dark | 8개 라우트 axe(wcag2a/2aa/21a/21aa/best-practice) | critical/serious ≥ 1 |
 
@@ -39,7 +39,7 @@ node run.mjs --dist=../../apps/web/build/web --out=../../evidence/browser-ux/lat
 
 ## 기대값 갱신 규칙
 
-`expectations.json`(키보드 순회 순서 등)은 러너 첫 실행의 실측값으로만 채우고, 바뀔 때는 PR 에서 변경 전후 순서를 나란히 적어 리뷰 승인 후 갱신한다. 러너 기준(overflow·44px·axe critical/serious)은 낮추지 않는다. 기준을 어기는 앱 결함은 앱을 고친다.
+`expectations.json`(키보드 순회 순서 등)은 러너 첫 실행의 실측값으로만 채우고, 바뀔 때는 PR 에서 변경 전후 순서를 나란히 적어 리뷰 승인 후 갱신한다. 러너 기준(overflow·24px 최소 타깃·axe critical/serious)은 낮추지 않는다. 24px 은 2026-09-19 스펙 §5.4-1 의 사용자 결정으로 44px 에서 옮긴 값이며, 그 아래로는 내리지 않는다. 기준을 어기는 앱 결함은 앱을 고친다.
 
 ## 실측 발견 사항 (2026-09-17, 첫 실행 → 수정 후 17/17 통과)
 
@@ -48,7 +48,7 @@ node run.mjs --dist=../../apps/web/build/web --out=../../evidence/browser-ux/lat
 | 외부 차단 시 렌더 정지 | `--no-web-resources-cdn` 없이는 CanvasKit 이 gstatic 에서 동적 import | 빌드 플래그 채택(ET13 와 동일) |
 | axe `meta-viewport`(critical) 8개 라우트 전부 | Flutter full-page 임베딩이 `user-scalable=no` 를 주입 | 부트스트랩을 전 라우트 커스텀 호스트 임베딩으로 전환 |
 | axe `aria-prohibited-attr`(serious) | role 없는 `flt-semantics` 에 aria-label(`DpLoading`) | `SemanticsRole.status`/`alert`(liveRegion 플래그와 병용 불가) |
-| 390px 작은 타깃: 세그먼트 85×32, `실습` 78×36 | 데스크톱 기본 `VisualDensity.compact` + SegmentedButton 이 minimumSize 미전달 | 테마 표준 밀도, 세그먼트 padding·padded 탭 타깃 |
+| 390px 작은 타깃: 세그먼트 85×32, `실습` 78×36 | 데스크톱 기본 `VisualDensity.compact` + SegmentedButton 이 minimumSize 미전달 | 테마 표준 밀도, 세그먼트 padding·padded 탭 타깃 (2026-09-24 계약 2.0.0 이 이 조치를 대체: 컨트롤 30px·최소 타깃 24px, 세그먼트는 compact 밀도·shrinkWrap) |
 | 목록 행마다 Tab 정지 2회 | `FocusableActionDetector` + `InkWell` 각각 포커스 노드 | InkWell `canRequestFocus:false`, `ActivateIntent` 로 Enter/Space |
 | 시트가 role=dialog 를 내지 않음 | Flutter 모달 시트는 modal barrier 를 'Dismiss' 버튼으로 노출 | 러너 판정을 Dismiss 버튼 기준으로(앱 변경 없음) |
 | 순회에 셸 레일이 없음 | 라우트 `FocusScope` 경계 — 페이지 스코프 안만 순회, 레일은 Shift+Tab/스코프 이탈 뒤 도달 | 셸에 `WidgetOrderTraversalPolicy` 고정(스코프 안 순서는 위젯 순), 기대값은 실측 순서(검색 → 게시판 3 → 글 작성 → 행 3)로 고정. 레일 우선 순회는 후속 과제 |
