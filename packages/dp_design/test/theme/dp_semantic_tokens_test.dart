@@ -251,8 +251,8 @@ void main() {
         expect(light['--dp-color-primary'], '#5653E7');
         expect(dark['--dp-color-primary'], '#9B99FF');
         expect(light['--dp-space-lg'], '16px');
-        expect(light['--dp-radius-chip'], '999px');
-        expect(light['--dp-radius-panel'], '18px');
+        expect(light['--dp-radius-chip'], '4px');
+        expect(light['--dp-radius-panel'], '8px');
         expect(light['--dp-layout-content-max'], isNull);
         expect(light['--dp-state-focus-ring'], '#4338CA');
         expect(dark['--dp-state-focus-ring'], '#B9B8FF');
