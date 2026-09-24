@@ -55,31 +55,4 @@ void main() {
     expect(size.height, DpDensity.controlHeight);
     expect(tester.takeException(), isNull); // 오버플로 없음
   });
-
-  testWidgets('FilledButton 은 30px 이고 인접 버튼과 8px 이상 떨어지면 2.5.8 간격 예외를 만족한다', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(390, 900);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: DpTheme.light(),
-        home: Scaffold(
-          body: Row(
-            children: [
-              FilledButton(onPressed: () {}, child: const Text('실습 시작하기')),
-              const SizedBox(width: DpSpacing.sm),
-              OutlinedButton(onPressed: () {}, child: const Text('취소')),
-            ],
-          ),
-        ),
-      ),
-    );
-    final filled = tester.getRect(find.byType(FilledButton));
-    final outlined = tester.getRect(find.byType(OutlinedButton));
-    expect(filled.height, DpDensity.controlHeight);
-    expect(outlined.height, DpDensity.controlHeight);
-    expect(outlined.left - filled.right, greaterThanOrEqualTo(DpSpacing.sm));
-  });
 }

@@ -200,6 +200,7 @@ Material 3 타입 스케일(Pretendard 적용):
 
 - **대비**: 본문/링크 텍스트 ≥4.5:1(`primary`를 텍스트로 쓰지 않고 `primaryText`/`primaryTextStrong` 사용), 큰 텍스트·UI 컴포넌트 ≥3:1.
 - **포인터 타깃(계약 2.0.0)**: ≥24×24 — WCAG 2.2 AA 2.5.8. 24 미만인 타깃은 인접 타깃과의 간격(≥8px)으로 예외 조건을 만족시킨다. 컨트롤 표준 높이는 30(`DpDensity.controlHeight`). 2026-09-19 스펙 §5.4-1 의 사용자 결정으로 44×44 터치 기준에서 옮겼다; browser-ux 러너 `MIN_TARGET` 과 같은 값이다.
+- **인접 타깃 간격(계약 2.0.0에서 바뀐 것)**: 테마는 각 타깃의 **크기**만 보장하고 타깃 **사이 간격은 보장하지 않는다**. `tapTargetSize: MaterialTapTargetSize.shrinkWrap` 으로 바뀌면서 버튼이 받던 암묵적 패딩(48px 박스)이 사라졌으므로, 아이콘 버튼을 나란히 놓는 셸·화면이 최소 `DpSpacing.xs`(4) 간격을 **직접** 준다. WCAG 2.2 AA 2.5.8 은 24×24 이상이면 간격 없이도 충족되지만(즉 위반은 아니다), 390px 폭에서 오조작을 부른다. 이 책임은 S3-P2(셸)·P3(공용 위젯)의 몫이며 `dp_chrome_bar` 의 인라인 액션이 첫 대상이다.
 - **키보드**: 전체 포커스 순서·가시 포커스 링(2px `primaryText`)·skip-to-content. **Monaco는 포커스 트랩 → `Esc`로 에디터 탈출** 명시.
 - **스크린리더**: 시맨틱 랜드마크(`nav`/`main`/`complementary`), `lang="ko"`. **SSE 실시간 업데이트는 `aria-live="polite"` 영역**(경로생성 단계·실행로그·멘토 스트리밍)에서 고지. 로딩 `aria-busy`, 에러 즉시 announce.
 - **상태 전달**: 색만으로 의미 전달 금지(텍스트 레이블 병행).
