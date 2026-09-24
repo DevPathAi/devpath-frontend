@@ -49,29 +49,35 @@ abstract final class DpTheme {
       splashFactory: InkSparkle.splashFactory,
       dividerColor: c.border,
       dividerTheme: DividerThemeData(color: c.border, thickness: 1),
-      // 데스크톱/웹 데스크톱 기본 밀도(compact)는 버튼을 44px 아래로 줄인다.
-      // 접근성 터치 타깃을 플랫폼과 무관하게 지키기 위해 표준 밀도로 고정한다.
+      // 계약 2.0.0(스펙 §5.4-1 "촘촘"): 컨트롤 30px, 최소 포인터 타깃 24px(WCAG 2.2 AA 2.5.8).
+      // 플랫폼 밀도에 기대지 않고 minimumSize 로 고정한다. tapTargetSize 는 shrinkWrap —
+      // padded 는 레이아웃 크기를 48px 로 부풀려 30px 컨트롤을 만들 수 없다.
       visualDensity: VisualDensity.standard,
-      // SegmentedButton 은 세그먼트에 minimumSize 를 전달하지 않는다(segmentStyleFor).
-      // 세로 padding 으로 44px 을 확보하고, 탭 타깃은 플랫폼과 무관하게 padded 로 둔다.
       segmentedButtonTheme: SegmentedButtonThemeData(
         style: ButtonStyle(
           padding: const WidgetStatePropertyAll(
-            EdgeInsets.symmetric(
-              horizontal: DpSpacing.lg,
-              vertical: DpSpacing.md,
-            ),
+            EdgeInsets.symmetric(horizontal: DpSpacing.md, vertical: 5),
           ),
-          tapTargetSize: MaterialTapTargetSize.padded,
+          minimumSize: const WidgetStatePropertyAll(
+            Size(DpDensity.minTarget, DpDensity.controlHeight),
+          ),
+          // SegmentedButton 은 minimumSize 를 세그먼트에 전달하지 않고 자체 하한
+          // (textButtonMinHeight 40 + visualDensity.baseSizeAdjustment.dy)으로 높이를
+          // 정한다(segmented_button.dart). compact 밀도가 그 하한을 32px 로 낮춘다.
+          visualDensity: VisualDensity.compact,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           textStyle: controlText,
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: ButtonStyle(
-          minimumSize: const WidgetStatePropertyAll(Size(64, 52)),
-          padding: const WidgetStatePropertyAll(
-            EdgeInsets.symmetric(horizontal: DpSpacing.xl),
+          minimumSize: const WidgetStatePropertyAll(
+            Size(64, DpDensity.controlHeight),
           ),
+          padding: const WidgetStatePropertyAll(
+            EdgeInsets.symmetric(horizontal: DpSpacing.lg),
+          ),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           shape: WidgetStatePropertyAll(roundedButton),
           textStyle: controlText,
           elevation: const WidgetStatePropertyAll(0),
@@ -89,10 +95,13 @@ abstract final class DpTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: ButtonStyle(
-          minimumSize: const WidgetStatePropertyAll(Size(64, 52)),
-          padding: const WidgetStatePropertyAll(
-            EdgeInsets.symmetric(horizontal: DpSpacing.xl),
+          minimumSize: const WidgetStatePropertyAll(
+            Size(64, DpDensity.controlHeight),
           ),
+          padding: const WidgetStatePropertyAll(
+            EdgeInsets.symmetric(horizontal: DpSpacing.lg),
+          ),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           shape: WidgetStatePropertyAll(roundedButton),
           textStyle: controlText,
           foregroundColor: WidgetStatePropertyAll(c.textPrimary),
@@ -101,18 +110,37 @@ abstract final class DpTheme {
       ),
       textButtonTheme: TextButtonThemeData(
         style: ButtonStyle(
-          minimumSize: const WidgetStatePropertyAll(Size(44, 44)),
+          minimumSize: const WidgetStatePropertyAll(
+            Size(DpDensity.minTarget, DpDensity.controlHeight),
+          ),
+          padding: const WidgetStatePropertyAll(
+            EdgeInsets.symmetric(horizontal: DpSpacing.sm),
+          ),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           shape: WidgetStatePropertyAll(roundedButton),
           textStyle: controlText,
           foregroundColor: WidgetStatePropertyAll(c.primaryText),
         ),
       ),
+      iconButtonTheme: IconButtonThemeData(
+        style: ButtonStyle(
+          minimumSize: const WidgetStatePropertyAll(
+            Size(DpDensity.controlHeight, DpDensity.controlHeight),
+          ),
+          padding: const WidgetStatePropertyAll(EdgeInsets.all(3)),
+          iconSize: const WidgetStatePropertyAll(20),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          shape: WidgetStatePropertyAll(roundedButton),
+        ),
+      ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
+        isDense: true,
         fillColor: c.surfaceMuted,
+        constraints: const BoxConstraints(minHeight: DpDensity.controlHeight),
         contentPadding: const EdgeInsets.symmetric(
-          horizontal: DpSpacing.lg,
-          vertical: DpSpacing.lg,
+          horizontal: DpSpacing.md,
+          vertical: 5,
         ),
         border: roundedInput,
         enabledBorder: roundedInput,

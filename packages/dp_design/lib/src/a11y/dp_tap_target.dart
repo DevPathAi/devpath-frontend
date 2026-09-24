@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 
-/// 최소 44x44 탭 타깃 + 시맨틱 라벨 보장(DESIGN §6 / DD7).
+import '../theme/dp_spacing.dart';
+
+/// 최소 포인터 타깃(기본 24 = DpDensity.minTarget, WCAG 2.2 AA 2.5.8) + 시맨틱 라벨 보장(DESIGN §6).
+/// 24 미만이 될 수 없고, 더 큰 값이 필요하면 minSize 로 올린다.
 class DpTapTarget extends StatelessWidget {
   const DpTapTarget({
     super.key,
     required this.child,
     required this.onTap,
     required this.semanticLabel,
-    this.minSize = 44,
+    this.minSize = DpDensity.minTarget,
   });
 
   final Widget child;
