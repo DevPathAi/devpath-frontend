@@ -46,7 +46,7 @@ void main() {
     expect(find.byKey(const ValueKey('rail-section-divider')), findsWidgets);
   });
 
-  testWidgets('활성 항목만 railActive 배경을 갖는다', (tester) async {
+  testWidgets('활성 항목만 headerActive 배경을 갖는다', (tester) async {
     await tester.pumpWidget(
       _host(
         DpNavRail(destinations: _dests, selectedIndex: 1, onSelect: (_) {}),
@@ -56,7 +56,7 @@ void main() {
       find.byKey(const ValueKey('rail-item-1')),
     );
     final deco = active.decoration! as BoxDecoration;
-    expect(deco.color, DpColors.light.railActive);
+    expect(deco.color, DpColors.light.headerActive);
   });
 
   testWidgets('목적지 탭은 index를 통지', (tester) async {
@@ -111,7 +111,7 @@ void main() {
   // brand 워드마크는 DpRailBrand가 색을 직접 확정하므로(dp_rail_brand_test.dart
   // 참고) 이 기본-전경색 메커니즘이 더 이상 적용되지 않는다 — 그래서 여기서는
   // account만 검증한다.
-  testWidgets('account 슬롯은 railMuted를 기본 전경색으로 제공', (tester) async {
+  testWidgets('account 슬롯은 headerMuted를 기본 전경색으로 제공', (tester) async {
     Color? accountIconColor;
     await tester.pumpWidget(
       _host(
@@ -128,7 +128,7 @@ void main() {
         ),
       ),
     );
-    expect(accountIconColor, DpColors.light.railMuted);
+    expect(accountIconColor, DpColors.light.headerMuted);
   });
 
   testWidgets('onToggle 지정 시 토글 버튼 노출·호출', (tester) async {
@@ -192,8 +192,8 @@ void main() {
       find.byKey(const ValueKey('rail-root')),
     );
     final deco = root.decoration! as BoxDecoration;
-    expect(deco.color, DpColors.light.railBg);
-    expect((deco.border! as Border).right.color, DpColors.light.railBorder);
+    expect(deco.color, DpColors.light.headerBg);
+    expect((deco.border! as Border).right.color, DpColors.light.headerBorder);
   });
 
   testWidgets('섹션 레이블과 목적지 라벨 색이 토큰과 배선된다', (tester) async {
@@ -204,13 +204,13 @@ void main() {
     );
 
     final sectionLabel = tester.widget<Text>(find.text('학습'));
-    expect(sectionLabel.style?.color, DpColors.light.railFaint);
+    expect(sectionLabel.style?.color, DpColors.light.headerFaint);
 
     final inactiveLabel = tester.widget<Text>(find.text('대시보드'));
-    expect(inactiveLabel.style?.color, DpColors.light.railMuted);
+    expect(inactiveLabel.style?.color, DpColors.light.headerMuted);
 
     final activeLabel = tester.widget<Text>(find.text('학습 경로'));
-    expect(activeLabel.style?.color, DpColors.light.railText);
+    expect(activeLabel.style?.color, DpColors.light.headerText);
   });
 
   testWidgets('접힘 상태 항목에 접근 가능한 툴팁이 있다', (tester) async {

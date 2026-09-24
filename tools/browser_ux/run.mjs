@@ -2,7 +2,7 @@
 //
 // mock 릴리스 빌드(build/web)를 루프백으로 서빙하고 실제 Chromium 에서
 // deep link · 새로고침 · back/forward · 키보드 순회 · focus 복귀 · overflow ·
-// 44px 타깃 · reduced-motion · axe 를 검증한다. 외부 네트워크 요청은 차단하고 기록한다.
+// 24px 타깃(WCAG 2.2 AA 2.5.8, 계약 2.0.0) · reduced-motion · axe 를 검증한다. 외부 네트워크 요청은 차단하고 기록한다.
 //
 // 사용: node run.mjs --dist=<build/web> --out=<report.json> [--built-from=<sha>] [--only=<id,id>]
 import { execFileSync } from 'node:child_process';
@@ -30,7 +30,7 @@ export const ROUTES = [
   '/content/future-async-await',
 ];
 const HEIGHT = 900;
-const MIN_TARGET = 44;
+const MIN_TARGET = 24; // = DpDensity.minTarget (packages/dp_design/lib/src/theme/dp_spacing.dart)
 const AXE_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'best-practice'];
 const READY_TIMEOUT_MS = 20000;
 

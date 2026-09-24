@@ -26,10 +26,10 @@ void main() {
 
     // 레일이 본문 배경과 같은 계열이면 「잉크 레일」의 분리감이 사라진다.
     expect(decoration.color, isNot(DpColors.dark.bg));
-    expect(decoration.color, DpColors.dark.railBg);
+    expect(decoration.color, DpColors.dark.headerBg);
     // v2 셸은 본문보다 더 짙은 네이비로 레일을 분리한다.
     expect(
-      DpColors.dark.railBg.computeLuminance(),
+      DpColors.dark.headerBg.computeLuminance(),
       lessThan(DpColors.dark.bg.computeLuminance()),
     );
   });
@@ -55,12 +55,12 @@ void main() {
       find.byKey(const ValueKey('rail-item-0')),
     );
     final decoration = selected.decoration! as BoxDecoration;
-    expect(decoration.color, DpColors.dark.railActive);
-    expect(decoration.color, isNot(DpColors.dark.railBg));
+    expect(decoration.color, DpColors.dark.headerActive);
+    expect(decoration.color, isNot(DpColors.dark.headerBg));
 
     // 값이 다르기만 해서는 부족하다 — 육안으로 구별돼야 한다.
-    final lumActive = DpColors.dark.railActive.computeLuminance();
-    final lumBg = DpColors.dark.railBg.computeLuminance();
+    final lumActive = DpColors.dark.headerActive.computeLuminance();
+    final lumBg = DpColors.dark.headerBg.computeLuminance();
     final contrast = (lumActive > lumBg
         ? (lumActive + 0.05) / (lumBg + 0.05)
         : (lumBg + 0.05) / (lumActive + 0.05));

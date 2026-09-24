@@ -29,11 +29,14 @@ Leva v2의 프라이머리는 **인디고·슬레이트**다. 차가운 중립 �
 
 32개 토큰 전부가 `DpColors`(`packages/dp_design/lib/src/theme/dp_colors.dart`)의 단일 클래스에 있으며,
 이 문서의 값은 그 코드에서 그대로 옮긴 것이다(코드가 SSoT, 이 표는 사본).
-`DpSemanticTokenManifest`(`dp_semantic_tokens.dart`) v1.1.0은 Flutter name, CSS custom property,
+`DpSemanticTokenManifest`(`dp_semantic_tokens.dart`) v2.0.0은 Flutter name, CSS custom property,
 light/dark 값, allowed usage와 default/hover/pressed/focus/selected/disabled/error mapping을 공개한다.
 값이 바뀌면 `version`도 올린다 — v1.1.0(2026-09-17)은 9/13 mobile-first 개편으로 바뀐 값(인디고 팔레트,
-반경 999/12/18/12/20, headline-small·title-large, 레이아웃 폭 1360/760/280/80)을 계약 버전에 반영한 것으로
-이름·구조 변경은 없다. 랜딩 mirror(`devpath-home-page/assets/tokens.css`)는 이 버전을 따라 맞춘다.
+반경 999/12/18/12/20, headline-small·title-large, 레이아웃 폭 1360/760/280/80)을 이름·구조 변경 없이
+반영한 것이고, **v2.0.0(2026-09-24, S3-P1)** 은 웹 문법 전환이라 major 다: 반경 4/6/8/6/12 · 밀도 토큰
+3종(`--dp-density-control-height`·`-row-padding`·`-min-target`) 신설 · 레이아웃 폭 1120/760 과 헤더 높이 56 ·
+다크 레일 색 6종 `rail*` → `header*`(값 불변). 랜딩 mirror(`devpath-home-page/assets/tokens.css`)는
+이 버전을 따라 맞춘다.
 
 **면 (Surface) — 3단계**
 | 토큰 | 라이트 | 다크 | 용도 |
@@ -157,17 +160,19 @@ Material 3 타입 스케일(Pretendard 적용):
 ## 3. 간격 · 라운드 · 고도
 
 - **간격(8pt 그리드)**: `4 · 8 · 12 · 16 · 24 · 32 · 48`. 컴포넌트 내부 패딩 12~16, 섹션 간 16~24.
-- **라운드**: 칩 `999` · 버튼 `12` · 카드/패널 `18` · 입력 `12` · 다이얼로그 `20`.
+- **라운드(계약 2.0.0, 웹 문법)**: 칩 `4` · 버튼 `6` · 카드/패널/드롭다운 `8` · 입력 `6` · 다이얼로그/시트 `12`. (2026-09-19 스펙 §5.3 — 999/12/18/12/20 의 모바일 문법에서 옮김.)
+- **밀도(계약 2.0.0)**: 컨트롤 높이 `30` · 표 행 세로 여백 `8` · 최소 포인터 타깃 `24`(`DpDensity`). 버튼·입력·세그먼트·아이콘 버튼은 `DpTheme` 이 이 값을 강제한다(세그먼트는 자체 하한 때문에 `VisualDensity.compact` 로 32px).
 - **고도/그림자**: 장식용 그림자 금지(APP UI). 보더(`border` 토큰) 우선, 그림자는 오버레이(드롭다운·다이얼로그·시트)에만.
 
 **레이아웃 토큰(`AppTokens` — 밝기 무관)**
 | 토큰 | 값 | 용도 |
 |---|---|---|
-| `contentMaxWidth` | 1360 | Large 본문 최대 폭 |
+| `contentMaxWidth` | 1120 | 본문 최대 폭(항상 중앙 정렬) |
 | `readableMaxWidth` | 760 | 문서·상세 읽기 폭 |
-| `railWidth` | 280 | 확장 rail 폭 |
-| `railCollapsedWidth` | 80 | Medium 접힘 rail 폭 |
-| `panelRadius` | 18 | 패널 반경(=카드) |
+| `headerHeight` | 56 | 상단 헤더 높이(P2 `DpWebShell`) |
+| `railWidth` | 280 | admin 레일 폭(web 은 P2 에서 헤더로) |
+| `railCollapsedWidth` | 80 | admin 접힘 레일 폭 |
+| `panelRadius` | 8 | 패널 반경(=카드) |
 
 > 소비: `context.appTokens`. 최대폭 제약은 `DpMaxWidth`, 상태 스타일은 `DpStateStyle`, 클릭 카드 베이스는 `DpInteractiveCard`, 텍스트 선택은 `DpSelectable`, 스크롤바는 `DpScrollbar`. (UI/UX 고도화 로드맵 Phase 0 산출.)
 
@@ -189,12 +194,13 @@ Material 3 타입 스케일(Pretendard 적용):
 - **SBX 규칙**: 데스크톱(≥1024)=3-페인, 모바일웹(<1024)=상단 세그먼트 탭으로 1-페인씩 전환. Monaco는 web 전용 유지(터치 편집 제약 명시). "3열을 그대로 축소" 금지.
 - "모바일은 스택" 금지 — 각 뷰포트는 의도적 레이아웃 전환.
 - 하단 내비는 시스템 `NavigationBar`를 직접 쓰지 않고 `DpMobileNavigation`이 소유한다. 비내비 경로에서는
-  선택 상태를 억지로 표시하지 않으며, 안전영역과 44px 이상 터치 타깃을 유지한다.
+  선택 상태를 억지로 표시하지 않으며, 안전영역과 §6 의 최소 타깃을 유지한다. (§5 표의 web 셸 열은 S3-P2 에서 상단 헤더 문법으로 다시 쓴다.)
 
 ## 6. 접근성 베이스라인 (필수)
 
 - **대비**: 본문/링크 텍스트 ≥4.5:1(`primary`를 텍스트로 쓰지 않고 `primaryText`/`primaryTextStrong` 사용), 큰 텍스트·UI 컴포넌트 ≥3:1.
-- **터치 타깃**: ≥44×44 (하단탭·아이콘 버튼·칩).
+- **포인터 타깃(계약 2.0.0)**: ≥24×24 — WCAG 2.2 AA 2.5.8. 24 미만인 타깃은 인접 타깃과의 간격(≥8px)으로 예외 조건을 만족시킨다. 컨트롤 표준 높이는 30(`DpDensity.controlHeight`). 2026-09-19 스펙 §5.4-1 의 사용자 결정으로 44×44 터치 기준에서 옮겼다; browser-ux 러너 `MIN_TARGET` 과 같은 값이다.
+- **인접 타깃 간격(계약 2.0.0에서 바뀐 것)**: 테마는 각 타깃의 **크기**만 보장하고 타깃 **사이 간격은 보장하지 않는다**. `tapTargetSize: MaterialTapTargetSize.shrinkWrap` 으로 바뀌면서 버튼이 받던 암묵적 패딩(48px 박스)이 사라졌으므로, 아이콘 버튼을 나란히 놓는 셸·화면이 최소 `DpSpacing.xs`(4) 간격을 **직접** 준다. WCAG 2.2 AA 2.5.8 은 24×24 이상이면 간격 없이도 충족되지만(즉 위반은 아니다), 390px 폭에서 오조작을 부른다. 이 책임은 S3-P2(셸)·P3(공용 위젯)의 몫이며 `dp_chrome_bar` 의 인라인 액션이 첫 대상이다.
 - **키보드**: 전체 포커스 순서·가시 포커스 링(2px `primaryText`)·skip-to-content. **Monaco는 포커스 트랩 → `Esc`로 에디터 탈출** 명시.
 - **스크린리더**: 시맨틱 랜드마크(`nav`/`main`/`complementary`), `lang="ko"`. **SSE 실시간 업데이트는 `aria-live="polite"` 영역**(경로생성 단계·실행로그·멘토 스트리밍)에서 고지. 로딩 `aria-busy`, 에러 즉시 announce.
 - **상태 전달**: 색만으로 의미 전달 금지(텍스트 레이블 병행).

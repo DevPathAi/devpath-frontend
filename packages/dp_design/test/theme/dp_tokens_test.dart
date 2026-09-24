@@ -17,11 +17,12 @@ void main() {
         ),
       ),
     );
-    expect(t.contentMaxWidth, 1360);
+    expect(t.contentMaxWidth, 1120);
     expect(t.readableMaxWidth, 760);
     expect(t.railWidth, 280);
     expect(t.railCollapsedWidth, 80);
-    expect(t.panelRadius, 18);
+    expect(t.panelRadius, 8);
+    expect(t.headerHeight, 56);
   });
 
   testWidgets('다크 테마도 동일 레이아웃 토큰(밝기 무관)', (tester) async {

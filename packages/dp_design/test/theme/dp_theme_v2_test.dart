@@ -3,31 +3,58 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('Leva v2 theme styles primary controls as 52px product actions', (
-    tester,
-  ) async {
-    late ThemeData theme;
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: DpTheme.light(),
-        home: Builder(
-          builder: (context) {
-            theme = Theme.of(context);
-            return const SizedBox();
-          },
+  testWidgets(
+    'Leva 2.0.0 theme styles primary controls as 30px pointer actions',
+    (tester) async {
+      late ThemeData theme;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: DpTheme.light(),
+          home: Builder(
+            builder: (context) {
+              theme = Theme.of(context);
+              return const SizedBox();
+            },
+          ),
         ),
-      ),
-    );
+      );
 
-    final buttonStyle = theme.filledButtonTheme.style!;
-    expect(buttonStyle.minimumSize!.resolve({}), const Size(64, 52));
-    expect(
-      (buttonStyle.shape!.resolve({})! as RoundedRectangleBorder).borderRadius,
-      BorderRadius.circular(DpRadius.button),
-    );
-    expect(theme.inputDecorationTheme.filled, isTrue);
-    expect(theme.inputDecorationTheme.fillColor, DpColors.light.surfaceMuted);
-  });
+      final buttonStyle = theme.filledButtonTheme.style!;
+      expect(
+        buttonStyle.minimumSize!.resolve({}),
+        Size(64, DpDensity.controlHeight),
+      );
+      expect(buttonStyle.tapTargetSize, MaterialTapTargetSize.shrinkWrap);
+      expect(
+        (buttonStyle.shape!.resolve({})! as RoundedRectangleBorder)
+            .borderRadius,
+        BorderRadius.circular(DpRadius.button),
+      );
+      expect(
+        theme.outlinedButtonTheme.style!.minimumSize!.resolve({}),
+        Size(64, DpDensity.controlHeight),
+      );
+      expect(
+        theme.textButtonTheme.style!.minimumSize!.resolve({}),
+        Size(DpDensity.minTarget, DpDensity.controlHeight),
+      );
+      expect(
+        theme.iconButtonTheme.style!.minimumSize!.resolve({}),
+        Size(DpDensity.controlHeight, DpDensity.controlHeight),
+      );
+      expect(
+        theme.iconButtonTheme.style!.tapTargetSize,
+        MaterialTapTargetSize.shrinkWrap,
+      );
+      expect(theme.inputDecorationTheme.filled, isTrue);
+      expect(theme.inputDecorationTheme.isDense, isTrue);
+      expect(
+        theme.inputDecorationTheme.contentPadding,
+        const EdgeInsets.symmetric(horizontal: DpSpacing.md, vertical: 5),
+      );
+      expect(theme.inputDecorationTheme.fillColor, DpColors.light.surfaceMuted);
+    },
+  );
 
   testWidgets('Leva v2 theme owns cards, sheets, chips and floating actions', (
     tester,

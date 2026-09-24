@@ -44,8 +44,8 @@ class DpNavRail extends StatelessWidget {
       key: const ValueKey('rail-root'),
       width: width,
       decoration: BoxDecoration(
-        color: c.railBg,
-        border: Border(right: BorderSide(color: c.railBorder)),
+        color: c.headerBg,
+        border: Border(right: BorderSide(color: c.headerBorder)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -58,10 +58,10 @@ class DpNavRail extends StatelessWidget {
             ),
           ),
           if (account != null) ...[
-            Divider(height: 1, thickness: 1, color: c.railBorder),
+            Divider(height: 1, thickness: 1, color: c.headerBorder),
             Padding(
               padding: const EdgeInsets.all(DpSpacing.md),
-              child: _withRailForeground(c.railMuted, account!),
+              child: _withRailForeground(c.headerMuted, account!),
             ),
           ],
         ],
@@ -91,7 +91,7 @@ class DpNavRail extends StatelessWidget {
         : IconButton(
             icon: Icon(
               extended ? DpIcons.menuOpen : DpIcons.menu,
-              color: c.railMuted,
+              color: c.headerMuted,
             ),
             tooltip: extended ? '메뉴 접기' : '메뉴 펼치기',
             onPressed: onToggle,
@@ -141,7 +141,7 @@ class DpNavRail extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   // 색을 여기서 확정한다. 앱은 문자열만 주므로 이 색이
                   // merge에서 질 상대가 없다.
-                  style: text.titleSmall?.copyWith(color: c.railText),
+                  style: text.titleSmall?.copyWith(color: c.headerText),
                 ),
               ),
             ],
@@ -172,7 +172,7 @@ class DpNavRail extends StatelessWidget {
                   child: Text(
                     d.section!,
                     style: text.labelMedium?.copyWith(
-                      color: c.railFaint,
+                      color: c.headerFaint,
                       letterSpacing: 1.1,
                     ),
                   ),
@@ -183,7 +183,11 @@ class DpNavRail extends StatelessWidget {
                     horizontal: DpSpacing.md,
                     vertical: DpSpacing.sm,
                   ),
-                  child: Divider(height: 1, thickness: 1, color: c.railBorder),
+                  child: Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: c.headerBorder,
+                  ),
                 ),
         );
       }
@@ -199,7 +203,7 @@ class DpNavRail extends StatelessWidget {
     final iconGlyph = Icon(
       d.icon,
       size: 22,
-      color: selected ? c.railText : c.railMuted,
+      color: selected ? c.headerText : c.headerMuted,
     );
     final icon = d.badgeCount > 0
         ? Badge(label: Text('${d.badgeCount}'), child: iconGlyph)
@@ -215,7 +219,7 @@ class DpNavRail extends StatelessWidget {
           child: Container(
             key: ValueKey('rail-item-$i'),
             decoration: BoxDecoration(
-              color: selected ? c.railActive : Colors.transparent,
+              color: selected ? c.headerActive : Colors.transparent,
               borderRadius: BorderRadius.circular(DpRadius.button),
               border: selected
                   ? Border.all(
@@ -241,7 +245,7 @@ class DpNavRail extends StatelessWidget {
                       d.label,
                       overflow: TextOverflow.ellipsis,
                       style: text.bodyMedium?.copyWith(
-                        color: selected ? c.railText : c.railMuted,
+                        color: selected ? c.headerText : c.headerMuted,
                         fontWeight: selected
                             ? FontWeight.w600
                             : FontWeight.w400,
