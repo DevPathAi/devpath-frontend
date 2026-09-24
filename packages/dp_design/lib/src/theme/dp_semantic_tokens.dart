@@ -5,7 +5,14 @@ import 'dp_spacing.dart';
 import 'dp_typography.dart';
 
 /// Landing과 Flutter가 공유하는 versioned semantic-token manifest의 종류.
-enum DpSemanticTokenKind { color, spacing, radius, duration, typography }
+enum DpSemanticTokenKind {
+  color,
+  spacing,
+  radius,
+  density,
+  duration,
+  typography,
+}
 
 /// 토큰을 raw 색/수치가 아니라 허용된 역할로 소비하게 하는 계약.
 enum DpSemanticTokenUsage {
@@ -29,6 +36,7 @@ enum DpSemanticTokenUsage {
   code,
   layoutSpacing,
   panelShape,
+  interactionDensity,
   motion,
   uiTypography,
   readingTypography,
@@ -240,6 +248,16 @@ extension on _RadiusRole {
   };
 }
 
+enum _DensityRole { controlHeight, rowPadding, minTarget }
+
+extension on _DensityRole {
+  double get value => switch (this) {
+    _DensityRole.controlHeight => DpDensity.controlHeight,
+    _DensityRole.rowPadding => DpDensity.rowPadding,
+    _DensityRole.minTarget => DpDensity.minTarget,
+  };
+}
+
 final class DpSemanticDimensionToken extends DpSemanticToken<double> {
   const DpSemanticDimensionToken({
     required super.kind,
@@ -420,11 +438,11 @@ class DpSemanticStateMapping {
   );
 }
 
-/// v1 manifest. 값은 DpColors/DpSpacing/DpTypography에서 읽으며 Landing mirror가
-/// 사용할 CSS 이름과 상태 mapping을 함께 고정한다.
+/// 2.0.0 manifest(웹 문법). 값은 DpColors/DpSpacing/DpRadius/DpDensity/DpTypography 에서
+/// 읽으며 Landing mirror 가 사용할 CSS 이름과 상태 mapping 을 함께 고정한다.
 abstract final class DpSemanticTokenManifest {
   static const String schema = 'leva.semantic-tokens';
-  static const String version = '1.1.0';
+  static const String version = '2.0.0';
 
   static final List<DpSemanticColorToken> colors = List.unmodifiable(
     DpSemanticColorRole.values.map(DpSemanticColorToken.new),
@@ -454,6 +472,19 @@ abstract final class DpSemanticTokenManifest {
     ),
   );
 
+  /// 포인터 밀도(2.0.0 신설). 컨트롤 높이·표 행 여백·최소 타깃 — DpDensity 가 SSoT.
+  static final List<DpSemanticDimensionToken> density = List.unmodifiable(
+    _DensityRole.values.map(
+      (role) => DpSemanticDimensionToken(
+        kind: DpSemanticTokenKind.density,
+        flutterName: 'DpDensity.${role.name}',
+        cssCustomProperty: '--dp-density-${_kebabCase(role.name)}',
+        value: role.value,
+        allowedUsages: const {DpSemanticTokenUsage.interactionDensity},
+      ),
+    ),
+  );
+
   static final List<DpSemanticDurationToken> durations = List.unmodifiable(
     _DurationRole.values.map(
       (role) => DpSemanticDurationToken(
@@ -472,6 +503,7 @@ abstract final class DpSemanticTokenManifest {
     ...colors,
     ...spacing,
     ...radii,
+    ...density,
     ...durations,
     ...typography,
   ]);
