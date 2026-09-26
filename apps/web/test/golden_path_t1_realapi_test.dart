@@ -7,6 +7,7 @@ import 'package:devpath_web/src/features/dashboard/presentation/dashboard_page.d
 import 'package:dp_core/dp_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dp_design/dp_design.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// T1(auth·커뮤니티·LCS) 실API 계약은 소스 대조로 정합 확인됨(2026-07-03 감사,
@@ -56,9 +57,17 @@ void main() {
     // DONE 유저 → 게이트 통과 → /dashboard(초기 위치)
     expect(find.byType(DashboardPage), findsOneWidget);
 
-    // 셸 네비게이션: 커뮤니티 탭 → /community. 레일 라벨이 「커뮤니티」→「게시판」으로
-    // 바뀌어(Task 6) 텍스트 탐색 대신 목적지 index(3)의 rail-item 키로 찾는다.
-    await tester.tap(find.byKey(const ValueKey('rail-item-3')));
+    // 셸 네비게이션: 헤더의 커뮤니티 드롭다운 → 자유게시판 → /community (S3-P2).
+    // 레일이 사라져 rail-item 키는 더 이상 없다. /dashboard 의 브레드크럼에는
+    // '커뮤니티' 가 없으므로 헤더 안으로 범위를 좁힐 필요는 없지만 명시해 둔다.
+    await tester.tap(
+      find.descendant(
+        of: find.byType(DpWebHeader),
+        matching: find.text('커뮤니티'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('자유게시판'));
     await tester.pumpAndSettle();
 
     expect(find.byType(CommunityHomePage), findsOneWidget);

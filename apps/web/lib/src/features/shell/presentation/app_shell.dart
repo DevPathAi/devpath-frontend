@@ -3,55 +3,40 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../common/application/external_link_opener.dart';
 import '../../support/presentation/support_dialog.dart';
 import '../../updates/presentation/notice_banner_bar.dart';
 import '../../settings/application/settings_controller.dart';
 
-/// 셸 목적지(경로·아이콘·라벨·섹션).
-typedef ShellDestination = ({
-  String path,
-  IconData icon,
-  String label,
-  String section,
-});
-
-/// 설정은 레일이 아니라 계정 블록으로 내려갔다(디자인 2단계).
-const List<ShellDestination> kShellDestinations = [
-  (path: '/dashboard', icon: DpIcons.dashboard, label: '오늘', section: '학습'),
-  (path: '/path', icon: DpIcons.path, label: '학습 경로', section: '학습'),
-  (path: '/mentor', icon: DpIcons.mentor, label: 'AI 멘토', section: '학습'),
-  (
-    path: '/community?board=FREE',
-    icon: DpIcons.community,
-    label: '자유게시판',
-    section: '커뮤니티',
-  ),
-  (
-    path: '/community?board=QNA',
-    icon: DpIcons.mentor,
-    label: 'Q/A',
-    section: '커뮤니티',
-  ),
-  (
-    path: '/community?board=FEEDBACK',
-    icon: DpIcons.thumbUp,
-    label: '피드백',
-    section: '커뮤니티',
+/// 상단 헤더의 주 메뉴(스펙 §5.3·시안). 커뮤니티는 드롭다운이고 세 게시판이
+/// 그 자식이다 — 게시판 이동 수단은 이 메뉴뿐이다(사용자 결정 2026-09-19 §5.4-3).
+const List<DpWebNavItem> kWebNavItems = [
+  DpWebNavItem(id: '/dashboard', label: '오늘'),
+  DpWebNavItem(id: '/path', label: '학습 경로'),
+  DpWebNavItem(id: '/mentor', label: 'AI 멘토'),
+  DpWebNavItem(
+    id: '/community',
+    label: '커뮤니티',
+    children: [
+      DpWebNavItem(id: '/community?board=FREE', label: '자유게시판'),
+      DpWebNavItem(id: '/community?board=QNA', label: 'Q/A'),
+      DpWebNavItem(id: '/community?board=FEEDBACK', label: '피드백'),
+    ],
   ),
 ];
 
-/// 모바일 하단 바는 네 개 핵심 목적지를 유지한다. 세 게시판은 커뮤니티
-/// 화면의 제목 메뉴(`CommunityBoardHeader`)로 노출하고 기본 진입은 자유게시판으로 고정한다.
-const List<ShellDestination> kCompactShellDestinations = [
-  (path: '/dashboard', icon: DpIcons.dashboard, label: '오늘', section: '학습'),
-  (path: '/path', icon: DpIcons.path, label: '학습 경로', section: '학습'),
-  (path: '/mentor', icon: DpIcons.mentor, label: 'AI 멘토', section: '학습'),
-  (
-    path: '/community?board=FREE',
-    icon: DpIcons.community,
-    label: '커뮤니티',
-    section: '커뮤니티',
-  ),
+/// 평면 목적지: `shellDestinationIndexFor` 의 index 순서와 1:1 이고, 명령 팔레트가
+/// 그대로 쓴다. **경로·라벨·아이콘을 한 레코드에 둔다** — 세 자료구조로 흩어 두면
+/// 목적지를 추가할 때 switch 의 `_ =>` 가 조용히 잘못된 라벨·아이콘을 준다.
+typedef FlatNavDestination = ({String id, String label, IconData icon});
+
+const List<FlatNavDestination> kFlatNavDestinations = [
+  (id: '/dashboard', label: '오늘', icon: DpIcons.dashboard),
+  (id: '/path', label: '학습 경로', icon: DpIcons.path),
+  (id: '/mentor', label: 'AI 멘토', icon: DpIcons.mentor),
+  (id: '/community?board=FREE', label: '자유게시판', icon: DpIcons.community),
+  (id: '/community?board=QNA', label: 'Q/A', icon: DpIcons.mentor),
+  (id: '/community?board=FEEDBACK', label: '피드백', icon: DpIcons.thumbUp),
 ];
 
 const _crumbCommunity = (label: '커뮤니티', path: null);
@@ -63,9 +48,8 @@ String _communityBoardLabel(Uri uri) => switch (uri.queryParameters['board']) {
 };
 
 /// 경로 → 브레드크럼. **긴 경로를 먼저 검사한다**(`/community/new/post`가
-/// `/community/new`보다 앞). 알 수 없는 경로는 빈 목록을 반환한다 — 다만 web은
-/// 오류 신고 액션(chromeActions)이 상시 있어 크롬바 자체는 계속 렌더된다
-/// (showChromeBar는 breadcrumb·chromeActions·compact account를 OR한다).
+/// `/community/new`보다 앞). 알 수 없는 경로는 빈 목록을 반환한다 — 그러면
+/// `DpBreadcrumb` 이 자리를 차지하지 않는다.
 List<DpCrumb> breadcrumbFor(String location) {
   final uri = Uri.parse(location);
   final path = uri.path;
@@ -178,20 +162,20 @@ int? shellDestinationIndexFor(String location) {
     };
   }
 
-  final index = kShellDestinations.indexWhere(
+  final index = kFlatNavDestinations.indexWhere(
     (destination) =>
-        destination.path != '/dashboard' &&
-        destination.path != '/path' &&
-        path.startsWith(Uri.parse(destination.path).path),
+        destination.id != '/dashboard' &&
+        destination.id != '/path' &&
+        path.startsWith(Uri.parse(destination.id).path),
   );
   return index < 0 ? null : index;
 }
 
-int? compactShellDestinationIndexFor(String location) {
-  final path = Uri.parse(location).path;
-  if (path.startsWith('/community')) return 3;
-  final desktopIndex = shellDestinationIndexFor(location);
-  return desktopIndex != null && desktopIndex < 3 ? desktopIndex : null;
+/// 위치 → 헤더에서 현재 표시할 id. 매칭되는 목적지가 없으면 null(무강조) —
+/// /settings·/mypage·/content/:id·/sandbox 에서 엉뚱한 항목에 밑줄이 가지 않게 한다.
+String? webNavSelectedIdFor(String location) {
+  final index = shellDestinationIndexFor(location);
+  return index == null ? null : kFlatNavDestinations[index].id;
 }
 
 /// 라우터 결합 셸: 위치를 읽고, 명령 팔레트로 감싸 표현부에 위임.
@@ -212,12 +196,12 @@ class AppShell extends ConsumerWidget {
         final location = router.routeInformationProvider.value.uri.toString();
         return DpCommandPalette(
           commands: [
-            for (final d in kShellDestinations)
+            for (final destination in kFlatNavDestinations)
               (
-                id: d.path,
-                label: d.label,
-                icon: d.icon,
-                onInvoke: () => context.go(d.path),
+                id: destination.id,
+                label: destination.label,
+                icon: destination.icon,
+                onInvoke: () => context.go(destination.id),
               ),
           ],
           child: AppShellView(
@@ -225,6 +209,9 @@ class AppShell extends ConsumerWidget {
             onSelect: (path) => context.go(path),
             onLogout: () =>
                 ref.read(settingsControllerProvider.notifier).logout(),
+            onOpenExternal: (url) =>
+                ref.read(externalLinkOpenerProvider).open(url),
+            onOpenSupport: () => showSupportDialog(context),
             child: Column(
               children: [
                 const NoticeBannerBar(),
@@ -238,119 +225,64 @@ class AppShell extends ConsumerWidget {
   }
 }
 
-/// 표현부: go_router 비의존 — DpAppShell(4-클래스 반응형)로 위임.
-///
-/// 레일 펼침 상태를 여기서 보유한다. 2단계에서는 onToggleRail을 넘기지
-/// 않아 medium(600~840)에서 접힘 고정이었다 — 사용자가 펼칠 방법이 없었다.
-class AppShellView extends StatefulWidget {
+/// 표현부: go_router 비의존 — DpWebShell(상단 헤더 문법)로 위임.
+class AppShellView extends StatelessWidget {
   const AppShellView({
     super.key,
     required this.location,
     required this.child,
     this.onSelect,
     this.onLogout,
+    this.onOpenExternal,
+    this.onOpenSupport,
   });
 
   final String location;
   final Widget child;
   final void Function(String path)? onSelect;
   final Future<void> Function()? onLogout;
+  final void Function(String url)? onOpenExternal;
+  final VoidCallback? onOpenSupport;
 
-  @override
-  State<AppShellView> createState() => _AppShellViewState();
-}
-
-class _AppShellViewState extends State<AppShellView> {
-  /// null이면 DpAppShell의 폭 기반 기본값(medium 접힘 / 그 이상 펼침)을 따른다.
-  /// 사용자가 토글하면 그 값이 기본값을 덮는다.
-  bool? _railExtended;
-
-  // I1: 매칭되는 목적지가 없으면 null(무강조)을 반환한다. 셸 목적지에 없는
-  // /settings·/mypage·/content/:id·/sandbox에서
-  // 예전처럼 0(대시보드)으로 폴백하면 레일이 잘못된 항목을 활성 표시한다.
-  int? get _index {
-    return shellDestinationIndexFor(widget.location);
-  }
-
-  int? get _compactIndex => compactShellDestinationIndexFor(widget.location);
+  /// 법적 문서와 업데이트 소식은 홈(leva.ai.kr)에 있다 — 앱에 라우트가 없다.
+  static const _homeBaseUrl = 'https://leva.ai.kr';
 
   @override
   Widget build(BuildContext context) {
-    return DpAppShell(
-      selectedIndex: _index,
-      onSelect: (i) => widget.onSelect?.call(kShellDestinations[i].path),
-      compactDestinations: [
-        for (final d in kCompactShellDestinations)
-          DpDestination(icon: d.icon, label: d.label, section: d.section),
-      ],
-      compactSelectedIndex: _compactIndex,
-      onCompactSelect: (i) =>
-          widget.onSelect?.call(kCompactShellDestinations[i].path),
-      destinations: [
-        for (final d in kShellDestinations)
-          DpDestination(icon: d.icon, label: d.label, section: d.section),
-      ],
-      brand: DpRailBrand(mark: const DpBrandMark(size: 32), wordmark: 'Leva'),
-      account: _AccountMenu(onGo: widget.onSelect, onLogout: widget.onLogout),
-      breadcrumb: breadcrumbFor(widget.location),
-      onCrumbTap: (p) => widget.onSelect?.call(p),
-      onSearchTap: () => _openPalette(context),
-      chromeActions: [
-        DpChromeAction(
-          icon: DpIcons.error,
-          label: '오류 신고·문의',
-          onPressed: (context) => showSupportDialog(context),
+    return DpWebShell(
+      brand: DpRailBrand(mark: const DpBrandMark(size: 24), wordmark: 'Leva'),
+      items: kWebNavItems,
+      selectedId: webNavSelectedIdFor(location),
+      onSelect: (id) => onSelect?.call(id),
+      accountEntries: [
+        (label: '마이페이지', onSelect: () => onSelect?.call('/mypage')),
+        (label: '설정', onSelect: () => onSelect?.call('/settings')),
+        (
+          label: '로그아웃',
+          onSelect: onLogout == null ? null : () async => onLogout!.call(),
         ),
       ],
-      railExtended: _railExtended,
-      onToggleRail: () => setState(() {
-        // 현재 실효 상태를 뒤집는다. 아직 토글한 적이 없으면 DpAppShell의
-        // 폭 기반 기본값(dp_app_shell.dart)과 같은 규칙으로 계산한다.
-        final wc = context.windowClass;
-        final current = _railExtended ?? (wc != DpWindowClass.medium);
-        _railExtended = !current;
-      }),
-      body: widget.child,
-    );
-  }
-
-  static void _openPalette(BuildContext context) =>
-      Actions.invoke(context, const OpenCommandPaletteIntent());
-}
-
-/// 레일 하단(또는 compact 크롬바 우측) 계정 블록. admin의 행 메뉴와 같은
-/// MenuAnchor 패턴을 쓴다 — 새 상호작용을 도입하지 않는다.
-class _AccountMenu extends StatelessWidget {
-  const _AccountMenu({this.onGo, this.onLogout});
-  final void Function(String path)? onGo;
-  final Future<void> Function()? onLogout;
-
-  @override
-  Widget build(BuildContext context) {
-    return MenuAnchor(
-      menuChildren: [
-        MenuItemButton(
-          onPressed: () => onGo?.call('/mypage'),
-          child: const Text('마이페이지'),
+      footerNotice: '© 레바 · 사업자등록번호 796-76-00732',
+      footerLinks: [
+        (
+          label: '이용약관',
+          onTap: () => onOpenExternal?.call('$_homeBaseUrl/terms'),
         ),
-        MenuItemButton(
-          onPressed: () => onGo?.call('/settings'),
-          child: const Text('설정'),
+        (
+          label: '개인정보 처리방침',
+          onTap: () => onOpenExternal?.call('$_homeBaseUrl/privacy'),
         ),
-        MenuItemButton(
-          onPressed: onLogout == null ? null : () async => onLogout!.call(),
-          child: const Text('로그아웃'),
+        (label: '오류 신고·문의', onTap: () => onOpenSupport?.call()),
+        (
+          label: '업데이트 소식',
+          onTap: () => onOpenExternal?.call('$_homeBaseUrl/updates'),
         ),
       ],
-      // color를 명시하지 않는다 — 슬롯(DpNavRail은 headerMuted, compact
-      // DpChromeBar는 textSecondary)이 공급하는 IconTheme을 상속해야
-      // 양쪽 배경 모두에서 대비가 유지된다(하드코딩 시 한쪽에서 WCAG 미달).
-      builder: (context, controller, _) => IconButton(
-        icon: const Icon(DpIcons.account),
-        tooltip: '계정',
-        onPressed: () =>
-            controller.isOpen ? controller.close() : controller.open(),
-      ),
+      breadcrumb: breadcrumbFor(location),
+      onCrumbTap: (p) => onSelect?.call(p),
+      onSearchTap: () =>
+          Actions.invoke(context, const OpenCommandPaletteIntent()),
+      body: child,
     );
   }
 }

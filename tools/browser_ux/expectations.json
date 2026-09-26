@@ -1,9 +1,11 @@
 {
   "schema_version": "leva.browser-ux.expectations.v1",
-  "recorded_from": "f25e2e96afe7363cc46a0db3cd7f0c07997d19fd",
+  "recorded_from": "ff4a886611a7d6445b9c7b8b3625c0893ed5cbc4",
   "notes": [
-    "community_desktop: /community 1440px 에서 Tab 순서(첫 4 정지). mock 자유게시판은 글이 1개라 본문 정지는 검색·정렬·작성·행 넷이다. 라우트 FocusScope 경계 때문에 셸 레일은 페이지 스코프 밖이라 순회에 포함되지 않는다(문서 참조).",
-    "recorded_from 은 실측한 작업 트리의 부모 커밋이다(페이지 안 게시판 세그먼트 제거 + 정렬 메뉴 추가 변경 위에서 실측).",
+    "community_desktop: /community 1440px 에서 Tab 순서(첫 8 정지). CI 36212413896(S3-P2 상단 헤더 셸) 실측.",
+    "S3-P2 로 바뀐 것: 푸터 링크 4개가 순회에 새로 들어왔다. 화면 안 순서(검색·최신순·글 작성·행)는 DpWebShell 이 DpAppShell 의 WidgetOrderTraversalPolicy 를 승계해 develop 과 같다.",
+    "헤더는 순회에 들어오지 않는다 — 레일이 빠져 있던 것과 같은 라우트 FocusScope 경계 문제이고 docs/community-information-architecture/handoff.md §9.6-5 에 있다.",
+    "러너는 14번 Tab 을 눌러 앞 N 개만 비교한다. 마지막 정지가 반복되는 꼬리는 develop 실측(35932928056)에도 똑같이 있다 — 이 셸이 만든 것이 아니다.",
     "갱신은 실측 후 PR 리뷰 승인으로만 한다."
   ],
   "keyboard_traversal": {
@@ -11,7 +13,11 @@
       "자유게시판에서 검색 (제목·본문·태그)",
       "최신순",
       "글 작성",
-      "오늘 배운 것 공유\n댓글 4 · 추천 5"
+      "오늘 배운 것 공유\n댓글 4 · 추천 5",
+      "이용약관",
+      "개인정보 처리방침",
+      "오류 신고·문의",
+      "업데이트 소식"
     ]
   }
 }

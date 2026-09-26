@@ -1,0 +1,438 @@
+import 'package:flutter/material.dart';
+
+import '../icons/dp_icons.dart';
+import '../theme/dp_colors.dart';
+import '../theme/dp_spacing.dart';
+import '../theme/dp_tokens.dart';
+import 'dp_menu_button.dart';
+import 'dp_rail_brand.dart';
+import 'dp_web_nav_item.dart';
+
+/// 웹 문법의 상단 헤더(스펙 §5.3, 시안 `.hd`). 라우팅 비의존 — 선택은 id 로 통지.
+///
+/// 어두운 면(`headerBg`)이고 높이는 계약의 `AppTokens.headerHeight`(56)다.
+/// [compactBreakpoint] 미만에서는 주 메뉴·검색·계정을 감추고 햄버거만 남기며,
+/// 펼치면 헤더 **아래로 인라인 확장**한다 — overlay·drawer·focus trap 을 쓰지
+/// 않는다(스펙 §5.3: 홈 랜딩과 같은 규칙).
+class DpWebHeader extends StatefulWidget {
+  const DpWebHeader({
+    super.key,
+    required this.brand,
+    required this.items,
+    required this.selectedId,
+    required this.onSelect,
+    required this.accountEntries,
+    this.onSearchTap,
+  });
+
+  /// 시안 `@container (max-width:720px)`. `DpWindowClass` 경계(600/840)와 다르다 —
+  /// 시안이 정한 값이라 그대로 쓴다.
+  static const double compactBreakpoint = 720;
+
+  final DpRailBrand brand;
+  final List<DpWebNavItem> items;
+  final String? selectedId;
+  final ValueChanged<String> onSelect;
+  final List<DpMenuEntry> accountEntries;
+  final VoidCallback? onSearchTap;
+
+  @override
+  State<DpWebHeader> createState() => _DpWebHeaderState();
+}
+
+class _DpWebHeaderState extends State<DpWebHeader> {
+  final _burgerFocus = FocusNode(debugLabel: 'web-header-burger');
+  bool _expanded = false;
+
+  @override
+  void dispose() {
+    _burgerFocus.dispose();
+    super.dispose();
+  }
+
+  void _pick(String id) {
+    // 먼저 접는다 — 라우트가 바뀐 뒤에 접으면 새 화면 위에 메뉴가 남는다.
+    if (_expanded) setState(() => _expanded = false);
+    widget.onSelect(id);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.dpColors;
+    final compact =
+        MediaQuery.sizeOf(context).width < DpWebHeader.compactBreakpoint;
+
+    // Review Focus 1: compact 가 아니게 되면 접힘 상태를 자동으로 푼다.
+    // 안 그러면 닫을 버튼(햄버거)이 사라진 채 메뉴만 남는다.
+    if (!compact && _expanded) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _expanded = false);
+      });
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _bar(context, c, compact),
+        if (compact && _expanded) _collapsedMenu(context, c),
+      ],
+    );
+  }
+
+  Widget _bar(BuildContext context, DpColors c, bool compact) => Container(
+    key: const ValueKey('web-header-bar'),
+    height: context.appTokens.headerHeight,
+    decoration: BoxDecoration(
+      color: c.headerBg,
+      border: Border(bottom: BorderSide(color: c.headerBorder)),
+    ),
+    padding: EdgeInsets.symmetric(
+      horizontal: compact ? DpSpacing.lg : DpSpacing.xl,
+    ),
+    child: Row(
+      children: [
+        _brand(context, c),
+        if (compact) ...[
+          const Spacer(),
+          _burger(context, c),
+        ] else ...[
+          const SizedBox(width: DpSpacing.xl),
+          // 720~839 구간은 자리가 빠듯하다. 주 메뉴와 검색이 **둘 다** 줄어들 수
+          // 있어야 한다 — 고정 폭이면 RenderFlex 가 넘치고, clipBehavior 기본값이
+          // Clip.none 이라 드롭다운이 검색 상자 위에 겹쳐 그려진다(실측 720 → 67px).
+          Expanded(child: _nav(context, c)),
+          const SizedBox(width: DpSpacing.sm),
+          Flexible(child: _search(context, c)),
+          const SizedBox(width: DpSpacing.sm),
+          _account(context, c),
+        ],
+      ],
+    ),
+  );
+
+  Widget _brand(BuildContext context, DpColors c) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      SizedBox.square(
+        dimension: 24,
+        child: FittedBox(child: widget.brand.mark),
+      ),
+      const SizedBox(width: DpSpacing.sm),
+      Text(
+        widget.brand.wordmark,
+        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+          color: c.headerText,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.2,
+        ),
+      ),
+    ],
+  );
+
+  Widget _nav(BuildContext context, DpColors c) => Row(
+    key: const ValueKey('web-header-nav'),
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      for (final item in widget.items)
+        Flexible(
+          child: Padding(
+            padding: const EdgeInsets.only(right: DpSpacing.xs),
+            child: item.children.isEmpty
+                ? _navLink(context, c, item)
+                : _navDropdown(context, c, item),
+          ),
+        ),
+    ],
+  );
+
+  /// 평시 `headerMuted`, 현재 항목은 `headerText` + 하단 2px primary 밑줄(반경 0).
+  Widget _navSurface(
+    BuildContext context,
+    DpColors c, {
+    required DpWebNavItem item,
+    required Widget child,
+    required VoidCallback onTap,
+    FocusNode? focusNode,
+  }) {
+    final current = item.isCurrent(widget.selectedId);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: current ? ValueKey('web-header-current-${item.id}') : null,
+        focusNode: focusNode,
+        onTap: onTap,
+        borderRadius: current
+            ? BorderRadius.zero
+            : BorderRadius.circular(DpRadius.button),
+        hoverColor: c.headerActive,
+        child: Container(
+          height: DpDensity.controlHeight,
+          padding: const EdgeInsets.symmetric(horizontal: DpSpacing.md),
+          decoration: current
+              ? BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(color: c.primary, width: 2),
+                  ),
+                )
+              : null,
+          alignment: Alignment.center,
+          child: DefaultTextStyle.merge(
+            style: TextStyle(
+              color: current ? c.headerText : c.headerMuted,
+              fontWeight: FontWeight.w500,
+            ),
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _navLink(BuildContext context, DpColors c, DpWebNavItem item) =>
+      _navSurface(
+        context,
+        c,
+        item: item,
+        onTap: () => _pick(item.id),
+        child: Text(item.label, overflow: TextOverflow.ellipsis),
+      );
+
+  Widget _navDropdown(BuildContext context, DpColors c, DpWebNavItem item) =>
+      DpMenuButton(
+        // 위치가 바뀌면(뒤로가기·리다이렉트) 열린 드롭다운을 닫는다.
+        closeWhenChanged: widget.selectedId,
+        entries: [
+          for (final child in item.children)
+            (label: child.label, onSelect: () => _pick(child.id)),
+        ],
+        builder: (context, buttonFocus, toggle, isOpen) => _navSurface(
+          context,
+          c,
+          item: item,
+          focusNode: buttonFocus,
+          onTap: toggle,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(item.label, overflow: TextOverflow.ellipsis),
+              ),
+              Icon(
+                isOpen ? DpIcons.expandLess : DpIcons.expandMore,
+                size: 18,
+                color: item.isCurrent(widget.selectedId)
+                    ? c.headerText
+                    : c.headerMuted,
+              ),
+            ],
+          ),
+        ),
+      );
+
+  /// 시안의 입력 상자 모양이지만 실제 입력은 `DpCommandPalette` 가 받는다
+  /// (`DpChromeBar` 와 같은 판단 — 입력 상태를 두 곳에서 관리하지 않는다).
+  Widget _search(BuildContext context, DpColors c) {
+    if (widget.onSearchTap == null) return const SizedBox.shrink();
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 200),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          key: const ValueKey('web-header-search'),
+          onTap: widget.onSearchTap,
+          borderRadius: BorderRadius.circular(DpRadius.input),
+          child: Container(
+            height: DpDensity.controlHeight,
+            padding: const EdgeInsets.symmetric(horizontal: DpSpacing.sm),
+            decoration: BoxDecoration(
+              // 시안의 #1B1E29 는 토큰이 아니다 — 어두운 헤더 위의 표면 토큰을 쓴다.
+              color: c.headerActive,
+              border: Border.all(color: c.headerBorder),
+              borderRadius: BorderRadius.circular(DpRadius.input),
+            ),
+            child: Row(
+              children: [
+                Icon(DpIcons.search, size: 16, color: c.headerMuted),
+                const SizedBox(width: DpSpacing.xs),
+                Flexible(
+                  child: Text(
+                    '검색',
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.labelMedium?.copyWith(color: c.headerMuted),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _account(BuildContext context, DpColors c) => DpMenuButton(
+    closeWhenChanged: widget.selectedId,
+    entries: widget.accountEntries,
+    // 사용자 결정(2026-09-26)은 「아이콘 + ▾ 만」이다 — 아바타·이름은 P4.
+    // ▾ 가 없으면 이 컨트롤이 메뉴를 연다는 신호가 없다(주 메뉴 드롭다운과 다르다).
+    builder: (context, buttonFocus, toggle, isOpen) => IconButton(
+      key: const ValueKey('web-header-account'),
+      focusNode: buttonFocus,
+      // 색을 명시하지 않는다 — 어두운 헤더가 공급하는 IconTheme 을 상속한다.
+      icon: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(DpIcons.account),
+          Icon(isOpen ? DpIcons.expandLess : DpIcons.expandMore, size: 18),
+        ],
+      ),
+      tooltip: '계정',
+      style: IconButton.styleFrom(
+        minimumSize: const Size(0, DpDensity.controlHeight),
+        foregroundColor: c.headerText,
+      ),
+      onPressed: toggle,
+    ),
+  );
+
+  // `Semantics(container: true)` 로 감싸지 않는다. 그 래퍼는 함정 1·2(헤더 표식이
+  // 위로 합쳐지는 것)를 막으려는 것이고 이 버튼은 heading 이 아니다. 감쌌더니 웹에서
+  // `getByRole('button', { name: '메뉴' })` 가 30초 타임아웃했다(CI 실측) — VM 시맨틱스는
+  // 라벨 '메뉴' 를 정상으로 보고하므로 브라우저 엔진에서만 드러나는 차이다.
+  // 이 레포에서 browser-ux 가 role 로 잘 찾는 버튼들(페이지 헤더 메뉴·정렬 메뉴)은
+  // 전부 래퍼가 없다.
+  // `Tooltip` 이 접근성 이름을 만든다. 실측(CI 36214923308): 이 페이지의 모든
+  // `flt-semantics[role=button]` 이 **aria-label 이 비어 있고** 라벨은 별도 텍스트
+  // 노드로만 나온다 — 그래서 `getByRole('button', {name:'메뉴'})` 가 세 번 연속
+  // 타임아웃했다. 이 레포에서 browser-ux 가 role+name 으로 잘 찾는 버튼
+  // (`page-header-title-menu`)은 전부 tooltip 을 갖고 있다. 테스트와 무관하게,
+  // 이름 없는 버튼은 보조기술 사용자가 무엇인지 알 수 없다.
+  Widget _burger(BuildContext context, DpColors c) => Tooltip(
+    message: '메뉴',
+    child: OutlinedButton.icon(
+      key: const ValueKey('web-header-burger'),
+      focusNode: _burgerFocus,
+      icon: const Icon(DpIcons.menu, size: 18),
+      label: const Text('메뉴'),
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(0, DpDensity.controlHeight),
+        padding: const EdgeInsets.symmetric(horizontal: DpSpacing.md),
+        foregroundColor: c.headerText,
+        side: BorderSide(color: c.headerBorder),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(DpRadius.button),
+        ),
+      ),
+      onPressed: () => setState(() => _expanded = !_expanded),
+    ),
+  );
+
+  Widget _collapsedMenu(BuildContext context, DpColors c) {
+    final rows = <Widget>[];
+    for (final item in widget.items) {
+      if (item.children.isEmpty) {
+        rows.add(_menuRow(context, c, item.label, () => _pick(item.id)));
+      } else {
+        rows.add(_menuSection(context, c, item.label));
+        for (final child in item.children) {
+          rows.add(
+            _menuRow(context, c, child.label, () => _pick(child.id), sub: true),
+          );
+        }
+      }
+    }
+    rows.add(_menuSection(context, c, '계정'));
+    for (final entry in widget.accountEntries) {
+      // onSelect 가 null 이면 데스크톱 메뉴와 같이 눌리지 않아야 한다.
+      // 늘 tappable 로 두면 눌러도 아무 일이 없는 행이 생긴다.
+      rows.add(
+        _menuRow(
+          context,
+          c,
+          entry.label,
+          entry.onSelect == null
+              ? null
+              : () {
+                  setState(() => _expanded = false);
+                  entry.onSelect!.call();
+                },
+          sub: true,
+        ),
+      );
+    }
+
+    return Container(
+      key: const ValueKey('web-header-collapsed-menu'),
+      decoration: BoxDecoration(
+        color: c.headerBg,
+        border: Border(bottom: BorderSide(color: c.headerBorder)),
+      ),
+      padding: const EdgeInsets.fromLTRB(
+        DpSpacing.lg,
+        DpSpacing.sm,
+        DpSpacing.lg,
+        DpSpacing.md,
+      ),
+      // 짧은 화면(가로 폰·200% 텍스트)에서는 메뉴가 뷰포트보다 길어진다. 묶지 않으면
+      // 셸의 Expanded 가 0 으로 눌리고 아래가 잘려 계정 항목에 아예 닿을 수 없다
+      // (실측 667x375 → 107px 잘림). 높이를 뷰포트의 60% 로 묶고 스크롤을 준다.
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.6,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: rows,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _menuRow(
+    BuildContext context,
+    DpColors c,
+    String label,
+    VoidCallback? onTap, {
+    bool sub = false,
+  }) => Material(
+    color: Colors.transparent,
+    child: InkWell(
+      onTap: onTap,
+      child: Container(
+        // 시안의 7px 세로 패딩으로는 시맨틱 박스가 최소 타깃(24)에 못 미칠 수
+        // 있어 하한을 명시한다. 값은 컨트롤 높이(30)로 둔다 — 24 로 낮추면
+        // 법적 하한에 딱 붙는다.
+        constraints: const BoxConstraints(minHeight: DpDensity.controlHeight),
+        padding: EdgeInsets.only(left: sub ? DpSpacing.md : 0),
+        alignment: Alignment.centerLeft,
+        child: Text(
+          label,
+          style: TextStyle(
+            color: sub ? c.headerMuted : c.headerText,
+            fontWeight: sub ? FontWeight.w400 : FontWeight.w500,
+          ),
+        ),
+      ),
+    ),
+  );
+
+  Widget _menuSection(BuildContext context, DpColors c, String label) =>
+      Container(
+        margin: const EdgeInsets.only(top: DpSpacing.sm),
+        padding: const EdgeInsets.only(top: DpSpacing.sm),
+        decoration: BoxDecoration(
+          border: Border(top: BorderSide(color: c.headerBorder)),
+        ),
+        child: Text(
+          label,
+          style: Theme.of(
+            context,
+          ).textTheme.labelSmall?.copyWith(color: c.headerMuted),
+        ),
+      );
+}

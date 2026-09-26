@@ -33,6 +33,8 @@ const HEIGHT = 900;
 const MIN_TARGET = 24; // = DpDensity.minTarget (packages/dp_design/lib/src/theme/dp_spacing.dart)
 const AXE_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'best-practice'];
 const READY_TIMEOUT_MS = 20000;
+/// 한 컨텍스트가 내는 외부(루프백 밖) 요청의 상한. 정상은 3~8건이다.
+const MAX_EXTERNAL_REQUESTS = 40;
 
 function parseArgs(argv) {
   const options = {};
@@ -242,7 +244,8 @@ export async function run(options) {
     }
 
     // 3. board 전환 뒤 back/forward 가 URL 과 H1 을 함께 되돌린다.
-    //    페이지 안 게시판 세그먼트는 없다 — compact 의 제목 메뉴가 본문에서 게시판을 옮기는 유일한 수단이다.
+    //    390 폭에서 게시판을 옮기는 유일한 수단은 헤더의 접힌 메뉴다(S3-P2).
+    //    페이지 안 세그먼트도, 제목 메뉴도 쓰지 않는다.
     if (wants('back-forward-boards')) {
       await scenario(scenarios, { id: 'back-forward-boards', width: 390, text_scale: 100, reduced_motion: false }, async () => {
         const { context, page } = await openPage(browser, server.base, { width: 390 });
@@ -251,13 +254,44 @@ export async function run(options) {
           const trail = [];
           const record = async (step) => trail.push({ step, location: location(page), headings: await headings(page) });
           await record('start');
-          for (const [label, expectedQuery] of [['Q/A', 'board=QNA'], ['피드백', 'board=FEEDBACK']]) {
-            await page.getByRole('button', { name: '게시판 바꾸기', exact: true }).first().click();
-            // Flutter Web 은 MenuItemButton 을 role=menuitem 이 아니라 button 으로 낸다(실측).
-            await page.getByRole('button', { name: label, exact: true }).first().click();
-            await page.waitForURL((url) => url.search.includes(expectedQuery), { timeout: READY_TIMEOUT_MS });
-            await page.waitForTimeout(300);
-            await record(`select ${label}`);
+          // 셸의 컨트롤을 role+name 으로 못 찾으면 30초 타임아웃만 남고 "그럼 뭐가
+          // 있었는지" 가 사라진다. **실패한 그 순간에** 브라우저가 실제로 내는 것을
+          // 남긴다 — 클릭 전 스냅샷은 시맨틱스 트리가 아직 덜 찼을 수 있어
+          // 부재의 증거가 되지 못했다(2026-09-26 실측). aria-label 만으로도 부족해
+          // textContent 까지 읽는다.
+          const dumpSemantics = () => page.evaluate(() =>
+            [...document.querySelectorAll('flt-semantics')]
+              .map((el) => ({
+                role: el.getAttribute('role') ?? '',
+                label: el.getAttribute('aria-label') ?? '',
+                text: (el.textContent ?? '').trim().slice(0, 40),
+              }))
+              .filter((n) => n.role || n.label || n.text)
+              .map((n) => `${n.role || '-'}|${n.label}|${n.text}`)
+              .slice(0, 60));
+          try {
+            for (const [label, expectedQuery] of [['Q/A', 'board=QNA'], ['피드백', 'board=FEEDBACK']]) {
+              await page.getByRole('button', { name: '메뉴', exact: true }).first().click();
+              // Flutter Web 은 접힘 메뉴 항목을 링크가 아니라 button 으로 낸다(함정 4).
+              await page.getByRole('button', { name: label, exact: true }).first().click();
+              await page.waitForURL((url) => url.search.includes(expectedQuery), { timeout: READY_TIMEOUT_MS });
+              await page.waitForTimeout(300);
+              await record(`select ${label}`);
+            }
+          } catch (error) {
+            const first = String(error).split(String.fromCharCode(10))[0];
+            const exposed = await dumpSemantics();
+            // 시맨틱스 트리만으로는 "안 그려졌다" 와 "그려졌는데 트리에 없다" 가
+            // 갈리지 않는다. 실패한 화면을 그대로 남긴다.
+            const shot = resolve(dirname(resolve(options.out)), 'failure-back-forward-boards.png');
+            await mkdir(dirname(shot), { recursive: true });
+            await page.screenshot({ path: shot, fullPage: false });
+            return {
+              trail,
+              exposed,
+              screenshot: 'failure-back-forward-boards.png',
+              failures: [`board switch failed: ${first}`],
+            };
           }
           await page.goBack({ waitUntil: 'load' });
           await page.waitForTimeout(500);
@@ -314,6 +348,8 @@ export async function run(options) {
     }
 
     // 5. 오버레이(메뉴) 닫힘 후 focus 가 여는 버튼으로 복귀.
+    //    셸의 계정·커뮤니티 메뉴도 같은 DpMenuButton 을 쓴다(S3-P2) — 여기서는 화면 안
+    //    정렬 메뉴로 재고, 셸 메뉴는 axe 와 키보드 순회가 덮는다.
     //    커뮤니티의 작성 버튼은 시트 없이 작성 화면으로 직행하므로, 같은 화면의 정렬 메뉴로 잰다.
     if (wants('dialog-focus-return')) {
       await scenario(scenarios, { id: 'dialog-focus-return', width: 1024, text_scale: 100, reduced_motion: false }, async () => {
@@ -347,19 +383,65 @@ export async function run(options) {
       for (const width of WIDTHS) {
         for (const textScale of [100, 200]) {
           await scenario(scenarios, { id: 'overflow-and-targets', width, text_scale: textScale, reduced_motion: false }, async () => {
-            const { context, page, external } = await openPage(browser, server.base, { width, textScale });
+            const { context, page, external, pageErrors } = await openPage(browser, server.base, { width, textScale });
             try {
               const failures = [];
               const routes = {};
               for (const route of ROUTES) {
-                await goto(page, server.base, route);
+                // goto 안의 ready() 는 networkidle 을 기다린다. 여기서 그냥 던지면
+                // "어느 라우트에서" "브라우저가 무엇을 불평하며" 안 가라앉았는지가
+                // 통째로 사라진다(2026-09-26 실측: 390x200% 가 이 자리에서 30초 타임아웃).
+                try {
+                  await goto(page, server.base, route);
+                } catch (error) {
+                  const first = String(error).split(String.fromCharCode(10))[0];
+                  failures.push(`${route} did not settle: ${first}`);
+                  break;
+                }
                 const size = await overflow(page);
                 const targets = width === 390 && textScale === 100 ? await smallTargets(page) : [];
-                routes[route] = { location: location(page), ...size, small_targets: targets };
+                routes[route] = {
+                  location: location(page),
+                  ...size,
+                  small_targets: targets,
+                  // 폭주가 **어느 라우트에서 시작되는지** 보려면 누적값을 라우트마다
+                  // 찍어야 한다. 총합만으로는 마지막 라우트가 범인처럼 보인다.
+                  external_so_far: external.length,
+                };
                 if (size.scrollWidth > size.innerWidth) failures.push(`${route} overflows ${size.scrollWidth}>${size.innerWidth}`);
                 if (targets.length) failures.push(`${route} small targets ${JSON.stringify(targets.slice(0, 4))}`);
+                // 폰트 폴백 폭주를 **타임아웃 전에** 이름 붙여 잡는다. 번들에 없는
+                // 패밀리로 그려지는 글자가 하나라도 있으면 엔진이 Noto 를 받으려
+                // 하고, 실패한 다운로드는 재시도 금지 목록에 들어가지 않아
+                // 레이아웃마다 다시 나간다(2026-09-26: `ChipThemeData.labelStyle`
+                // 의 fontFamily 누락으로 390x200% `/content` 에서 230건 넘게).
+                // 정상값은 컨텍스트당 3~8건이다.
+                if (external.length > MAX_EXTERNAL_REQUESTS) {
+                  failures.push(`${route} external requests ${external.length} > ${MAX_EXTERNAL_REQUESTS} (font fallback retry storm?)`);
+                  break;
+                }
               }
-              return { routes, external: [...new Set(external)].slice(0, 10), failures };
+              return {
+                routes,
+                external: [...new Set(external)].slice(0, 10),
+                // 중복 제거 전 총 건수. 차단된 요청을 앱이 재시도하면
+                // networkidle 이 영원히 안 온다 — 그 폭주를 고유 목록으로는
+                // 구별할 수 없다(390x200% 가 이 자리에서 624건으로 멈춘다).
+                external_total: external.length,
+                // 무엇을 몇 번 다시 부르는지. 총 건수만으로는 범인을 못 고른다.
+                external_top: Object.entries(
+                  external.reduce((counts, url) => {
+                    const key = url.replace(/\?.*$/, '');
+                    counts[key] = (counts[key] ?? 0) + 1;
+                    return counts;
+                  }, {}),
+                )
+                  .sort((a, b) => b[1] - a[1])
+                  .slice(0, 5)
+                  .map(([url, count]) => `${count}x ${url}`),
+                page_errors: [...new Set(pageErrors)].slice(0, 5),
+                failures,
+              };
             } finally {
               await context.close();
             }

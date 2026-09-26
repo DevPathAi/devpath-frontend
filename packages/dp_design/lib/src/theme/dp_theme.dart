@@ -165,7 +165,16 @@ abstract final class DpTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(DpRadius.chip),
         ),
-        labelStyle: TextStyle(color: c.tagText),
+        // Material 은 이 스타일을 기본값과 병합하지 않고 **대체**한다
+        // (`chipTheme.labelStyle ?? chipDefaults.labelStyle!`). 앱 폰트는 기본값
+        // (`textTheme.labelLarge`)에만 있으므로 여기서 직접 지정해야 한다 —
+        // 빠뜨리면 칩만 번들에 없는 패밀리로 그려지고, 라벨이 넘칠 때 Material 의
+        // `TextOverflow.fade` 가 만드는 '…' 측정 문단이 외부 Noto 폰트를 부른다
+        // (test/theme/dp_chip_theme_font_test.dart).
+        labelStyle: TextStyle(
+          fontFamily: DpTypography.family,
+          color: c.tagText,
+        ),
         padding: const EdgeInsets.symmetric(horizontal: DpSpacing.sm),
       ),
       dialogTheme: DialogThemeData(
