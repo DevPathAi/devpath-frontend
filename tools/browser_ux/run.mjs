@@ -242,7 +242,8 @@ export async function run(options) {
     }
 
     // 3. board 전환 뒤 back/forward 가 URL 과 H1 을 함께 되돌린다.
-    //    페이지 안 게시판 세그먼트는 없다 — compact 의 제목 메뉴가 본문에서 게시판을 옮기는 유일한 수단이다.
+    //    390 폭에서 게시판을 옮기는 유일한 수단은 헤더의 접힌 메뉴다(S3-P2).
+    //    페이지 안 세그먼트도, 제목 메뉴도 쓰지 않는다.
     if (wants('back-forward-boards')) {
       await scenario(scenarios, { id: 'back-forward-boards', width: 390, text_scale: 100, reduced_motion: false }, async () => {
         const { context, page } = await openPage(browser, server.base, { width: 390 });
@@ -252,8 +253,8 @@ export async function run(options) {
           const record = async (step) => trail.push({ step, location: location(page), headings: await headings(page) });
           await record('start');
           for (const [label, expectedQuery] of [['Q/A', 'board=QNA'], ['피드백', 'board=FEEDBACK']]) {
-            await page.getByRole('button', { name: '게시판 바꾸기', exact: true }).first().click();
-            // Flutter Web 은 MenuItemButton 을 role=menuitem 이 아니라 button 으로 낸다(실측).
+            await page.getByRole('button', { name: '메뉴', exact: true }).first().click();
+            // Flutter Web 은 접힘 메뉴 항목을 링크가 아니라 button 으로 낸다(함정 4).
             await page.getByRole('button', { name: label, exact: true }).first().click();
             await page.waitForURL((url) => url.search.includes(expectedQuery), { timeout: READY_TIMEOUT_MS });
             await page.waitForTimeout(300);
@@ -314,6 +315,8 @@ export async function run(options) {
     }
 
     // 5. 오버레이(메뉴) 닫힘 후 focus 가 여는 버튼으로 복귀.
+    //    셸의 계정·커뮤니티 메뉴도 같은 DpMenuButton 을 쓴다(S3-P2) — 여기서는 화면 안
+    //    정렬 메뉴로 재고, 셸 메뉴는 axe 와 키보드 순회가 덮는다.
     //    커뮤니티의 작성 버튼은 시트 없이 작성 화면으로 직행하므로, 같은 화면의 정렬 메뉴로 잰다.
     if (wants('dialog-focus-return')) {
       await scenario(scenarios, { id: 'dialog-focus-return', width: 1024, text_scale: 100, reduced_motion: false }, async () => {
