@@ -21,7 +21,10 @@ void main() {
   testWidgets('열면 첫 항목으로 focus 가 간다 — 웹에서 Escape 가 닿으려면 필요하다', (tester) async {
     await tester.pumpWidget(
       _host(
-        entries: [(label: '첫째', onSelect: () {}), (label: '둘째', onSelect: () {})],
+        entries: [
+          (label: '첫째', onSelect: () {}),
+          (label: '둘째', onSelect: () {}),
+        ],
       ),
     );
 
@@ -48,7 +51,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(picked, 1);
-    expect(find.text('첫째'), findsNothing, reason: '메뉴가 열린 채 남으면 다음 화면 위에 떠 있는다');
+    expect(
+      find.text('첫째'),
+      findsNothing,
+      reason: '메뉴가 열린 채 남으면 다음 화면 위에 떠 있는다',
+    );
   });
 
   testWidgets('열린 상태는 builder 에 전달된다', (tester) async {
