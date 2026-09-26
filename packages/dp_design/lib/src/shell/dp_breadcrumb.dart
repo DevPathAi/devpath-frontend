@@ -8,6 +8,13 @@ import 'dp_chrome_bar.dart' show DpCrumb;
 ///
 /// `DpChromeBar` 안의 브레드크럼과 별개다 — 크롬바는 `apps/admin` 이 계속 쓰고,
 /// web 은 크롬바 없이 이것을 본문 맨 위에 둔다.
+///
+/// **구분자는 `·` 다. 시안의 `›`(U+203A) 로 되돌리지 말 것** — 번들 폰트에 없어
+/// CanvasKit 이 fonts.gstatic.com 에서 Noto Sans Symbols 를 받아 온다. 실측
+/// (CI 36212413896 vs develop 35932928056): develop 에 없던 `notosanssymbols`
+/// 요청이 이 브랜치에서만 생겼고, 외부 요청이 차단된 browser-ux 에서
+/// `/content` 가 390x200% 에서 networkidle 에 도달하지 못했다. 운영에서도
+/// 페이지마다 폰트를 한 벌 더 받는다(docs/design/font-diet.md 의 방향과 반대).
 class DpBreadcrumb extends StatelessWidget {
   const DpBreadcrumb({super.key, required this.crumbs, this.onCrumbTap});
 
@@ -62,7 +69,7 @@ class DpBreadcrumb extends StatelessWidget {
         children.add(
           ConstrainedBox(
             constraints: const BoxConstraints(minHeight: DpDensity.minTarget),
-            child: Center(widthFactor: 1, child: Text('›', style: style)),
+            child: Center(widthFactor: 1, child: Text('·', style: style)),
           ),
         );
       }
