@@ -303,21 +303,30 @@ class _DpWebHeaderState extends State<DpWebHeader> {
   // 라벨 '메뉴' 를 정상으로 보고하므로 브라우저 엔진에서만 드러나는 차이다.
   // 이 레포에서 browser-ux 가 role 로 잘 찾는 버튼들(페이지 헤더 메뉴·정렬 메뉴)은
   // 전부 래퍼가 없다.
-  Widget _burger(BuildContext context, DpColors c) => OutlinedButton.icon(
-    key: const ValueKey('web-header-burger'),
-    focusNode: _burgerFocus,
-    icon: const Icon(DpIcons.menu, size: 18),
-    label: const Text('메뉴'),
-    style: OutlinedButton.styleFrom(
-      minimumSize: const Size(0, DpDensity.controlHeight),
-      padding: const EdgeInsets.symmetric(horizontal: DpSpacing.md),
-      foregroundColor: c.headerText,
-      side: BorderSide(color: c.headerBorder),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(DpRadius.button),
+  // `Tooltip` 이 접근성 이름을 만든다. 실측(CI 36214923308): 이 페이지의 모든
+  // `flt-semantics[role=button]` 이 **aria-label 이 비어 있고** 라벨은 별도 텍스트
+  // 노드로만 나온다 — 그래서 `getByRole('button', {name:'메뉴'})` 가 세 번 연속
+  // 타임아웃했다. 이 레포에서 browser-ux 가 role+name 으로 잘 찾는 버튼
+  // (`page-header-title-menu`)은 전부 tooltip 을 갖고 있다. 테스트와 무관하게,
+  // 이름 없는 버튼은 보조기술 사용자가 무엇인지 알 수 없다.
+  Widget _burger(BuildContext context, DpColors c) => Tooltip(
+    message: '메뉴',
+    child: OutlinedButton.icon(
+      key: const ValueKey('web-header-burger'),
+      focusNode: _burgerFocus,
+      icon: const Icon(DpIcons.menu, size: 18),
+      label: const Text('메뉴'),
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(0, DpDensity.controlHeight),
+        padding: const EdgeInsets.symmetric(horizontal: DpSpacing.md),
+        foregroundColor: c.headerText,
+        side: BorderSide(color: c.headerBorder),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(DpRadius.button),
+        ),
       ),
+      onPressed: () => setState(() => _expanded = !_expanded),
     ),
-    onPressed: () => setState(() => _expanded = !_expanded),
   );
 
   Widget _collapsedMenu(BuildContext context, DpColors c) {

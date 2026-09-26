@@ -390,8 +390,19 @@ export async function run(options) {
                 external: [...new Set(external)].slice(0, 10),
                 // 중복 제거 전 총 건수. 차단된 요청을 앱이 재시도하면
                 // networkidle 이 영원히 안 온다 — 그 폭주를 고유 목록으로는
-                // 구별할 수 없다(390x200% 가 이 자리에서 멈춘다).
+                // 구별할 수 없다(390x200% 가 이 자리에서 624건으로 멈춘다).
                 external_total: external.length,
+                // 무엇을 몇 번 다시 부르는지. 총 건수만으로는 범인을 못 고른다.
+                external_top: Object.entries(
+                  external.reduce((counts, url) => {
+                    const key = url.replace(/\?.*$/, '');
+                    counts[key] = (counts[key] ?? 0) + 1;
+                    return counts;
+                  }, {}),
+                )
+                  .sort((a, b) => b[1] - a[1])
+                  .slice(0, 5)
+                  .map(([url, count]) => `${count}x ${url}`),
                 page_errors: [...new Set(pageErrors)].slice(0, 5),
                 failures,
               };
