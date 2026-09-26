@@ -9,12 +9,11 @@ import 'dp_chrome_bar.dart' show DpCrumb;
 /// `DpChromeBar` 안의 브레드크럼과 별개다 — 크롬바는 `apps/admin` 이 계속 쓰고,
 /// web 은 크롬바 없이 이것을 본문 맨 위에 둔다.
 ///
-/// **구분자는 `·` 다. 시안의 `›`(U+203A) 로 되돌리지 말 것** — 번들 폰트에 없어
-/// CanvasKit 이 fonts.gstatic.com 에서 Noto Sans Symbols 를 받아 온다. 실측
-/// (CI 36212413896 vs develop 35932928056): develop 에 없던 `notosanssymbols`
-/// 요청이 이 브랜치에서만 생겼고, 외부 요청이 차단된 browser-ux 에서
-/// `/content` 가 390x200% 에서 networkidle 에 도달하지 못했다. 운영에서도
-/// 페이지마다 폰트를 한 벌 더 받는다(docs/design/font-diet.md 의 방향과 반대).
+/// 구분자는 시안대로 `›` 다. 한때 `·` 로 바꿨다가 되돌렸다 — `notosanssymbols`
+/// 폰트 폴백 요청이 이 글자 때문이라고 봤는데, 실측(CI 36214032743, 구분자가
+/// `·` 인 상태)에서도 같은 요청이 그대로 났다. 그 요청은 원인이 아니라 390x200%
+/// 에서 `/content` 가 안 가라앉는 것의 **증상**이다(두 실행 모두 그 시나리오
+/// 에서만 나타난다).
 class DpBreadcrumb extends StatelessWidget {
   const DpBreadcrumb({super.key, required this.crumbs, this.onCrumbTap});
 
@@ -69,7 +68,7 @@ class DpBreadcrumb extends StatelessWidget {
         children.add(
           ConstrainedBox(
             constraints: const BoxConstraints(minHeight: DpDensity.minTarget),
-            child: Center(widthFactor: 1, child: Text('·', style: style)),
+            child: Center(widthFactor: 1, child: Text('›', style: style)),
           ),
         );
       }

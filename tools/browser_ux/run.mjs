@@ -252,13 +252,27 @@ export async function run(options) {
           const trail = [];
           const record = async (step) => trail.push({ step, location: location(page), headings: await headings(page) });
           await record('start');
-          for (const [label, expectedQuery] of [['Q/A', 'board=QNA'], ['피드백', 'board=FEEDBACK']]) {
-            await page.getByRole('button', { name: '메뉴', exact: true }).first().click();
-            // Flutter Web 은 접힘 메뉴 항목을 링크가 아니라 button 으로 낸다(함정 4).
-            await page.getByRole('button', { name: label, exact: true }).first().click();
-            await page.waitForURL((url) => url.search.includes(expectedQuery), { timeout: READY_TIMEOUT_MS });
-            await page.waitForTimeout(300);
-            await record(`select ${label}`);
+          // 셸의 컨트롤을 role+name 으로 못 찾으면 30초 타임아웃만 남고 "그럼 뭐가
+          // 있었는지" 가 사라진다. 실패 전에 브라우저가 실제로 내는 이름을 남긴다
+          // (2026-09-26: 햄버거가 세 번 연속 이 자리에서 죽었는데 VM 시맨틱스는
+          // 라벨을 '메뉴' 로 정상 보고했다).
+          const exposed = await page.evaluate(() =>
+            [...document.querySelectorAll('flt-semantics')]
+              .map((el) => `${el.getAttribute('role') ?? '-'}:${el.getAttribute('aria-label') ?? ''}`)
+              .filter((entry) => entry !== '-:')
+              .slice(0, 40));
+          try {
+            for (const [label, expectedQuery] of [['Q/A', 'board=QNA'], ['피드백', 'board=FEEDBACK']]) {
+              await page.getByRole('button', { name: '메뉴', exact: true }).first().click();
+              // Flutter Web 은 접힘 메뉴 항목을 링크가 아니라 button 으로 낸다(함정 4).
+              await page.getByRole('button', { name: label, exact: true }).first().click();
+              await page.waitForURL((url) => url.search.includes(expectedQuery), { timeout: READY_TIMEOUT_MS });
+              await page.waitForTimeout(300);
+              await record(`select ${label}`);
+            }
+          } catch (error) {
+            const first = String(error).split(String.fromCharCode(10))[0];
+            return { trail, exposed, failures: [`board switch failed: ${first}`] };
           }
           await page.goBack({ waitUntil: 'load' });
           await page.waitForTimeout(500);
@@ -374,6 +388,10 @@ export async function run(options) {
               return {
                 routes,
                 external: [...new Set(external)].slice(0, 10),
+                // 중복 제거 전 총 건수. 차단된 요청을 앱이 재시도하면
+                // networkidle 이 영원히 안 온다 — 그 폭주를 고유 목록으로는
+                // 구별할 수 없다(390x200% 가 이 자리에서 멈춘다).
+                external_total: external.length,
                 page_errors: [...new Set(pageErrors)].slice(0, 5),
                 failures,
               };
