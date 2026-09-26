@@ -24,14 +24,21 @@ class DpBreadcrumb extends StatelessWidget {
   Widget build(BuildContext context) {
     if (crumbs.isEmpty) return const SizedBox.shrink();
     final c = context.dpColors;
+    // compact 에서는 마지막 세그먼트만 — `DpChromeBar._crumbs` 와 같은 규칙이다.
+    // 전체 경로를 폰 폭에 욱여넣으면 잘리고, 잘린 자리에 그려지는 ellipsis(…)가
+    // 번들 폰트에 없어 CanvasKit 이 Noto Sans Symbols 를 계속 다시 받는다
+    // (CI 36215681312 실측: 390x200% 에서 차단된 요청 724건 중 695건이 그 폰트).
+    final visible = MediaQuery.sizeOf(context).width < 600
+        ? [crumbs.last]
+        : crumbs;
     final style = Theme.of(
       context,
     ).textTheme.labelMedium?.copyWith(color: c.textFaint);
 
     final children = <Widget>[];
-    for (var i = 0; i < crumbs.length; i++) {
-      final crumb = crumbs[i];
-      final isLast = i == crumbs.length - 1;
+    for (var i = 0; i < visible.length; i++) {
+      final crumb = visible[i];
+      final isLast = i == visible.length - 1;
       final label = Text(
         crumb.label,
         style: style?.copyWith(color: isLast ? c.textFaint : c.textSecondary),

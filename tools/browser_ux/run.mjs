@@ -253,14 +253,20 @@ export async function run(options) {
           const record = async (step) => trail.push({ step, location: location(page), headings: await headings(page) });
           await record('start');
           // 셸의 컨트롤을 role+name 으로 못 찾으면 30초 타임아웃만 남고 "그럼 뭐가
-          // 있었는지" 가 사라진다. 실패 전에 브라우저가 실제로 내는 이름을 남긴다
-          // (2026-09-26: 햄버거가 세 번 연속 이 자리에서 죽었는데 VM 시맨틱스는
-          // 라벨을 '메뉴' 로 정상 보고했다).
-          const exposed = await page.evaluate(() =>
+          // 있었는지" 가 사라진다. **실패한 그 순간에** 브라우저가 실제로 내는 것을
+          // 남긴다 — 클릭 전 스냅샷은 시맨틱스 트리가 아직 덜 찼을 수 있어
+          // 부재의 증거가 되지 못했다(2026-09-26 실측). aria-label 만으로도 부족해
+          // textContent 까지 읽는다.
+          const dumpSemantics = () => page.evaluate(() =>
             [...document.querySelectorAll('flt-semantics')]
-              .map((el) => `${el.getAttribute('role') ?? '-'}:${el.getAttribute('aria-label') ?? ''}`)
-              .filter((entry) => entry !== '-:')
-              .slice(0, 40));
+              .map((el) => ({
+                role: el.getAttribute('role') ?? '',
+                label: el.getAttribute('aria-label') ?? '',
+                text: (el.textContent ?? '').trim().slice(0, 40),
+              }))
+              .filter((n) => n.role || n.label || n.text)
+              .map((n) => `${n.role || '-'}|${n.label}|${n.text}`)
+              .slice(0, 60));
           try {
             for (const [label, expectedQuery] of [['Q/A', 'board=QNA'], ['피드백', 'board=FEEDBACK']]) {
               await page.getByRole('button', { name: '메뉴', exact: true }).first().click();
@@ -272,6 +278,7 @@ export async function run(options) {
             }
           } catch (error) {
             const first = String(error).split(String.fromCharCode(10))[0];
+            const exposed = await dumpSemantics();
             return { trail, exposed, failures: [`board switch failed: ${first}`] };
           }
           await page.goBack({ waitUntil: 'load' });
