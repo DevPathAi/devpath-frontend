@@ -8,14 +8,28 @@ import 'package:flutter_test/flutter_test.dart';
 Widget _host(Widget child) => MaterialApp(theme: DpTheme.light(), home: child);
 
 void _setWidth(WidgetTester tester, double w) {
-  tester.view.physicalSize = Size(w, 800);
+  tester.view.physicalSize = Size(w, 900);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
 }
 
 void main() {
   test('첫 목적지 라벨은 Today다', () {
-    expect(kShellDestinations.first.label, '오늘');
+    expect(kWebNavItems.first.label, '오늘');
+  });
+
+  test('주 메뉴는 오늘·학습 경로·AI 멘토·커뮤니티(자식 3)다', () {
+    expect(kWebNavItems.map((i) => i.label).toList(), [
+      '오늘',
+      '학습 경로',
+      'AI 멘토',
+      '커뮤니티',
+    ]);
+    expect(kWebNavItems.last.children.map((i) => i.label).toList(), [
+      '자유게시판',
+      'Q/A',
+      '피드백',
+    ]);
   });
 
   test('셸 위치 resolver는 canonical child만 Today로 묶고 legacy content는 중립이다', () {
@@ -27,26 +41,46 @@ void main() {
     expect(shellDestinationIndexFor('/content/77'), isNull);
   });
 
-  testWidgets('좁은 폭(<600)은 Leva 플로팅 하단 내비', (tester) async {
-    _setWidth(tester, 390);
-    await tester.pumpWidget(
-      _host(const AppShellView(location: '/dashboard', child: Text('본문'))),
+  test('위치 → 헤더 선택 id', () {
+    expect(webNavSelectedIdFor('/dashboard'), '/dashboard');
+    expect(webNavSelectedIdFor('/path/301/today'), '/dashboard');
+    expect(webNavSelectedIdFor('/mission/302/sandbox'), '/dashboard');
+    expect(webNavSelectedIdFor('/path'), '/path');
+    expect(webNavSelectedIdFor('/mentor'), '/mentor');
+    expect(webNavSelectedIdFor('/community'), '/community?board=FREE');
+    expect(webNavSelectedIdFor('/community?board=QNA'), '/community?board=QNA');
+    expect(
+      webNavSelectedIdFor('/community?board=FEEDBACK'),
+      '/community?board=FEEDBACK',
     );
-    expect(find.byType(DpMobileNavigation), findsOneWidget);
-    expect(find.byType(DpNavRail), findsNothing);
   });
 
-  testWidgets('넓은 폭(≥840)은 DpNavRail', (tester) async {
-    _setWidth(tester, 1200);
-    await tester.pumpWidget(
-      _host(const AppShellView(location: '/dashboard', child: Text('본문'))),
-    );
-    expect(find.byType(DpNavRail), findsOneWidget);
-    expect(find.byType(DpMobileNavigation), findsNothing);
+  // Review Focus 3
+  test('목적지에 없는 위치는 null 이다 — 헤더가 엉뚱한 항목에 밑줄을 긋지 않는다', () {
+    for (final location in [
+      '/settings',
+      '/mypage',
+      '/content/77',
+      '/sandbox',
+    ]) {
+      expect(webNavSelectedIdFor(location), isNull, reason: location);
+    }
   });
 
-  testWidgets('목적지 선택 시 해당 경로로 콜백', (tester) async {
-    _setWidth(tester, 390);
+  testWidgets('모든 폭에서 상단 헤더 셸이다 — 레일도 하단 내비도 없다', (tester) async {
+    for (final width in [390.0, 700.0, 1400.0]) {
+      _setWidth(tester, width);
+      await tester.pumpWidget(
+        _host(const AppShellView(location: '/dashboard', child: Text('본문'))),
+      );
+      expect(find.byType(DpWebShell), findsOneWidget, reason: '폭 $width');
+      expect(find.byType(DpNavRail), findsNothing, reason: '폭 $width');
+      expect(find.byType(DpMobileNavigation), findsNothing, reason: '폭 $width');
+    }
+  });
+
+  testWidgets('헤더에서 목적지를 고르면 해당 경로로 콜백', (tester) async {
+    _setWidth(tester, 1400);
     String? picked;
     await tester.pumpWidget(
       _host(
@@ -57,96 +91,34 @@ void main() {
         ),
       ),
     );
+
     await tester.tap(find.text('AI 멘토'));
+    await tester.pumpAndSettle();
     expect(picked, '/mentor');
   });
 
-  testWidgets('중간 폭(600–839)은 접힌 NavigationRail(하단 Bar 아님)', (tester) async {
-    _setWidth(tester, 700);
-    await tester.pumpWidget(
-      _host(const AppShellView(location: '/dashboard', child: Text('본문'))),
-    );
-    expect(find.byType(DpNavRail), findsOneWidget);
-    expect(find.byType(NavigationBar), findsNothing);
-    final rail = tester.widget<DpNavRail>(find.byType(DpNavRail));
-    expect(rail.extended, isFalse);
-  });
-
-  testWidgets('Large 폭(≥1240)은 펼친 Rail + 본문 최대폭 제약', (tester) async {
-    _setWidth(tester, 1400);
-    await tester.pumpWidget(
-      _host(const AppShellView(location: '/dashboard', child: Text('본문'))),
-    );
-    final rail = tester.widget<DpNavRail>(find.byType(DpNavRail));
-    expect(rail.extended, isTrue);
-    expect(find.byType(DpMaxWidth), findsOneWidget);
-  });
-
-  // 순수 함수(breadcrumbFor) 테스트만으로는 배선이 끊겨도 통과한다 — 셸이
-  // 실제로 크롬바에 전달하는지, 세그먼트 탭이 실제로 콜백을 트리거하는지
-  // 위젯 테스트로 확인한다.
-  testWidgets('게시글 상세 위치는 크롬바에 3세그먼트 브레드크럼이 배선된다', (tester) async {
-    _setWidth(tester, 1200);
-    await tester.pumpWidget(
-      _host(
-        const AppShellView(
-          location: '/community/post/12?board=FREE',
-          child: Text('본문'),
-        ),
-      ),
-    );
-
-    final chromeBar = tester.widget<DpChromeBar>(find.byType(DpChromeBar));
-    expect(chromeBar.breadcrumb, const [
-      (label: '커뮤니티', path: null),
-      (label: '자유게시판', path: '/community?board=FREE'),
-      (label: '게시글', path: null),
-    ]);
-  });
-
-  testWidgets('브레드크럼의 클릭 가능 세그먼트를 탭하면 해당 경로로 콜백', (tester) async {
-    _setWidth(tester, 1200);
+  testWidgets('390 폭: 햄버거 메뉴 안에서 게시판으로 이동한다', (tester) async {
+    _setWidth(tester, 390);
     String? picked;
     await tester.pumpWidget(
       _host(
         AppShellView(
-          location: '/community/post/12?board=FREE',
+          location: '/community',
           onSelect: (p) => picked = p,
           child: const Text('본문'),
         ),
       ),
     );
 
-    // 레일 목적지 라벨도 "자유게시판"이라 크롬바 안으로 범위를 좁힌다.
-    await tester.tap(
-      find.descendant(
-        of: find.byType(DpChromeBar),
-        matching: find.text('자유게시판'),
-      ),
-    );
-    expect(picked, '/community?board=FREE');
+    await tester.tap(find.byKey(const ValueKey('web-header-burger')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('피드백'));
+    await tester.pumpAndSettle();
+    expect(picked, '/community?board=FEEDBACK');
   });
 
-  // 계정 아이콘은 DpNavRail(다크 배경)과 DpChromeBar(밝은 배경, compact) 사이를
-  // 오가는 같은 위젯 인스턴스다. Icon.color를 하드코딩하면 한쪽 배경에서
-  // 대비가 무너진다 — 슬롯이 공급하는 IconTheme을 상속해야 한다.
-  testWidgets('compact 폭: 계정 아이콘은 색을 상속하고 크롬바의 textSecondary가 된다', (
-    tester,
-  ) async {
-    _setWidth(tester, 390);
-    await tester.pumpWidget(
-      _host(const AppShellView(location: '/dashboard', child: Text('본문'))),
-    );
-
-    final icon = tester.widget<Icon>(find.byIcon(DpIcons.account));
-    expect(icon.color, isNull, reason: '하드코딩된 색이면 배경에 따라 상속받지 못해 대비가 무너진다');
-
-    final context = tester.element(find.byIcon(DpIcons.account));
-    expect(IconTheme.of(context).color, DpColors.light.textSecondary);
-  });
-
-  testWidgets('계정 메뉴 첫 단계에서 로그아웃을 실행할 수 있다', (tester) async {
-    _setWidth(tester, 390);
+  testWidgets('계정 메뉴에서 로그아웃을 실행할 수 있다', (tester) async {
+    _setWidth(tester, 1400);
     var logoutCalls = 0;
     await tester.pumpWidget(
       _host(
@@ -158,36 +130,113 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byTooltip('계정'));
+    await tester.tap(find.byKey(const ValueKey('web-header-account')));
     await tester.pumpAndSettle();
-    expect(find.text('로그아웃'), findsOneWidget);
-
     await tester.tap(find.text('로그아웃'));
     await tester.pump();
     expect(logoutCalls, 1);
   });
 
-  // I1 회귀 가드: kShellDestinations가 5→4로 줄면서 /settings가 목적지에서
-  // 빠졌다. 예전 `_index`(매칭 실패 시 0 폴백)는 레일이 "대시보드"를 잘못
-  // 활성 표시했다 — 크롬바 브레드크럼은 "계정 · 설정"이라 셸 안 두 위치
-  // 표시가 서로 모순됐다. 지금은 매칭 실패 시 null(무강조)이어야 한다.
-  testWidgets('/settings 위치에서 레일은 어떤 항목도 활성 표시하지 않는다(대시보드 오표시 회귀 방지)', (
-    tester,
-  ) async {
-    _setWidth(tester, 1200);
+  testWidgets('푸터 링크: 약관·처리방침은 외부로, 오류 신고는 앱 안에서 연다', (tester) async {
+    _setWidth(tester, 1400);
+    final opened = <String>[];
+    var supportCalls = 0;
+    await tester.pumpWidget(
+      _host(
+        AppShellView(
+          location: '/dashboard',
+          onOpenExternal: opened.add,
+          onOpenSupport: () => supportCalls++,
+          child: const Text('본문'),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('이용약관'));
+    await tester.tap(find.text('개인정보 처리방침'));
+    await tester.tap(find.text('업데이트 소식'));
+    await tester.tap(find.text('오류 신고·문의'));
+    await tester.pump();
+
+    expect(opened, [
+      'https://leva.ai.kr/terms',
+      'https://leva.ai.kr/privacy',
+      'https://leva.ai.kr/updates',
+    ]);
+    expect(supportCalls, 1);
+  });
+
+  testWidgets('계정 아이콘은 색을 하드코딩하지 않고 어두운 헤더가 공급하는 색을 받는다', (tester) async {
+    _setWidth(tester, 1400);
+    await tester.pumpWidget(
+      _host(const AppShellView(location: '/dashboard', child: Text('본문'))),
+    );
+
+    final icon = tester.widget<Icon>(find.byIcon(DpIcons.account));
+    expect(icon.color, isNull, reason: '하드코딩된 색이면 배경에 따라 상속받지 못해 대비가 무너진다');
+  });
+
+  // 순수 함수(breadcrumbFor) 테스트만으로는 배선이 끊겨도 통과한다 — 셸이 실제로
+  // 브레드크럼을 본문 위에 놓는지, 세그먼트 탭이 콜백을 트리거하는지 확인한다.
+  testWidgets('게시글 상세 위치는 본문 상단에 3세그먼트 브레드크럼이 배선된다', (tester) async {
+    _setWidth(tester, 1400);
+    await tester.pumpWidget(
+      _host(
+        const AppShellView(
+          location: '/community/post/12?board=FREE',
+          child: Text('본문'),
+        ),
+      ),
+    );
+
+    final crumb = tester.widget<DpBreadcrumb>(find.byType(DpBreadcrumb));
+    expect(crumb.crumbs, const [
+      (label: '커뮤니티', path: null),
+      (label: '자유게시판', path: '/community?board=FREE'),
+      (label: '게시글', path: null),
+    ]);
+  });
+
+  testWidgets('브레드크럼의 클릭 가능 세그먼트를 탭하면 해당 경로로 콜백', (tester) async {
+    _setWidth(tester, 1400);
+    String? picked;
+    await tester.pumpWidget(
+      _host(
+        AppShellView(
+          location: '/community/post/12?board=FREE',
+          onSelect: (p) => picked = p,
+          child: const Text('본문'),
+        ),
+      ),
+    );
+
+    // 헤더 드롭다운 항목 라벨도 "자유게시판"이라 브레드크럼 안으로 범위를 좁힌다.
+    await tester.tap(
+      find.descendant(
+        of: find.byType(DpBreadcrumb),
+        matching: find.text('자유게시판'),
+      ),
+    );
+    expect(picked, '/community?board=FREE');
+  });
+
+  // I1 회귀 가드: /settings 는 목적지에 없다. 예전 레일은 매칭 실패 시 0(대시보드)으로
+  // 폴백해 잘못된 항목을 활성 표시했다 — 헤더도 같은 실수를 하면 안 된다.
+  testWidgets('/settings 위치에서 헤더는 어떤 항목도 활성 표시하지 않는다', (tester) async {
+    _setWidth(tester, 1400);
     await tester.pumpWidget(
       _host(const AppShellView(location: '/settings', child: Text('본문'))),
     );
-    final rail = tester.widget<DpNavRail>(find.byType(DpNavRail));
+    final header = tester.widget<DpWebHeader>(find.byType(DpWebHeader));
     expect(
-      rail.selectedIndex,
+      header.selectedId,
       isNull,
-      reason: '/settings는 kShellDestinations에 없다 — 0(대시보드)으로 폴백하면 잘못 강조된다',
+      reason: '/settings는 kWebNavItems에 없다 — 폴백하면 잘못 강조된다',
     );
   });
 
-  testWidgets('canonical mission child는 rail에서 Today를 선택한다', (tester) async {
-    _setWidth(tester, 1200);
+  testWidgets('canonical mission child는 헤더에서 Today를 선택한다', (tester) async {
+    _setWidth(tester, 1400);
     await tester.pumpWidget(
       _host(
         const AppShellView(
@@ -197,33 +246,13 @@ void main() {
       ),
     );
 
-    final rail = tester.widget<DpNavRail>(find.byType(DpNavRail));
-    expect(rail.selectedIndex, 0);
+    final header = tester.widget<DpWebHeader>(find.byType(DpWebHeader));
+    expect(header.selectedId, '/dashboard');
   });
 
-  testWidgets('비-compact 폭: 계정 아이콘은 색을 상속하고 레일의 headerMuted가 된다', (
-    tester,
-  ) async {
-    _setWidth(tester, 1200);
-    await tester.pumpWidget(
-      _host(const AppShellView(location: '/dashboard', child: Text('본문'))),
-    );
-
-    final icon = tester.widget<Icon>(find.byIcon(DpIcons.account));
-    expect(icon.color, isNull, reason: '하드코딩된 색이면 배경에 따라 상속받지 못해 대비가 무너진다');
-
-    final context = tester.element(find.byIcon(DpIcons.account));
-    expect(IconTheme.of(context).color, DpColors.light.headerMuted);
-  });
-
-  // 3단계(DpRailBrand)부터는 앱이 Text를 직접 만들지 않는다 — brand:에
-  // DpRailBrand(mark:, wordmark:)를 넘기면 워드마크 Text는 DpNavRail 내부에서
-  // color: c.headerText를 명시해 만들어진다(dp_nav_rail.dart). 즉 이 회귀는
-  // 이제 dp_design 쪽에서 구조적으로 막혀 있다(dp_rail_brand_test.dart·
-  // dp_nav_rail_test.dart). 여기서는 web 셸이 실제로 DpRailBrand를 통해
-  // 배선했는지(과거처럼 raw Text/Widget을 brand:에 직접 넘기는 회귀가
-  // 없는지)를 앱 레벨에서 고정한다 — Text 위젯의 "실효 색"(DefaultTextStyle과의
-  // 병합 결과, Flutter Text가 실제로 렌더할 색)을 단언한다.
+  // 3단계(DpRailBrand)부터 앱은 Text를 직접 만들지 않는다 — brand: 에 DpRailBrand 를
+  // 넘기면 워드마크 Text 는 셸 위젯 내부에서 색을 명시해 만들어진다. 여기서는 web 셸이
+  // 실제로 그 경로를 쓰는지(raw Text 회귀가 없는지)를 앱 레벨에서 고정한다.
   Color? effectiveTextColor(WidgetTester tester, Finder finder) {
     final widget = tester.widget<Text>(finder);
     final context = tester.element(finder);
@@ -234,29 +263,25 @@ void main() {
     return effective.color;
   }
 
-  testWidgets('레일 브랜드 텍스트의 실효 색은 라이트에서 headerText다(레일 배경에 묻히지 않음)', (
-    tester,
-  ) async {
-    _setWidth(tester, 1200);
+  testWidgets('헤더 브랜드 텍스트의 실효 색은 라이트에서 headerText다', (tester) async {
+    _setWidth(tester, 1400);
     await tester.pumpWidget(
       _host(const AppShellView(location: '/dashboard', child: Text('본문'))),
     );
 
     final finder = find.descendant(
-      of: find.byType(DpNavRail),
+      of: find.byType(DpWebHeader),
       matching: find.text('Leva'),
     );
     expect(
       effectiveTextColor(tester, finder),
       DpColors.light.headerText,
-      reason:
-          'titleSmall이 이미 textPrimary를 품고 있어 color를 명시하지 않으면 '
-          'headerText 대신 textPrimary로 렌더돼 라이트에서 headerBg와 같은 색이 된다',
+      reason: 'titleMedium이 textPrimary를 품고 있어 명시하지 않으면 headerBg와 같은 색이 된다',
     );
   });
 
-  testWidgets('레일 브랜드 텍스트의 실효 색은 다크에서도 headerText다', (tester) async {
-    _setWidth(tester, 1200);
+  testWidgets('헤더 브랜드 텍스트의 실효 색은 다크에서도 headerText다', (tester) async {
+    _setWidth(tester, 1400);
     await tester.pumpWidget(
       MaterialApp(
         theme: DpTheme.dark(),
@@ -265,7 +290,7 @@ void main() {
     );
 
     final finder = find.descendant(
-      of: find.byType(DpNavRail),
+      of: find.byType(DpWebHeader),
       matching: find.text('Leva'),
     );
     expect(effectiveTextColor(tester, finder), DpColors.dark.headerText);
