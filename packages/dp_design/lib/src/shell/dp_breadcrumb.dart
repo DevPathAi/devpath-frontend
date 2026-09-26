@@ -11,9 +11,9 @@ import 'dp_chrome_bar.dart' show DpCrumb;
 ///
 /// 구분자는 시안대로 `›` 다. 한때 `·` 로 바꿨다가 되돌렸다 — `notosanssymbols`
 /// 폰트 폴백 요청이 이 글자 때문이라고 봤는데, 실측(CI 36214032743, 구분자가
-/// `·` 인 상태)에서도 같은 요청이 그대로 났다. 그 요청은 원인이 아니라 390x200%
-/// 에서 `/content` 가 안 가라앉는 것의 **증상**이다(두 실행 모두 그 시나리오
-/// 에서만 나타난다).
+/// `·` 인 상태)에서도 같은 요청이 그대로 났다. 그 요청은 이 위젯과 무관했다:
+/// 원인은 `ChipThemeData.labelStyle` 에 `fontFamily` 가 없어 칩 라벨만 번들에
+/// 없는 패밀리로 그려진 것이었다(2026-09-26 실측, `DpTheme` 에서 수정).
 class DpBreadcrumb extends StatelessWidget {
   const DpBreadcrumb({super.key, required this.crumbs, this.onCrumbTap});
 
@@ -25,9 +25,9 @@ class DpBreadcrumb extends StatelessWidget {
     if (crumbs.isEmpty) return const SizedBox.shrink();
     final c = context.dpColors;
     // compact 에서는 마지막 세그먼트만 — `DpChromeBar._crumbs` 와 같은 규칙이다.
-    // 전체 경로를 폰 폭에 욱여넣으면 잘리고, 잘린 자리에 그려지는 ellipsis(…)가
-    // 번들 폰트에 없어 CanvasKit 이 Noto Sans Symbols 를 계속 다시 받는다
-    // (CI 36215681312 실측: 390x200% 에서 차단된 요청 724건 중 695건이 그 폰트).
+    // 전체 경로를 폰 폭에 욱여넣으면 잘려서 어차피 읽을 수 없다.
+    // (이 규칙을 폰트 폭주의 해법으로 적어 뒀던 앞선 기록은 틀렸다 — 폭주의
+    //  원인은 칩 라벨 스타일이었고, 생략기호 `…` 는 번들 폰트에 있다.)
     final visible = MediaQuery.sizeOf(context).width < 600
         ? [crumbs.last]
         : crumbs;
