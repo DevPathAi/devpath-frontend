@@ -279,7 +279,17 @@ export async function run(options) {
           } catch (error) {
             const first = String(error).split(String.fromCharCode(10))[0];
             const exposed = await dumpSemantics();
-            return { trail, exposed, failures: [`board switch failed: ${first}`] };
+            // 시맨틱스 트리만으로는 "안 그려졌다" 와 "그려졌는데 트리에 없다" 가
+            // 갈리지 않는다. 실패한 화면을 그대로 남긴다.
+            const shot = resolve(dirname(resolve(options.out)), 'failure-back-forward-boards.png');
+            await mkdir(dirname(shot), { recursive: true });
+            await page.screenshot({ path: shot, fullPage: false });
+            return {
+              trail,
+              exposed,
+              screenshot: 'failure-back-forward-boards.png',
+              failures: [`board switch failed: ${first}`],
+            };
           }
           await page.goBack({ waitUntil: 'load' });
           await page.waitForTimeout(500);
