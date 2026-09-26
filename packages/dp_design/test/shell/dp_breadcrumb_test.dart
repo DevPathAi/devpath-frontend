@@ -75,4 +75,32 @@ void main() {
     );
     handle.dispose();
   });
+
+  // 리뷰 실측(2026-09-26): 같은 Wrap+Align 확장으로 세그먼트가 세로로 쌓였다
+  // (1240 폭에서 높이 120px, 구분자는 혼자 떠 있었다).
+  testWidgets('세그먼트는 한 줄에 놓인다 — 세로로 쌓이지 않는다', (tester) async {
+    tester.view.physicalSize = const Size(1240, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      _host(
+        crumbs: const [
+          (label: '커뮤니티', path: '/community'),
+          (label: '자유게시판', path: '/community?board=FREE'),
+          (label: '게시글', path: null),
+        ],
+      ),
+    );
+
+    final height = tester.getSize(find.byType(DpBreadcrumb)).height;
+    expect(
+      height,
+      lessThan(48),
+      reason: '한 줄이면 최소 타깃 24 수준이다. $height 는 세그먼트가 줄마다 쌓였다는 뜻',
+    );
+    final first = tester.getRect(find.text('커뮤니티'));
+    final last = tester.getRect(find.text('게시글'));
+    expect(first.top, closeTo(last.top, 2), reason: '같은 줄이면 top 이 같다');
+  });
 }

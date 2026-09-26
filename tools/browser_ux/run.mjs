@@ -361,8 +361,8 @@ export async function run(options) {
                 try {
                   await goto(page, server.base, route);
                 } catch (error) {
-                  failures.push(`${route} did not settle: ${String(error).split('
-')[0]}`);
+                  const first = String(error).split(String.fromCharCode(10))[0];
+                  failures.push(`${route} did not settle: ${first}`);
                   break;
                 }
                 const size = await overflow(page);

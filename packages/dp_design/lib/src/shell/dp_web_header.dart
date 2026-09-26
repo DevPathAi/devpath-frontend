@@ -98,9 +98,12 @@ class _DpWebHeaderState extends State<DpWebHeader> {
           _burger(context, c),
         ] else ...[
           const SizedBox(width: DpSpacing.xl),
+          // 720~839 구간은 자리가 빠듯하다. 주 메뉴와 검색이 **둘 다** 줄어들 수
+          // 있어야 한다 — 고정 폭이면 RenderFlex 가 넘치고, clipBehavior 기본값이
+          // Clip.none 이라 드롭다운이 검색 상자 위에 겹쳐 그려진다(실측 720 → 67px).
           Expanded(child: _nav(context, c)),
-          const SizedBox(width: DpSpacing.xl),
-          _search(context, c),
+          const SizedBox(width: DpSpacing.sm),
+          Flexible(child: _search(context, c)),
           const SizedBox(width: DpSpacing.sm),
           _account(context, c),
         ],
@@ -132,11 +135,13 @@ class _DpWebHeaderState extends State<DpWebHeader> {
     mainAxisSize: MainAxisSize.min,
     children: [
       for (final item in widget.items)
-        Padding(
-          padding: const EdgeInsets.only(right: DpSpacing.xs),
-          child: item.children.isEmpty
-              ? _navLink(context, c, item)
-              : _navDropdown(context, c, item),
+        Flexible(
+          child: Padding(
+            padding: const EdgeInsets.only(right: DpSpacing.xs),
+            child: item.children.isEmpty
+                ? _navLink(context, c, item)
+                : _navDropdown(context, c, item),
+          ),
         ),
     ],
   );
@@ -195,6 +200,8 @@ class _DpWebHeaderState extends State<DpWebHeader> {
 
   Widget _navDropdown(BuildContext context, DpColors c, DpWebNavItem item) =>
       DpMenuButton(
+        // 위치가 바뀌면(뒤로가기·리다이렉트) 열린 드롭다운을 닫는다.
+        closeWhenChanged: widget.selectedId,
         entries: [
           for (final child in item.children)
             (label: child.label, onSelect: () => _pick(child.id)),
@@ -227,8 +234,8 @@ class _DpWebHeaderState extends State<DpWebHeader> {
   /// (`DpChromeBar` 와 같은 판단 — 입력 상태를 두 곳에서 관리하지 않는다).
   Widget _search(BuildContext context, DpColors c) {
     if (widget.onSearchTap == null) return const SizedBox.shrink();
-    return SizedBox(
-      width: 200,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 200),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
@@ -266,15 +273,24 @@ class _DpWebHeaderState extends State<DpWebHeader> {
   }
 
   Widget _account(BuildContext context, DpColors c) => DpMenuButton(
+    closeWhenChanged: widget.selectedId,
     entries: widget.accountEntries,
+    // 사용자 결정(2026-09-26)은 「아이콘 + ▾ 만」이다 — 아바타·이름은 P4.
+    // ▾ 가 없으면 이 컨트롤이 메뉴를 연다는 신호가 없다(주 메뉴 드롭다운과 다르다).
     builder: (context, buttonFocus, toggle, isOpen) => IconButton(
       key: const ValueKey('web-header-account'),
       focusNode: buttonFocus,
       // 색을 명시하지 않는다 — 어두운 헤더가 공급하는 IconTheme 을 상속한다.
-      icon: const Icon(DpIcons.account),
+      icon: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(DpIcons.account),
+          Icon(isOpen ? DpIcons.expandLess : DpIcons.expandMore, size: 18),
+        ],
+      ),
       tooltip: '계정',
       style: IconButton.styleFrom(
-        minimumSize: const Size.square(DpDensity.controlHeight),
+        minimumSize: const Size(0, DpDensity.controlHeight),
         foregroundColor: c.headerText,
       ),
       onPressed: toggle,
@@ -320,11 +336,21 @@ class _DpWebHeaderState extends State<DpWebHeader> {
     }
     rows.add(_menuSection(context, c, '계정'));
     for (final entry in widget.accountEntries) {
+      // onSelect 가 null 이면 데스크톱 메뉴와 같이 눌리지 않아야 한다.
+      // 늘 tappable 로 두면 눌러도 아무 일이 없는 행이 생긴다.
       rows.add(
-        _menuRow(context, c, entry.label, () {
-          setState(() => _expanded = false);
-          entry.onSelect?.call();
-        }, sub: true),
+        _menuRow(
+          context,
+          c,
+          entry.label,
+          entry.onSelect == null
+              ? null
+              : () {
+                  setState(() => _expanded = false);
+                  entry.onSelect!.call();
+                },
+          sub: true,
+        ),
       );
     }
 
@@ -340,10 +366,20 @@ class _DpWebHeaderState extends State<DpWebHeader> {
         DpSpacing.lg,
         DpSpacing.md,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: rows,
+      // 짧은 화면(가로 폰·200% 텍스트)에서는 메뉴가 뷰포트보다 길어진다. 묶지 않으면
+      // 셸의 Expanded 가 0 으로 눌리고 아래가 잘려 계정 항목에 아예 닿을 수 없다
+      // (실측 667x375 → 107px 잘림). 높이를 뷰포트의 60% 로 묶고 스크롤을 준다.
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.6,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: rows,
+          ),
+        ),
       ),
     );
   }
@@ -352,15 +388,16 @@ class _DpWebHeaderState extends State<DpWebHeader> {
     BuildContext context,
     DpColors c,
     String label,
-    VoidCallback onTap, {
+    VoidCallback? onTap, {
     bool sub = false,
   }) => Material(
     color: Colors.transparent,
     child: InkWell(
       onTap: onTap,
       child: Container(
-        // 최소 타깃 24(계약 2.0.0). 시안의 7px 세로 패딩으로는 시맨틱 박스가
-        // 모자랄 수 있어 하한을 명시한다.
+        // 시안의 7px 세로 패딩으로는 시맨틱 박스가 최소 타깃(24)에 못 미칠 수
+        // 있어 하한을 명시한다. 값은 컨트롤 높이(30)로 둔다 — 24 로 낮추면
+        // 법적 하한에 딱 붙는다.
         constraints: const BoxConstraints(minHeight: DpDensity.controlHeight),
         padding: EdgeInsets.only(left: sub ? DpSpacing.md : 0),
         alignment: Alignment.centerLeft,

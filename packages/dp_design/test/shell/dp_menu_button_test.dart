@@ -77,4 +77,59 @@ void main() {
 
     expect(find.text('첫째'), findsNothing);
   });
+
+  // Review Focus 2: 메뉴 밖에서 화면이 바뀌면 열린 메뉴가 새 화면 위에 남는다.
+  testWidgets('closeWhenChanged 가 바뀌면 열린 메뉴가 닫힌다', (tester) async {
+    Widget host(String signal) => MaterialApp(
+      theme: DpTheme.light(),
+      home: Scaffold(
+        body: DpMenuButton(
+          closeWhenChanged: signal,
+          entries: [(label: '첫째', onSelect: () {})],
+          builder: (context, buttonFocus, toggle, isOpen) => TextButton(
+            key: const ValueKey('opener'),
+            focusNode: buttonFocus,
+            onPressed: toggle,
+            child: const Text('열기'),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(host('/community'));
+    await tester.tap(find.byKey(const ValueKey('opener')));
+    await tester.pumpAndSettle();
+    expect(find.text('첫째'), findsOneWidget);
+
+    await tester.pumpWidget(host('/mentor'));
+    await tester.pumpAndSettle();
+    expect(find.text('첫째'), findsNothing, reason: '라우트가 바뀌었는데 메뉴가 떠 있다');
+  });
+
+  // 콜백은 빌드마다 새 클로저다 — entries 비교로 닫으면 아무 리빌드에서나 닫힌다.
+  testWidgets('신호가 그대로면 리빌드해도 메뉴가 열려 있다', (tester) async {
+    Widget host() => MaterialApp(
+      theme: DpTheme.light(),
+      home: Scaffold(
+        body: DpMenuButton(
+          closeWhenChanged: '/community',
+          entries: [(label: '첫째', onSelect: () {})],
+          builder: (context, buttonFocus, toggle, isOpen) => TextButton(
+            key: const ValueKey('opener'),
+            focusNode: buttonFocus,
+            onPressed: toggle,
+            child: const Text('열기'),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(host());
+    await tester.tap(find.byKey(const ValueKey('opener')));
+    await tester.pumpAndSettle();
+
+    await tester.pumpWidget(host());
+    await tester.pumpAndSettle();
+    expect(find.text('첫째'), findsOneWidget);
+  });
 }

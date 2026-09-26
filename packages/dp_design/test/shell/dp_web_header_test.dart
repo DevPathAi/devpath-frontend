@@ -149,6 +149,18 @@ void main() {
       findsNothing,
       reason: '닫을 버튼이 사라진 채 메뉴만 남으면 빠져나올 수 없다',
     );
+
+    // 여기까지는 build 의 `if (compact && _expanded)` 만으로도 통과한다 —
+    // 즉 위 단언만으로는 리셋을 지워도 초록이다. 진짜 계약은 **다시 좁혔을 때**
+    // 메뉴가 저절로 열려 있지 않은 것이다.
+    tester.view.physicalSize = const Size(390, 900);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('web-header-collapsed-menu')),
+      findsNothing,
+      reason: '넓혔다 좁혔더니 열어 본 적 없는 메뉴가 펼쳐져 있다',
+    );
   });
 
   testWidgets('현재 항목에만 밑줄이 있다 — 매칭 실패면 아무 데도 없다', (tester) async {

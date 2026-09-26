@@ -401,7 +401,7 @@ FREE/QNA/FEEDBACK 세 운영 화면을 전용 fixture로 직접 봉인하지는 
 2. 렌더러 전략: wasm A/B(전송 −12%, ready −27%/−21%) 근거로 결정. 운영 빌드의 gstatic CDN 캐시 효과는 별도 측정.
 3. `main.dart.js` 5.7 MB: deferred loading 후보(샌드박스·Monaco·에디터).
 4. 위 셋 반영 뒤 `perf/budget.json` `enforce_absolute: true`(기준선을 낮춰 맞추지 않는다).
-5. 키보드 순회에 셸 **헤더** 포함(라우트 `FocusScope` 경계 재설계). S3-P2 에서 레일이 상단 헤더로 바뀌었고 경계 문제는 그대로다 — 순회 기대값은 그 PR 의 CI 실측으로 다시 기록했다. 스크롤 컨테이너가 Tab 정지로 잡히는 엔진 동작은 미해결.
+5. 키보드 순회에 셸 **헤더** 포함(라우트 `FocusScope` 경계 재설계). S3-P2 에서 레일이 상단 헤더로 바뀌었고 경계 문제는 그대로다 — 순회 기대값은 그 PR 의 CI 실측으로 다시 기록한다. 스크롤 컨테이너가 Tab 정지로 잡히는 엔진 동작은 미해결.
 6. ET13 baseline release_ready 전환은 사람 승인·provenance로만. DPR 1/2 분리는 matrix 계약 변경이 필요하다.
 7. Firefox/Safari 성능·a11y 측정은 미수행.
 

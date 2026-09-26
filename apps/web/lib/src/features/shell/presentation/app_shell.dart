@@ -25,33 +25,19 @@ const List<DpWebNavItem> kWebNavItems = [
   ),
 ];
 
-/// `shellDestinationIndexFor` 의 index 순서와 1:1 로 맞춘 평면 id 목록.
-/// 순서를 바꾸면 두 곳을 함께 바꿔야 한다.
-const List<String> _flatNavIds = [
-  '/dashboard',
-  '/path',
-  '/mentor',
-  '/community?board=FREE',
-  '/community?board=QNA',
-  '/community?board=FEEDBACK',
+/// 평면 목적지: `shellDestinationIndexFor` 의 index 순서와 1:1 이고, 명령 팔레트가
+/// 그대로 쓴다. **경로·라벨·아이콘을 한 레코드에 둔다** — 세 자료구조로 흩어 두면
+/// 목적지를 추가할 때 switch 의 `_ =>` 가 조용히 잘못된 라벨·아이콘을 준다.
+typedef FlatNavDestination = ({String id, String label, IconData icon});
+
+const List<FlatNavDestination> kFlatNavDestinations = [
+  (id: '/dashboard', label: '오늘', icon: DpIcons.dashboard),
+  (id: '/path', label: '학습 경로', icon: DpIcons.path),
+  (id: '/mentor', label: 'AI 멘토', icon: DpIcons.mentor),
+  (id: '/community?board=FREE', label: '자유게시판', icon: DpIcons.community),
+  (id: '/community?board=QNA', label: 'Q/A', icon: DpIcons.mentor),
+  (id: '/community?board=FEEDBACK', label: '피드백', icon: DpIcons.thumbUp),
 ];
-
-String _commandLabelFor(String id) => switch (id) {
-  '/dashboard' => '오늘',
-  '/path' => '학습 경로',
-  '/mentor' => 'AI 멘토',
-  '/community?board=FREE' => '자유게시판',
-  '/community?board=QNA' => 'Q/A',
-  _ => '피드백',
-};
-
-IconData _commandIconFor(String id) => switch (id) {
-  '/dashboard' => DpIcons.dashboard,
-  '/path' => DpIcons.path,
-  '/mentor' || '/community?board=QNA' => DpIcons.mentor,
-  '/community?board=FREE' => DpIcons.community,
-  _ => DpIcons.thumbUp,
-};
 
 const _crumbCommunity = (label: '커뮤니티', path: null);
 
@@ -176,11 +162,11 @@ int? shellDestinationIndexFor(String location) {
     };
   }
 
-  final index = _flatNavIds.indexWhere(
-    (id) =>
-        id != '/dashboard' &&
-        id != '/path' &&
-        path.startsWith(Uri.parse(id).path),
+  final index = kFlatNavDestinations.indexWhere(
+    (destination) =>
+        destination.id != '/dashboard' &&
+        destination.id != '/path' &&
+        path.startsWith(Uri.parse(destination.id).path),
   );
   return index < 0 ? null : index;
 }
@@ -189,7 +175,7 @@ int? shellDestinationIndexFor(String location) {
 /// /settings·/mypage·/content/:id·/sandbox 에서 엉뚱한 항목에 밑줄이 가지 않게 한다.
 String? webNavSelectedIdFor(String location) {
   final index = shellDestinationIndexFor(location);
-  return index == null ? null : _flatNavIds[index];
+  return index == null ? null : kFlatNavDestinations[index].id;
 }
 
 /// 라우터 결합 셸: 위치를 읽고, 명령 팔레트로 감싸 표현부에 위임.
@@ -210,12 +196,12 @@ class AppShell extends ConsumerWidget {
         final location = router.routeInformationProvider.value.uri.toString();
         return DpCommandPalette(
           commands: [
-            for (final id in _flatNavIds)
+            for (final destination in kFlatNavDestinations)
               (
-                id: id,
-                label: _commandLabelFor(id),
-                icon: _commandIconFor(id),
-                onInvoke: () => context.go(id),
+                id: destination.id,
+                label: destination.label,
+                icon: destination.icon,
+                onInvoke: () => context.go(destination.id),
               ),
           ],
           child: AppShellView(

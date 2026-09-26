@@ -93,4 +93,79 @@ void main() {
     expect(find.byType(DpBreadcrumb), findsOneWidget);
     expect(tester.getSize(find.byType(DpBreadcrumb)).height, 0);
   });
+
+  // 리뷰 실측(2026-09-26): 720 compact 경계 바로 위 구간에서 헤더가 가로로 넘쳤다
+  // (720 → 67px, 740 → 47px, 768 → 19px). Flex.clipBehavior 기본값이 Clip.none 이라
+  // 커뮤니티 드롭다운이 검색 상자 위에 겹쳐 그려진다. browser-ux 는 RenderFlex
+  // 오버플로가 scrollWidth 를 키우지 않아 못 잡는다.
+  testWidgets('compact 경계 바로 위(720~839)에서 헤더가 넘치지 않는다', (tester) async {
+    for (final width in [720.0, 740.0, 768.0, 800.0, 839.0]) {
+      _setWidth(tester, width);
+      await tester.pumpWidget(_hostFullNav());
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull, reason: '폭 $width 에서 헤더가 넘쳤다');
+    }
+  });
+
+  // 리뷰 실측(2026-09-26): 짧은 화면에서 접힘 메뉴를 열면 Expanded 가 0 으로 눌리고
+  // 아래가 잘려 계정 항목(마이페이지·설정·로그아웃)에 도달할 수 없었다
+  // (667x375 → 191px, 390x844 200% → 121px 오버플로).
+  testWidgets('짧은 화면에서 접힘 메뉴를 열어도 잘리지 않는다', (tester) async {
+    for (final size in [const Size(667, 375), const Size(390, 500)]) {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      // 같은 위젯 타입을 다시 pump 하면 State 가 살아남아 _expanded 가 이월된다
+      // → 다음 탭이 메뉴를 '닫는다'. 크기마다 셸을 새로 만든다.
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpWidget(_hostFullNav());
+      await tester.tap(find.byKey(const ValueKey('web-header-burger')));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull, reason: '$size 에서 접힘 메뉴가 넘쳤다');
+      expect(
+        find.text('로그아웃'),
+        findsOneWidget,
+        reason: '$size 에서 계정 항목이 트리에서 사라졌다',
+      );
+    }
+  });
 }
+
+Widget _hostFullNav() => MaterialApp(
+  theme: DpTheme.light(),
+  home: DpWebShell(
+    brand: DpRailBrand(mark: const DpBrandMark(size: 24), wordmark: 'Leva'),
+    items: const [
+      DpWebNavItem(id: '/dashboard', label: '오늘'),
+      DpWebNavItem(id: '/path', label: '학습 경로'),
+      DpWebNavItem(id: '/mentor', label: 'AI 멘토'),
+      DpWebNavItem(
+        id: '/community',
+        label: '커뮤니티',
+        children: [
+          DpWebNavItem(id: '/community?board=FREE', label: '자유게시판'),
+          DpWebNavItem(id: '/community?board=QNA', label: 'Q/A'),
+          DpWebNavItem(id: '/community?board=FEEDBACK', label: '피드백'),
+        ],
+      ),
+    ],
+    selectedId: '/dashboard',
+    onSelect: (_) {},
+    accountEntries: [
+      (label: '마이페이지', onSelect: () {}),
+      (label: '설정', onSelect: () {}),
+      (label: '로그아웃', onSelect: () {}),
+    ],
+    footerNotice: '© 레바 · 사업자등록번호 796-76-00732',
+    footerLinks: [
+      (label: '이용약관', onTap: () {}),
+      (label: '개인정보 처리방침', onTap: () {}),
+      (label: '오류 신고·문의', onTap: () {}),
+      (label: '업데이트 소식', onTap: () {}),
+    ],
+    onSearchTap: () {},
+    body: const Text('본문'),
+  ),
+);

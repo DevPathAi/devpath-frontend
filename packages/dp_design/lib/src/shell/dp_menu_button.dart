@@ -11,9 +11,20 @@ typedef DpMenuEntry = ({String label, VoidCallback? onSelect});
 /// 한다(WAI-ARIA 메뉴 버튼 관례). 이 위젯은 그 조합을 한 곳에 가둔다 —
 /// 새 메뉴를 만들 때 `MenuAnchor` 를 직접 쓰지 말고 이것을 쓴다.
 class DpMenuButton extends StatefulWidget {
-  const DpMenuButton({super.key, required this.entries, required this.builder});
+  const DpMenuButton({
+    super.key,
+    required this.entries,
+    required this.builder,
+    this.closeWhenChanged,
+  });
 
   final List<DpMenuEntry> entries;
+
+  /// 이 값이 바뀌면 열려 있던 메뉴를 닫는다. 메뉴 밖에서 화면이 바뀌는 경우
+  /// (브라우저 뒤로가기, 라우터 리다이렉트, 세션 만료)에 열린 메뉴가 새 화면
+  /// 위에 남는 것을 막는다. `entries` 비교로는 안 된다 — 항목의 콜백이 빌드마다
+  /// 새 클로저라 어떤 리빌드에서도 「달라졌다」가 되어 메뉴가 즉시 닫힌다.
+  final Object? closeWhenChanged;
 
   /// [buttonFocus] 를 여는 위젯의 `focusNode` 로 넘겨야 닫을 때 focus 가 돌아온다.
   final Widget Function(
@@ -33,6 +44,15 @@ class _DpMenuButtonState extends State<DpMenuButton> {
   final _firstItemFocus = FocusNode(debugLabel: 'dp-menu-button-first-item');
   final _controller = MenuController();
   bool _open = false;
+
+  @override
+  void didUpdateWidget(DpMenuButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.closeWhenChanged != oldWidget.closeWhenChanged &&
+        _controller.isOpen) {
+      _controller.close();
+    }
+  }
 
   @override
   void dispose() {

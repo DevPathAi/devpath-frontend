@@ -93,4 +93,31 @@ void main() {
       findsOneWidget,
     );
   });
+
+  // 리뷰 실측(2026-09-26): `Wrap` 안의 `Align`/`Container(alignment:)` 는 부모가 주는
+  // 최대 폭까지 확장한다 → 항목마다 한 줄을 차지해 푸터가 153px(200% 에서 225px)이 됐다.
+  // 같은 함정을 `DpChromeBar._crumbs` 가 이미 `widthFactor: 1` 로 피해 뒀다.
+  testWidgets('푸터는 한 줄이다 — 항목이 세로로 쌓이지 않는다', (tester) async {
+    _setWidth(tester, 1240);
+    await tester.pumpWidget(_host());
+
+    final height = tester.getSize(find.byType(DpWebFooter)).height;
+    expect(
+      height,
+      lessThan(60),
+      reason: '한 줄이면 패딩 16 + 타깃 24 + 경계 1 ≈ 41 이다. $height 는 항목이 줄마다 쌓였다는 뜻',
+    );
+
+    // 링크의 히트 박스가 줄 전체를 먹으면 빈 공간을 눌러도 그 링크가 눌린다.
+    final linkWidth = tester
+        .getSize(
+          find.ancestor(of: find.text('이용약관'), matching: find.byType(InkWell)),
+        )
+        .width;
+    expect(
+      linkWidth,
+      lessThan(200),
+      reason: '링크 히트 박스가 $linkWidth — 줄 전체를 먹고 있다',
+    );
+  });
 }
