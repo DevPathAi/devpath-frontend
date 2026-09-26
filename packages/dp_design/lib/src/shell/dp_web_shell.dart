@@ -81,7 +81,24 @@ class DpWebShell extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       DpBreadcrumb(crumbs: breadcrumb, onCrumbTap: onCrumbTap),
-                      Expanded(child: body),
+                      // 본문을 시맨틱 경계로 감싼다. `apps/web` 의 본문은
+                      // `ShellRoute` 가 넘겨 주는 **중첩 Navigator** 이고,
+                      // `ModalRoute` 는 언제나 `ModalBarrier` 를 함께 올린다
+                      // (`modal_barrier.dart`: `BlockSemantics(...)`). 그 차단은
+                      // **먼저 그려진 형제**의 시맨틱스를 없애므로, 감싸지 않으면
+                      // 헤더와 브레드크럼이 통째로 시맨틱스 트리에서 사라진다
+                      // (푸터는 본문보다 뒤에 그려져 살아남는다). 차단은 시맨틱
+                      // 경계에서 멈춘다(`rendering/object.dart`:
+                      // `if (…isSemanticBoundary) return false;`).
+                      // 루트 Navigator 로 뜨는 진짜 모달은 셸 전체보다 뒤에
+                      // 그려지므로 여전히 정상으로 가린다.
+                      Expanded(
+                        child: Semantics(
+                          container: true,
+                          explicitChildNodes: true,
+                          child: body,
+                        ),
+                      ),
                     ],
                   ),
                 ),

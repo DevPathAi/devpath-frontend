@@ -132,17 +132,12 @@ void main() {
     }
   });
 
-  // ⚠ 이 테스트는 **브라우저를 보장하지 않는다.** VM 에서는 통과하는데 Flutter Web
-  // 에서는 헤더가 시맨틱스 트리에 아예 없다(로컬 실측 2026-09-26, 아래 기록).
-  //   · 헤더는 그려진다(스크린샷 확인) — 마우스로는 눌린다
-  //   · 시맨틱스 노드는 0개 — 보조기술·Playwright 는 닿지 못한다
-  //   · 위치·위젯 종류·활성화 타이밍·FocusTraversalGroup 전부 배제(실험 6회)
-  //   · 규칙: 각 Column 에서 **Expanded 앞에 오는 형제**만 빠진다. 헤더와
-  //     본문 Column 에 끼워 본 프로브 버튼 4종이 모두 빠졌고, Expanded 와
-  //     그 뒤(푸터)는 남는다
-  // 재현: apps/web 을 mock 릴리스로 빌드 → 핀 Playwright 이미지에서
-  // flt-semantics 노드를 덤프. 절차는 PR #233 설명과 실행 원장에 있다.
-  testWidgets('390: 셸 전체에서도 햄버거와 브랜드가 시맨틱스에 있다(VM 한정)', (tester) async {
+  // 이 테스트의 본문은 단순 위젯이라 **중첩 Navigator 가 없다.** 「Expanded 앞
+  // 형제만 시맨틱스에서 빠진다」로 관측됐던 현상은 브라우저 한정이 아니라
+  // 본문이 중첩 Navigator(= `ModalRoute` 의 `ModalBarrier` → `BlockSemantics`)
+  // 일 때 나타나며, VM 에서도 그대로 재현된다. 그 경우는
+  // `dp_web_shell_semantics_test.dart` 가 덮는다.
+  testWidgets('390: 셸 전체에서도 햄버거와 브랜드가 시맨틱스에 있다', (tester) async {
     final handle = tester.ensureSemantics();
 
     _setWidth(tester, 390);
