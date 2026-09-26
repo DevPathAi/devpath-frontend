@@ -17,6 +17,9 @@ import 'dp_rail_brand.dart';
 /// [account]가 있을 때 렌더된다(셋 다 없을 때만 렌더하지 않는다).
 /// [account]는 폭에 따라 레일 하단 또는 크롬바 우측으로 간다 —
 /// 앱은 한 벌만 만들고 배치는 셸이 정한다.
+///
+/// `apps/web` 은 S3-P2 부터 이 셸을 쓰지 않는다(`DpWebShell`). 지금 소비처는
+/// `apps/admin` 뿐이므로 web 전용이던 compact 목적지 축약은 제거했다.
 class DpAppShell extends StatelessWidget {
   const DpAppShell({
     super.key,
@@ -24,9 +27,6 @@ class DpAppShell extends StatelessWidget {
     required this.selectedIndex,
     required this.onSelect,
     required this.body,
-    this.compactDestinations,
-    this.compactSelectedIndex,
-    this.onCompactSelect,
     this.brand,
     this.account,
     this.breadcrumb = const [],
@@ -40,16 +40,10 @@ class DpAppShell extends StatelessWidget {
 
   final List<DpDestination> destinations;
 
-  /// compact 폭에서만 사용할 축약 목적지. 데스크톱 정보 구조를 그대로
-  /// 하단 바에 밀어 넣지 않고, 모바일의 핵심 목적지 수를 유지할 때 쓴다.
-  final List<DpDestination>? compactDestinations;
-
   /// null이면 어떤 목적지도 활성 표시하지 않는다. compact의 [NavigationBar]는
   /// non-null `int`만 받으므로(Flutter 3.44) 그 분기에서만 0으로 클램프한다.
   final int? selectedIndex;
   final ValueChanged<int> onSelect;
-  final int? compactSelectedIndex;
-  final ValueChanged<int>? onCompactSelect;
   final Widget body;
   final DpRailBrand? brand;
   final Widget? account;
@@ -96,15 +90,12 @@ class DpAppShell extends StatelessWidget {
     );
 
     if (compact) {
-      final usesCompactDestinations = compactDestinations != null;
       return Scaffold(
         body: main,
         bottomNavigationBar: DpMobileNavigation(
-          destinations: compactDestinations ?? destinations,
-          selectedIndex: usesCompactDestinations
-              ? compactSelectedIndex
-              : selectedIndex,
-          onSelect: onCompactSelect ?? onSelect,
+          destinations: destinations,
+          selectedIndex: selectedIndex,
+          onSelect: onSelect,
         ),
       );
     }

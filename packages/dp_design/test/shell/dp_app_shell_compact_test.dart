@@ -45,4 +45,22 @@ void main() {
     expect(bar.selectedIndex, 1);
     expect(find.byType(NavigationBar), findsNothing);
   });
+
+  // S3-P2 로 `apps/web` 이 이 셸을 떠난 뒤 남은 소비처는 `apps/admin` 뿐이고,
+  // admin 은 compact 전용 목적지를 넘기지 않는다 — `destinations` 가 그대로
+  // 하단 내비가 되는 이 경로가 admin 의 compact 동작 전부다.
+  testWidgets('compact에서 destinations 가 그대로 하단 내비로 전달된다(admin 경로)', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(host(1));
+
+    final bar = tester.widget<DpMobileNavigation>(
+      find.byType(DpMobileNavigation),
+    );
+    expect(bar.destinations.map((d) => d.label), ['대시보드', '학습 경로']);
+  });
 }
