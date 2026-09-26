@@ -33,6 +33,8 @@ const HEIGHT = 900;
 const MIN_TARGET = 24; // = DpDensity.minTarget (packages/dp_design/lib/src/theme/dp_spacing.dart)
 const AXE_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'best-practice'];
 const READY_TIMEOUT_MS = 20000;
+/// 한 컨텍스트가 내는 외부(루프백 밖) 요청의 상한. 정상은 3~8건이다.
+const MAX_EXTERNAL_REQUESTS = 40;
 
 function parseArgs(argv) {
   const options = {};
@@ -408,6 +410,16 @@ export async function run(options) {
                 };
                 if (size.scrollWidth > size.innerWidth) failures.push(`${route} overflows ${size.scrollWidth}>${size.innerWidth}`);
                 if (targets.length) failures.push(`${route} small targets ${JSON.stringify(targets.slice(0, 4))}`);
+                // 폰트 폴백 폭주를 **타임아웃 전에** 이름 붙여 잡는다. 번들에 없는
+                // 패밀리로 그려지는 글자가 하나라도 있으면 엔진이 Noto 를 받으려
+                // 하고, 실패한 다운로드는 재시도 금지 목록에 들어가지 않아
+                // 레이아웃마다 다시 나간다(2026-09-26: `ChipThemeData.labelStyle`
+                // 의 fontFamily 누락으로 390x200% `/content` 에서 230건 넘게).
+                // 정상값은 컨텍스트당 3~8건이다.
+                if (external.length > MAX_EXTERNAL_REQUESTS) {
+                  failures.push(`${route} external requests ${external.length} > ${MAX_EXTERNAL_REQUESTS} (font fallback retry storm?)`);
+                  break;
+                }
               }
               return {
                 routes,
