@@ -188,6 +188,26 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  // browser-ux 는 햄버거를 `getByRole('button', { name: '메뉴' })` 로 찾는다.
+  // 라벨이 바뀌면 그 시나리오가 30초 타임아웃으로 죽는다(2026-09-26 실측) — 여기서 못박는다.
+  testWidgets('햄버거의 시맨틱 라벨은 정확히 "메뉴" 다(browser-ux 선택자 계약)', (tester) async {
+    final handle = tester.ensureSemantics();
+
+    _setWidth(tester, 390);
+    await tester.pumpWidget(_host());
+
+    final node = tester.getSemantics(
+      find.byKey(const ValueKey('web-header-burger')),
+    );
+    expect(node.label, '메뉴');
+    expect(
+      node.rect.shortestSide,
+      greaterThanOrEqualTo(DpDensity.minTarget),
+      reason: '위젯 크기가 아니라 시맨틱 박스가 2.5.8 기준이다',
+    );
+    handle.dispose();
+  });
+
   testWidgets('접힘 메뉴의 모든 항목은 최소 타깃 24 이상이다', (tester) async {
     // getSemantics 는 시맨틱스가 켜져 있어야 한다 — 핸들 없이 부르면 던진다.
     // 해제는 본문 끝에서 명시적으로 한다: 핸들 검증이 tearDown 콜백보다 **먼저**

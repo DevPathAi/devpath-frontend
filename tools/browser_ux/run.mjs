@@ -350,19 +350,33 @@ export async function run(options) {
       for (const width of WIDTHS) {
         for (const textScale of [100, 200]) {
           await scenario(scenarios, { id: 'overflow-and-targets', width, text_scale: textScale, reduced_motion: false }, async () => {
-            const { context, page, external } = await openPage(browser, server.base, { width, textScale });
+            const { context, page, external, pageErrors } = await openPage(browser, server.base, { width, textScale });
             try {
               const failures = [];
               const routes = {};
               for (const route of ROUTES) {
-                await goto(page, server.base, route);
+                // goto 안의 ready() 는 networkidle 을 기다린다. 여기서 그냥 던지면
+                // "어느 라우트에서" "브라우저가 무엇을 불평하며" 안 가라앉았는지가
+                // 통째로 사라진다(2026-09-26 실측: 390x200% 가 이 자리에서 30초 타임아웃).
+                try {
+                  await goto(page, server.base, route);
+                } catch (error) {
+                  failures.push(`${route} did not settle: ${String(error).split('
+')[0]}`);
+                  break;
+                }
                 const size = await overflow(page);
                 const targets = width === 390 && textScale === 100 ? await smallTargets(page) : [];
                 routes[route] = { location: location(page), ...size, small_targets: targets };
                 if (size.scrollWidth > size.innerWidth) failures.push(`${route} overflows ${size.scrollWidth}>${size.innerWidth}`);
                 if (targets.length) failures.push(`${route} small targets ${JSON.stringify(targets.slice(0, 4))}`);
               }
-              return { routes, external: [...new Set(external)].slice(0, 10), failures };
+              return {
+                routes,
+                external: [...new Set(external)].slice(0, 10),
+                page_errors: [...new Set(pageErrors)].slice(0, 5),
+                failures,
+              };
             } finally {
               await context.close();
             }

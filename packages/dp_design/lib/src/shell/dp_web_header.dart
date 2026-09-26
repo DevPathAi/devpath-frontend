@@ -281,25 +281,27 @@ class _DpWebHeaderState extends State<DpWebHeader> {
     ),
   );
 
-  Widget _burger(BuildContext context, DpColors c) => Semantics(
-    // 함정 1·2: 헤더 표식과 합쳐지지 않도록 자기 노드로 가둔다.
-    container: true,
-    child: OutlinedButton.icon(
-      key: const ValueKey('web-header-burger'),
-      focusNode: _burgerFocus,
-      icon: const Icon(DpIcons.menu, size: 18),
-      label: const Text('메뉴'),
-      style: OutlinedButton.styleFrom(
-        minimumSize: const Size(0, DpDensity.controlHeight),
-        padding: const EdgeInsets.symmetric(horizontal: DpSpacing.md),
-        foregroundColor: c.headerText,
-        side: BorderSide(color: c.headerBorder),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(DpRadius.button),
-        ),
+  // `Semantics(container: true)` 로 감싸지 않는다. 그 래퍼는 함정 1·2(헤더 표식이
+  // 위로 합쳐지는 것)를 막으려는 것이고 이 버튼은 heading 이 아니다. 감쌌더니 웹에서
+  // `getByRole('button', { name: '메뉴' })` 가 30초 타임아웃했다(CI 실측) — VM 시맨틱스는
+  // 라벨 '메뉴' 를 정상으로 보고하므로 브라우저 엔진에서만 드러나는 차이다.
+  // 이 레포에서 browser-ux 가 role 로 잘 찾는 버튼들(페이지 헤더 메뉴·정렬 메뉴)은
+  // 전부 래퍼가 없다.
+  Widget _burger(BuildContext context, DpColors c) => OutlinedButton.icon(
+    key: const ValueKey('web-header-burger'),
+    focusNode: _burgerFocus,
+    icon: const Icon(DpIcons.menu, size: 18),
+    label: const Text('메뉴'),
+    style: OutlinedButton.styleFrom(
+      minimumSize: const Size(0, DpDensity.controlHeight),
+      padding: const EdgeInsets.symmetric(horizontal: DpSpacing.md),
+      foregroundColor: c.headerText,
+      side: BorderSide(color: c.headerBorder),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(DpRadius.button),
       ),
-      onPressed: () => setState(() => _expanded = !_expanded),
     ),
+    onPressed: () => setState(() => _expanded = !_expanded),
   );
 
   Widget _collapsedMenu(BuildContext context, DpColors c) {

@@ -54,35 +54,42 @@ class DpWebShell extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: c.bg,
-      body: Column(
-        children: [
-          DpWebHeader(
-            brand: brand,
-            items: items,
-            selectedId: selectedId,
-            onSelect: onSelect,
-            accountEntries: accountEntries,
-            onSearchTap: onSearchTap,
-          ),
-          Expanded(
-            child: Padding(
-              key: const ValueKey('web-shell-main'),
-              padding: EdgeInsets.symmetric(
-                horizontal: compact ? DpSpacing.lg : DpSpacing.xl,
-              ),
-              child: DpMaxWidth(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    DpBreadcrumb(crumbs: breadcrumb, onCrumbTap: onCrumbTap),
-                    Expanded(child: body),
-                  ],
+      // `DpAppShell` 이 갖고 있던 정책을 그대로 승계한다. 빼면 기본
+      // `ReadingOrderTraversalPolicy` 가 위치로 정렬해 **화면 안** Tab 순서가
+      // 바뀐다(2026-09-26 CI 실측: 커뮤니티에서 '글 작성' 이 목록 행 뒤로 밀렸다).
+      // P2 는 셸을 바꾸는 단계지 화면의 순회 순서를 바꾸는 단계가 아니다.
+      body: FocusTraversalGroup(
+        policy: WidgetOrderTraversalPolicy(),
+        child: Column(
+          children: [
+            DpWebHeader(
+              brand: brand,
+              items: items,
+              selectedId: selectedId,
+              onSelect: onSelect,
+              accountEntries: accountEntries,
+              onSearchTap: onSearchTap,
+            ),
+            Expanded(
+              child: Padding(
+                key: const ValueKey('web-shell-main'),
+                padding: EdgeInsets.symmetric(
+                  horizontal: compact ? DpSpacing.lg : DpSpacing.xl,
+                ),
+                child: DpMaxWidth(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      DpBreadcrumb(crumbs: breadcrumb, onCrumbTap: onCrumbTap),
+                      Expanded(child: body),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-          DpWebFooter(notice: footerNotice, links: footerLinks),
-        ],
+            DpWebFooter(notice: footerNotice, links: footerLinks),
+          ],
+        ),
       ),
     );
   }
