@@ -60,9 +60,24 @@ class DpAppShell extends StatelessWidget {
     final wc = context.windowClass;
     final compact = wc == DpWindowClass.compact;
 
+    // 본문을 시맨틱 경계로 감싼다. `apps/admin` 의 본문은 `ShellRoute` 가 넘겨
+    // 주는 **중첩 Navigator** 이고, `ModalRoute` 는 언제나 `ModalBarrier` 를 함께
+    // 올린다(`modal_barrier.dart`: `BlockSemantics(...)`). 그 차단은 **먼저
+    // 그려진 형제**의 시맨틱스를 없애는데, 이 셸은 레일도 크롬바도 본문보다 먼저
+    // 그려지므로 감싸지 않으면 **둘 다** 사라지고 본문만 남는다(`DpWebShell` 은
+    // 푸터가 본문 뒤라 살아남지만 여기는 살아남는 형제가 없다). 차단은 시맨틱
+    // 경계에서 멈춘다(`rendering/object.dart`:
+    // `if (…isSemanticBoundary) return false;`). 루트 Navigator 로 뜨는 진짜
+    // 모달은 셸 전체보다 뒤에 그려지므로 여전히 정상으로 가린다.
+    final bounded = Semantics(
+      container: true,
+      explicitChildNodes: true,
+      child: body,
+    );
+
     final content = (constrainBodyAtLarge && wc == DpWindowClass.large)
-        ? DpMaxWidth(child: body)
-        : body;
+        ? DpMaxWidth(child: bounded)
+        : bounded;
 
     // 크롬바에 실제로 전달될 게 있을 때만 렌더한다. account는 compact에서만
     // 크롬바로 가므로(그 외엔 레일로 간다) 그 경우만 여기 포함한다 — 안 그러면
