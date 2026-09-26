@@ -398,7 +398,14 @@ export async function run(options) {
                 }
                 const size = await overflow(page);
                 const targets = width === 390 && textScale === 100 ? await smallTargets(page) : [];
-                routes[route] = { location: location(page), ...size, small_targets: targets };
+                routes[route] = {
+                  location: location(page),
+                  ...size,
+                  small_targets: targets,
+                  // 폭주가 **어느 라우트에서 시작되는지** 보려면 누적값을 라우트마다
+                  // 찍어야 한다. 총합만으로는 마지막 라우트가 범인처럼 보인다.
+                  external_so_far: external.length,
+                };
                 if (size.scrollWidth > size.innerWidth) failures.push(`${route} overflows ${size.scrollWidth}>${size.innerWidth}`);
                 if (targets.length) failures.push(`${route} small targets ${JSON.stringify(targets.slice(0, 4))}`);
               }
