@@ -25,6 +25,7 @@ export 'src/shell/dp_mobile_navigation.dart';
 export 'src/shell/dp_brand_mark.dart';
 export 'src/shell/dp_command.dart';
 export 'src/shell/dp_command_palette.dart';
+export 'src/shell/dp_menu_button.dart';
 export 'src/interaction/dp_interactive_card.dart';
 export 'src/icons/dp_icons.dart';
 export 'src/a11y/dp_tap_target.dart';
