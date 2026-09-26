@@ -30,6 +30,7 @@ export 'src/shell/dp_web_nav_item.dart';
 export 'src/shell/dp_web_header.dart';
 export 'src/shell/dp_web_footer.dart';
 export 'src/shell/dp_breadcrumb.dart';
+export 'src/shell/dp_web_shell.dart';
 export 'src/interaction/dp_interactive_card.dart';
 export 'src/icons/dp_icons.dart';
 export 'src/a11y/dp_tap_target.dart';
