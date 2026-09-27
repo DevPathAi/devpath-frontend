@@ -136,73 +136,90 @@ class _Loaded extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.dpColors;
+    // 시안 `post` 는 `.narrow{max-width:760px}` **좌측 정렬** 한 열이다
+    // (`.narrow{margin-inline:0}`) — `DpMaxWidth` 는 중앙 정렬이라 쓰지 않는다.
+    // 좌우 패딩은 셸이 준다.
     return SliverPadding(
-      padding: const EdgeInsets.all(DpSpacing.lg),
-      sliver: SliverList.list(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  detail.title,
-                  style: Theme.of(context).textTheme.headlineSmall,
+      padding: const EdgeInsets.symmetric(vertical: DpSpacing.lg),
+      sliver: SliverToBoxAdapter(
+        child: Align(
+          alignment: Alignment.topLeft,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: context.appTokens.readableMaxWidth,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        detail.title,
+                        style: Theme.of(context).textTheme.headlineSmall,
+                      ),
+                    ),
+                    ContentMenuButton(
+                      kind: ContentKind.post,
+                      targetId: detail.id,
+                      authorId: detail.authorId,
+                      currentUserId: currentUserId,
+                      onEdit: () =>
+                          context.go('/community/post/${detail.id}/edit'),
+                      onDeleted: () => context.go('/community'),
+                    ),
+                  ],
                 ),
-              ),
-              ContentMenuButton(
-                kind: ContentKind.post,
-                targetId: detail.id,
-                authorId: detail.authorId,
-                currentUserId: currentUserId,
-                onEdit: () => context.go('/community/post/${detail.id}/edit'),
-                onDeleted: () => context.go('/community'),
-              ),
-            ],
-          ),
-          if (detail.tags.isNotEmpty) ...[
-            const SizedBox(height: DpSpacing.sm),
-            Wrap(
-              spacing: DpSpacing.xs,
-              children: [for (final t in detail.tags) DpTag(label: '#$t')],
+                if (detail.tags.isNotEmpty) ...[
+                  const SizedBox(height: DpSpacing.sm),
+                  Wrap(
+                    spacing: DpSpacing.xs,
+                    children: [
+                      for (final t in detail.tags) DpTag(label: '#$t'),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: DpSpacing.sm),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(DpIcons.thumbUp, size: 18),
+                      tooltip: '추천',
+                      onPressed: submitting ? null : onUpvote,
+                    ),
+                    Text(
+                      '${detail.upvoteCount}',
+                      style: TextStyle(color: c.textSecondary),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: DpSpacing.md),
+                DpMarkdown(data: detail.bodyMd),
+                const Divider(height: DpSpacing.xl),
+                Text(
+                  '댓글 ${detail.comments.length}',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: DpSpacing.sm),
+                for (final cm in detail.comments)
+                  _CommentCard(
+                    comment: cm,
+                    currentUserId: currentUserId,
+                    submitting: submitting,
+                    onSave: (body) => onEditComment(cm.id, body),
+                    onChanged: onReload,
+                  ),
+                const SizedBox(height: DpSpacing.lg),
+                _CommentComposer(
+                  controller: commentCtrl,
+                  submitting: submitting,
+                  onSubmit: onComment,
+                ),
+              ],
             ),
-          ],
-          const SizedBox(height: DpSpacing.sm),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                icon: const Icon(DpIcons.thumbUp, size: 18),
-                tooltip: '추천',
-                onPressed: submitting ? null : onUpvote,
-              ),
-              Text(
-                '${detail.upvoteCount}',
-                style: TextStyle(color: c.textSecondary),
-              ),
-            ],
           ),
-          const SizedBox(height: DpSpacing.md),
-          DpMarkdown(data: detail.bodyMd),
-          const Divider(height: DpSpacing.xl),
-          Text(
-            '댓글 ${detail.comments.length}',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: DpSpacing.sm),
-          for (final cm in detail.comments)
-            _CommentCard(
-              comment: cm,
-              currentUserId: currentUserId,
-              submitting: submitting,
-              onSave: (body) => onEditComment(cm.id, body),
-              onChanged: onReload,
-            ),
-          const SizedBox(height: DpSpacing.lg),
-          _CommentComposer(
-            controller: commentCtrl,
-            submitting: submitting,
-            onSubmit: onComment,
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -250,7 +267,10 @@ class _CommentCardState extends State<_CommentCard> {
     final comment = widget.comment;
     if (comment.deleted) return const ContentTombstone();
     final c = context.dpColors;
-    return Card(
+    // 시안 `.ans` 는 상단 구분선을 가진 블록이지만, 이 카드 안에서 **인라인
+    // 수정**(`TextField`)이 열린다 — 구분선만 두면 수정 중인 댓글의 경계가
+    // 사라진다. 그래서 `DpPanel`(면)로 간다.
+    return DpPanel(
       child: Padding(
         padding: const EdgeInsets.all(DpSpacing.md),
         child: Column(
