@@ -146,6 +146,15 @@ void main() {
   });
 
   testWidgets('진행 저장 중에도 최신 dwell을 보존해 후속 요청으로 합친다', (tester) async {
+    // 이 테스트의 전제는 **문서가 뷰포트에 다 들어가 스크롤이 불가능하다**는
+    // 것이다 — `_scrollPct` 는 그때 `maxExtent <= 0` 분기로 1 을 돌려주고, 그
+    // 값이 첫 flush 를 띄운다. 기본 800×600 에서 우연히 성립하던 전제를
+    // 명시한다(S3-P4: 사이드 패널이 1열에서 아래로 쌓이면 문서가 길어져
+    // 스크롤이 생기고, 그러면 최상단의 진행률은 정확히 0 이라 flush 가 없다).
+    tester.view.physicalSize = const Size(1280, 2000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
     final adapter = _BlockingProgressAdapter();
     await tester.pumpWidget(
       _host(analytics: _SpyAnalytics(), adapter: adapter),

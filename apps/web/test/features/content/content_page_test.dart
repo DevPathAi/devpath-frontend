@@ -28,7 +28,8 @@ void main() {
 
     expect(find.text('Future/async-await 정리'), findsOneWidget);
     expect(find.textContaining('8분'), findsOneWidget);
-    expect(find.text('20% 진행'), findsOneWidget);
+    // 진행률은 본문 위가 아니라 사이드 「콘텐츠 학습 진행률」 패널이 말한다.
+    expect(find.textContaining('20%'), findsOneWidget);
     expect(find.textContaining('비동기 기초'), findsWidgets);
     expect(find.text('실습'), findsOneWidget);
 
@@ -36,6 +37,25 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('sandbox route'), findsOneWidget);
+  });
+
+  testWidgets('콘텐츠 본문은 .cols 2열이고 진행률은 사이드 패널이 말한다', (tester) async {
+    tester.view.physicalSize = const Size(1280, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final adapter = _SequenceAdapter({
+      'GET /contents/future-async-await': [
+        (200, _contentJson(markdown: '# 비동기 기초\n\n본문')),
+      ],
+    });
+
+    await tester.pumpWidget(_host(adapter));
+    await _pumpLoad(tester);
+
+    expect(find.byType(DpCols), findsOneWidget);
+    expect(find.text('콘텐츠 학습 진행률'), findsOneWidget);
+    expect(find.textContaining('20%'), findsOneWidget);
   });
 
   testWidgets('scroll 후 progress POST와 완료 refresh를 수행한다', (tester) async {
@@ -144,6 +164,56 @@ void main() {
     // 높이가 섞여 pixels/maxScrollExtent > 실제 본문 스크롤 비율이 되므로).
     expect(sentScrollPct.toDouble(), closeTo(0.5, 0.001));
   });
+
+  // 사이드 패널이 생기면서 문서 높이가 폭에 따라 달라진다(1열에서는 사이드가
+  // 본문 아래로 쌓인다). 진행률은 그래도 **그 폭의 본문 범위 기준 비율**이어야
+  // 한다 — 헤더 높이만 빼고 나눈다는 계약이 두 폭 모두에서 유지되는지 잰다.
+  for (final width in <double>[390, 1280]) {
+    testWidgets('${width.toInt()}px 에서도 scrollPct 는 본문 50% 를 0.5 로 보낸다', (
+      tester,
+    ) async {
+      tester.view.physicalSize = Size(width, 700);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      final adapter = _SequenceAdapter({
+        'GET /contents/future-async-await': [
+          (200, _contentJson(markdown: _longMarkdown(), scrollPct: 0)),
+        ],
+        'POST /contents/future-async-await/progress': [
+          (
+            200,
+            {
+              'scrollPct': 0.5,
+              'dwellSec': 6,
+              'completed': false,
+              'completedAt': null,
+            },
+          ),
+        ],
+      });
+
+      await tester.pumpWidget(_host(adapter));
+      await _pumpLoad(tester);
+
+      final headerHeight = tester.getSize(find.byType(DpPageHeader)).height;
+      final controller = tester
+          .widget<CustomScrollView>(find.byType(CustomScrollView))
+          .controller!;
+      final bodyMax = controller.position.maxScrollExtent - headerHeight;
+      expect(bodyMax, greaterThan(0));
+
+      await tester.pump(const Duration(seconds: 6));
+
+      controller.jumpTo(headerHeight + bodyMax * 0.5);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(adapter.postBodies, isNotEmpty);
+      final sent = (adapter.postBodies.last as Map)['scrollPct'] as num;
+      expect(sent.toDouble(), closeTo(0.5, 0.001));
+    });
+  }
 
   testWidgets('헤더가 스크롤로 트리에서 걷어내진 뒤에도 scrollPct 보정이 유지된다', (tester) async {
     tester.view.physicalSize = const Size(900, 700);
