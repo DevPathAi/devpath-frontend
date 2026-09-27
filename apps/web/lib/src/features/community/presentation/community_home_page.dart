@@ -113,11 +113,6 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
     void compose() => context.go(activeBoard.composePath);
 
     return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: compose,
-        icon: const Icon(DpIcons.edit),
-        label: Text(activeBoard.composeLabel),
-      ),
       body: CustomScrollView(
         // 스크린리더가 「N개 중 M번째」를 읽을 수 있게 목록 항목 수를 알린다.
         // `CustomScrollView`는 `ListView`와 달리 이 값을 자동으로 채우지 않는다.
@@ -130,21 +125,7 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
             : search.items.length,
         slivers: [
           SliverToBoxAdapter(
-            child: CommunityBoardHeader(
-              board: activeBoard,
-              // 셸의 게시판 목적지와 같은 URL 로 간다 — 게시판·검색 상태는
-              // `didUpdateWidget` 이 URL 에서 다시 맞춘다(이동 경로가 하나).
-              // 검색 중이면 검색어를 들고 가 새 게시판에서 같은 검색을 잇는다.
-              onSelectBoard: (board) => context.go(
-                Uri(
-                  path: '/community',
-                  queryParameters: {
-                    'board': board.value,
-                    if (search.query.isNotEmpty) 'q': search.query,
-                  },
-                ).toString(),
-              ),
-            ),
+            child: CommunityBoardHeader(board: activeBoard, onCompose: compose),
           ),
           PinnedHeaderSliver(
             child: ColoredBox(
@@ -265,11 +246,6 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
     // 본문 매칭이 없으면 highlight 가 비어 오므로 excerpt 로 폴백한다.
     final body = item.highlight.isNotEmpty ? item.highlight : item.excerpt;
     return DpListRow(
-      accentColor: communityRowAccent(
-        c,
-        boardType: item.boardType,
-        solved: item.solved,
-      ),
       title: item.title,
       subtitle: body.isEmpty ? null : SearchHighlightText(body),
       badges: [

@@ -266,7 +266,27 @@ Primary action hover는 `primary` 위에 `onPrimary` 8% overlay를 합성한 같
 |---|---|---|
 | `DpNavRail` | 좌측 고정 | 목적지 내비게이션. Expanded(256px)/Collapsed(72px) 두 상태, 브랜드·계정 메뉴 슬롯 |
 | `DpChromeBar` | 상단(46px) | 브레드크럼 + 검색 트리거 + 화면별 액션 슬롯 |
-| `DpPageHeader` | 본문 최상단 | 화면 제목(`headlineSmall`)·설명·1차 액션·필터 슬롯 |
+| `DpPageHeader` | 본문 최상단 | 화면 제목(`headlineSmall`)·설명·1차 액션·필터 슬롯. **제목 메뉴는 없다**(S3-P3에서 제거 — 게시판 이동은 셸 헤더만 맡는다) |
+
+**웹 문법 프리미티브(S3-P3, `apps/web`)** — 시안의 「구분선 목록·패널」 문법을 위젯으로 고정한 것들이다.
+카드 나열을 쓰지 않는다: 면 구분은 `DpPanel`의 테두리 한 겹, 항목 구분은 1px 가로선뿐이다.
+
+| 컴포넌트 | 시안 | 책임 |
+|---|---|---|
+| `DpPanel` | `.panel` | 표면 + 1px 테두리 + 반경 8, 선택적 제목행(12×16 + 하단 구분선). 웹 화면에서 Material `Card`를 대신한다. 그림자 없음 |
+| `DpWebTable` | `<table>` | 헤더행(12/600 `textFaint`) + 행 하단 구분선 + hover 배경 + 숫자 칼럼(우측·등폭·nowrap) + `minWidth` 미만에서 표만 가로 스크롤. **admin의 `DpDataTable`(data_table_2, 세로 테두리)과 다른 위젯이다** |
+| `DpListRow` | 표 한 행의 축약형 | 뱃지행 → 제목 → 부제, 우측 메타. 8×16 여백 + 하단 구분선 + hover 배경. **카드도 좌측 상태 표시선도 없다**(S3-P3에서 제거) |
+| `DpListLines` | `.list` | 사이드 패널의 짧은 목록. 항목 10×16, 마지막을 뺀 항목에 구분선 |
+| `DpRowLine` | `.rowline` | 설정·동의 행. 좌 라벨(600)+설명(13 보조색), 우 컨트롤. 좁으면 `Wrap`이 컨트롤을 아랫줄로 내린다 |
+| `DpKeyValues` | `.kv` | 요약 키-값. 좌 키(보조색), 우 값(우측 정렬·600·등폭 숫자) |
+| `DpLink` | `.ttl`·`.lk` | `title`(평소 본문색 600·밑줄 없음, hover에서 강조색+밑줄)과 `inline`(항상 강조색+밑줄). 키보드로 도달·활성화되며 포커스 시 2px 외곽선 |
+| `DpStatusText` | `.st` | 상태 문구 3색(`done`=success·`idle`=textSecondary·`current`=primaryTextStrong), 12/600. 기호(✓·●)는 호출부가 문자열에 넣는다 |
+
+- **행 제스처는 시맨틱스에서 뺀다**(`DpWebTable`·`DpListRow`). 빼지 않으면 그 노드가 셀·제목·메타
+  조각을 흡수해 행 전체가 한 덩어리로 읽힌다(실측 2026-09-27). 행 클릭은 포인터용 보조 수단이고,
+  접근성 컨트롤은 제목의 `DpLink`가 담당한다 — 시안의 표도 행이 아니라 제목 `a.ttl`만 링크다.
+- **상태는 색이 아니라 글로 낸다.** `DpListRow`의 좌측 색 막대를 없앤 자리는 `DpStatusText`와 배지가
+  대신한다(색만으로 의미를 전달하지 않는다).
 
 - **레일 섹션 그룹**: `DpNavRail.destinations`는 평면 `List<DpDestination>`이다. 별도 그룹 구조를
   두지 않고, **연속으로 같은 `section` 값을 가진 항목끼리** 렌더 시점에 묶어 레이블을 붙인다

@@ -54,7 +54,7 @@ void main() {
         expect(header.description, description);
         // 게시판은 레일의 독립 목적지다 — 페이지 안에서 다시 나누지 않는다.
         expect(find.byType(SegmentedButton<CommunityBoard>), findsNothing);
-        // 레일이 보이는 폭에서는 제목이 메뉴가 아니다.
+        // 제목은 어느 폭에서도 메뉴가 아니다 — 게시판 이동은 셸 헤더만 맡는다.
         expect(find.byKey(_titleMenu), findsNothing);
         // 한 게시판 안의 행은 게시판 이름 배지를 반복하지 않는다(헤더 1회만).
         expect(find.text(label), findsOneWidget);
@@ -66,8 +66,7 @@ void main() {
     );
   }
 
-  testWidgets('compact 폭에서는 제목 메뉴가 세 게시판 이동 경로다', (tester) async {
-    final picked = <CommunityBoard>[];
+  testWidgets('compact 폭에서도 제목 메뉴를 만들지 않는다', (tester) async {
     await tester.pumpWidget(
       _host(
         width: 390,
@@ -76,24 +75,17 @@ void main() {
           posts: _posts('FREE'),
           onOpenPost: (_) {},
           onCompose: () {},
-          onSelectBoard: picked.add,
         ),
       ),
     );
 
-    await tester.tap(find.byKey(_titleMenu));
-    await tester.pumpAndSettle();
-    for (final label in ['자유게시판', 'Q/A', '피드백']) {
-      expect(find.widgetWithText(MenuItemButton, label), findsOneWidget);
-    }
-    expect(find.widgetWithText(MenuItemButton, '전체'), findsNothing);
-
-    await tester.tap(find.widgetWithText(MenuItemButton, '피드백'));
-    await tester.pumpAndSettle();
-    expect(picked, [CommunityBoard.feedback]);
+    // S3-P3: 시안에 제목 메뉴가 없다. 좁은 폭의 게시판 이동은 셸 헤더의
+    // 햄버거 메뉴(커뮤니티 > 자유게시판·Q/A·피드백)가 담당한다.
+    expect(find.byKey(_titleMenu), findsNothing);
+    expect(find.byType(MenuItemButton), findsNothing);
   });
 
-  testWidgets('Q/A 행의 강조색은 해결 여부를 알린다', (tester) async {
+  testWidgets('Q/A 행은 해결 여부를 배지로 알린다', (tester) async {
     await tester.pumpWidget(
       _host(
         WebCommunityBoardProjection(
@@ -104,14 +96,13 @@ void main() {
         ),
       ),
     );
-    final colors = tester.element(find.byType(DpListRow).first).dpColors;
-    final rows = tester.widgetList<DpListRow>(find.byType(DpListRow)).toList();
-    expect(rows[0].accentColor, colors.success); // 해결됨
-    expect(rows[1].accentColor, colors.primary); // 답변을 기다리는 질문
+    // S3-P3: 좌측 상태 표시선을 없앴다(시안에 없다). 해결 여부는 색이 아니라
+    // 글로 드러난다 — 색만으로 의미를 전달하지 않는 편이 낫기도 하다.
+    expect(find.byType(DpListRow), findsNWidgets(2));
     expect(find.text('✓ 해결됨'), findsOneWidget);
   });
 
-  testWidgets('자유게시판·피드백 행은 상태가 없어 강조색을 쓰지 않는다', (tester) async {
+  testWidgets('자유게시판·피드백 행에는 해결 배지가 없다', (tester) async {
     await tester.pumpWidget(
       _host(
         WebCommunityBoardProjection(
@@ -122,9 +113,7 @@ void main() {
         ),
       ),
     );
-    for (final row in tester.widgetList<DpListRow>(find.byType(DpListRow))) {
-      expect(row.accentColor, isNull);
-    }
+    expect(find.text('✓ 해결됨'), findsNothing);
   });
 
   for (final (board, title, action) in [
@@ -146,8 +135,24 @@ void main() {
       );
       expect(find.byType(DpEmpty), findsOneWidget);
       expect(find.text(title), findsOneWidget);
-      await tester.tap(find.text(action));
+      // 같은 라벨의 액션이 둘이다 — 페이지 헤더의 상시 버튼과 빈 상태의 CTA.
+      // 여기서 확인할 것은 빈 상태 쪽이다.
+      await tester.tap(
+        find.descendant(of: find.byType(DpEmpty), matching: find.text(action)),
+      );
       expect(composed, 1);
+
+      // 헤더의 상시 버튼도 같은 작성 화면으로 간다.
+      // NOTE(P4): 한 화면에 접근명이 같은 버튼이 둘이다 — 스크린리더로는
+      // 구분할 수 없다. P4 에서 하나로 줄이거나 빈 상태 CTA 의 라벨을
+      // 다르게 둔다(예: '첫 글 쓰기'). 그때 이 단언도 함께 고친다.
+      await tester.tap(
+        find.descendant(
+          of: find.byType(DpPageHeader),
+          matching: find.text(action),
+        ),
+      );
+      expect(composed, 2);
     });
   }
 
