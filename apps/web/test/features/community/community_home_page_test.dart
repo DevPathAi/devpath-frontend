@@ -24,8 +24,6 @@ CommunityPostSummary _p(
   upvoteCount: upvoteCount,
 );
 
-const _titleMenu = ValueKey('page-header-title-menu');
-
 /// 운영 라우터와 같은 모양: `/community?board=` 가 게시판을 정한다.
 GoRouter _router({String initialLocation = '/community'}) => GoRouter(
   initialLocation: initialLocation,
@@ -202,8 +200,8 @@ void main() {
 
     // 게시판 이동은 셸(레일)의 몫이다 — 본문은 다시 나누지 않는다.
     expect(find.byType(SegmentedButton<CommunityBoard>), findsNothing);
-    // 기본 테스트 폭(800)은 레일이 보이는 폭이라 제목도 메뉴가 아니다.
-    expect(find.byKey(_titleMenu), findsNothing);
+    // 제목은 어느 폭에서도 메뉴가 아니다(S3-P3).
+    expect(find.byKey(const ValueKey('page-header-title-menu')), findsNothing);
     expect(find.text('자유글'), findsOneWidget);
     expect(find.text('자유게시판'), findsOneWidget); // 헤더뿐 — 행 배지 없음
     // FREE는 "댓글" 라벨
@@ -215,7 +213,7 @@ void main() {
     expect(find.text('일반 상세 화면'), findsOneWidget);
   });
 
-  testWidgets('compact 폭에서는 제목 메뉴로 Q/A 로 이동하고 그 게시판을 재조회한다', (tester) async {
+  testWidgets('compact 폭에서 셸이 Q/A 로 보내면 그 게시판을 재조회한다', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -226,9 +224,9 @@ void main() {
     await tester.pumpWidget(_host(c, router: router));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(_titleMenu));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(MenuItemButton, 'Q/A'));
+    // S3-P3: 제목 메뉴를 없앴다. 좁은 폭의 게시판 이동은 셸 헤더의 햄버거
+    // 메뉴가 맡으므로, 그 경로와 같은 모양으로 라우터를 움직인다.
+    router.go('/community?board=QNA');
     await tester.pumpAndSettle();
 
     expect(
@@ -237,48 +235,6 @@ void main() {
     );
     expect(seen, containsAllInOrder(['FREE', 'QNA']));
     expect(find.widgetWithText(FloatingActionButton, '질문하기'), findsOneWidget);
-  });
-
-  testWidgets('검색 중 제목 메뉴로 게시판을 바꾸면 같은 검색어를 새 게시판에서 다시 조회한다', (tester) async {
-    tester.view.physicalSize = const Size(390, 844);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
-
-    final searched = <(String, String?)>[];
-    final c = ProviderContainer(
-      overrides: [
-        communityListProvider.overrideWithValue(
-          ({String? board, String? tag, String? sort}) async => const [],
-        ),
-        communitySearchProvider.overrideWithValue(({
-          required String q,
-          String? board,
-          String? tag,
-          bool? solved,
-          String? sort,
-          int page = 0,
-          int size = 20,
-        }) async {
-          searched.add((q, board));
-          return const CommunitySearchResult(items: [], total: 0);
-        }),
-      ],
-    );
-    addTearDown(c.dispose);
-    final router = _router(initialLocation: '/community?board=FREE&q=flutter');
-    await tester.pumpWidget(_host(c, router: router));
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byKey(_titleMenu));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(MenuItemButton, 'Q/A'));
-    await tester.pumpAndSettle();
-
-    expect(
-      router.routeInformationProvider.value.uri.toString(),
-      '/community?board=QNA&q=flutter',
-    );
-    expect(searched, [('flutter', 'FREE'), ('flutter', 'QNA')]);
   });
 
   testWidgets('initialBoard 쿼리로 진입 시 초기 필터가 반영된다', (tester) async {

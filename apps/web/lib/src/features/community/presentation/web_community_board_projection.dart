@@ -60,7 +60,6 @@ class WebCommunityBoardProjection extends StatelessWidget {
     required this.posts,
     required this.onOpenPost,
     required this.onCompose,
-    this.onSelectBoard,
   });
 
   final CommunityBoard board;
@@ -69,7 +68,6 @@ class WebCommunityBoardProjection extends StatelessWidget {
   final VoidCallback onCompose;
 
   /// compact 제목 메뉴 선택. null 이면 메뉴는 열리되 이동하지 않는다(증거 캡처).
-  final ValueChanged<CommunityBoard>? onSelectBoard;
 
   static String descriptionFor(CommunityBoard board) => board.description;
 
@@ -77,12 +75,7 @@ class WebCommunityBoardProjection extends StatelessWidget {
   Widget build(BuildContext context) => CustomScrollView(
     semanticChildCount: posts.length,
     slivers: [
-      SliverToBoxAdapter(
-        child: CommunityBoardHeader(
-          board: board,
-          onSelectBoard: onSelectBoard ?? (_) {},
-        ),
-      ),
+      SliverToBoxAdapter(child: CommunityBoardHeader(board: board)),
       if (posts.isEmpty)
         SliverFillRemaining(
           child: CommunityBoardEmpty(board: board, onCompose: onCompose),
@@ -109,32 +102,13 @@ class WebCommunityBoardProjection extends StatelessWidget {
 /// 본문에서 다시 나누지 않는다. compact 하단 바에는 `커뮤니티` 하나뿐이라, 그 폭에서만
 /// 제목이 세 게시판을 고르는 메뉴가 된다.
 class CommunityBoardHeader extends StatelessWidget {
-  const CommunityBoardHeader({
-    super.key,
-    required this.board,
-    required this.onSelectBoard,
-  });
+  const CommunityBoardHeader({super.key, required this.board});
 
   final CommunityBoard board;
-  final ValueChanged<CommunityBoard> onSelectBoard;
 
   @override
   Widget build(BuildContext context) {
-    final compact = context.windowClass == DpWindowClass.compact;
-    return DpPageHeader(
-      title: board.label,
-      description: board.description,
-      titleMenuTooltip: '게시판 바꾸기',
-      titleMenu: [
-        if (compact)
-          for (final b in kCommunityBoards)
-            (
-              label: b.label,
-              selected: b == board,
-              onSelect: () => onSelectBoard(b),
-            ),
-      ],
-    );
+    return DpPageHeader(title: board.label, description: board.description);
   }
 }
 
@@ -159,14 +133,6 @@ class CommunityBoardEmpty extends StatelessWidget {
   );
 }
 
-/// 행 강조색. 한 페이지의 행은 모두 같은 게시판이라 게시판 색은 정보가 없다 —
-/// 상태가 있는 Q/A 만 해결 여부를 알리고(배지 문구와 함께), 나머지는 쓰지 않는다.
-Color? communityRowAccent(
-  DpColors c, {
-  required String boardType,
-  required bool solved,
-}) => boardType == 'QNA' ? (solved ? c.success : c.primary) : null;
-
 /// 목록 한 행. 해결 배지·집계를 [DpListRow] 로 그린다.
 class CommunityPostRow extends StatelessWidget {
   const CommunityPostRow({super.key, required this.post, required this.onTap});
@@ -179,11 +145,6 @@ class CommunityPostRow extends StatelessWidget {
     final c = context.dpColors;
     final isQna = post.boardType == 'QNA';
     return DpListRow(
-      accentColor: communityRowAccent(
-        c,
-        boardType: post.boardType,
-        solved: post.solved,
-      ),
       title: post.title,
       preview: post.excerpt.isEmpty ? null : post.excerpt,
       badges: [

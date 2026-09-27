@@ -101,4 +101,19 @@ void main() {
     // 넓은 화면 헤더의 우측 패딩(DpSpacing.xl = 24)만큼만 떨어져 있어야 한다.
     expect(headerRight - actionRight, closeTo(24, 1.0));
   });
+
+  testWidgets('제목은 언제나 헤더이며 메뉴 버튼이 되지 않는다', (tester) async {
+    final handle = tester.ensureSemantics();
+    await tester.pumpWidget(
+      _host(const DpPageHeader(title: 'Q/A', description: '막힌 곳을 질문하세요.')),
+    );
+
+    // 시안에 제목 메뉴가 없다. 게시판 이동은 셸 헤더 메뉴만 담당한다.
+    expect(find.byKey(const ValueKey('page-header-title-menu')), findsNothing);
+    expect(
+      tester.getSemantics(find.text('Q/A')),
+      matchesSemantics(label: 'Q/A', isHeader: true),
+    );
+    handle.dispose();
+  });
 }

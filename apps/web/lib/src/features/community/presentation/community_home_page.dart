@@ -129,23 +129,7 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
             ? posts.length
             : search.items.length,
         slivers: [
-          SliverToBoxAdapter(
-            child: CommunityBoardHeader(
-              board: activeBoard,
-              // 셸의 게시판 목적지와 같은 URL 로 간다 — 게시판·검색 상태는
-              // `didUpdateWidget` 이 URL 에서 다시 맞춘다(이동 경로가 하나).
-              // 검색 중이면 검색어를 들고 가 새 게시판에서 같은 검색을 잇는다.
-              onSelectBoard: (board) => context.go(
-                Uri(
-                  path: '/community',
-                  queryParameters: {
-                    'board': board.value,
-                    if (search.query.isNotEmpty) 'q': search.query,
-                  },
-                ).toString(),
-              ),
-            ),
-          ),
+          SliverToBoxAdapter(child: CommunityBoardHeader(board: activeBoard)),
           PinnedHeaderSliver(
             child: ColoredBox(
               color: Theme.of(context).scaffoldBackgroundColor,
@@ -265,11 +249,6 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
     // 본문 매칭이 없으면 highlight 가 비어 오므로 excerpt 로 폴백한다.
     final body = item.highlight.isNotEmpty ? item.highlight : item.excerpt;
     return DpListRow(
-      accentColor: communityRowAccent(
-        c,
-        boardType: item.boardType,
-        solved: item.solved,
-      ),
       title: item.title,
       subtitle: body.isEmpty ? null : SearchHighlightText(body),
       badges: [
