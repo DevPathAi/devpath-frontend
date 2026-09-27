@@ -15,6 +15,7 @@ export 'src/layout/dp_selectable.dart';
 export 'src/layout/dp_scrollbar.dart';
 export 'src/layout/dp_window_class.dart';
 export 'src/layout/dp_page_header.dart';
+export 'src/layout/dp_panel.dart';
 export 'src/shell/dp_destination.dart';
 export 'src/shell/dp_nav_rail.dart';
 export 'src/shell/dp_rail_brand.dart';
