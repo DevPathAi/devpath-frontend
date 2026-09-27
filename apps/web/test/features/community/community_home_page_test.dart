@@ -427,11 +427,52 @@ void main() {
   });
 
   testWidgets('검색 중 게시판을 바꿔도 같은 검색어를 새 게시판에서 다시 조회한다', (tester) async {
-    // S3-P3 에서 이 계약을 들고 있던 유일한 경로(제목 메뉴)가 사라졌고,
-    // 셸 헤더는 q 를 떨군다. 사용자 결정으로 복원은 P4 다 —
-    // 커버리지를 0 으로 두지 않기 위해 계약만 남긴다. P4 에서 셸 헤더의
-    // 커뮤니티 하위 목적지가 현재 q 를 들고 가게 하면 이 테스트를 켠다.
-    fail('S3-P4 에서 구현한다');
-    // testWidgets 의 skip 은 bool 이다 — 사유는 위 주석과 이름에 남긴다.
-  }, skip: true);
+    // 계약의 두 반쪽: ① 셸이 이동할 때 q 를 들고 간다 — `carryCommunityQuery`
+    // 단위 테스트와 `app_shell_view_test` 의 배선 테스트가 잰다. ② 게시판이
+    // 바뀐 URL 을 받은 이 화면이 **새 게시판 범위로 다시 조회한다** — 여기서
+    // 잰다(`didUpdateWidget` 의 board 변경 분기).
+    final searchedBoards = <String?>[];
+    final c = ProviderContainer(
+      overrides: [
+        communityListProvider.overrideWithValue(
+          ({String? board, String? tag, String? sort}) async => [
+            _p(1, title: '게시판 목록', boardType: 'FREE'),
+          ],
+        ),
+        communitySearchProvider.overrideWithValue(({
+          required String q,
+          String? board,
+          String? tag,
+          bool? solved,
+          String? sort,
+          int page = 0,
+          int size = 20,
+        }) async {
+          searchedBoards.add(board);
+          return CommunitySearchResult(
+            items: [
+              CommunitySearchItem(id: 2, title: '$board 검색 결과', replyCount: 0),
+            ],
+            total: 1,
+          );
+        }),
+      ],
+    );
+    addTearDown(c.dispose);
+    final router = _router(initialLocation: '/community?board=FREE&q=stream');
+
+    await tester.pumpWidget(_host(c, router: router));
+    await tester.pumpAndSettle();
+    expect(find.text('FREE 검색 결과'), findsOneWidget);
+    expect(searchedBoards, ['FREE']);
+
+    // 셸이 만들어 주는 경로 그대로 — 게시판만 바뀌고 q 는 남는다.
+    router.go('/community?board=QNA&q=stream');
+    await tester.pumpAndSettle();
+
+    expect(searchedBoards, ['FREE', 'QNA']);
+    expect(find.text('QNA 검색 결과'), findsOneWidget);
+    // 검색 입력에도 그 낱말이 남아 있다.
+    expect(find.text('stream'), findsOneWidget);
+  });
 }
