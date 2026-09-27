@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../layout/dp_scrollbar.dart';
 import '../theme/dp_colors.dart';
 import '../theme/dp_spacing.dart';
 
@@ -17,7 +18,7 @@ typedef DpTableRowSpec = ({List<Widget> cells, VoidCallback? onTap});
 /// `DpDataTable`(admin 이 쓰는 `data_table_2` 래퍼)과 **다른 위젯**이다.
 /// 그쪽은 `TableBorder.all` 로 세로 테두리를 그리지만 시안의 표에는
 /// 세로선이 없다.
-class DpWebTable extends StatelessWidget {
+class DpWebTable extends StatefulWidget {
   const DpWebTable({
     super.key,
     required this.columns,
@@ -36,8 +37,24 @@ class DpWebTable extends StatelessWidget {
   final Widget? empty;
 
   @override
+  State<DpWebTable> createState() => _DpWebTableState();
+}
+
+class _DpWebTableState extends State<DpWebTable> {
+  final _horizontal = ScrollController();
+
+  @override
+  void dispose() {
+    _horizontal.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (rows.isEmpty && empty != null) return empty!;
+    final columns = widget.columns;
+    final rows = widget.rows;
+    final minWidth = widget.minWidth;
+    if (rows.isEmpty && widget.empty != null) return widget.empty!;
 
     final table = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -54,10 +71,17 @@ class DpWebTable extends StatelessWidget {
         if (!constraints.hasBoundedWidth || constraints.maxWidth >= minWidth) {
           return table;
         }
-        return SingleChildScrollView(
-          key: const ValueKey('dp-web-table-scroll'),
-          scrollDirection: Axis.horizontal,
-          child: SizedBox(width: minWidth, child: table),
+        // 잘렸다는 표시가 없으면 숨은 칼럼에 도달할 방법을 찾지 못한다
+        // (Flutter 는 shift+휠에만 가로 스크롤을 준다). `DpScrollbar` 가
+        // 레포에서 정확히 이 용도로 있는 프리미티브다.
+        return DpScrollbar(
+          controller: _horizontal,
+          child: SingleChildScrollView(
+            key: const ValueKey('dp-web-table-scroll'),
+            controller: _horizontal,
+            scrollDirection: Axis.horizontal,
+            child: SizedBox(width: minWidth, child: table),
+          ),
         );
       },
     );
@@ -107,7 +131,11 @@ class _Header extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: c.textFaint,
+                // 시안 `th` 는 `--faint` 지만 그 토큰은 라이트에서 3.52:1 이라
+                // WCAG AA(4.5:1) 에 못 미치고, `DpColors` 자신이 "본문 텍스트로
+                // 쓰지 않는다"고 못 박았다. 칼럼 라벨은 「이 열이 무엇인가」를
+                // 전달하는 유일한 수단이라 장식 글리프가 아니다.
+                color: c.textSecondary,
               ),
             ),
         ]),

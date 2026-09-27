@@ -54,4 +54,31 @@ void main() {
       ),
     );
   });
+
+  testWidgets('좁은 폭 + 긴 키 + 200% 배율에서도 넘치지 않는다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: DpTheme.light(),
+        home: MediaQuery(
+          data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+          child: const Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: 280,
+                child: DpKeyValues(
+                  entries: [
+                    (key: '이번 주 학습 시간', value: Text('3시간 20분')),
+                    (key: '연속 학습 일수', value: Text('7일')),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    // 키가 유연 자식이 아니면 고유 폭 그대로 깔려 RenderFlex 가 넘친다.
+    expect(tester.takeException(), isNull);
+  });
 }

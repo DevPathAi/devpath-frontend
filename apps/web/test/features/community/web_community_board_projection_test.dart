@@ -143,6 +143,9 @@ void main() {
       expect(composed, 1);
 
       // 헤더의 상시 버튼도 같은 작성 화면으로 간다.
+      // NOTE(P4): 한 화면에 접근명이 같은 버튼이 둘이다 — 스크린리더로는
+      // 구분할 수 없다. P4 에서 하나로 줄이거나 빈 상태 CTA 의 라벨을
+      // 다르게 둔다(예: '첫 글 쓰기'). 그때 이 단언도 함께 고친다.
       await tester.tap(
         find.descendant(
           of: find.byType(DpPageHeader),

@@ -35,9 +35,14 @@ class DpKeyValues extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  entries[i].key,
-                  style: text.bodyMedium?.copyWith(color: c.textSecondary),
+                // 키도 유연 자식이어야 한다. `Text` 를 그냥 두면 Row 가 주축
+                // 제약을 무한대로 주어 고유 폭 그대로 깔리고, 좁은 패널 + 큰
+                // 배율에서 RenderFlex 오버플로로 값이 통째로 사라진다(실측).
+                Flexible(
+                  child: Text(
+                    entries[i].key,
+                    style: text.bodyMedium?.copyWith(color: c.textSecondary),
+                  ),
                 ),
                 const SizedBox(width: DpSpacing.lg),
                 Expanded(

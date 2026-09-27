@@ -187,4 +187,23 @@ void main() {
     expect(d.border!.bottom.color, DpColors.dark.border);
     expect(d.border!.bottom.color, isNot(DpColors.light.border));
   });
+
+  testWidgets('390px 의 가로 스크롤에는 항상 보이는 스크롤바가 붙는다', (tester) async {
+    await tester.pumpWidget(_host(_table(), width: 390));
+    await tester.pumpAndSettle();
+
+    // 잘렸다는 표시가 없으면 숨은 칼럼에 도달할 방법을 찾지 못한다.
+    // 레포에 이미 있는 DpScrollbar 가 정확히 이 용도다.
+    expect(find.byType(DpScrollbar), findsOneWidget);
+  });
+
+  testWidgets('헤더 라벨은 본문 대비(4.5:1) 를 만족하는 토큰을 쓴다', (tester) async {
+    await tester.pumpWidget(_host(_table()));
+
+    final label = tester.widget<Text>(find.text('제목'));
+    // textFaint(라이트 3.52:1)는 토큰 자신이 본문 텍스트 금지로 못 박은 값이다.
+    // 칼럼 라벨은 「이 열이 무엇인가」를 전달하는 유일한 수단이라 장식이 아니다.
+    expect(label.style!.color, DpColors.light.textSecondary);
+    expect(label.style!.color, isNot(DpColors.light.textFaint));
+  });
 }
