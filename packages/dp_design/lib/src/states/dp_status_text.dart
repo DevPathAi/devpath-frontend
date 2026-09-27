@@ -37,11 +37,7 @@ class DpStatusText extends StatelessWidget {
       text,
       softWrap: false,
       overflow: TextOverflow.clip,
-      style: TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
-        color: color,
-      ),
+      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color),
     );
   }
 }

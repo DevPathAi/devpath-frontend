@@ -2,8 +2,10 @@ import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-Widget _host(Widget child) =>
-    MaterialApp(theme: DpTheme.light(), home: Scaffold(body: child));
+Widget _host(Widget child) => MaterialApp(
+  theme: DpTheme.light(),
+  home: Scaffold(body: child),
+);
 
 void main() {
   testWidgets('자식을 모두 그리고 마지막만 구분선이 없다', (tester) async {

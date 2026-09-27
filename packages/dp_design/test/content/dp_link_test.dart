@@ -76,7 +76,7 @@ void main() {
     // 요구사항이다.
     final data = tester.getSemantics(find.text('이용약관')).getSemanticsData();
     expect(data.label, '이용약관');
-    expect(data.hasFlag(SemanticsFlag.isLink), isTrue);
+    expect(data.flagsCollection.isLink, isTrue);
     expect(data.hasAction(SemanticsAction.tap), isTrue);
     handle.dispose();
   });

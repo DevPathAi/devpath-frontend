@@ -3,38 +3,36 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets(
-    'SegmentedButton 세그먼트는 30px 컨트롤 높이(±4)이며 24px 최소 타깃을 넘는다',
-    (tester) async {
-      tester.view.physicalSize = const Size(390, 900);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.reset);
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: DpTheme.light(),
-          home: Scaffold(
-            body: SegmentedButton<int>(
-              segments: const [
-                ButtonSegment(value: 0, label: Text('자유게시판')),
-                ButtonSegment(value: 1, label: Text('Q/A')),
-                ButtonSegment(value: 2, label: Text('피드백')),
-              ],
-              selected: const {0},
-              onSelectionChanged: (_) {},
-            ),
+  testWidgets('SegmentedButton 세그먼트는 30px 컨트롤 높이(±4)이며 24px 최소 타깃을 넘는다', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: DpTheme.light(),
+        home: Scaffold(
+          body: SegmentedButton<int>(
+            segments: const [
+              ButtonSegment(value: 0, label: Text('자유게시판')),
+              ButtonSegment(value: 1, label: Text('Q/A')),
+              ButtonSegment(value: 2, label: Text('피드백')),
+            ],
+            selected: const {0},
+            onSelectionChanged: (_) {},
           ),
         ),
-      );
-      final height = tester.getSize(find.byType(SegmentedButton<int>)).height;
-      expect(height, greaterThanOrEqualTo(DpDensity.minTarget));
-      expect(
-        height,
-        inInclusiveRange(DpDensity.controlHeight, DpDensity.controlHeight + 4),
-      );
-      // 계약 2.0.0(스펙 §5.4-1): 포인터 밀도. 44px 터치 기준은 2026-09-19 에 24px(WCAG 2.2 AA 2.5.8)로 옮겼다.
-    },
-    variant: TargetPlatformVariant.only(TargetPlatform.windows),
-  );
+      ),
+    );
+    final height = tester.getSize(find.byType(SegmentedButton<int>)).height;
+    expect(height, greaterThanOrEqualTo(DpDensity.minTarget));
+    expect(
+      height,
+      inInclusiveRange(DpDensity.controlHeight, DpDensity.controlHeight + 4),
+    );
+    // 계약 2.0.0(스펙 §5.4-1): 포인터 밀도. 44px 터치 기준은 2026-09-19 에 24px(WCAG 2.2 AA 2.5.8)로 옮겼다.
+  }, variant: TargetPlatformVariant.only(TargetPlatform.windows));
 
   testWidgets('TextButton 은 30px 컨트롤이고 한 줄 라벨을 자르지 않는다', (tester) async {
     await tester.pumpWidget(

@@ -4,7 +4,11 @@ import 'package:flutter_test/flutter_test.dart';
 
 Widget _host(Widget child, {double width = 360}) => MaterialApp(
   theme: DpTheme.light(),
-  home: Scaffold(body: Center(child: SizedBox(width: width, child: child))),
+  home: Scaffold(
+    body: Center(
+      child: SizedBox(width: width, child: child),
+    ),
+  ),
 );
 
 const _entries = <DpKeyValue>[

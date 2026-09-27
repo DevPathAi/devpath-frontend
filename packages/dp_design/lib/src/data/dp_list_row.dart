@@ -1,26 +1,29 @@
 import 'package:flutter/material.dart';
 
-import '../interaction/dp_interactive_card.dart';
+import '../content/dp_link.dart';
 import '../theme/dp_colors.dart';
 import '../theme/dp_spacing.dart';
 import '../theme/dp_tokens.dart';
 
-/// 리스트 행(Layer 2). 좌측 상태 표시선(accent) + 상단 뱃지행 → 제목 + 우측 trailing 메타.
-/// DpInteractiveCard(hover/focus) 베이스. go_router·Riverpod 비의존 순수 표현부.
+/// 웹 문법 목록 행(Layer 2) — 상단 뱃지행 → 제목 → 부제, 우측 trailing 메타.
+/// go_router·Riverpod 비의존 순수 표현부.
+///
+/// S3-P3 에서 카드(DpInteractiveCard)를 벗고 구분선 행이 됐다. 시안의 목록에는
+/// 카드도 좌측 상태 표시선도 없다 — 상태는 색 막대가 아니라 [DpStatusText] 로
+/// 드러낸다. hover 는 표(DpWebTable)의 행과 같은 규칙으로 배경색만 바꾼다.
 class DpListRow extends StatelessWidget {
   const DpListRow({
     super.key,
     required this.title,
-    this.accentColor,
     this.badges = const [],
     this.trailing,
     this.onTap,
     this.preview,
     this.subtitle,
+    this.last = false,
   });
 
   final String title;
-  final Color? accentColor;
   final List<Widget> badges;
   final Widget? trailing;
   final VoidCallback? onTap;
@@ -33,84 +36,59 @@ class DpListRow extends StatelessWidget {
   /// 서식이 필요할 수 있어 String 이 아니라 Widget 을 받는다.
   final Widget? subtitle;
 
+  /// 목록의 마지막 행이면 하단 구분선을 그리지 않는다.
+  final bool last;
+
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
-    return DpInteractiveCard(
+    return _HoverRow(
       onTap: onTap,
-      padding: EdgeInsets.zero,
+      last: last,
       child: LayoutBuilder(
         builder: (context, constraints) {
           final compact = constraints.maxWidth < 520;
           if (compact) {
-            return IntrinsicHeight(
+            // 좁은 폭에서는 메타를 본문 아래로 내린다. 한 줄에 같이 두면
+            // 제목이 두 글자 폭으로 눌린다.
+            return Column(
               key: const ValueKey('dp-list-row-mobile-layout'),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (accentColor != null) _accent(),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.all(DpSpacing.lg),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _content(context, text),
-                          if (trailing != null) ...[
-                            const SizedBox(height: DpSpacing.md),
-                            DefaultTextStyle.merge(
-                              style: text.bodySmall?.copyWith(
-                                color: context.dpColors.textSecondary,
-                              ),
-                              child: trailing!,
-                            ),
-                          ],
-                        ],
-                      ),
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _content(context, text),
+                if (trailing != null) ...[
+                  const SizedBox(height: DpSpacing.sm),
+                  DefaultTextStyle.merge(
+                    style: text.bodySmall?.copyWith(
+                      color: context.dpColors.textSecondary,
                     ),
+                    child: trailing!,
                   ),
                 ],
-              ),
+              ],
             );
           }
 
-          return IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (accentColor != null) _accent(),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(DpSpacing.lg),
-                    child: _content(context, text),
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: _content(context, text)),
+              if (trailing != null) ...[
+                const SizedBox(width: DpSpacing.lg),
+                DefaultTextStyle.merge(
+                  style: text.bodySmall?.copyWith(
+                    color: context.dpColors.textSecondary,
                   ),
+                  child: trailing!,
                 ),
-                if (trailing != null)
-                  Padding(
-                    padding: const EdgeInsets.all(DpSpacing.lg),
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: trailing,
-                    ),
-                  ),
               ],
-            ),
+            ],
           );
         },
       ),
     );
   }
-
-  Widget _accent() => Container(
-    width: 4,
-    decoration: BoxDecoration(
-      color: accentColor,
-      borderRadius: const BorderRadius.horizontal(
-        left: Radius.circular(DpRadius.card),
-      ),
-    ),
-  );
 
   Widget _content(BuildContext context, TextTheme text) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -128,9 +106,9 @@ class DpListRow extends StatelessWidget {
       (preview != null && preview!.trim().isNotEmpty)
           ? _HoverPreview(
               preview: preview!,
-              child: Text(title, style: text.titleSmall),
+              child: DpLink.title(text: title, onTap: onTap),
             )
-          : Text(title, style: text.titleSmall),
+          : DpLink.title(text: title, onTap: onTap),
       if (subtitle != null) ...[
         const SizedBox(height: DpSpacing.sm),
         DefaultTextStyle.merge(
@@ -212,6 +190,61 @@ class _PreviewCard extends StatelessWidget {
           ).textTheme.bodySmall?.copyWith(color: c.textSecondary),
         ),
       ),
+    );
+  }
+}
+
+/// 구분선 행의 hover 배경. 표(`DpWebTable`)의 행과 같은 규칙이다 —
+/// 카드 테두리·그림자를 쓰지 않고 배경색만 바꾼다.
+///
+/// 제스처에 `excludeFromSemantics: true` 를 주는 이유는 표와 같다: 없으면 이
+/// 노드가 제목·뱃지·메타 조각을 흡수해 행 전체가 한 덩어리로 읽힌다. 접근성
+/// 컨트롤은 제목의 [DpLink] 가 담당한다.
+class _HoverRow extends StatefulWidget {
+  const _HoverRow({required this.child, required this.last, this.onTap});
+
+  final Widget child;
+  final bool last;
+  final VoidCallback? onTap;
+
+  @override
+  State<_HoverRow> createState() => _HoverRowState();
+}
+
+class _HoverRowState extends State<_HoverRow> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.dpColors;
+    final body = Container(
+      key: const ValueKey('dp-list-row'),
+      padding: const EdgeInsets.symmetric(
+        vertical: DpDensity.rowPadding,
+        horizontal: DpSpacing.lg,
+      ),
+      decoration: BoxDecoration(
+        color: _hovered ? c.surfaceMuted : null,
+        border: widget.last
+            ? null
+            : Border(bottom: BorderSide(color: c.border)),
+      ),
+      child: widget.child,
+    );
+
+    return MouseRegion(
+      cursor: widget.onTap == null
+          ? MouseCursor.defer
+          : SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: widget.onTap == null
+          ? body
+          : GestureDetector(
+              onTap: widget.onTap,
+              excludeFromSemantics: true,
+              child: body,
+            ),
     );
   }
 }

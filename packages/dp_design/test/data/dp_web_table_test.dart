@@ -9,7 +9,11 @@ Widget _host(
   Brightness brightness = Brightness.light,
 }) => MaterialApp(
   theme: brightness == Brightness.light ? DpTheme.light() : DpTheme.dark(),
-  home: Scaffold(body: Center(child: SizedBox(width: width, child: child))),
+  home: Scaffold(
+    body: Center(
+      child: SizedBox(width: width, child: child),
+    ),
+  ),
 );
 
 const _columns = <DpTableColumn>[

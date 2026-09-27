@@ -16,10 +16,14 @@ class DpLink extends StatefulWidget {
   const DpLink._({
     super.key,
     required this.text,
-    required this.variant,
+    required _DpLinkVariant variant,
     this.onTap,
     this.maxLines,
-  });
+    // 초기화 형식 매개변수(`this._variant`)를 쓸 수 없다 — Dart 는 밑줄로
+    // 시작하는 명명 매개변수를 금지한다. 필드를 공개로 되돌리면 이번에는
+    // 비공개 타입이 공개 API 에 새는 library_private_types_in_public_api 가 뜬다.
+    // ignore: prefer_initializing_formals
+  }) : _variant = variant;
 
   const DpLink.title({
     Key? key,
@@ -43,7 +47,7 @@ class DpLink extends StatefulWidget {
       );
 
   final String text;
-  final _DpLinkVariant variant;
+  final _DpLinkVariant _variant;
   final VoidCallback? onTap;
   final int? maxLines;
 
@@ -59,7 +63,7 @@ class _DpLinkState extends State<DpLink> {
   Widget build(BuildContext context) {
     final c = context.dpColors;
     final base = Theme.of(context).textTheme.bodyMedium;
-    final inline = widget.variant == _DpLinkVariant.inline;
+    final inline = widget._variant == _DpLinkVariant.inline;
     final emphasised = inline || _hovered;
 
     final style = (base ?? const TextStyle()).copyWith(
