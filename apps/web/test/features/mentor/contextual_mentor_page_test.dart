@@ -5,6 +5,7 @@ import 'package:devpath_web/src/features/dashboard/application/current_mission_c
 import 'package:devpath_web/src/features/mentor/application/mentor_controller.dart';
 import 'package:devpath_web/src/features/mentor/data/mentor_sse_source.dart';
 import 'package:devpath_web/src/features/mentor/presentation/mentor_page.dart';
+import 'package:devpath_web/src/features/mentor/presentation/web_mentor_context_projection.dart';
 import 'package:devpath_web/src/features/mentor/state/mentor_scope_key.dart';
 import 'package:devpath_web/src/features/mentor/state/mentor_state.dart';
 import 'package:devpath_web/src/features/mission/state/mission_workspace_key.dart';
@@ -174,6 +175,38 @@ Future<ProviderContainer> _pump(
 }
 
 void main() {
+  testWidgets('멘토: 1280 에서 맥락 캡슐이 사이드에 있고 대화가 좌측에 있다', (tester) async {
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await _pump(tester);
+
+    expect(find.byType(DpCols), findsOneWidget);
+
+    // 시안 `.side` — 맥락은 오른쪽 칼럼이다(대화 위가 아니다). 대화 영역은
+    // 메시지가 없으면 `ListView` 가 아니므로 좌측 칼럼의 작성칸을 기준으로 잰다.
+    final capsule = tester.getRect(find.byType(WebMentorContextProjection));
+    final composer = tester.getRect(
+      find.byKey(const ValueKey('mentor-primary-action')),
+    );
+    expect(capsule.left, greaterThan(composer.left));
+  });
+
+  testWidgets('멘토: 390px 에서 대화 → 맥락 순서로 한 열이 된다', (tester) async {
+    tester.view.physicalSize = const Size(390, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await _pump(tester);
+
+    expect(tester.takeException(), isNull);
+    final composer = tester.getRect(
+      find.byKey(const ValueKey('mentor-primary-action')),
+    );
+    final capsule = tester.getRect(find.byType(WebMentorContextProjection));
+    // 1열에서는 main(대화+작성칸) 다음에 side(맥락)다.
+    expect(capsule.top, greaterThan(composer.top));
+  });
+
   testWidgets('Mission Header + 선택 capsule → 실제 preview → private send', (
     tester,
   ) async {

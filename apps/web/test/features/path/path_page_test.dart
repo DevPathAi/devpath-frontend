@@ -474,6 +474,24 @@ void main() {
     expect(find.textContaining('비동기 기초'), findsWidgets); // week1 제목
   });
 
+  testWidgets('완료 본문은 헤더와 같은 좌측선에서 시작한다 — 좌우 거터는 셸이 준다', (tester) async {
+    final c = ProviderContainer(
+      overrides: [
+        authControllerProvider.overrideWith(_AuthedAuthController.new),
+        pathSseConnectProvider.overrideWithValue(() => _emit(kPathStages)),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    await tester.pumpWidget(_host(c));
+    await tester.pumpAndSettle();
+
+    expect(c.read(pathControllerProvider).phase, PathPhase.complete);
+    final header = tester.getTopLeft(find.text('학습 경로'));
+    final firstPanel = tester.getTopLeft(find.byType(DpPanel).first);
+    expect(firstPanel.dx, header.dx);
+  });
+
   testWidgets('중단 시 "다시 생성" 노출', (tester) async {
     final c = ProviderContainer(
       overrides: [

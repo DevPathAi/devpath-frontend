@@ -121,7 +121,12 @@ class _LoginAccessPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
+          // 로그인은 셸 밖(bare 라우트)이라 거터를 줄 셸이 없다. 형제들이
+          // `horizontalPadding` 으로 각자 주므로 헤더도 스스로 준다.
+          // S3-P4c(Task 14)에서 이 화면을 시안 `.login` 으로 다시 짤 때
+          // 페이지 헤더 자체가 패널 제목으로 바뀌며 사라진다.
           const DpPageHeader(
+            gutter: true,
             title: '다시 만나서 반가워요',
             description: '계정을 연결하고 오늘의 학습 흐름을 이어가세요.',
           ),

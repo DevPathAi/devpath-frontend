@@ -7,7 +7,40 @@ Widget _host(Widget child) => MaterialApp(
   home: Scaffold(body: child),
 );
 
+EdgeInsets _outerPaddingOf(WidgetTester tester) {
+  final padding = tester.widget<Padding>(
+    find
+        .descendant(
+          of: find.byType(DpPageHeader),
+          matching: find.byType(Padding),
+        )
+        .first,
+  );
+  return padding.padding.resolve(TextDirection.ltr);
+}
+
 void main() {
+  testWidgets('기본값은 좌우 패딩을 주지 않는다 — 셸이 이미 준다', (tester) async {
+    await tester.pumpWidget(_host(const DpPageHeader(title: '오늘')));
+
+    // 시안 `.ph` 에는 패딩이 없다 — 좌우 여백은 `.main` 의 24 한 겹이고,
+    // `DpWebShell` 이 그 값을 준다. 여기서 또 주면 두 겹이 된다.
+    final p = _outerPaddingOf(tester);
+    expect(p.left, 0);
+    expect(p.right, 0);
+    expect(p.top, DpSpacing.xxl);
+  });
+
+  testWidgets('gutter: true 면 좌우 패딩을 스스로 준다 — 셸이 안 주는 admin 용', (tester) async {
+    await tester.pumpWidget(
+      _host(const DpPageHeader(title: '대시보드', gutter: true)),
+    );
+
+    final p = _outerPaddingOf(tester);
+    expect(p.left, DpSpacing.xl);
+    expect(p.right, DpSpacing.xl);
+  });
+
   testWidgets('제목만 주면 설명·액션·필터는 렌더하지 않는다', (tester) async {
     await tester.pumpWidget(_host(const DpPageHeader(title: '대시보드')));
     expect(find.text('대시보드'), findsOneWidget);
@@ -98,8 +131,31 @@ void main() {
 
     final headerRight = tester.getRect(find.byType(DpPageHeader)).right;
     final actionRight = tester.getRect(find.byKey(const ValueKey('act'))).right;
-    // 넓은 화면 헤더의 우측 패딩(DpSpacing.xl = 24)만큼만 떨어져 있어야 한다.
-    expect(headerRight - actionRight, closeTo(24, 1.0));
+    // 기본값(gutter: false)에서는 헤더 자신이 좌우 패딩을 주지 않으므로 액션이
+    // 헤더의 우측 끝에 정확히 붙는다. 거터는 셸이 본문 전체에 준다.
+    expect(headerRight - actionRight, closeTo(0, 1.0));
+  });
+
+  testWidgets('gutter: true 면 액션이 헤더의 우측 패딩만큼 떨어진다', (tester) async {
+    tester.view.physicalSize = const Size(1000, 300);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      _host(
+        const DpPageHeader(
+          title: '대시보드',
+          gutter: true,
+          actions: [
+            SizedBox(width: 100, key: ValueKey('act'), child: Text('실습')),
+          ],
+        ),
+      ),
+    );
+
+    final headerRight = tester.getRect(find.byType(DpPageHeader)).right;
+    final actionRight = tester.getRect(find.byKey(const ValueKey('act'))).right;
+    expect(headerRight - actionRight, closeTo(DpSpacing.xl, 1.0));
   });
 
   testWidgets('제목은 언제나 헤더이며 메뉴 버튼이 되지 않는다', (tester) async {

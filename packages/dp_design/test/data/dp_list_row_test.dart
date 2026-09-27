@@ -29,19 +29,28 @@ void main() {
     expect(tapped, isTrue);
   });
 
-  testWidgets('DpListRow: hover/focus 베이스(FocusableActionDetector) 존재', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: DpTheme.light(),
-        home: Scaffold(
-          body: DpListRow(title: '글', onTap: () {}),
+  testWidgets(
+    'DpListRow: 제목 링크가 hover/focus 베이스(FocusableActionDetector)를 갖는다',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: DpTheme.light(),
+          home: Scaffold(
+            body: DpListRow(title: '글', onTap: () {}),
+          ),
         ),
-      ),
-    );
-    expect(find.byType(FocusableActionDetector), findsWidgets);
-  });
+      );
+      // 그 `FocusableActionDetector` 는 이제 행이 아니라 `DpLink` 내부의 것이다
+      // (P3 에서 행을 카드 → 구분선 행으로 바꾸고 접근성 컨트롤을 제목 링크로 옮겼다).
+      expect(
+        find.descendant(
+          of: find.byType(DpLink),
+          matching: find.byType(FocusableActionDetector),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets('DpListRow: preview 지정 시 hover로 미리보기 등장', (tester) async {
     await tester.pumpWidget(

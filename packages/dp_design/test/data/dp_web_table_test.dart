@@ -24,7 +24,7 @@ const _columns = <DpTableColumn>[
 
 DpWebTable _table({
   List<DpTableRowSpec>? rows,
-  Widget? empty,
+  Widget empty = const Text('아직 글이 없어요'),
   double minWidth = 640,
 }) => DpWebTable(
   columns: _columns,
@@ -115,13 +115,6 @@ void main() {
     expect(find.byKey(const ValueKey('dp-web-table-header')), findsNothing);
   });
 
-  testWidgets('행이 없고 empty 가 없으면 헤더만 남는다', (tester) async {
-    await tester.pumpWidget(_host(_table(rows: const [])));
-
-    expect(find.byKey(const ValueKey('dp-web-table-header')), findsOneWidget);
-    expect(find.byKey(const ValueKey('dp-web-table-row')), findsNothing);
-  });
-
   testWidgets('390px 에서는 표만 가로 스크롤하고 본문은 넘치지 않는다', (tester) async {
     await tester.pumpWidget(_host(_table(), width: 390));
     await tester.pumpAndSettle();
@@ -132,6 +125,50 @@ void main() {
       lessThanOrEqualTo(390),
     );
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('가로로 잘린 표는 스크롤 영역 **안에** 키보드 포커스 노드를 둔다', (tester) async {
+    await tester.pumpWidget(_host(_table(), width: 390));
+
+    final scroll = find.byKey(const ValueKey('dp-web-table-scroll'));
+    expect(scroll, findsOneWidget);
+
+    // 포커스 노드가 스크롤 뷰 **밖**에 있으면 웹 시맨틱스가 tabindex 를
+    // overflow 를 가진 요소가 아니라 그 부모에 붙여, axe
+    // `scrollable-region-focusable`(serious)이 여전히 잡는다.
+    expect(
+      find.descendant(
+        of: scroll,
+        matching: find.byKey(const ValueKey('dp-web-table-scroll-focus')),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('스크롤 영역에 포커스가 오면 2px 링이 보인다', (tester) async {
+    await tester.pumpWidget(_host(_table(), width: 390));
+
+    expect(find.byKey(const ValueKey('dp-web-table-focus-ring')), findsNothing);
+
+    // `Focus.of` 는 그 `Focus` 가 **자기 아래에** 심는 마커를 찾는다 — 노드를
+    // 얻으려면 자식 맥락에서 불러야 한다(위젯 자신의 element 에서 부르면 부모
+    // 스코프가 나온다).
+    Focus.of(tester.element(find.text('오늘 배운 것 공유'))).requestFocus();
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey('dp-web-table-focus-ring')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('잘리지 않는 표는 여분의 탭 정지를 만들지 않는다', (tester) async {
+    await tester.pumpWidget(_host(_table(), width: 1120));
+
+    expect(
+      find.byKey(const ValueKey('dp-web-table-scroll-focus')),
+      findsNothing,
+    );
   });
 
   testWidgets('minWidth 이상 폭에서는 스크롤을 감싸지 않는다', (tester) async {
@@ -205,5 +242,47 @@ void main() {
     // 칼럼 라벨은 「이 열이 무엇인가」를 전달하는 유일한 수단이라 장식이 아니다.
     expect(label.style!.color, DpColors.light.textSecondary);
     expect(label.style!.color, isNot(DpColors.light.textFaint));
+  });
+
+  test('셀 개수가 칼럼 수와 다르면 assert 로 막는다', () {
+    // doc 에만 있던 계약이다. 어기면 배치 중 RangeError 로 터지고, 그 스택에는
+    // 원인이 칼럼 정의에 있다는 단서가 남지 않는다.
+    expect(
+      () => DpWebTable(
+        columns: const [
+          (label: '제목', width: null, numeric: false),
+          (label: '추천', width: null, numeric: true),
+        ],
+        rows: const [
+          (cells: [Text('제목만')], onTap: null),
+        ],
+        empty: const Text('비었다'),
+      ),
+      throwsA(isA<AssertionError>()),
+    );
+  });
+
+  testWidgets('numeric 유연 칼럼도 우측 정렬한다', (tester) async {
+    await tester.pumpWidget(
+      _host(
+        DpWebTable(
+          columns: const [
+            (label: '제목', width: null, numeric: false),
+            (label: '추천', width: null, numeric: true),
+          ],
+          rows: const [
+            (cells: [Text('제목 A'), Text('7')], onTap: null),
+          ],
+          empty: const Text('비었다'),
+        ),
+      ),
+    );
+
+    // `numeric` 은 칼럼 폭과 무관한 약속이다(DpTableColumn doc). 고정폭 분기에만
+    // 정렬이 있으면 유연 칼럼에서 조용히 좌측 정렬이 된다.
+    final align = tester.widget<Align>(
+      find.ancestor(of: find.text('7'), matching: find.byType(Align)).first,
+    );
+    expect(align.alignment, Alignment.centerRight);
   });
 }

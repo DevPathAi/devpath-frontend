@@ -95,7 +95,9 @@ void main() {
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
 
-    expect(find.text('에러 처리 패턴 적용'), findsOneWidget);
+    // 제목은 미션 밴드와 「이번 주 과제」 표에 함께 나온다(시안의 의도된 반복) —
+    // 이 테스트의 계약은 「제목이 렌더된다」이지 「한 번만 나온다」가 아니다.
+    expect(find.text('에러 처리 패턴 적용'), findsWidgets);
     await tester.tap(find.text('미션 열기'));
     await tester.pumpAndSettle();
 

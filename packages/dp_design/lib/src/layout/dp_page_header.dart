@@ -14,11 +14,24 @@ class DpPageHeader extends StatelessWidget {
     this.description,
     this.actions = const [],
     this.filters = const [],
+    this.gutter = false,
   });
 
   final String title;
   final String? description;
   final List<Widget> actions;
+
+  /// 좌우 여백을 이 헤더가 **스스로** 줄지 여부.
+  ///
+  /// 기본값 false 는 시안 `.ph`(패딩 없음) 다 — `DpWebShell` 이 본문 전체에
+  /// `.main` 의 거터(compact `lg` / 그 외 `xl`)를 주므로 헤더가 또 주면 두 겹이
+  /// 되어 헤더만 본문보다 더 들여쓰인다.
+  ///
+  /// `apps/admin` 의 `DpAppShell` 은 본문에 좌우 패딩을 주지 않고 화면의 형제
+  /// 위젯들이 각자 패딩을 갖는다(실측 2026-09-27). 그래서 admin 의 호출부는
+  /// `gutter: true` 로 옛 거동을 유지한다 — 스펙 §10 「관리자 앱을 바꾸지
+  /// 않는다」를 지키는 쪽이 셸에 패딩을 넣어 형제들을 이중으로 만드는 것보다 낫다.
+  final bool gutter;
 
   /// 헤더 아래 필터 줄. 자식들은 Wrap의 형제로 배치되어 좁은 폭에서
   /// 줄바꿈한다 — Row를 통째로 받으면 줄바꿈이 일어나지 않는다.
@@ -32,9 +45,9 @@ class DpPageHeader extends StatelessWidget {
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
-        compact ? DpSpacing.lg : DpSpacing.xl,
+        gutter ? (compact ? DpSpacing.lg : DpSpacing.xl) : 0,
         compact ? DpSpacing.xl : DpSpacing.xxl,
-        compact ? DpSpacing.lg : DpSpacing.xl,
+        gutter ? (compact ? DpSpacing.lg : DpSpacing.xl) : 0,
         DpSpacing.lg,
       ),
       child: Column(

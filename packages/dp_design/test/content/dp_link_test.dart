@@ -123,6 +123,29 @@ void main() {
     expect(find.byKey(const ValueKey('dp-link-focus-ring')), findsOneWidget);
   });
 
+  testWidgets('하이라이트 모드가 touch 여도 focused 가 실제 포커스를 따른다', (tester) async {
+    // `onShowFocusHighlight` 는 highlightMode 가 traditional 일 때만 불린다.
+    // 이 위젯의 `Semantics.focused` 는 자식 subtree 를 excludeSemantics 로 가린
+    // 뒤 **직접 선언하는 유일한 진실**이므로, 하이라이트 정책이 아니라 실제
+    // 포커스를 따라야 한다.
+    FocusManager.instance.highlightStrategy =
+        FocusHighlightStrategy.alwaysTouch;
+    addTearDown(() {
+      FocusManager.instance.highlightStrategy =
+          FocusHighlightStrategy.automatic;
+    });
+
+    await tester.pumpWidget(_host(DpLink.title(text: '제목 링크', onTap: () {})));
+    await tester.pumpAndSettle();
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pumpAndSettle();
+
+    // 포커스 링과 `Semantics.focused` 는 같은 `_focused` 를 공유한다. 링을 보는
+    // 쪽이 시맨틱스 플래그 타입(버전마다 bool/Tristate 로 갈린다)에 의존하지 않는다.
+    expect(find.byKey(const ValueKey('dp-link-focus-ring')), findsOneWidget);
+  });
+
   testWidgets('onTap 이 null 이면 순회 대상이 아니다', (tester) async {
     await tester.pumpWidget(_host(DpLink.title(text: '삭제된 글')));
     await tester.pumpAndSettle();

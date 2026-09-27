@@ -93,7 +93,7 @@ void main() {
     expect(find.byKey(const Key('progress-trend-card')), findsOneWidget);
   });
 
-  testWidgets('Today 보조 지표는 이번 주 진행을 스트릭보다 먼저 배치한다', (tester) async {
+  testWidgets('Today 보조 지표는 주간 활동 다음에 추세를 둔다', (tester) async {
     tester.view.physicalSize = const Size(1000, 1400);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -105,22 +105,44 @@ void main() {
     final weeklyTop = tester.getTopLeft(
       find.byKey(const Key('weekly-activity-card')),
     );
-    final streakTop = tester.getTopLeft(find.text('연속 학습'));
-    expect(weeklyTop.dy, lessThan(streakTop.dy));
+    final trendTop = tester.getTopLeft(
+      find.byKey(const Key('progress-trend-card')),
+    );
+    expect(weeklyTop.dy, lessThan(trendTop.dy));
+    expect(find.byType(DpSide), findsOneWidget);
   });
 
-  testWidgets('Today 보조 지표는 compact 에서 주간 활동과 스트릭만 남긴다', (tester) async {
+  // S3-P4: KPI 카드·도넛·배지의 **숫자는 사라지지 않았다** — 「진행」 키-값 패널
+  // (`TodayProgressPanel`)이 같은 데이터를 맡고 여기서는 차트만 남는다. 같은 숫자를
+  // 한 화면에 두 번 그리지 않기 위한 분담이다.
+  testWidgets('Today 보조 지표는 차트만 남기고 KPI·도넛·배지를 갖지 않는다', (tester) async {
+    tester.view.physicalSize = const Size(1000, 1400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(_supportingDashboardHost(_summary));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('weekly-activity-card')), findsOneWidget);
+    expect(find.byKey(const Key('progress-trend-card')), findsOneWidget);
+    expect(find.byType(DpKpiCard), findsNothing);
+    expect(find.text('62%'), findsNothing);
+    expect(find.textContaining('첫걸음'), findsNothing);
+  });
+
+  // 옛 코드는 가용 폭 440 미만에서 추세를 숨겼다. 새 사이드 칼럼은 1120 의 1/3
+  // (≈373px)이라 그 게이트를 남기면 **데스크톱에서도** 추세가 사라진다 — 게이트를
+  // 걷어내고 좁은 폭에서도 차트를 남긴다(차트는 폭에 맞춰 줄어든다).
+  testWidgets('Today 보조 지표는 compact 에서도 두 차트를 남긴다', (tester) async {
     tester.view.physicalSize = const Size(400, 900);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(_supportingDashboardHost(_summary));
     await tester.pumpAndSettle();
+
     expect(find.byKey(const Key('weekly-activity-card')), findsOneWidget);
-    expect(find.text('연속 학습'), findsOneWidget);
-    expect(find.text('62%'), findsNothing);
-    expect(find.text('완료 콘텐츠'), findsNothing);
-    expect(find.byKey(const Key('progress-trend-card')), findsNothing);
-    expect(find.textContaining('첫걸음'), findsNothing);
+    expect(find.byKey(const Key('progress-trend-card')), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

@@ -25,6 +25,7 @@ class SupportPage extends ConsumerWidget {
       body: Column(
         children: [
           DpPageHeader(
+            gutter: true,
             // 제목은 kAdminDestinations가 유일한 출처다(admin_shell.dart).
             title: adminHeaderTitleFor('/support'),
             description: '사용자가 보낸 오류와 문의를 처리합니다',

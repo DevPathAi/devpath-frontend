@@ -72,7 +72,8 @@ class _PathPageState extends ConsumerState<PathPage> {
     // 그 외 상태(진행·중단·실패)는 화면 중앙에 고정하는 SliverFillRemaining.
     final legacyBodySliver = switch (s.phase) {
       PathPhase.complete when s.result != null => SliverPadding(
-        padding: const EdgeInsets.all(DpSpacing.lg),
+        // 좌우는 셸이 준다 — 화면은 세로 여백만 준다.
+        padding: const EdgeInsets.symmetric(vertical: DpSpacing.lg),
         sliver: SliverList.list(
           children: PathPlanView.children(context, s.result!),
         ),

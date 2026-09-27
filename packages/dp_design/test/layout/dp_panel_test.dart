@@ -60,13 +60,39 @@ void main() {
   testWidgets('제목은 시맨틱스에서 헤더로 노출된다', (tester) async {
     final handle = tester.ensureSemantics();
     await tester.pumpWidget(
-      _host(const DpPanel(title: Text('진행'), child: Text('본문'))),
+      _host(const DpPanel(title: DpPanelTitle('진행'), child: Text('본문'))),
     );
 
     expect(
       tester.getSemantics(find.text('진행')),
       matchesSemantics(label: '진행', isHeader: true),
     );
+    handle.dispose();
+  });
+
+  testWidgets('제목에 액션이 함께 있어도 heading 라벨이 남는다', (tester) async {
+    final handle = tester.ensureSemantics();
+    await tester.pumpWidget(
+      _host(
+        DpPanel(
+          title: Row(
+            children: [
+              const Expanded(child: DpPanelTitle('이번 주 과제')),
+              TextButton(onPressed: () {}, child: const Text('전체 보기')),
+            ],
+          ),
+          child: const Text('본문'),
+        ),
+      ),
+    );
+
+    // `Semantics` 는 기본 container: false 라 자식 노드가 둘 이상이면 병합되지
+    // 않고 **라벨 없는 header 컨테이너**가 생긴다(2026-09-17 함정 1 과 같은 뿌리).
+    // 전수 매처(`matchesSemantics`) 대신 핵심만 본다 — 제목행이 Row 라 주변
+    // 노드가 함께 붙고, 그것들은 결함이 아니다.
+    final data = tester.getSemantics(find.text('이번 주 과제')).getSemanticsData();
+    expect(data.label, '이번 주 과제');
+    expect(data.flagsCollection.isHeader, isTrue);
     handle.dispose();
   });
 

@@ -10,6 +10,7 @@ export 'src/theme/dp_theme.dart';
 export 'src/theme/dp_tokens.dart';
 export 'src/theme/dp_state_style.dart';
 export 'src/theme/dp_semantic_tokens.dart';
+export 'src/layout/dp_cols.dart';
 export 'src/layout/dp_max_width.dart';
 export 'src/layout/dp_selectable.dart';
 export 'src/layout/dp_scrollbar.dart';

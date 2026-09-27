@@ -26,13 +26,8 @@ class PathPlanView extends StatelessWidget {
     final diagnosis = plan.diagnosis;
 
     return [
-      Container(
+      DpPanel(
         padding: const EdgeInsets.all(DpSpacing.md),
-        decoration: BoxDecoration(
-          color: c.surface,
-          border: Border.all(color: c.border),
-          borderRadius: BorderRadius.circular(DpRadius.card),
-        ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -49,71 +44,107 @@ class PathPlanView extends StatelessWidget {
       ),
       if (diagnosis != null) ...[
         const SizedBox(height: DpSpacing.xl),
-        Text('진단 요약', style: text.titleMedium),
-        const SizedBox(height: DpSpacing.sm),
-        Text('현재 수준 ${diagnosis.diagnosedLevel}', style: text.bodyMedium),
-        // 색만으로 강점/약점을 구분하지 않는다(DESIGN.md §1) — 소제목 텍스트를
-        // 병행하고, 약점은 "위험"이 아니므로 중립(textSecondary)을 쓴다.
-        if (diagnosis.strengthConcepts.isNotEmpty) ...[
-          const SizedBox(height: DpSpacing.sm),
-          Text('강점', style: text.titleSmall),
-          const SizedBox(height: DpSpacing.xs),
-          Wrap(
-            spacing: DpSpacing.xs,
-            runSpacing: DpSpacing.xs,
+        DpPanel(
+          title: const DpPanelTitle('진단 요약'),
+          padding: const EdgeInsets.all(DpSpacing.lg),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              for (final strength in diagnosis.strengthConcepts)
-                _Tag(label: strength, color: c.success),
+              Text('현재 수준 ${diagnosis.diagnosedLevel}', style: text.bodyMedium),
+              // 색만으로 강점/약점을 구분하지 않는다(DESIGN.md §1) — 소제목
+              // 텍스트가 구분을 지고, 칩은 `DpTag` 의 중립 토큰을 쓴다.
+              if (diagnosis.strengthConcepts.isNotEmpty) ...[
+                const SizedBox(height: DpSpacing.sm),
+                Text('강점', style: text.titleSmall),
+                const SizedBox(height: DpSpacing.xs),
+                Wrap(
+                  spacing: DpSpacing.xs,
+                  runSpacing: DpSpacing.xs,
+                  children: [
+                    for (final strength in diagnosis.strengthConcepts)
+                      DpTag(label: strength),
+                  ],
+                ),
+              ],
+              if (diagnosis.weaknessConcepts.isNotEmpty) ...[
+                const SizedBox(height: DpSpacing.sm),
+                Text('보강할 점', style: text.titleSmall),
+                const SizedBox(height: DpSpacing.xs),
+                Wrap(
+                  spacing: DpSpacing.xs,
+                  runSpacing: DpSpacing.xs,
+                  children: [
+                    for (final weakness in diagnosis.weaknessConcepts)
+                      DpTag(label: weakness),
+                  ],
+                ),
+              ],
             ],
           ),
-        ],
-        if (diagnosis.weaknessConcepts.isNotEmpty) ...[
-          const SizedBox(height: DpSpacing.sm),
-          Text('보강할 점', style: text.titleSmall),
-          const SizedBox(height: DpSpacing.xs),
-          Wrap(
-            spacing: DpSpacing.xs,
-            runSpacing: DpSpacing.xs,
-            children: [
-              for (final weakness in diagnosis.weaknessConcepts)
-                _Tag(label: weakness, color: c.textSecondary),
-            ],
-          ),
-        ],
+        ),
       ],
       if (thisWeek != null) ...[
         const SizedBox(height: DpSpacing.xl),
-        Text('이번 주 과제', style: text.titleMedium),
-        const SizedBox(height: DpSpacing.sm),
-        Text(thisWeek.expectedOutcome, style: text.bodySmall),
-        const SizedBox(height: DpSpacing.sm),
-        for (final t in thisWeek.tasks) _TaskTile(task: t),
+        DpPanel(
+          title: const DpPanelTitle('이번 주 과제'),
+          // `DpPanel` 은 색을 가진 `DecoratedBox` 다 — 그 안의 Material
+          // `ListTile` 은 가장 가까운 Material(Scaffold) 에 잉크를 그리므로
+          // 패널 표면에 가려진다(프레임워크가 단언으로 잡는다). 패널 안쪽에
+          // 투명 Material 을 한 겹 둬 잉크가 패널 위에 오게 한다.
+          child: Material(
+            type: MaterialType.transparency,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    DpSpacing.lg,
+                    DpSpacing.md,
+                    DpSpacing.lg,
+                    0,
+                  ),
+                  child: Text(thisWeek.expectedOutcome, style: text.bodySmall),
+                ),
+                for (final t in thisWeek.tasks) _TaskTile(task: t),
+              ],
+            ),
+          ),
+        ),
       ],
       // 「이번 주」에서 「전체 주차」로 시야가 넓어지는 순서로 둔다.
       const SizedBox(height: DpSpacing.xl),
       MilestoneProgressCard(milestones: plan.milestones),
       const SizedBox(height: DpSpacing.xl),
-      Text('12주 타임라인', style: text.titleMedium),
-      const SizedBox(height: DpSpacing.sm),
-      for (final m in plan.milestones)
-        ListTile(
-          dense: true,
-          leading: CircleAvatar(
-            radius: 14,
-            backgroundColor: m.locked ? c.surface : c.primary,
-            child: Text(
-              '${m.weekNum}',
-              style: text.labelLarge?.copyWith(
-                color: m.locked ? c.textSecondary : c.onPrimary,
-              ),
-            ),
-          ),
-          title: Text(m.title, style: text.bodyMedium),
-          subtitle: Text(
-            '${m.goalDescription}\n${m.whyThisOrder}',
-            style: text.bodySmall?.copyWith(color: c.textSecondary),
+      DpPanel(
+        title: const DpPanelTitle('12주 타임라인'),
+        child: Material(
+          type: MaterialType.transparency,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final m in plan.milestones)
+                ListTile(
+                  dense: true,
+                  leading: CircleAvatar(
+                    radius: 14,
+                    backgroundColor: m.locked ? c.surface : c.primary,
+                    child: Text(
+                      '${m.weekNum}',
+                      style: text.labelLarge?.copyWith(
+                        color: m.locked ? c.textSecondary : c.onPrimary,
+                      ),
+                    ),
+                  ),
+                  title: Text(m.title, style: text.bodyMedium),
+                  subtitle: Text(
+                    '${m.goalDescription}\n${m.whyThisOrder}',
+                    style: text.bodySmall?.copyWith(color: c.textSecondary),
+                  ),
+                ),
+            ],
           ),
         ),
+      ),
     ];
   }
 }
@@ -141,31 +172,6 @@ class _TaskTile extends StatelessWidget {
       subtitle: Text(
         '${task.taskType}${task.required ? ' · 필수' : ''}',
         style: text.bodySmall?.copyWith(color: c.textSecondary),
-      ),
-    );
-  }
-}
-
-class _Tag extends StatelessWidget {
-  const _Tag({required this.label, required this.color});
-
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        border: Border.all(color: color),
-        borderRadius: BorderRadius.circular(DpRadius.chip),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: DpSpacing.xs,
-          vertical: 2,
-        ),
-        child: Text(label, style: text.labelSmall),
       ),
     );
   }
