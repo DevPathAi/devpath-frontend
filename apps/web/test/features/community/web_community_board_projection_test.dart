@@ -58,8 +58,11 @@ void main() {
         expect(find.byKey(_titleMenu), findsNothing);
         // 한 게시판 안의 행은 게시판 이름 배지를 반복하지 않는다(헤더 1회만).
         expect(find.text(label), findsOneWidget);
-        expect(find.byType(DpListRow), findsNWidgets(2));
+        // 카드 나열 → 칼럼 있는 표 하나(시안 `.panel > table`).
+        expect(find.byType(DpWebTable), findsOneWidget);
+        expect(find.byType(DpListRow), findsNothing);
         expect(find.text('첫 번째 글'), findsOneWidget);
+        expect(find.text('두 번째 글'), findsOneWidget);
         await tester.tap(find.text('첫 번째 글'));
         expect(opened, [1]);
       },
@@ -98,7 +101,9 @@ void main() {
     );
     // S3-P3: 좌측 상태 표시선을 없앴다(시안에 없다). 해결 여부는 색이 아니라
     // 글로 드러난다 — 색만으로 의미를 전달하지 않는 편이 낫기도 하다.
-    expect(find.byType(DpListRow), findsNWidgets(2));
+    expect(find.byType(DpWebTable), findsOneWidget);
+    // 해결 여부는 이제 「상태」 칼럼의 `DpStatusText` 다.
+    expect(find.text('상태'), findsOneWidget);
     expect(find.text('✓ 해결됨'), findsOneWidget);
   });
 
@@ -135,24 +140,22 @@ void main() {
       );
       expect(find.byType(DpEmpty), findsOneWidget);
       expect(find.text(title), findsOneWidget);
-      // 같은 라벨의 액션이 둘이다 — 페이지 헤더의 상시 버튼과 빈 상태의 CTA.
-      // 여기서 확인할 것은 빈 상태 쪽이다.
-      await tester.tap(
+      // P4 가 P3 이월 과제를 닫았다: 빈 상태는 **안내만** 한다. 접근명이 같은
+      // 버튼이 둘이면 스크린리더로 구분할 수 없어, 상시 보이는 헤더 버튼 하나만
+      // 남겼다.
+      expect(
         find.descendant(of: find.byType(DpEmpty), matching: find.text(action)),
+        findsNothing,
       );
-      expect(composed, 1);
+      expect(find.text(action), findsOneWidget);
 
-      // 헤더의 상시 버튼도 같은 작성 화면으로 간다.
-      // NOTE(P4): 한 화면에 접근명이 같은 버튼이 둘이다 — 스크린리더로는
-      // 구분할 수 없다. P4 에서 하나로 줄이거나 빈 상태 CTA 의 라벨을
-      // 다르게 둔다(예: '첫 글 쓰기'). 그때 이 단언도 함께 고친다.
       await tester.tap(
         find.descendant(
           of: find.byType(DpPageHeader),
           matching: find.text(action),
         ),
       );
-      expect(composed, 2);
+      expect(composed, 1);
     });
   }
 
