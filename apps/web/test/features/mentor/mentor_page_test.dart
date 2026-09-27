@@ -243,6 +243,60 @@ void main() {
     expect(find.textContaining('A 늦은 토큰'), findsNothing);
   });
 
+  testWidgets('killSwitch 에서는 작성칸 대신 안내만 남는다', (tester) async {
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final fake = _FakeMentor(
+      const MentorState(messages: [], status: MentorStatus.killSwitch),
+    );
+    final c = ProviderContainer(
+      overrides: [
+        currentMissionOwnerKeyProvider.overrideWithValue('owner-a'),
+        mentorControllerProvider.overrideWith(() => fake),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: c,
+        child: MaterialApp(theme: DpTheme.light(), home: const MentorPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(DpKillSwitch), findsOneWidget);
+    expect(find.byType(TextField), findsNothing);
+  });
+
+  testWidgets('참고 자료가 없으면 사이드 칼럼을 만들지 않는다', (tester) async {
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final fake = _FakeMentor(_manyMessages());
+    final c = ProviderContainer(
+      overrides: [
+        currentMissionOwnerKeyProvider.overrideWithValue('owner-a'),
+        mentorControllerProvider.overrideWith(() => fake),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: c,
+        child: MaterialApp(theme: DpTheme.light(), home: const MentorPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 빈 `DpSide` 로 사이드를 만들면 대화 폭만 2/3 로 줄고 오른쪽은 빈칸이 된다.
+    expect(find.byType(DpCols), findsNothing);
+  });
+
   testWidgets('하단 근처에서 새 메시지 → 자동으로 하단까지 스크롤', (tester) async {
     tester.view.physicalSize = const Size(500, 400);
     tester.view.devicePixelRatio = 1.0;
