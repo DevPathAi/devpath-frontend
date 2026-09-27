@@ -1,10 +1,14 @@
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-Widget _host(Widget child) =>
-    MaterialApp(theme: DpTheme.light(), home: Scaffold(body: child));
+Widget _host(Widget child) => MaterialApp(
+  theme: DpTheme.light(),
+  home: Scaffold(body: child),
+);
 
 TextStyle _styleOf(WidgetTester tester) =>
     tester.widget<Text>(find.byType(Text)).style!;
@@ -66,10 +70,14 @@ void main() {
     // `DpLink` 의 최외곽은 MouseRegion 이라 자체 시맨틱스 노드가 없다.
     // byType 으로 찾으면 위로 올라가 루트(scopesRoute)를 잡으므로, 노드를
     // 실제로 들고 있는 Semantics 까지 글에서부터 올라가게 한다.
-    expect(
-      tester.getSemantics(find.text('이용약관')),
-      matchesSemantics(label: '이용약관', isLink: true, hasTapAction: true),
-    );
+    //
+    // 전수 매처(`matchesSemantics`) 대신 핵심 플래그만 본다 — 링크가 키보드
+    // 순회 대상이라 isFocusable 같은 플래그가 함께 붙고, 그것들은 결함이 아니라
+    // 요구사항이다.
+    final data = tester.getSemantics(find.text('이용약관')).getSemanticsData();
+    expect(data.label, '이용약관');
+    expect(data.hasFlag(SemanticsFlag.isLink), isTrue);
+    expect(data.hasAction(SemanticsAction.tap), isTrue);
     handle.dispose();
   });
 
@@ -82,5 +90,46 @@ void main() {
       matchesSemantics(label: '삭제된 글'),
     );
     handle.dispose();
+  });
+
+  testWidgets('Tab 으로 포커스를 받고 Enter 로 활성화된다', (tester) async {
+    var taps = 0;
+    await tester.pumpWidget(
+      _host(DpLink.title(text: '링크', onTap: () => taps++)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pumpAndSettle();
+    expect(
+      FocusManager.instance.primaryFocus?.context?.widget,
+      isNot(isA<FocusScope>()),
+      reason: '링크가 순회 대상이 아니면 포커스는 라우트 스코프에 머문다',
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(taps, 1);
+  });
+
+  testWidgets('포커스를 받으면 시안의 2px 외곽선이 보인다', (tester) async {
+    await tester.pumpWidget(_host(DpLink.inline(text: '이용약관', onTap: () {})));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('dp-link-focus-ring')), findsNothing);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('dp-link-focus-ring')), findsOneWidget);
+  });
+
+  testWidgets('onTap 이 null 이면 순회 대상이 아니다', (tester) async {
+    await tester.pumpWidget(_host(DpLink.title(text: '삭제된 글')));
+    await tester.pumpAndSettle();
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('dp-link-focus-ring')), findsNothing);
   });
 }
