@@ -476,6 +476,22 @@ void main() {
     });
   }
 
+  testWidgets('canonical 맥락 영역은 IDE 프레임과 같은 좌측선에서 시작한다', (tester) async {
+    tester.view.physicalSize = const Size(1240, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await _pump(tester, track: 'BACKEND_SPRING');
+
+    // 좌우 거터는 셸이 준다 — 맥락 영역이 또 주면 미션 헤더만 24px 들여쓰여
+    // 아래 IDE 프레임과 좌측선이 어긋난다.
+    final headerLeft = tester.getTopLeft(find.byType(DpMissionHeader)).dx;
+    final frameLeft = tester
+        .getTopLeft(find.byKey(const ValueKey('sandbox-ide-frame')))
+        .dx;
+    expect(headerLeft, frameLeft);
+  });
+
   testWidgets('1240px ReviewFailed도 화면 primary surface가 정확히 하나다', (
     tester,
   ) async {

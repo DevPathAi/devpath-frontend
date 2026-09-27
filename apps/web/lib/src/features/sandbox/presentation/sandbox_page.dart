@@ -281,7 +281,9 @@ class _SandboxPageState extends ConsumerState<SandboxPage> {
               constraints: BoxConstraints(maxHeight: topMaxHeight),
               child: SingleChildScrollView(
                 key: const ValueKey('sandbox-context-scroll'),
-                padding: const EdgeInsets.all(DpSpacing.lg),
+                // 좌우 거터는 셸이 준다 — 여기서 또 주면 미션 헤더만 들여쓰여
+                // 아래 IDE 프레임과 좌측선이 어긋난다.
+                padding: const EdgeInsets.symmetric(vertical: DpSpacing.lg),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
