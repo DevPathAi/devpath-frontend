@@ -1,5 +1,9 @@
+import 'dart:async';
+
 import 'package:devpath_web/src/features/community/data/community_source.dart';
 import 'package:devpath_web/src/features/community/presentation/question_create_page.dart';
+import 'package:devpath_web/src/features/community/presentation/question_edit_page.dart';
+import 'package:devpath_web/src/features/support/presentation/supportable_error.dart';
 import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/cupertino.dart';
@@ -38,6 +42,53 @@ Widget _host(ProviderContainer c, Widget child) {
 }
 
 void main() {
+  testWidgets('질문 수정: 불러오는 중에는 레포 표준 로딩을 쓴다', (tester) async {
+    final c = ProviderContainer(
+      overrides: [
+        qnaDetailFetchProvider.overrideWithValue(
+          (id) => Completer<CommunityQuestionDetail>().future,
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    await tester.pumpWidget(_host(c, const QuestionEditPage(postId: 9)));
+    await tester.pump();
+
+    // `DpLoading` 자체가 `CircularProgressIndicator` 를 품는다 — 맨 것을 쓰지
+    // 않는다는 계약은 `DpLoading` 의 존재로 잰다.
+    expect(find.byType(DpLoading), findsOneWidget);
+  });
+
+  testWidgets('질문 수정: 조회 실패는 셸 문법(AppBar 없음) + 재시도로 안내한다', (tester) async {
+    var calls = 0;
+    final c = ProviderContainer(
+      overrides: [
+        qnaDetailFetchProvider.overrideWithValue((id) async {
+          calls += 1;
+          // 컨트롤러는 `ApiException` 만 잡는다 — 맨 Exception 은 테스트 밖으로 샌다.
+          throw const ApiException(
+            code: ApiErrorCode.network,
+            message: '불러오지 못했어요',
+          );
+        }),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    await tester.pumpWidget(_host(c, const QuestionEditPage(postId: 9)));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AppBar), findsNothing);
+    expect(find.byType(DpPageHeader), findsOneWidget);
+    expect(find.byType(SupportableError), findsOneWidget);
+
+    final before = calls;
+    await tester.tap(find.text('다시 시도'));
+    await tester.pumpAndSettle();
+    expect(calls, greaterThan(before));
+  });
+
   testWidgets('편집 모드는 기존 제목을 채운다', (tester) async {
     final c = ProviderContainer();
     addTearDown(c.dispose);

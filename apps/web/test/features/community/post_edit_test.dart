@@ -1,5 +1,9 @@
+import 'dart:async';
+
 import 'package:devpath_web/src/features/community/data/community_source.dart';
 import 'package:devpath_web/src/features/community/presentation/post_create_page.dart';
+import 'package:devpath_web/src/features/community/presentation/post_edit_page.dart';
+import 'package:devpath_web/src/features/support/presentation/supportable_error.dart';
 import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
 import 'package:flutter/cupertino.dart';
@@ -48,6 +52,55 @@ Widget _host(ProviderContainer c, Widget child) {
 }
 
 void main() {
+  testWidgets('글 수정: 불러오는 중에는 레포 표준 로딩을 쓴다', (tester) async {
+    final c = ProviderContainer(
+      overrides: [
+        // 끝나지 않는 조회 — 로딩 상태에 머문다.
+        postDetailFetchProvider.overrideWithValue(
+          (id) => Completer<CommunityPostDetail>().future,
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    await tester.pumpWidget(_host(c, const PostEditPage(postId: 9)));
+    await tester.pump();
+
+    // `DpLoading` 자체가 `CircularProgressIndicator` 를 품는다 — 맨 것을 쓰지
+    // 않는다는 계약은 `DpLoading` 의 존재로 잰다.
+    expect(find.byType(DpLoading), findsOneWidget);
+  });
+
+  testWidgets('글 수정: 조회 실패는 셸 문법(AppBar 없음) + 재시도로 안내한다', (tester) async {
+    var calls = 0;
+    final c = ProviderContainer(
+      overrides: [
+        postDetailFetchProvider.overrideWithValue((id) async {
+          calls += 1;
+          // 컨트롤러는 `ApiException` 만 잡는다 — 맨 Exception 은 테스트 밖으로 샌다.
+          throw const ApiException(
+            code: ApiErrorCode.network,
+            message: '불러오지 못했어요',
+          );
+        }),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    await tester.pumpWidget(_host(c, const PostEditPage(postId: 9)));
+    await tester.pumpAndSettle();
+
+    // 웹 셸에는 AppBar 가 없다 — 화면 제목은 DpPageHeader 가 맡는다.
+    expect(find.byType(AppBar), findsNothing);
+    expect(find.byType(DpPageHeader), findsOneWidget);
+    expect(find.byType(SupportableError), findsOneWidget);
+
+    final before = calls;
+    await tester.tap(find.text('다시 시도'));
+    await tester.pumpAndSettle();
+    expect(calls, greaterThan(before));
+  });
+
   /// 본문은 Quill 이 Text 위젯으로 렌더하지 않아 find 로 볼 수 없다 — 대신 저장 경로에서
   /// 실제로 실려 나가는지 확인한다(아래 「저장하면 postUpdate 를 부른다」).
   testWidgets('편집 모드는 기존 제목을 채운다', (tester) async {
