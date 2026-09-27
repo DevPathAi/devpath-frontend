@@ -127,7 +127,16 @@ class _DpLinkState extends State<DpLink> {
         onEnter: (_) => setState(() => _hovered = true),
         onExit: (_) => setState(() => _hovered = false),
         child: FocusableActionDetector(
-          onShowFocusHighlight: (v) => setState(() => _focused = v),
+          // `onShowFocusHighlight` 는 `FocusManager.highlightMode` 가
+          // traditional 일 때만 불린다(터치 기본값에서는 조용하다). 이 위젯의
+          // `Semantics.focused` 는 자식 subtree 를 `excludeSemantics` 로 가린 뒤
+          // **직접 선언하는 유일한 진실**이므로 하이라이트 정책이 아니라 실제
+          // 포커스를 따라야 한다(실측: touch 모드에서 isFocused 가 false 였다).
+          //
+          // 대가: 포인터 클릭으로 포커스를 받아도 2px 링이 보인다 — 시안의
+          // `:focus-visible` 과 어긋나지만, 링과 시맨틱스가 `_focused` 하나를
+          // 공유하므로 **시맨틱스 정확성을 택했다.**
+          onFocusChange: (v) => setState(() => _focused = v),
           actions: <Type, Action<Intent>>{
             ActivateIntent: CallbackAction<ActivateIntent>(
               onInvoke: (_) {

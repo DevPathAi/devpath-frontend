@@ -18,14 +18,26 @@ typedef DpTableRowSpec = ({List<Widget> cells, VoidCallback? onTap});
 /// `DpDataTable`(admin 이 쓰는 `data_table_2` 래퍼)과 **다른 위젯**이다.
 /// 그쪽은 `TableBorder.all` 로 세로 테두리를 그리지만 시안의 표에는
 /// 세로선이 없다.
+///
+/// hover 배경은 `surfaceMuted` 다 — 시안 `tbody tr:hover{background:var(--muted)}`
+/// 와 같은 값이다. 그 대비는 `surface` 위에서 1.12:1, `bg` 위에서 1.046:1 이라
+/// **이 위젯은 `DpPanel` 안에서만 쓴다.** 행을 클릭할 수 있다는 어포던스는
+/// hover 배경이 아니라 제목의 `DpLink.title` hover 밑줄이 담당한다.
 class DpWebTable extends StatefulWidget {
-  const DpWebTable({
+  DpWebTable({
     super.key,
     required this.columns,
     required this.rows,
+    required this.empty,
     this.minWidth = 640,
-    this.empty,
-  });
+  }) : assert(
+         // doc 에만 있던 계약을 코드로 올린다. 어기면 배치 중 RangeError 로
+         // 터지고, 그 스택에는 원인이 칼럼 정의에 있다는 단서가 남지 않는다.
+         // `rows.every` 를 부르므로 이 생성자는 더 이상 const 가 아니다 —
+         // 표는 화면당 한두 개라 비용이 무의미하다.
+         rows.every((row) => row.cells.length == columns.length),
+         'DpTableRowSpec.cells 길이는 columns 길이와 같아야 한다.',
+       );
 
   final List<DpTableColumn> columns;
   final List<DpTableRowSpec> rows;
@@ -33,8 +45,9 @@ class DpWebTable extends StatefulWidget {
   /// 이 폭보다 좁으면 표만 가로로 스크롤한다(페이지 본문은 넘치지 않는다).
   final double minWidth;
 
-  /// 행이 없을 때 표 대신 보여 줄 것. null 이면 헤더만 남는다.
-  final Widget? empty;
+  /// 행이 없을 때 표 대신 보여 줄 것. **필수다** — 헤더만 남은 표는 「목록이
+  /// 비었다」를 전달하지 못한다(기본값이 곧 실패 상태였다).
+  final Widget empty;
 
   @override
   State<DpWebTable> createState() => _DpWebTableState();
@@ -54,7 +67,7 @@ class _DpWebTableState extends State<DpWebTable> {
     final columns = widget.columns;
     final rows = widget.rows;
     final minWidth = widget.minWidth;
-    if (rows.isEmpty && widget.empty != null) return widget.empty!;
+    if (rows.isEmpty) return widget.empty;
 
     final table = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -88,10 +101,20 @@ class _DpWebTableState extends State<DpWebTable> {
   }
 }
 
+// `numeric` 은 칼럼 폭과 무관한 약속이다(`DpTableColumn` doc). 고정폭 분기에만
+// 정렬을 넣으면 유연 칼럼에서 조용히 좌측 정렬이 된다(실측: `Align` 조상 자체가
+// 없었다).
 List<Widget> _cells(List<DpTableColumn> columns, List<Widget> children) => [
   for (var i = 0; i < columns.length; i++)
     if (columns[i].width == null)
-      Expanded(child: children[i])
+      Expanded(
+        child: Align(
+          alignment: columns[i].numeric
+              ? Alignment.centerRight
+              : Alignment.centerLeft,
+          child: children[i],
+        ),
+      )
     else
       SizedBox(
         width: columns[i].width,

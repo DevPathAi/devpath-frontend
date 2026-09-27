@@ -107,11 +107,11 @@ class SandboxLayoutState extends State<SandboxLayout> {
         // 좌측 정렬 — Column의 기본 crossAxisAlignment(center)로는 세그먼트가
         // 중앙에 놓여 페이지 헤더의 좌측선과 어긋난다(실측 left=255.6 vs 헤더 16).
         // 가로 여백은 반응형 헤더와 같은 값(compact=lg, 그 외=xl)으로 맞춘다.
+        // 좌우 패딩을 주지 않는다 — 셸이 본문 거터를 주고 `DpPageHeader` 도
+        // 이제 스스로 주지 않는다(S3-P4 Task 1). 여기서 또 주면 세그먼트가
+        // 헤더보다 더 들여쓰인다.
         Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: w < 600 ? DpSpacing.lg : DpSpacing.xl,
-            vertical: DpSpacing.sm,
-          ),
+          padding: const EdgeInsets.symmetric(vertical: DpSpacing.sm),
           child: Align(
             alignment: Alignment.centerLeft,
             child: SegmentedButton<int>(

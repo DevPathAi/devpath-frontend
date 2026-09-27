@@ -36,6 +36,7 @@ class _S extends ConsumerState<AdminDashboardPage> {
         slivers: [
           SliverToBoxAdapter(
             child: DpPageHeader(
+              gutter: true,
               // 제목은 kAdminDestinations가 유일한 출처다(admin_shell.dart).
               title: adminHeaderTitleFor('/dashboard'),
               description: '서비스 지표를 요약합니다',
@@ -153,6 +154,7 @@ class _AdminKpiDashboardProjectionState
   Widget _buildHeader() {
     const label = '운영 대시보드. 위아래 화살표로 스크롤';
     final header = DpPageHeader(
+      gutter: true,
       title: adminHeaderTitleFor('/dashboard'),
       description: '서비스 지표를 요약합니다',
     );

@@ -45,12 +45,13 @@ class DpPanel extends StatelessWidget {
               decoration: BoxDecoration(
                 border: Border(bottom: BorderSide(color: c.border)),
               ),
-              child: Semantics(
-                header: true,
-                child: DefaultTextStyle.merge(
-                  style: text.titleSmall?.copyWith(color: c.textPrimary),
-                  child: title!,
-                ),
+              // heading 플래그는 제목행 전체가 아니라 `DpPanelTitle` 이 자기
+              // 텍스트에만 붙인다. 여기서 감싸면 제목 옆에 액션이 함께 있을 때
+              // 자식 노드가 둘이라 병합되지 않고 **라벨 없는 header 컨테이너**가
+              // 생긴다(2026-09-17 함정 1 「heading+button 병합」과 같은 뿌리).
+              child: DefaultTextStyle.merge(
+                style: text.titleSmall?.copyWith(color: c.textPrimary),
+                child: title!,
               ),
             ),
           Padding(padding: padding ?? EdgeInsets.zero, child: child),
@@ -58,4 +59,19 @@ class DpPanel extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 패널 제목 텍스트(시안 `.panel>h3`). heading 플래그를 **이 텍스트에만** 준다.
+///
+/// `DpPanel.title` 에 액션을 함께 넣을 때 제목행 전체를 `Semantics(header: true)`
+/// 로 감싸면, 자식 노드가 둘 이상이라 병합되지 않고 라벨 없는 header 컨테이너가
+/// 생긴다. 제목만 감싸면 그 함정이 닫힌다.
+class DpPanelTitle extends StatelessWidget {
+  const DpPanelTitle(this.text, {super.key});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) =>
+      Semantics(header: true, child: Text(text));
 }
