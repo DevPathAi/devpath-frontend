@@ -92,6 +92,20 @@ void main() {
     expect(find.text('트랜잭션 심화'), findsOneWidget);
   });
 
+  testWidgets('legacy 완료 화면의 블록은 패널 문법과 태그 칩으로 그려진다', (tester) async {
+    // `ListView` 는 뷰포트 밖 자식을 mount 하지 않는다 — 네 패널을 한 번에
+    // 재려면 뷰포트가 그만큼 높아야 한다.
+    tester.view.physicalSize = const Size(1280, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(_host(_diagnosedPlan()));
+
+    // 근거 · 진단 요약 · 이번 주 과제 · 12주 타임라인 네 블록이 패널이다.
+    expect(find.byType(DpPanel), findsNWidgets(4));
+    // 강점 1 + 보강 1 — 색만으로 구분하지 않으므로 둘 다 중립 칩이다.
+    expect(find.byType(DpTag), findsNWidgets(2));
+  });
+
   testWidgets('contentSlug가 있으면 slug 기반 content route로 이동한다', (tester) async {
     await tester.pumpWidget(
       _routerHost(
@@ -183,6 +197,31 @@ LearningPath _planWithTask({
           'completed': false,
         },
       ],
+    },
+  ],
+});
+
+LearningPath _diagnosedPlan() => LearningPath.fromJson({
+  'pathId': 101,
+  'track': 'BACKEND',
+  'totalWeeks': 12,
+  'rationale': '비동기 보강이 필요해요.',
+  'diagnosis': {
+    'diagnosedLevel': 'MID',
+    'strengthConcepts': ['HTTP'],
+    'weaknessConcepts': ['트랜잭션'],
+  },
+  'milestones': [
+    {
+      'weekNum': 1,
+      'title': '비동기 기초',
+      'goalDescription': '목표',
+      'targetSkills': <String>[],
+      'estimatedHours': 4,
+      'whyThisOrder': '순서',
+      'expectedOutcome': '결과',
+      'locked': false,
+      'tasks': <Map<String, dynamic>>[],
     },
   ],
 });

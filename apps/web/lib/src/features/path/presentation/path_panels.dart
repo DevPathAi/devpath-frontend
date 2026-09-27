@@ -164,7 +164,10 @@ class PathWeekOutcomePanel extends StatelessWidget {
     required this.nextUnlock,
   });
 
-  final PathMilestone milestone;
+  /// 현재 주차의 경로 상세. null 이면 완료 근거 없이 [nextUnlock] 만 말한다 —
+  /// 「다음에 무엇이 열리는가」는 서버 미션만으로 계산되므로 경로 상세가 아직
+  /// 없거나 현재 미션과 맞지 않다는 이유로 지우지 않는다.
+  final PathMilestone? milestone;
 
   /// 다음에 열리는 것. 문장을 계산하는 책임은 호출부에 둔다.
   final String nextUnlock;
@@ -173,8 +176,11 @@ class PathWeekOutcomePanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.dpColors;
     final text = Theme.of(context).textTheme;
+    final week = milestone;
     return DpPanel(
-      title: DpPanelTitle('${milestone.weekNum}주차를 끝내면'),
+      title: DpPanelTitle(
+        week == null ? '다음에 열리는 것' : '${week.weekNum}주차를 끝내면',
+      ),
       padding: const EdgeInsets.symmetric(
         vertical: DpSpacing.md,
         horizontal: DpSpacing.lg,
@@ -183,8 +189,10 @@ class PathWeekOutcomePanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(milestone.expectedOutcome, style: text.bodyMedium),
-          const SizedBox(height: DpSpacing.sm),
+          if (week != null) ...[
+            Text(week.expectedOutcome, style: text.bodyMedium),
+            const SizedBox(height: DpSpacing.sm),
+          ],
           Text(
             '다음 잠금 해제 · $nextUnlock',
             style: text.bodySmall?.copyWith(color: c.textSecondary),

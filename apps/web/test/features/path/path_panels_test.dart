@@ -186,6 +186,21 @@ void main() {
     expect(find.text('다음 잠금 해제 · 2주차 주차 2 학습'), findsOneWidget);
   });
 
+  testWidgets('PathWeekOutcomePanel: 주차 상세가 없어도 다음 잠금 해제는 남는다', (tester) async {
+    _view(tester, const Size(1280, 900));
+    await tester.pumpWidget(
+      _host(
+        const PathWeekOutcomePanel(milestone: null, nextUnlock: '아직 남은 과제'),
+      ),
+    );
+
+    // 경로 상세가 아직 없거나 현재 미션과 맞지 않을 때도 「다음에 무엇이 열리는가」는
+    // 서버 미션만으로 계산된다 — 상세가 없다는 이유로 지우지 않는다.
+    expect(find.text('다음에 열리는 것'), findsOneWidget);
+    expect(find.text('다음 잠금 해제 · 아직 남은 과제'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('PathRationalePanel: 설계 근거를 그린다', (tester) async {
     _view(tester, const Size(1280, 900));
     await tester.pumpWidget(_host(const PathRationalePanel(plan: _plan)));

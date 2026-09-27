@@ -83,7 +83,13 @@ void main() {
     expect(find.text('3주차를 지금 배우는 서버 경로 근거'), findsNothing);
   });
 
-  testWidgets('미래 주차 상세는 기본 접힘이며 사용자가 열 때만 보인다', (tester) async {
+  // 옛 계약(「미래 주차 상세는 기본 접힘이며 사용자가 열 때만 보인다」)은 표로
+  // 바뀌면서 주제를 잃었다 — 접는 것이 없으므로 「열 때만 보인다」가 성립하지
+  // 않는다. 대신 접혀 있던 정보가 사라지지 않았음을 잰다.
+  testWidgets('미래 주차의 목표와 기대 결과를 접지 않고 표에 함께 올린다', (tester) async {
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     await tester.pumpWidget(
       _host(
         missionState: CurrentMissionState(mission: _availableMission()),
@@ -91,31 +97,25 @@ void main() {
       ),
     );
 
-    expect(find.text('앞으로의 주차'), findsOneWidget);
-    expect(find.text('5주차 다음 단계'), findsOneWidget);
-    expect(find.text('미래 상세 목표'), findsNothing);
-
-    await tester.ensureVisible(find.text('5주차 다음 단계'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('5주차 다음 단계'));
-    await tester.pumpAndSettle();
-
+    expect(find.text('다음 단계'), findsOneWidget);
     expect(find.text('미래 상세 목표'), findsOneWidget);
+    expect(find.text('다음 단계 완료'), findsOneWidget);
   });
 
-  testWidgets('주차 목록 갱신 시 펼침 상태가 다른 weekNum으로 이동하지 않는다', (tester) async {
+  // 옛 계약(「펼침 상태가 다른 weekNum 으로 이동하지 않는다」)이 막던 결함은
+  // 접힘 상태 누출이었다 — 접힘이 없어져 그 결함 자체가 성립하지 않는다.
+  // 남는 계약은 「갱신이 표에 즉시 반영된다」다.
+  testWidgets('주차 목록이 갱신되면 새 주차가 표에 바로 나타난다', (tester) async {
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     await tester.pumpWidget(
       _host(
         missionState: CurrentMissionState(mission: _availableMission()),
         plan: _path(),
       ),
     );
-
-    await tester.ensureVisible(find.text('5주차 다음 단계'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('5주차 다음 단계'));
-    await tester.pumpAndSettle();
-    expect(find.text('미래 상세 목표'), findsOneWidget);
+    expect(find.text('새로 추가된 상세 목표'), findsNothing);
 
     await tester.pumpWidget(
       _host(
@@ -123,9 +123,9 @@ void main() {
         plan: _pathWithInsertedFutureWeek(),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
 
-    expect(find.text('새로 추가된 상세 목표'), findsNothing);
+    expect(find.text('새로 추가된 상세 목표'), findsOneWidget);
     expect(find.text('미래 상세 목표'), findsOneWidget);
   });
 
@@ -280,6 +280,40 @@ void main() {
     final mission = tester.getTopLeft(find.text('미션 열기'));
     final unlock = tester.getTopLeft(find.textContaining('다음 잠금 해제 ·'));
     expect(unlock.dx, greaterThan(mission.dx));
+  });
+
+  testWidgets('학습 경로: .cols 2열(미션+표 | 사이드)을 그린다', (tester) async {
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      _host(
+        missionState: CurrentMissionState(mission: _availableMission()),
+        plan: _path(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(DpCols), findsOneWidget);
+    expect(find.byType(ExpansionTile), findsNothing);
+    expect(find.text('12주 계획'), findsOneWidget);
+    expect(find.text('진단 요약'), findsOneWidget);
+    expect(find.text('경로 설계 근거'), findsOneWidget);
+  });
+
+  testWidgets('학습 경로: 390px 에서 가로로 넘치지 않는다', (tester) async {
+    tester.view.physicalSize = const Size(390, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      _host(
+        missionState: CurrentMissionState(mission: _availableMission()),
+        plan: _path(),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(tester.getSize(find.byType(DpCols)).width, lessThanOrEqualTo(390));
   });
 
   testWidgets('320px와 200% 글자에서도 primary action 하나로 overflow 없이 읽힌다', (

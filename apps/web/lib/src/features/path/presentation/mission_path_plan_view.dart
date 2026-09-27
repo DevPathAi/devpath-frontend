@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../dashboard/application/current_mission_controller.dart';
 import '../../mission/state/mission_workspace_key.dart';
+import 'path_panels.dart';
 
 /// Authoritative current-mission projection을 전경에 두고 전체 12주 문서를
 /// 보조 detail로 낮춘 Path 화면입니다. 현재 주차나 task는 [LearningPath]의
@@ -143,10 +144,6 @@ class _AvailablePath extends StatelessWidget {
     final nextUnlock = _nextUnlock(mission, matchingPlan);
 
     final compact = context.windowClass == DpWindowClass.compact;
-    final wide = switch (context.windowClass) {
-      DpWindowClass.expanded || DpWindowClass.large => true,
-      _ => false,
-    };
     final band = DpNextActionBand(
       actionId: retriesCompletion
           ? 'retry_path_contentless_completion'
@@ -234,25 +231,15 @@ class _AvailablePath extends StatelessWidget {
               : DpProgressSpineLayout.vertical,
           label: '${mission.weekNum}주차 미션 순서',
         ),
-      ],
-    );
-    final supporting = Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          '다음 잠금 해제 · $nextUnlock',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: context.dpColors.textSecondary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        if (currentMilestone != null) ...[
-          const SizedBox(height: DpSpacing.xl),
-          _CurrentWeekDetail(milestone: currentMilestone),
-        ],
         if (matchingPlan != null) ...[
           const SizedBox(height: DpSpacing.xl),
-          _RoadmapDetails(plan: matchingPlan, currentWeek: mission.weekNum!),
+          // 주차 상세 라우트가 없으므로 onOpenWeek 를 넘기지 않는다 — 표의 제목이
+          // 링크처럼 보이지 않게 한다(빈 콜백 금지).
+          PathWeeksPanel(
+            plan: matchingPlan,
+            currentWeek: mission.weekNum,
+            onOpenWeek: null,
+          ),
         ] else if (isPlanLoading || planFailureMessage != null) ...[
           const SizedBox(height: DpSpacing.xl),
           _PlanEnrichmentStatus(
@@ -263,26 +250,24 @@ class _AvailablePath extends StatelessWidget {
         ],
       ],
     );
+    final supporting = DpSide(
+      children: [
+        // 상세가 없어도 그린다 — 「다음 잠금 해제」는 서버 미션만으로 계산된다.
+        PathWeekOutcomePanel(
+          milestone: currentMilestone,
+          nextUnlock: nextUnlock,
+        ),
+        if (matchingPlan != null) PathDiagnosisPanel(plan: matchingPlan),
+        if (matchingPlan != null) PathRationalePanel(plan: matchingPlan),
+      ],
+    );
 
+    // 폭 분기는 `DpCols` 가 한다 — 화면에서 `wide` 를 다시 계산하지 않는다.
+    // 좌우 패딩도 주지 않는다(셸이 준다). 아래 여백만 화면이 준다 — `/dashboard`
+    // 의 `.cols` 와 같은 값이다.
     return Padding(
-      padding: const EdgeInsets.all(DpSpacing.lg),
-      child: wide
-          ? Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(flex: 3, child: primary),
-                const SizedBox(width: DpSpacing.xl),
-                Expanded(flex: 2, child: supporting),
-              ],
-            )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                primary,
-                const SizedBox(height: DpSpacing.lg),
-                supporting,
-              ],
-            ),
+      padding: const EdgeInsets.only(bottom: DpSpacing.xl),
+      child: DpCols(main: primary, side: supporting),
     );
   }
 }
@@ -302,7 +287,8 @@ class _CompletedPath extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.all(DpSpacing.lg),
+    // 좌우는 셸이 준다 — 화면은 아래 여백만 준다.
+    padding: const EdgeInsets.only(bottom: DpSpacing.xl),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -328,17 +314,33 @@ class _CompletedPath extends StatelessWidget {
             onAction: onRetryMission,
           ),
         ],
-        const SizedBox(height: DpSpacing.sm),
-        for (final task in mission.tasks)
-          ListTile(
-            dense: true,
-            leading: Icon(DpIcons.stepDone, color: context.dpColors.success),
-            title: Text(task.title),
-            subtitle: Text('완료 기록 확인됨 · ${task.completedAt!.toLocal()}'),
+        const SizedBox(height: DpSpacing.md),
+        DpPanel(
+          title: const DpPanelTitle('완료한 미션'),
+          child: DpListLines(
+            children: [
+              for (final task in mission.tasks)
+                Row(
+                  children: [
+                    Icon(DpIcons.stepDone, color: context.dpColors.success),
+                    const SizedBox(width: DpSpacing.sm),
+                    Expanded(child: Text(task.title)),
+                    Text(
+                      '완료 기록 확인됨 · ${task.completedAt!.toLocal()}',
+                      style: TextStyle(color: context.dpColors.textSecondary),
+                    ),
+                  ],
+                ),
+            ],
           ),
+        ),
         if (plan != null) ...[
           const SizedBox(height: DpSpacing.xl),
-          _RoadmapDetails(plan: plan!, currentWeek: mission.weekNum!),
+          PathWeeksPanel(
+            plan: plan!,
+            currentWeek: mission.weekNum,
+            onOpenWeek: null,
+          ),
         ],
       ],
     ),
@@ -373,143 +375,6 @@ class _PlanEnrichmentStatus extends StatelessWidget {
       ),
       if (!isLoading && onRetry != null)
         TextButton(onPressed: onRetry, child: const Text('경로 상세 다시 확인')),
-    ],
-  );
-}
-
-class _CurrentWeekDetail extends StatelessWidget {
-  const _CurrentWeekDetail({required this.milestone});
-
-  final PathMilestone milestone;
-
-  @override
-  Widget build(BuildContext context) => DecoratedBox(
-    decoration: BoxDecoration(
-      color: context.dpColors.surface,
-      border: Border.all(color: context.dpColors.border),
-      borderRadius: BorderRadius.circular(context.appTokens.panelRadius),
-    ),
-    child: Padding(
-      padding: const EdgeInsets.all(DpSpacing.lg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('이번 주 완료 근거', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: DpSpacing.sm),
-          Text(milestone.goalDescription),
-          const SizedBox(height: DpSpacing.xs),
-          Text(
-            milestone.expectedOutcome,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: context.dpColors.textSecondary,
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-class _RoadmapDetails extends StatelessWidget {
-  const _RoadmapDetails({required this.plan, required this.currentWeek});
-
-  final LearningPath plan;
-  final int currentWeek;
-
-  @override
-  Widget build(BuildContext context) {
-    final completed = plan.milestones
-        .where((milestone) => milestone.weekNum < currentWeek)
-        .toList(growable: false);
-    final future = plan.milestones
-        .where((milestone) => milestone.weekNum > currentWeek)
-        .toList(growable: false);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        ExpansionTile(
-          tilePadding: EdgeInsets.zero,
-          title: const Text('경로 설계 근거와 진단 요약'),
-          children: [
-            Align(alignment: Alignment.centerLeft, child: Text(plan.rationale)),
-            if (plan.diagnosis case final diagnosis?) ...[
-              const SizedBox(height: DpSpacing.sm),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text('진단 수준 · ${diagnosis.diagnosedLevel}'),
-              ),
-            ],
-          ],
-        ),
-        if (completed.isNotEmpty) ...[
-          const SizedBox(height: DpSpacing.lg),
-          Text('완료한 주차', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: DpSpacing.xs),
-          for (final milestone in completed)
-            _MilestoneDisclosure(
-              key: ValueKey('path-week-${milestone.weekNum}'),
-              milestone: milestone,
-              completed: true,
-            ),
-        ],
-        if (future.isNotEmpty) ...[
-          const SizedBox(height: DpSpacing.lg),
-          Text('앞으로의 주차', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: DpSpacing.xs),
-          for (final milestone in future)
-            _MilestoneDisclosure(
-              key: ValueKey('path-week-${milestone.weekNum}'),
-              milestone: milestone,
-              completed: false,
-            ),
-        ],
-      ],
-    );
-  }
-}
-
-class _MilestoneDisclosure extends StatelessWidget {
-  const _MilestoneDisclosure({
-    super.key,
-    required this.milestone,
-    required this.completed,
-  });
-
-  final PathMilestone milestone;
-  final bool completed;
-
-  @override
-  Widget build(BuildContext context) => ExpansionTile(
-    key: ValueKey('path-week-tile-${milestone.weekNum}'),
-    tilePadding: EdgeInsets.zero,
-    leading: Icon(
-      completed ? DpIcons.stepDone : DpIcons.stepPending,
-      color: completed
-          ? context.dpColors.success
-          : context.dpColors.textSecondary,
-    ),
-    title: Text('${milestone.weekNum}주차 ${milestone.title}'),
-    subtitle: Text(completed ? '완료 근거와 복습 정보' : '접힌 미래 계획'),
-    childrenPadding: const EdgeInsets.only(
-      left: DpSpacing.xl,
-      bottom: DpSpacing.md,
-    ),
-    children: [
-      Align(
-        alignment: Alignment.centerLeft,
-        child: Text(milestone.goalDescription),
-      ),
-      const SizedBox(height: DpSpacing.xs),
-      Align(
-        alignment: Alignment.centerLeft,
-        child: Text(
-          milestone.expectedOutcome,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: context.dpColors.textSecondary,
-          ),
-        ),
-      ),
     ],
   );
 }
