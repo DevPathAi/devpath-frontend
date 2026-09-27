@@ -135,8 +135,21 @@ void main() {
       );
       expect(find.byType(DpEmpty), findsOneWidget);
       expect(find.text(title), findsOneWidget);
-      await tester.tap(find.text(action));
+      // 같은 라벨의 액션이 둘이다 — 페이지 헤더의 상시 버튼과 빈 상태의 CTA.
+      // 여기서 확인할 것은 빈 상태 쪽이다.
+      await tester.tap(
+        find.descendant(of: find.byType(DpEmpty), matching: find.text(action)),
+      );
       expect(composed, 1);
+
+      // 헤더의 상시 버튼도 같은 작성 화면으로 간다.
+      await tester.tap(
+        find.descendant(
+          of: find.byType(DpPageHeader),
+          matching: find.text(action),
+        ),
+      );
+      expect(composed, 2);
     });
   }
 

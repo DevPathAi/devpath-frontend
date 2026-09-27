@@ -160,7 +160,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.widgetWithText(FloatingActionButton, label));
+      await tester.tap(find.widgetWithText(FilledButton, label));
       await tester.pumpAndSettle();
 
       expect(find.byType(BottomSheet), findsNothing);
@@ -234,7 +234,7 @@ void main() {
       '/community?board=QNA',
     );
     expect(seen, containsAllInOrder(['FREE', 'QNA']));
-    expect(find.widgetWithText(FloatingActionButton, '질문하기'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, '질문하기'), findsOneWidget);
   });
 
   testWidgets('initialBoard 쿼리로 진입 시 초기 필터가 반영된다', (tester) async {
@@ -365,5 +365,22 @@ void main() {
 
     expect(find.byType(DpListRow), findsOneWidget);
     expect(find.text('DpListRow 행'), findsOneWidget);
+  });
+
+  testWidgets('작성 버튼은 FAB 이 아니라 페이지 헤더 안에 있다', (tester) async {
+    final c = _container([_p(10, title: '글', boardType: 'FREE')]);
+    await tester.pumpWidget(
+      _host(c, router: _router(initialLocation: '/community?board=FREE')),
+    );
+    await tester.pumpAndSettle();
+
+    // 시안에 FAB 이 없다. 주요 액션은 페이지 헤더 우측 버튼이다.
+    expect(find.byType(FloatingActionButton), findsNothing);
+    final compose = find.widgetWithText(FilledButton, '글 작성');
+    expect(compose, findsOneWidget);
+    expect(
+      find.ancestor(of: compose, matching: find.byType(DpPageHeader)),
+      findsOneWidget,
+    );
   });
 }

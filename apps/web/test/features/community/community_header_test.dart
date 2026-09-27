@@ -21,10 +21,8 @@ void main() {
     expect(header.title, '자유게시판');
     expect(header.description, '개발 이야기를 자유롭게 나눕니다');
     expect(find.byType(PinnedHeaderSliver), findsOneWidget);
-    expect(
-      find.byType(FloatingActionButton),
-      findsOneWidget,
-      reason: 'FAB는 이번 개편에서 유지한다',
-    );
+    // S3-P3: 시안에 FAB 이 없다 — 주요 액션은 페이지 헤더 우측 버튼이다.
+    expect(find.byType(FloatingActionButton), findsNothing);
+    expect(find.widgetWithText(FilledButton, '글 작성'), findsOneWidget);
   });
 }

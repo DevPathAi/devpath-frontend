@@ -67,15 +67,15 @@ class WebCommunityBoardProjection extends StatelessWidget {
   final ValueChanged<CommunityPostSummary> onOpenPost;
   final VoidCallback onCompose;
 
-  /// compact 제목 메뉴 선택. null 이면 메뉴는 열리되 이동하지 않는다(증거 캡처).
-
   static String descriptionFor(CommunityBoard board) => board.description;
 
   @override
   Widget build(BuildContext context) => CustomScrollView(
     semanticChildCount: posts.length,
     slivers: [
-      SliverToBoxAdapter(child: CommunityBoardHeader(board: board)),
+      SliverToBoxAdapter(
+        child: CommunityBoardHeader(board: board, onCompose: onCompose),
+      ),
       if (posts.isEmpty)
         SliverFillRemaining(
           child: CommunityBoardEmpty(board: board, onCompose: onCompose),
@@ -98,17 +98,28 @@ class WebCommunityBoardProjection extends StatelessWidget {
 
 /// 게시판 페이지 헤더.
 ///
-/// 게시판 이동은 셸의 몫이다: 레일이 보이는 폭에서는 세 게시판이 레일의 직접 목적지라
-/// 본문에서 다시 나누지 않는다. compact 하단 바에는 `커뮤니티` 하나뿐이라, 그 폭에서만
-/// 제목이 세 게시판을 고르는 메뉴가 된다.
+/// 게시판 이동은 셸의 몫이다 — 어느 폭에서도 본문에서 다시 나누지 않는다.
+/// 좁은 폭에서는 셸 헤더의 햄버거 메뉴가 세 게시판을 보여 준다(S3-P2).
 class CommunityBoardHeader extends StatelessWidget {
-  const CommunityBoardHeader({super.key, required this.board});
+  const CommunityBoardHeader({super.key, required this.board, this.onCompose});
 
   final CommunityBoard board;
 
+  /// 이 게시판의 작성 화면으로 가는 액션. 시안은 주요 액션을 페이지 헤더
+  /// 우측에 두고 FAB 을 쓰지 않는다.
+  final VoidCallback? onCompose;
+
   @override
   Widget build(BuildContext context) {
-    return DpPageHeader(title: board.label, description: board.description);
+    return DpPageHeader(
+      title: board.label,
+      description: board.description,
+      actions: [
+        // 시안 `.btn.p` 는 글자만이다(아이콘 없음).
+        if (onCompose != null)
+          FilledButton(onPressed: onCompose, child: Text(board.composeLabel)),
+      ],
+    );
   }
 }
 

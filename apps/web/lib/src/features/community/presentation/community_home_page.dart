@@ -113,11 +113,6 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
     void compose() => context.go(activeBoard.composePath);
 
     return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: compose,
-        icon: const Icon(DpIcons.edit),
-        label: Text(activeBoard.composeLabel),
-      ),
       body: CustomScrollView(
         // 스크린리더가 「N개 중 M번째」를 읽을 수 있게 목록 항목 수를 알린다.
         // `CustomScrollView`는 `ListView`와 달리 이 값을 자동으로 채우지 않는다.
@@ -129,7 +124,9 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
             ? posts.length
             : search.items.length,
         slivers: [
-          SliverToBoxAdapter(child: CommunityBoardHeader(board: activeBoard)),
+          SliverToBoxAdapter(
+            child: CommunityBoardHeader(board: activeBoard, onCompose: compose),
+          ),
           PinnedHeaderSliver(
             child: ColoredBox(
               color: Theme.of(context).scaffoldBackgroundColor,
