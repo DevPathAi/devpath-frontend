@@ -13,7 +13,9 @@ import '../../support/presentation/supportable_error.dart';
 import '../application/current_mission_controller.dart';
 import '../application/dashboard_controller.dart';
 import '../state/dashboard_state.dart';
+import '../../mission/state/mission_workspace_key.dart';
 import 'widgets/dashboard_body.dart';
+import 'widgets/today_panels.dart';
 import 'widgets/today_mission_section.dart';
 
 /// 로딩 스켈레톤이 실제 카드 구조를 반영하도록 DashboardBody에 주입하는 자리표시 요약.
@@ -122,57 +124,76 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
         DashboardBody.supportingContent(context, summary),
       ),
     };
-    // expanded/large: 미션(다음 행동)과 보조 맥락을 2열로, 그 외는 1열 문서형.
-    final wide = switch (context.windowClass) {
-      DpWindowClass.expanded || DpWindowClass.large => true,
-      _ => false,
+    final mission = missionState.mission;
+    final summary = switch (s) {
+      DashLoaded(:final summary) => summary,
+      _ => null,
     };
 
     return Scaffold(
       body: CustomScrollView(
         slivers: [
           const SliverToBoxAdapter(child: DpPageHeader(title: '오늘')),
-          if (showSupporting && wide)
+          // 시안 `.next` — 다음 할 일 밴드. 상태 분기(로딩·실패·경로 없음)는
+          // 그대로 이 위젯 안에 있다.
+          SliverToBoxAdapter(
+            key: const ValueKey('today-mission-section'),
+            child: missionSection,
+          ),
+          // 시안 `.cols` — 폭 분기는 `DpCols` 가 한다(옛 `wide` 계산 제거).
+          // 좌우 패딩은 셸이 준다.
+          if (showSupporting && mission != null)
             SliverToBoxAdapter(
-              key: const ValueKey('today-two-column'),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: KeyedSubtree(
-                      key: const ValueKey('today-mission-section'),
-                      child: missionSection,
-                    ),
+              key: const ValueKey('today-cols'),
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: DpSpacing.xl),
+                child: DpCols(
+                  main: TodayTasksPanel(
+                    mission: mission,
+                    onOpenTask: (task) {
+                      final contentId = task.contentId;
+                      final taskId = task.taskId;
+                      if (contentId == null || taskId == null) {
+                        context.go('/path');
+                        return;
+                      }
+                      context.push(
+                        MissionWorkspaceKey(
+                          taskId: taskId,
+                          contentId: contentId,
+                        ).contentLocation,
+                      );
+                    },
                   ),
-                  Expanded(
-                    flex: 2,
-                    child: KeyedSubtree(
-                      key: supportingKey,
-                      child: supportingSection,
-                    ),
+                  side: DpSide(
+                    children: [
+                      if (summary != null)
+                        TodayProgressPanel(summary: summary, mission: mission),
+                      TodayWhyPanel(
+                        why: '서버가 정한 이번 주의 첫 미완료 과제예요.',
+                        onOpenPath: () => context.go('/path'),
+                      ),
+                      TodayHelpPanel(
+                        onOpenMentor: () => context.go('/mentor'),
+                        onOpenQna: () => context.go('/community?board=QNA'),
+                      ),
+                      // 지표 로딩·실패도 사이드에서 말한다(기존 분기를 잃지 않는다).
+                      KeyedSubtree(
+                        key: supportingKey,
+                        child: supportingSection,
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             )
-          else ...[
-            SliverToBoxAdapter(
-              key: const ValueKey('today-mission-section'),
-              child: missionSection,
-            ),
-            if (showSupporting)
-              SliverToBoxAdapter(key: supportingKey, child: supportingSection),
-          ],
+          else if (showSupporting)
+            SliverToBoxAdapter(key: supportingKey, child: supportingSection),
           if (showSupporting)
             const SliverToBoxAdapter(
               key: ValueKey('today-ad-section'),
               child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                  DpSpacing.lg,
-                  0,
-                  DpSpacing.lg,
-                  DpSpacing.xl,
-                ),
+                padding: EdgeInsets.only(bottom: DpSpacing.xl),
                 child: AdSlotWidget(slot: 'DASHBOARD_TOP'),
               ),
             ),

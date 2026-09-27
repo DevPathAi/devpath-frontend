@@ -308,7 +308,10 @@ void main() {
       dashboardClient: dashboardClient,
     );
 
-    expect(find.text('JPA 트랜잭션 경계 읽기'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('dp-mission-header-title')),
+      findsOneWidget,
+    );
     expect(find.byType(DpMissionHeader), findsOneWidget);
     expect(find.byKey(const ValueKey('today-mission-section')), findsOneWidget);
     expect(find.byKey(const ValueKey('today-metrics-loading')), findsOneWidget);
@@ -319,15 +322,17 @@ void main() {
     final missionIndex = scroll.slivers.indexWhere(
       (sliver) => sliver.key == const ValueKey('today-mission-section'),
     );
-    final metricsIndex = scroll.slivers.indexWhere(
-      (sliver) => sliver.key == const ValueKey('today-metrics-loading'),
+    // S3-P4: 지표 섹션은 최상위 sliver 가 아니라 `.cols` 의 사이드 칼럼 안에 있다
+    // (시안 `today` 의 `.side`). 순서 계약은 미션 밴드 → `.cols` → 광고다.
+    final colsIndex = scroll.slivers.indexWhere(
+      (sliver) => sliver.key == const ValueKey('today-cols'),
     );
     final adIndex = scroll.slivers.indexWhere(
       (sliver) => sliver.key == const ValueKey('today-ad-section'),
     );
     expect(missionIndex, greaterThanOrEqualTo(0));
-    expect(metricsIndex, greaterThan(missionIndex));
-    expect(adIndex, greaterThan(metricsIndex));
+    expect(colsIndex, greaterThan(missionIndex));
+    expect(adIndex, greaterThan(colsIndex));
 
     // v2의 넉넉한 모바일 리듬에서는 마지막 sliver가 초기 cache 밖일 수 있다.
     // 순서는 위에서 확인하고, 실제 광고는 스크롤했을 때 지연 생성되는지 검증한다.
@@ -365,7 +370,10 @@ void main() {
 
     mission.complete(_mission('AVAILABLE'));
     await tester.pump();
-    expect(find.text('JPA 트랜잭션 경계 읽기'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('dp-mission-header-title')),
+      findsOneWidget,
+    );
     expect(find.byKey(const ValueKey('today-metrics-loading')), findsOneWidget);
 
     dashboardClient.dashboardCompleter.complete({
@@ -395,7 +403,10 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('JPA 트랜잭션 경계 읽기'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('dp-mission-header-title')),
+      findsOneWidget,
+    );
     expect(find.text('미션 열기'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('dp-next-action-primary')),
@@ -424,7 +435,11 @@ void main() {
       dashboardClient: _DashboardClient(),
       dynamicOwner: true,
     );
-    expect(find.text('사용자 A 미션'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('dp-mission-header-title')),
+      findsOneWidget,
+    );
+    expect(find.text('사용자 A 미션'), findsWidgets);
 
     final container = ProviderScope.containerOf(
       tester.element(find.byType(DashboardPage)),
@@ -439,7 +454,7 @@ void main() {
       _mission('AVAILABLE', availableTitle: '사용자 B 미션'),
     );
     await tester.pump();
-    expect(find.text('사용자 B 미션'), findsOneWidget);
+    expect(find.text('사용자 B 미션'), findsWidgets);
     expect(find.text('사용자 A 미션'), findsNothing);
   });
 
@@ -464,13 +479,13 @@ void main() {
       dynamicOwner: true,
     );
     await tester.pumpAndSettle();
-    expect(find.text('사용자 A 미션'), findsOneWidget);
     expect(
-      tester
-          .widgetList<DpKpiCard>(find.byType(DpKpiCard))
-          .map((card) => card.value),
-      contains(3),
+      find.byKey(const ValueKey('dp-mission-header-title')),
+      findsOneWidget,
     );
+    expect(find.text('사용자 A 미션'), findsWidgets);
+    // S3-P4: KPI 카드 대신 「진행」 키-값이 같은 숫자를 맡는다(연속 학습 = 3일).
+    expect(find.text('3일'), findsOneWidget);
 
     final container = ProviderScope.containerOf(
       tester.element(find.byType(DashboardPage)),
@@ -481,7 +496,7 @@ void main() {
     expect(missionApi.calls, 2);
     expect(dashboardClient.dashboardCalls, 2);
     expect(find.text('사용자 A 미션'), findsNothing);
-    expect(find.byType(DpKpiCard), findsNothing);
+    expect(find.text('3일'), findsNothing);
     expect(find.text('오늘의 미션을 불러오는 중'), findsOneWidget);
 
     nextOwnerMission.complete(
@@ -491,13 +506,8 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(find.text('사용자 B 미션'), findsOneWidget);
-    expect(
-      tester
-          .widgetList<DpKpiCard>(find.byType(DpKpiCard))
-          .map((card) => card.value),
-      contains(19),
-    );
+    expect(find.text('사용자 B 미션'), findsWidgets);
+    expect(find.text('19일'), findsOneWidget);
     expect(find.text('사용자 A 미션'), findsNothing);
     expect(
       tester
@@ -722,7 +732,10 @@ void main() {
     await refresh;
     await tester.pump();
 
-    expect(find.text('JPA 트랜잭션 경계 읽기'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('dp-mission-header-title')),
+      findsOneWidget,
+    );
     expect(find.text('마지막으로 확인한 미션'), findsOneWidget);
     expect(find.text('미션 다시 확인'), findsOneWidget);
     expect(
@@ -755,16 +768,23 @@ void main() {
       ]),
     );
     await tester.pump();
-    expect(find.text('JPA 트랜잭션 경계 읽기'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('dp-mission-header-title')),
+      findsOneWidget,
+    );
     final notice = find.byKey(const ValueKey('dp-inline-notice'));
     expect(notice, findsOneWidget);
     expect(
       find.descendant(of: notice, matching: find.text('지표 다시 보기')),
       findsOneWidget,
     );
+    // S3-P4: 지표 알림이 `.cols` 의 사이드 칼럼으로 내려가 기본 뷰포트 아래에
+    // 있다. 스크롤해서 누르지 않으면 탭이 빗나가 재시도가 걸리지 않는다
+    // (실제 사용자도 스크롤해서 누른다).
+    await tester.ensureVisible(find.text('지표 다시 보기'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('지표 다시 보기'));
-    await tester.pump();
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('today-metrics-section')), findsOneWidget);
   });
 
@@ -793,9 +813,15 @@ void main() {
       scrollable: find.byType(Scrollable).first,
     );
     expect(find.byKey(const Key('weekly-activity-card')), findsOneWidget);
-    expect(find.text('62%'), findsNothing); // 진행률 도넛 제거
-    expect(find.textContaining('첫 경로'), findsNothing); // 배지 스트립 제거
+    // S3-P4: KPI 카드·도넛 위젯은 없어졌지만 **그 숫자는 사라지지 않았다** —
+    // 「진행」 키-값 패널이 맡는다. 같은 숫자를 두 번 그리지 않기 위한 분담이다.
+    expect(find.byType(DpKpiCard), findsNothing);
+    expect(find.text('62%'), findsOneWidget);
     expect(find.text('지금 완료할 한 가지 미션부터 시작합니다'), findsNothing);
+    // Review Focus 1: 390px 에서 본문이 가로로 넘치지 않는다 — `.cols` 는 한 열이
+    // 되고 표만 자체 가로 스크롤로 들어간다.
+    expect(tester.takeException(), isNull);
+    expect(tester.getSize(find.byType(DpCols)).width, lessThanOrEqualTo(390));
   });
 
   testWidgets('1240px Today 는 미션과 보조 레일을 2열로 놓는다', (tester) async {
@@ -811,12 +837,16 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    final mission = tester.getTopLeft(find.text('JPA 트랜잭션 경계 읽기'));
-    final rail = tester.getTopLeft(
-      find.byKey(const Key('weekly-activity-card')),
+    // S3-P4: 시안 `.next` 밴드는 본문 폭 전체를 쓰고 그 **아래**에 `.cols` 2열이
+    // 온다. 그래서 2열의 짝은 미션 밴드와 레일이 아니라 **과제 표와 레일**이다.
+    final mission = tester.getTopLeft(
+      find.byKey(const ValueKey('dp-mission-header-title')),
     );
-    expect(rail.dx, greaterThan(mission.dx));
-    expect((rail.dy - mission.dy).abs(), lessThan(120));
+    final tasks = tester.getTopLeft(find.text('이번 주 과제'));
+    final rail = tester.getTopLeft(find.text('진행'));
+    expect(mission.dy, lessThan(tasks.dy));
+    expect(rail.dx, greaterThan(tasks.dx));
+    expect((rail.dy - tasks.dy).abs(), lessThan(120));
     expect(find.byKey(const Key('progress-trend-card')), findsOneWidget);
   });
 }
