@@ -127,6 +127,50 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('가로로 잘린 표는 스크롤 영역 **안에** 키보드 포커스 노드를 둔다', (tester) async {
+    await tester.pumpWidget(_host(_table(), width: 390));
+
+    final scroll = find.byKey(const ValueKey('dp-web-table-scroll'));
+    expect(scroll, findsOneWidget);
+
+    // 포커스 노드가 스크롤 뷰 **밖**에 있으면 웹 시맨틱스가 tabindex 를
+    // overflow 를 가진 요소가 아니라 그 부모에 붙여, axe
+    // `scrollable-region-focusable`(serious)이 여전히 잡는다.
+    expect(
+      find.descendant(
+        of: scroll,
+        matching: find.byKey(const ValueKey('dp-web-table-scroll-focus')),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('스크롤 영역에 포커스가 오면 2px 링이 보인다', (tester) async {
+    await tester.pumpWidget(_host(_table(), width: 390));
+
+    expect(find.byKey(const ValueKey('dp-web-table-focus-ring')), findsNothing);
+
+    // `Focus.of` 는 그 `Focus` 가 **자기 아래에** 심는 마커를 찾는다 — 노드를
+    // 얻으려면 자식 맥락에서 불러야 한다(위젯 자신의 element 에서 부르면 부모
+    // 스코프가 나온다).
+    Focus.of(tester.element(find.text('오늘 배운 것 공유'))).requestFocus();
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey('dp-web-table-focus-ring')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('잘리지 않는 표는 여분의 탭 정지를 만들지 않는다', (tester) async {
+    await tester.pumpWidget(_host(_table(), width: 1120));
+
+    expect(
+      find.byKey(const ValueKey('dp-web-table-scroll-focus')),
+      findsNothing,
+    );
+  });
+
   testWidgets('minWidth 이상 폭에서는 스크롤을 감싸지 않는다', (tester) async {
     await tester.pumpWidget(_host(_table(), width: 1120));
 

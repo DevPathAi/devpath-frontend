@@ -93,10 +93,63 @@ class _DpWebTableState extends State<DpWebTable> {
             key: const ValueKey('dp-web-table-scroll'),
             controller: _horizontal,
             scrollDirection: Axis.horizontal,
-            child: SizedBox(width: minWidth, child: table),
+            // 가로로 잘린 표는 **키보드로도** 스크롤할 수 있어야 한다
+            // (WCAG 2.1.1 · axe `scrollable-region-focusable`, serious).
+            // 표 안에 포커스 가능한 셀이 하나라도 있으면(제목이
+            // `DpLink.title` 인 표) axe 가 통과하지만, 링크가 없는 표
+            // (예: 주차 상세 라우트가 없는 「N주 계획」 표)에서는 숨은
+            // 칼럼이 키보드 사용자에게 **완전히 막힌다**(실측: ET13
+            // `web-path-current-week` w320·text200 과 browser-ux axe 390
+            // 이 둘 다 이 한 노드를 잡았다).
+            //
+            // 포커스 노드를 **스크롤 뷰 안**에 둔다. 밖에 두면 웹 시맨틱스가
+            // tabindex 를 overflow 를 가진 요소가 아니라 그 부모에 붙여 axe
+            // 가 여전히 잡고, 안에 두면 `Scrollable` 의 `ScrollAction` 이
+            // 화살표 키를 받는다(Actions 조회가 포커스 노드에서 위로
+            // 올라간다).
+            child: _ScrollFocus(
+              child: SizedBox(width: minWidth, child: table),
+            ),
           ),
         );
       },
+    );
+  }
+}
+
+/// 가로로 잘린 표의 스크롤 영역을 키보드 순회 대상으로 만든다.
+///
+/// 별도 위젯인 이유: 포커스 상태로 링을 그리려면 `setState` 가 필요하고,
+/// 그 리빌드를 표 전체가 아니라 이 한 겹으로 좁힌다.
+class _ScrollFocus extends StatefulWidget {
+  const _ScrollFocus({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_ScrollFocus> createState() => _ScrollFocusState();
+}
+
+class _ScrollFocusState extends State<_ScrollFocus> {
+  bool _focused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.dpColors;
+    return Focus(
+      key: const ValueKey('dp-web-table-scroll-focus'),
+      onFocusChange: (v) => setState(() => _focused = v),
+      // 포커스가 보이지 않으면 WCAG 2.4.7 을 대신 어긴다 — `DpLink` 와 같은
+      // 2px 링을 전경 장식으로 그려 레이아웃을 밀지 않는다.
+      child: _focused
+          ? Container(
+              key: const ValueKey('dp-web-table-focus-ring'),
+              foregroundDecoration: BoxDecoration(
+                border: Border.all(color: c.primaryText, width: 2),
+              ),
+              child: widget.child,
+            )
+          : widget.child,
     );
   }
 }
