@@ -53,6 +53,7 @@ export 'src/data/dp_list_row.dart';
 export 'src/data/dp_data_table.dart';
 export 'src/data/dp_web_table.dart';
 export 'src/data/dp_list_lines.dart';
+export 'src/data/dp_row_line.dart';
 export 'src/data/dp_tag.dart';
 export 'src/data/dp_chart_legend.dart';
 export 'src/data/dp_learning_labels.dart';
