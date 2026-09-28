@@ -33,11 +33,12 @@ class DpStatusText extends StatelessWidget {
       DpStatusTone.current => c.primaryTextStrong,
     };
 
+    final base = Theme.of(context).textTheme.labelMedium;
     return Text(
       text,
       softWrap: false,
       overflow: TextOverflow.clip,
-      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color),
+      style: base?.copyWith(color: color),
     );
   }
 }

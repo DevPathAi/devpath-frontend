@@ -31,7 +31,7 @@ class DpKeyValues extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           for (var i = 0; i < entries.length; i++) ...[
-            if (i > 0) const SizedBox(height: 6),
+            if (i > 0) const SizedBox(height: DpWebDensity.keyValueGap),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

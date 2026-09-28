@@ -41,7 +41,7 @@ class _Line extends StatelessWidget {
     return Container(
       key: const ValueKey('dp-list-line'),
       padding: const EdgeInsets.symmetric(
-        vertical: 10,
+        vertical: DpWebDensity.rowVerticalPadding,
         horizontal: DpSpacing.lg,
       ),
       decoration: BoxDecoration(

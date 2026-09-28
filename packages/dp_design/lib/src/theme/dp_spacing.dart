@@ -49,3 +49,13 @@ abstract final class DpMotion {
     return reduceMotion ? Duration.zero : duration;
   }
 }
+
+/// 시안의 웹 문법이 쓰는 비(非)8pt 치수. 8pt 스케일(`DpSpacing`)에 없는 값이라
+/// 여기에 이름을 두고 출처를 적는다 — 리터럴로 흩어지면 시안과 대조할 수 없다.
+abstract final class DpWebDensity {
+  /// 구분선 행의 세로 패딩. 시안 `.chk`·`.rowline`·`.list li` = `padding:10px 16px`.
+  static const double rowVerticalPadding = 10;
+
+  /// 키-값 목록의 행 간격. 시안 `.kv{gap:6px 16px}`.
+  static const double keyValueGap = 6;
+}

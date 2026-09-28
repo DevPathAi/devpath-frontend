@@ -63,7 +63,7 @@ class _DpOptionRowState extends State<DpOptionRow> {
     final body = Container(
       key: const ValueKey('dp-option-row'),
       padding: const EdgeInsets.symmetric(
-        vertical: 10,
+        vertical: DpWebDensity.rowVerticalPadding,
         horizontal: DpSpacing.md,
       ),
       decoration: BoxDecoration(
@@ -108,7 +108,7 @@ class _DpOptionRowState extends State<DpOptionRow> {
                 if (widget.description != null) ...[
                   const SizedBox(height: 2),
                   DefaultTextStyle.merge(
-                    style: TextStyle(fontSize: 13, color: c.textSecondary),
+                    style: text.bodySmall!.copyWith(color: c.textSecondary),
                     child: widget.description!,
                   ),
                 ],

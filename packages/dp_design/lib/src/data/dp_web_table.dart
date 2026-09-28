@@ -188,6 +188,7 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.dpColors;
+    final text = Theme.of(context).textTheme;
     return Container(
       key: const ValueKey('dp-web-table-header'),
       padding: const EdgeInsets.symmetric(
@@ -204,9 +205,7 @@ class _Header extends StatelessWidget {
               col.label,
               softWrap: false,
               overflow: TextOverflow.clip,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
+              style: text.labelMedium?.copyWith(
                 // 시안 `th` 는 `--faint` 지만 그 토큰은 라이트에서 3.52:1 이라
                 // WCAG AA(4.5:1) 에 못 미치고, `DpColors` 자신이 "본문 텍스트로
                 // 쓰지 않는다"고 못 박았다. 칼럼 라벨은 「이 열이 무엇인가」를
