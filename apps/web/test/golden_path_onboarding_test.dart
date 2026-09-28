@@ -10,7 +10,6 @@ import 'package:devpath_web/src/features/path/presentation/path_page.dart';
 import 'package:devpath_web/src/providers/api_providers.dart';
 import 'package:dio/dio.dart';
 import 'package:dp_core/dp_core.dart';
-import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -145,10 +144,10 @@ void main() {
 
     await tester.tap(find.text('GitHub로 계속하기 (목)'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('diagnostic-track')));
+    // 트랙은 드롭다운이 아니라 보이는 보기 행이다(시안 `dstart` 의 `.opt`).
+    await tester.tap(find.text('백엔드 (Spring)'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('백엔드 (Spring)').last);
-    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('진단 시작하기'));
     await tester.tap(find.text('진단 시작하기'));
     await tester.pumpAndSettle();
 
@@ -177,13 +176,14 @@ void main() {
 
     // 진단 시작 → 즉시 완료(next=null) → saved preview. 명시 CTA 뒤 PATH 생성 화면.
     // 트랙을 고르기 전에는 시작 버튼이 비활성이다.
-    await tester.tap(find.byKey(const ValueKey('diagnostic-track')));
+    // 트랙은 드롭다운이 아니라 보이는 보기 행이다(시안 `dstart` 의 `.opt`).
+    await tester.tap(find.text('백엔드 (Spring)'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('백엔드 (Spring)').last);
-    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('진단 시작하기'));
     await tester.tap(find.text('진단 시작하기'));
     await tester.pumpAndSettle();
     expect(find.text('진단 결과'), findsOneWidget);
+    await tester.ensureVisible(find.text('기존 경로로 계속'));
     await tester.tap(find.text('기존 경로로 계속'));
     await tester.pumpAndSettle();
     expect(find.byType(PathPage), findsOneWidget);
@@ -226,10 +226,10 @@ void main() {
     await tester.tap(find.text('GitHub로 계속하기 (목)'));
     await tester.pumpAndSettle();
     // 트랙을 고르기 전에는 시작 버튼이 비활성이다.
-    await tester.tap(find.byKey(const ValueKey('diagnostic-track')));
+    // 트랙은 드롭다운이 아니라 보이는 보기 행이다(시안 `dstart` 의 `.opt`).
+    await tester.tap(find.text('백엔드 (Spring)'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('백엔드 (Spring)').last);
-    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('진단 시작하기'));
     await tester.tap(find.text('진단 시작하기'));
     await tester.pumpAndSettle();
     expect(find.text('진단 결과'), findsOneWidget);
@@ -272,10 +272,10 @@ void main() {
     // 진단 시작 → 실제 픽스처(POST /onboarding/assessments → GET .../1/next)로
     // 문항이 렌더돼야 한다(회원 경로 픽스처 누락 시 이 지점에서 막힌다).
     // 트랙을 고르기 전에는 시작 버튼이 비활성이다.
-    await tester.tap(find.byKey(const ValueKey('diagnostic-track')));
+    // 트랙은 드롭다운이 아니라 보이는 보기 행이다(시안 `dstart` 의 `.opt`).
+    await tester.tap(find.text('백엔드 (Spring)'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('백엔드 (Spring)').last);
-    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('진단 시작하기'));
     await tester.tap(find.text('진단 시작하기'));
     await tester.pumpAndSettle();
     expect(find.text('비동기 함수의 반환 타입은 무엇인가요?'), findsOneWidget);
@@ -303,10 +303,10 @@ void main() {
     await tester.tap(find.text('GitHub로 계속하기 (목)'));
     await tester.pumpAndSettle();
     // 트랙을 고르기 전에는 시작 버튼이 비활성이다.
-    await tester.tap(find.byKey(const ValueKey('diagnostic-track')));
+    // 트랙은 드롭다운이 아니라 보이는 보기 행이다(시안 `dstart` 의 `.opt`).
+    await tester.tap(find.text('백엔드 (Spring)'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('백엔드 (Spring)').last);
-    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('진단 시작하기'));
     await tester.tap(find.text('진단 시작하기'));
     await tester.pumpAndSettle();
 
@@ -328,6 +328,7 @@ void main() {
       findsOneWidget,
       reason: 'complete 뒤 저장된 결과를 먼저 보여줘야 한다',
     );
+    await tester.ensureVisible(find.text('기존 경로로 계속'));
     await tester.tap(find.text('기존 경로로 계속'));
     await tester.pumpAndSettle();
     expect(find.byType(DiagnosticPage), findsNothing);

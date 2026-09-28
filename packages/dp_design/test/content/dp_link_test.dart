@@ -155,4 +155,34 @@ void main() {
 
     expect(find.byKey(const ValueKey('dp-link-focus-ring')), findsNothing);
   });
+
+  testWidgets('DpLink.inline: semanticsLabel 로 같은 문구의 링크를 구분한다', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    await tester.pumpWidget(
+      _host(
+        Column(
+          children: [
+            DpLink.inline(
+              text: '전문 보기',
+              semanticsLabel: '서비스 이용약관 동의 전문 보기',
+              onTap: () {},
+            ),
+            DpLink.inline(
+              text: '전문 보기',
+              semanticsLabel: '개인정보 수집·이용 동의 전문 보기',
+              onTap: () {},
+            ),
+          ],
+        ),
+      ),
+    );
+
+    // 화면에는 둘 다 「전문 보기」로 보이지만 스크린리더는 무엇의 전문인지 안다.
+    expect(find.text('전문 보기'), findsNWidgets(2));
+    expect(find.bySemanticsLabel('서비스 이용약관 동의 전문 보기'), findsOneWidget);
+    expect(find.bySemanticsLabel('개인정보 수집·이용 동의 전문 보기'), findsOneWidget);
+    handle.dispose();
+  });
 }

@@ -4,6 +4,7 @@ import 'package:devpath_web/src/app/app_config.dart';
 import 'package:devpath_web/src/features/auth/application/auth_controller.dart';
 import 'package:devpath_web/src/features/auth/state/auth_state.dart';
 import 'package:devpath_web/src/features/diagnostic/application/diagnostic_controller.dart';
+import 'package:devpath_web/src/features/common/application/track_catalog.dart';
 import 'package:devpath_web/src/features/diagnostic/presentation/diagnostic_page.dart';
 import 'package:devpath_web/src/features/diagnostic/state/diagnostic_continuation.dart';
 import 'package:devpath_web/src/features/diagnostic/state/diagnostic_state.dart';
@@ -134,6 +135,15 @@ DiagnosticState _previewState({
 );
 
 void main() {
+  /// 시안 `.steps` 단계 표시와 패널이 더해지며 결과·시작 화면이 기본 테스트
+  /// 뷰포트(800x600)보다 길어졌다. 화면은 `SingleChildScrollView` 안이라 실제로는
+  /// 스크롤되지만, 탭하는 테스트는 뷰포트를 키워 CTA 를 화면 안에 둔다.
+  void tallView(WidgetTester tester) {
+    tester.view.physicalSize = const Size(1200, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+  }
+
   testWidgets('flag OFF guest 완료는 결과를 숨기고 legacy 로그인 gate를 보인다', (
     tester,
   ) async {
@@ -159,19 +169,18 @@ void main() {
     expect(find.byKey(const ValueKey('brand-row')), findsOneWidget);
   });
 
-  testWidgets('트랙 선택기는 보이는 제목을 접근 가능한 버튼 이름으로 연결한다', (tester) async {
+  testWidgets('트랙 선택기는 라디오 그룹 이름을 갖고 보기 행마다 탭 동작이 있다', (tester) async {
     final semantics = tester.ensureSemantics();
     final controller = _FixedDiagnosticController(const DiagnosticState());
     await tester.pumpWidget(_host(controller));
     await tester.pump();
 
-    final selector = tester.getSemantics(
-      find.bySemanticsLabel(RegExp('진단할 트랙')),
-    );
-    expect(
-      selector.getSemanticsData().hasAction(ui.SemanticsAction.tap),
-      isTrue,
-    );
+    // 그룹에 이름이 있어야 스크린리더가 「무엇을 고르는 라디오 묶음인지」 안다.
+    expect(find.bySemanticsLabel(RegExp('진단할 트랙')), findsOneWidget);
+
+    // 탭 동작은 드롭다운 버튼이 아니라 보기 행마다 있다.
+    final row = tester.getSemantics(find.text('백엔드 (Spring)'));
+    expect(row.getSemanticsData().hasAction(ui.SemanticsAction.tap), isTrue);
 
     semantics.dispose();
   });
@@ -192,7 +201,11 @@ void main() {
         findsOneWidget,
       );
     }
-    expect(find.bySemanticsLabel('현재 단계: 트랙 선택'), findsOneWidget);
+    // `DpSteps` 는 커스텀 문구가 아니라 `selected` 로 현재 단계를 알린다.
+    expect(
+      tester.getSemantics(find.text('1 트랙 선택')),
+      isSemantics(isSelected: true),
+    );
     expect(
       find.descendant(of: surface, matching: find.textContaining('약 5분')),
       findsOneWidget,
@@ -248,12 +261,11 @@ void main() {
   });
 
   testWidgets('선택한 트랙으로만 guest 진단을 시작한다', (tester) async {
+    tallView(tester);
     final controller = _FixedDiagnosticController(const DiagnosticState());
     await tester.pumpWidget(_host(controller));
 
-    await tester.tap(find.byKey(const ValueKey('diagnostic-track')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('DevOps').last);
+    await tester.tap(find.text('DevOps'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('진단 시작하기'));
 
@@ -288,6 +300,7 @@ void main() {
   });
 
   testWidgets('guest preview는 로그인 전에 보이고 저장 CTA 전에는 이동하지 않는다', (tester) async {
+    tallView(tester);
     final controller = _FixedDiagnosticController(_previewState());
     await tester.pumpWidget(_host(controller, router: true));
     await tester.pumpAndSettle();
@@ -307,6 +320,7 @@ void main() {
   testWidgets('saved preview도 동일한 결과를 보이며 explicit CTA 뒤에만 /path로 간다', (
     tester,
   ) async {
+    tallView(tester);
     final controller = _FixedDiagnosticController(
       _previewState(
         phase: DiagnosticContinuationPhase.saved,
@@ -348,6 +362,7 @@ void main() {
   testWidgets('claim/path 오류는 preview를 가리지 않고 해당 단계 retry만 제공한다', (
     tester,
   ) async {
+    tallView(tester);
     final controller = _FixedDiagnosticController(
       _previewState(
         phase: DiagnosticContinuationPhase.saved,
@@ -369,6 +384,7 @@ void main() {
   });
 
   testWidgets('claim 오류는 preview를 유지하고 저장 재시도라고 명확히 표시한다', (tester) async {
+    tallView(tester);
     final controller = _FixedDiagnosticController(
       _previewState(
         phase: DiagnosticContinuationPhase.claim,
@@ -478,11 +494,12 @@ void main() {
     await tester.pump();
 
     expect(find.text('첫 답'), findsOneWidget);
-    expect(find.text('✓ 둘째 답'), findsOneWidget);
-    expect(
+    expect(find.text('둘째 답'), findsOneWidget);
+    // 실패한 선택은 ✓ 글자가 아니라 라디오 선택 상태로 남는다(시안 `.opt.sel`).
+    final selectedRow = tester.widget<DpOptionRow>(
       find.byKey(const ValueKey('diagnostic-option-selected-1')),
-      findsOneWidget,
     );
+    expect(selectedRow.selected, isTrue);
     await tester.tap(find.text('같은 답변 다시 저장'));
     expect(controller.retryAnswerCalls, 1);
   });
@@ -501,10 +518,11 @@ void main() {
     await tester.pumpWidget(_host(controller, router: true));
     await tester.pump();
 
-    final button = tester.widget<FilledButton>(
-      find.widgetWithText(FilledButton, '학습 경로로 계속'),
-    );
-    expect(button.onPressed, isNull);
+    // 시안 `.next` 밴드로 옮겨 `FilledButton` 이 아니다 — 밴드의 상태로 읽는다.
+    final band = tester.widget<DpNextActionBand>(find.byType(DpNextActionBand));
+    expect(band.label, '학습 경로로 계속');
+    expect(band.state, DpNextActionState.disabled);
+    expect(band.onPressed, isNull);
     expect(find.text('PATH'), findsNothing);
   });
 
@@ -534,7 +552,11 @@ void main() {
         expect(tester.takeException(), isNull);
         expect(find.text('새 진단 시작'), findsOneWidget);
         expect(find.text('진단 다시 시작'), findsNothing);
-        expect(find.bySemanticsLabel('새 진단 시작'), findsOneWidget);
+        // 밴드는 예상 결과를 접근성 이름에 함께 싣는다.
+        expect(
+          find.bySemanticsLabel(RegExp('^새 진단 시작, 예상 결과: ')),
+          findsOneWidget,
+        );
       }
       semantics.dispose();
     },
@@ -581,5 +603,188 @@ void main() {
     expect(find.byKey(const ValueKey('dp-inline-notice')), findsOneWidget);
     expect(find.text('답변을 저장하지 못했어요.'), findsOneWidget);
     expect(find.text('Spring Bean의 기본 스코프는?'), findsOneWidget);
+  });
+
+  // ── S3-P4c Task 16: 시안 `.steps`·`.opt`·`.next` ─────────────────────────
+
+  const stepLabels = ['1 트랙 선택', '2 실력 진단', '3 학습 경로'];
+
+  testWidgets('진단 시작: 시안 .steps 3단계에서 1단계가 현재다', (tester) async {
+    final controller = _FixedDiagnosticController(const DiagnosticState());
+    await tester.pumpWidget(_host(controller));
+    await tester.pump();
+
+    final steps = tester.widget<DpSteps>(find.byType(DpSteps));
+    expect(steps.labels, stepLabels);
+    expect(steps.currentIndex, 0);
+  });
+
+  testWidgets('진단 문항: 2단계가 현재이고 보기를 DpOptionRow 로 그린다', (tester) async {
+    final controller = _FixedDiagnosticController(
+      const DiagnosticState(
+        phase: DiagnosticContinuationPhase.questions,
+        track: 'BACKEND_SPRING',
+        nextQuestion: NextQuestion(
+          question: AssessmentQuestion(
+            id: 1,
+            type: 'MCQ',
+            content: 'Spring Bean의 기본 스코프는?',
+            bloomLevel: 'REMEMBER',
+            difficulty: 0.3,
+            options: '["singleton","prototype","request","session"]',
+          ),
+          index: 3,
+          total: 15,
+        ),
+      ),
+    );
+    await tester.pumpWidget(_host(controller));
+    await tester.pump();
+
+    final steps = tester.widget<DpSteps>(find.byType(DpSteps));
+    expect(steps.currentIndex, 1);
+    expect(find.byType(DpOptionRow), findsNWidgets(4));
+    expect(find.text('singleton'), findsOneWidget);
+  });
+
+  testWidgets('진단 결과: 3단계가 현재이고 다음 행동을 .next 밴드로 보인다', (tester) async {
+    final controller = _FixedDiagnosticController(_previewState());
+    await tester.pumpWidget(_host(controller, router: true));
+    await tester.pumpAndSettle();
+
+    final steps = tester.widget<DpSteps>(find.byType(DpSteps));
+    expect(steps.currentIndex, 2);
+    expect(find.byType(DpNextActionBand), findsOneWidget);
+    expect(find.text('저장하고 계속'), findsOneWidget);
+  });
+
+  testWidgets('진단 시작: 트랙을 보기 행으로 골라 시작한다', (tester) async {
+    tallView(tester);
+    final controller = _FixedDiagnosticController(const DiagnosticState());
+    await tester.pumpWidget(_host(controller));
+    await tester.pump();
+
+    // 시안 `dstart` 의 `.opt` — 드롭다운이 아니라 보이는 보기 행이다.
+    expect(find.byType(DpOptionRow), findsNWidgets(trackLabels.length));
+    await tester.tap(find.text('DevOps'));
+    await tester.pump();
+    await tester.tap(find.text('진단 시작하기'));
+
+    expect(controller.selectedTracks, ['DEVOPS']);
+    expect(controller.guestStarts, ['DEVOPS']);
+  });
+
+  testWidgets('진단 문항: 제출 중에는 보기가 잠긴다', (tester) async {
+    final controller = _FixedDiagnosticController(
+      const DiagnosticState(
+        phase: DiagnosticContinuationPhase.questions,
+        track: 'BACKEND_SPRING',
+        busy: true,
+        nextQuestion: NextQuestion(
+          question: AssessmentQuestion(
+            id: 1,
+            type: 'MCQ',
+            content: 'Spring Bean의 기본 스코프는?',
+            bloomLevel: 'REMEMBER',
+            difficulty: 0.3,
+            options: '["singleton","prototype"]',
+          ),
+          index: 3,
+          total: 15,
+        ),
+      ),
+    );
+    await tester.pumpWidget(_host(controller));
+    await tester.pump();
+
+    final rows = tester.widgetList<DpOptionRow>(find.byType(DpOptionRow));
+    expect(rows, isNotEmpty);
+    expect(rows.every((r) => r.onSelect == null), isTrue);
+  });
+
+  testWidgets('진단: 390px 에서 단계 표시가 세로로 쌓이고 넘치지 않는다', (tester) async {
+    tester.view.physicalSize = const Size(390, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final controller = _FixedDiagnosticController(const DiagnosticState());
+    await tester.pumpWidget(_host(controller));
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    final first = tester.getRect(find.text('1 트랙 선택'));
+    final second = tester.getRect(find.text('2 실력 진단'));
+    expect(second.top, greaterThan(first.bottom - 1));
+    // 본문이 가로로 넘치지 않는다.
+    final viewport = tester.getRect(find.byType(Scaffold));
+    expect(second.right, lessThanOrEqualTo(viewport.right));
+  });
+
+  testWidgets('진단: 페이지 헤더가 본문과 같은 좌측선을 갖는다', (tester) async {
+    tester.view.physicalSize = const Size(390, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final controller = _FixedDiagnosticController(const DiagnosticState());
+    await tester.pumpWidget(_host(controller));
+    await tester.pump();
+
+    // 셸 밖 화면이라 헤더가 거터를 스스로 줘야 한다 — 없으면 화면 끝에 붙는다.
+    expect(tester.getTopLeft(find.text('실력 진단')).dx, greaterThanOrEqualTo(16));
+  });
+
+  testWidgets('진단 시작: 트랙 묶음에 보이는 제목이 있다', (tester) async {
+    tallView(tester);
+    final controller = _FixedDiagnosticController(const DiagnosticState());
+    await tester.pumpWidget(_host(controller));
+    await tester.pump();
+
+    // 드롭다운의 `labelText` 가 사라진 자리를 보이는 제목이 대신한다.
+    expect(find.text('진단할 트랙'), findsOneWidget);
+  });
+
+  testWidgets('진단 문항: 누르면 즉시 제출되므로 보기는 버튼 역할이다', (tester) async {
+    final controller = _FixedDiagnosticController(
+      const DiagnosticState(
+        phase: DiagnosticContinuationPhase.questions,
+        track: 'BACKEND_SPRING',
+        nextQuestion: NextQuestion(
+          question: AssessmentQuestion(
+            id: 1,
+            type: 'MCQ',
+            content: 'Spring Bean의 기본 스코프는?',
+            bloomLevel: 'REMEMBER',
+            difficulty: 0.3,
+            options: '["singleton","prototype"]',
+          ),
+          index: 3,
+          total: 15,
+        ),
+      ),
+    );
+    await tester.pumpWidget(_host(controller));
+    await tester.pump();
+
+    final rows = tester.widgetList<DpOptionRow>(find.byType(DpOptionRow));
+    expect(rows, isNotEmpty);
+    expect(rows.every((r) => r.role == DpOptionRole.button), isTrue);
+  });
+
+  testWidgets('진단 시작: 트랙 보기는 라디오 역할이다 — 고른 것이 상태로 남는다', (tester) async {
+    tallView(tester);
+    final controller = _FixedDiagnosticController(const DiagnosticState());
+    await tester.pumpWidget(_host(controller));
+    await tester.pump();
+
+    final rows = tester.widgetList<DpOptionRow>(find.byType(DpOptionRow));
+    expect(rows, isNotEmpty);
+    expect(rows.every((r) => r.role == DpOptionRole.radio), isTrue);
+  });
+
+  testWidgets('진단 결과: 저장이 선행 조건임을 문구가 알린다', (tester) async {
+    tallView(tester);
+    final controller = _FixedDiagnosticController(_previewState());
+    await tester.pumpWidget(_host(controller, router: true));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('저장 후'), findsOneWidget);
   });
 }

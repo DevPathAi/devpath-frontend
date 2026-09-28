@@ -156,4 +156,62 @@ void main() {
       expect(find.textContaining('1일 안에'), findsNothing);
     }
   });
+
+  testWidgets('마이페이지: 시안 .cols 2열(본문 | 사이드)을 그린다', (tester) async {
+    tester.view.physicalSize = const Size(1280, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(_host(loaded));
+    await tester.pump();
+
+    expect(find.byType(DpCols), findsOneWidget);
+    // 카드 나열이 아니라 패널 + 사이드다 — ListTile 은 쓰지 않는다.
+    expect(find.byType(ListTile), findsNothing);
+
+    // AI 멘토는 사이드로 옮겼다 — 본문(프로필 편집)보다 오른쪽에 있다.
+    final form = tester.getRect(find.text('프로필 편집'));
+    final mentor = tester.getRect(find.text('AI 멘토 초대'));
+    expect(mentor.left, greaterThan(form.left));
+  });
+
+  testWidgets('마이페이지: 아바타 유무를 문구로 알린다', (tester) async {
+    tester.view.physicalSize = const Size(1280, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(_host(loaded));
+    await tester.pump();
+
+    // `CircleAvatar` 는 시맨틱스 라벨이 없다 — 문구가 없으면 유무를 알 수 없다.
+    expect(find.text('프로필 사진 없음'), findsOneWidget);
+  });
+
+  testWidgets('마이페이지: 긴 소개가 머리를 차지하지 않는다', (tester) async {
+    tester.view.physicalSize = const Size(1280, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      _host(
+        MyPageLoaded(
+          profile: ProfileView(bio: '가' * 500),
+          dashboard: const DashboardSummary(
+            streakDays: 3,
+            progressPercent: 40,
+            completedContentCount: 7,
+          ),
+          activity: const MyActivity(questionCount: 2, answerCount: 5),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    // 편집 폼의 maxLength 가 500 이다 — 소개는 잘려 보여야 한다.
+    final bio = tester.widget<Text>(
+      find.byKey(const ValueKey('mypage-prof-bio')),
+    );
+    expect(bio.maxLines, 3);
+    expect(bio.overflow, TextOverflow.ellipsis);
+  });
 }

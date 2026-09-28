@@ -19,6 +19,7 @@ double contrast(Color a, Color b) {
 
 void main() {
   // 스펙 §8: 17조합 × 라이트·다크 = 34건. 미달 0건이 확인된 값이다.
+  // P4 Task 13 에서 `DpSteps` 의 accentSoft 위 2조합을 더했다(라이트·다크 각 2건).
   // 토큰 값을 바꿀 때 이 테스트가 회귀를 막는다.
   for (final (label, p) in [('라이트', DpColors.light), ('다크', DpColors.dark)]) {
     group('$label 대비', () {
@@ -40,6 +41,19 @@ void main() {
           contrast(p.primaryText, p.accentSoft),
           greaterThanOrEqualTo(4.5),
         );
+      });
+
+      test('DpSteps 단계: 현재는 accentSoft 위, 비현재는 surface 위 4.5:1', () {
+        // `DpSteps` 는 현재 단계를 accentSoft 배경 + primaryTextStrong 으로,
+        // 나머지는 **배경을 칠하지 않아** 패널의 surface 위 textSecondary 가 된다
+        // (`dp_steps.dart` 의 `color: current ? accentSoft : null`). 실재하지 않는
+        // 조합을 재면 토큰을 바꿀 때 계약을 못 지킨다. P3 의 textFaint 사고처럼
+        // 한쪽 테마만 보면 미달을 놓치므로 두 테마에서 잰다.
+        expect(
+          contrast(p.primaryTextStrong, p.accentSoft),
+          greaterThanOrEqualTo(4.5),
+        );
+        expect(contrast(p.textSecondary, p.surface), greaterThanOrEqualTo(4.5));
       });
 
       test('★채움 위 텍스트 4.5:1 — 다크는 onPrimary 가 어두운 색이다', () {

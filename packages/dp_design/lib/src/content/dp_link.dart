@@ -19,6 +19,7 @@ class DpLink extends StatefulWidget {
     required _DpLinkVariant variant,
     this.onTap,
     this.maxLines,
+    this.semanticsLabel,
     // 초기화 형식 매개변수(`this._variant`)를 쓸 수 없다 — Dart 는 밑줄로
     // 시작하는 명명 매개변수를 금지한다. 필드를 공개로 되돌리면 이번에는
     // 비공개 타입이 공개 API 에 새는 library_private_types_in_public_api 가 뜬다.
@@ -30,26 +31,37 @@ class DpLink extends StatefulWidget {
     required String text,
     VoidCallback? onTap,
     int? maxLines,
+    String? semanticsLabel,
   }) : this._(
          key: key,
          text: text,
          variant: _DpLinkVariant.title,
          onTap: onTap,
          maxLines: maxLines,
+         semanticsLabel: semanticsLabel,
        );
 
-  const DpLink.inline({Key? key, required String text, VoidCallback? onTap})
-    : this._(
-        key: key,
-        text: text,
-        variant: _DpLinkVariant.inline,
-        onTap: onTap,
-      );
+  const DpLink.inline({
+    Key? key,
+    required String text,
+    VoidCallback? onTap,
+    String? semanticsLabel,
+  }) : this._(
+         key: key,
+         text: text,
+         variant: _DpLinkVariant.inline,
+         onTap: onTap,
+         semanticsLabel: semanticsLabel,
+       );
 
   final String text;
   final _DpLinkVariant _variant;
   final VoidCallback? onTap;
   final int? maxLines;
+
+  /// 스크린리더가 읽을 라벨. 같은 문구의 링크가 한 화면에 여럿 있을 때
+  /// 무엇의 링크인지 구분한다(동의 화면의 「전문 보기」 2개). null 이면 [text].
+  final String? semanticsLabel;
 
   @override
   State<DpLink> createState() => _DpLinkState();
@@ -85,7 +97,7 @@ class _DpLinkState extends State<DpLink> {
     // 바깥 노드와 **두 겹**이 된다 — 스크린리더가 같은 링크를 두 번 만난다.
     if (widget.onTap == null) {
       return Semantics(
-        label: widget.text,
+        label: widget.semanticsLabel ?? widget.text,
         excludeSemantics: true,
         child: label,
       );
@@ -117,7 +129,7 @@ class _DpLinkState extends State<DpLink> {
     // 선언하고 자식 subtree 는 통째로 가린다.
     return Semantics(
       link: true,
-      label: widget.text,
+      label: widget.semanticsLabel ?? widget.text,
       onTap: widget.onTap,
       focusable: true,
       focused: _focused,

@@ -36,6 +36,27 @@ class _FakeOAuthLauncher implements OAuthLauncher {
   }
 }
 
+/// 시안 `.login` 레이아웃 테스트용 호스트. 폭 의존은 `tester.view.physicalSize`
+/// 로 준다 — `MaterialApp` 이 뷰에서 자기 MediaQuery 를 만들어 바깥
+/// `MediaQuery` 를 덮는다.
+Widget _app(WidgetTester tester, {required Size size}) {
+  tester.view.physicalSize = size;
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+  return ProviderScope(
+    overrides: [
+      authControllerProvider.overrideWith(_UnauthController.new),
+      appConfigProvider.overrideWithValue(
+        const AppConfig(
+          baseUrl: 'https://test.devpath.ai/api/v1',
+          useMock: false,
+        ),
+      ),
+    ],
+    child: MaterialApp(theme: DpTheme.light(), home: const LoginPage()),
+  );
+}
+
 void main() {
   testWidgets('로그인 버튼 탭 → Launcher 호출(OAuth 리다이렉트 시작)', (tester) async {
     final fakeLauncher = _FakeOAuthLauncher();
@@ -123,5 +144,72 @@ void main() {
     expect(find.byKey(const ValueKey('dp-inline-notice')), findsOneWidget);
     expect(find.text('로그인 세션이 만료됐어요.'), findsOneWidget);
     expect(find.text('GitHub로 계속하기'), findsOneWidget);
+  });
+
+  testWidgets('로그인: expanded 이상에서 스토리 | 로그인 패널 2열로 배치한다', (tester) async {
+    await tester.pumpWidget(_app(tester, size: const Size(1280, 900)));
+    await tester.pumpAndSettle();
+
+    // 시안 `.flow` 는 칩 나열이 아니라 제목 + 설명 2열 목록이다.
+    expect(find.byType(DpListLines), findsOneWidget);
+    expect(find.text('15문항 진단과 GitHub 분석으로 12주 계획을 만듭니다.'), findsOneWidget);
+
+    final story = tester.getRect(find.text('맞춤 학습 경로'));
+    final panel = tester.getRect(find.text('GitHub로 계속하기'));
+    expect(panel.left, greaterThan(story.left));
+  });
+
+  testWidgets('로그인: 장식 원과 그라디언트를 쓰지 않는다', (tester) async {
+    await tester.pumpWidget(_app(tester, size: const Size(1280, 900)));
+    await tester.pumpAndSettle();
+
+    // 장식 컨테이너가 남아 있으면 시안과 어긋난다(시안의 면 구분은 1px 테두리뿐).
+    // 브랜드 로고(`leva-brand-mark`)는 제외한다 — 제품 로고이고 셸 전체가 쓰는
+    // dp_design 위젯이라 이 화면의 장식이 아니다.
+    final gradients = tester
+        .widgetList<Container>(find.byType(Container))
+        .where((c) {
+          final d = c.decoration;
+          return d is BoxDecoration &&
+              d.gradient != null &&
+              c.key != const ValueKey('leva-brand-mark');
+        });
+    expect(gradients, isEmpty);
+  });
+
+  testWidgets('로그인: medium 에서 스토리 위 · 로그인 패널 아래 한 열이 된다', (tester) async {
+    await tester.pumpWidget(_app(tester, size: const Size(800, 900)));
+    await tester.pumpAndSettle();
+
+    final story = tester.getRect(find.text('맞춤 학습 경로'));
+    final panel = tester.getRect(find.text('GitHub로 계속하기'));
+    expect(panel.top, greaterThan(story.top));
+  });
+
+  testWidgets('로그인: 넓은 화면에서도 본문이 contentMaxWidth 를 넘지 않는다', (tester) async {
+    await tester.pumpWidget(_app(tester, size: const Size(1920, 1200)));
+    await tester.pumpAndSettle();
+
+    // 로그인은 셸 밖 bare 라우트라 폭을 줄 셸이 없다 — 화면이 직접 캡을 둔다.
+    final box = tester.widget<ConstrainedBox>(
+      find.byKey(const ValueKey('login-content')),
+    );
+    expect(box.constraints.maxWidth, 1120);
+
+    // 그 결과 로그인 패널이 800px 버튼으로 늘어나지 않는다.
+    final panel = tester.getSize(
+      find.byKey(const ValueKey('login-access-panel')),
+    );
+    expect(panel.width, lessThan(600));
+  });
+
+  testWidgets('로그인: medium 1열에서 로그인 패널이 readable 760 을 넘지 않는다', (tester) async {
+    await tester.pumpWidget(_app(tester, size: const Size(839, 1200)));
+    await tester.pumpAndSettle();
+
+    final panel = tester.getSize(
+      find.byKey(const ValueKey('login-access-panel')),
+    );
+    expect(panel.width, lessThanOrEqualTo(760));
   });
 }

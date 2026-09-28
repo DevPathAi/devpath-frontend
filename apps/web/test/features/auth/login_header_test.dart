@@ -19,21 +19,26 @@ Widget _host() => ProviderScope(
 );
 
 void main() {
-  testWidgets('로그인은 AppBar 없이 헤더 + 테마 전환 버튼을 유지', (tester) async {
-    await tester.pumpWidget(_host());
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-    expect(find.byType(AppBar), findsNothing);
-    final header = tester.widget<DpPageHeader>(find.byType(DpPageHeader));
-    expect(header.title, '다시 만나서 반가워요');
-    expect(find.byTooltip('테마 전환'), findsOneWidget);
-    // T3: brandRow(context) 호출 자체를 지워도 byTooltip 단언은 깨지지 않는다
-    // (버튼이 brandRow 밖으로 옮겨져도 통과한다) — brandRow의 key로 호출
-    // 자체를 직접 단언한다(find.text보다 brandRow 위젯 유무에 견고하다 —
-    // F4, 4화면 전부 이 형태로 통일).
-    expect(find.byKey(const ValueKey('brand-row')), findsOneWidget);
-    expect(find.text('Leva'), findsOneWidget);
-  });
+  testWidgets(
+    '로그인은 페이지 헤더가 아니라 패널 제목을 쓴다 — 시안 .panel.signin (AppBar·테마 전환은 유지)',
+    (tester) async {
+      await tester.pumpWidget(_host());
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byType(AppBar), findsNothing);
+      // 시안 `.panel.signin` 은 h3 + 설명 + 버튼 둘이다 — 페이지 헤더가 아니다.
+      expect(find.byType(DpPageHeader), findsNothing);
+      expect(find.byKey(const ValueKey('login-access-panel')), findsOneWidget);
+      expect(find.text('다시 만나서 반가워요'), findsOneWidget);
+      expect(find.byTooltip('테마 전환'), findsOneWidget);
+      // T3: brandRow(context) 호출 자체를 지워도 byTooltip 단언은 깨지지 않는다
+      // (버튼이 brandRow 밖으로 옮겨져도 통과한다) — brandRow의 key로 호출
+      // 자체를 직접 단언한다(find.text보다 brandRow 위젯 유무에 견고하다 —
+      // F4, 4화면 전부 이 형태로 통일).
+      expect(find.byKey(const ValueKey('brand-row')), findsOneWidget);
+      expect(find.text('Leva'), findsOneWidget);
+    },
+  );
 
   testWidgets('desktop login uses a split story and access layout', (
     tester,
@@ -45,9 +50,9 @@ void main() {
     await tester.pumpWidget(_host());
     await tester.pump();
 
-    expect(find.byKey(const ValueKey('login-story-panel')), findsOneWidget);
+    expect(find.byKey(const ValueKey('login-story')), findsOneWidget);
     expect(find.byKey(const ValueKey('login-access-panel')), findsOneWidget);
-    expect(find.text('오늘 할 일을 선명하게,'), findsOneWidget);
+    expect(find.text('오늘 할 일을 선명하게, 성장은 매일 이어지게.'), findsOneWidget);
     expect(
       tester.getTopLeft(find.text('다시 만나서 반가워요')).dx,
       closeTo(tester.getTopLeft(find.byType(FilledButton)).dx, 0.1),
@@ -64,7 +69,8 @@ void main() {
       await tester.pumpWidget(_host());
       await tester.pump();
 
-      expect(find.byKey(const ValueKey('login-story-panel')), findsNothing);
+      // compact 은 스토리를 접는다 — 폰에서는 로그인 한 흐름만 남긴다.
+      expect(find.byKey(const ValueKey('login-story')), findsNothing);
       expect(find.byKey(const ValueKey('login-access-panel')), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
