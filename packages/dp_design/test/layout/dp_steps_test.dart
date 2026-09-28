@@ -59,4 +59,37 @@ void main() {
     final second = tester.getRect(find.text('2 실력 진단'));
     expect(second.top, greaterThan(first.bottom - 1));
   });
+
+  // 시안 `.steps` 는 CSS flex 기본값인 align-items:stretch 다 — 라벨이 줄바꿈
+  // 하는 폭에서도 세 단계의 높이가 같아야 배경(accentSoft)이 어긋나지 않는다.
+  testWidgets('라벨이 줄바꿈하는 폭에서도 단계 높이가 같다', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    // 640: compact(<600)를 넘겨 가로 배치로 두면서, 세 단계를 나란히 놓으면
+    // 한 칸이 약 213px 이라 긴 라벨이 두 줄이 되는 폭이다.
+    tester.view.physicalSize = const Size(640, 400);
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: DpTheme.light(),
+        home: const Scaffold(
+          body: Align(
+            alignment: Alignment.topCenter,
+            child: DpSteps(
+              labels: ['1 트랙 선택', '2 실력 진단을 아주 길게 적은 라벨', '3 학습 경로'],
+              currentIndex: 0,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final heights = <double>[
+      for (var i = 0; i < 3; i++)
+        tester.getSize(find.byKey(ValueKey('dp-step-$i'))).height,
+    ];
+    expect(heights[1], greaterThan(24), reason: '긴 라벨이 실제로 줄바꿈해야 판별력이 생긴다');
+    expect(heights[0], heights[1]);
+    expect(heights[2], heights[1]);
+  });
 }

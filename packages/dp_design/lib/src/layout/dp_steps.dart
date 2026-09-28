@@ -23,6 +23,7 @@ class DpSteps extends StatelessWidget {
     final items = <Widget>[
       for (var i = 0; i < labels.length; i++)
         _Step(
+          key: ValueKey('dp-step-$i'),
           label: labels[i],
           current: i == currentIndex,
           // 마지막이 아니면 다음 단계와의 사이에 구분선을 둔다.
@@ -45,13 +46,23 @@ class DpSteps extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: items,
             )
-          : Row(children: [for (final item in items) Expanded(child: item)]),
+          : IntrinsicHeight(
+              // 시안 `.steps` 는 flex 기본 align-items:stretch 다. Row 의
+              // `stretch` 만으로는 안 된다 — 세로 제약이 무한인 자리에서는
+              // 무한 높이가 자식에게 넘어간다. IntrinsicHeight 가 가장 높은
+              // 자식의 높이를 먼저 정해 준다.
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [for (final item in items) Expanded(child: item)],
+              ),
+            ),
     );
   }
 }
 
 class _Step extends StatelessWidget {
   const _Step({
+    super.key,
     required this.label,
     required this.current,
     required this.divider,
