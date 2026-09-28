@@ -11,7 +11,7 @@ class ContentTombstone extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return DpPanel(
       child: Padding(
         padding: const EdgeInsets.all(DpSpacing.md),
         child: Text(

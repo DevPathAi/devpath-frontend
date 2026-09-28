@@ -97,6 +97,53 @@ void main() {
     expect(picked, '/mentor');
   });
 
+  testWidgets('검색 중 게시판을 바꾸면 셸이 q 를 들고 간다', (tester) async {
+    _setWidth(tester, 1400);
+    String? picked;
+    await tester.pumpWidget(
+      _host(
+        AppShellView(
+          location: '/community?board=FREE&q=stream',
+          onSelect: (p) => picked = p,
+          child: const Text('본문'),
+        ),
+      ),
+    );
+
+    // 브레드크럼에도 「커뮤니티」가 있어 헤더 안으로 범위를 좁힌다.
+    await tester.tap(
+      find.descendant(
+        of: find.byType(DpWebHeader),
+        matching: find.text('커뮤니티'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Q/A'));
+    await tester.pumpAndSettle();
+
+    // 목적지 id 는 정적(`/community?board=QNA`)이다 — 셸이 현재 q 를 붙인다.
+    expect(picked, '/community?board=QNA&q=stream');
+  });
+
+  testWidgets('커뮤니티 밖으로 나갈 때는 q 를 버린다', (tester) async {
+    _setWidth(tester, 1400);
+    String? picked;
+    await tester.pumpWidget(
+      _host(
+        AppShellView(
+          location: '/community?board=FREE&q=stream',
+          onSelect: (p) => picked = p,
+          child: const Text('본문'),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('학습 경로'));
+    await tester.pumpAndSettle();
+
+    expect(picked, '/path');
+  });
+
   testWidgets('390 폭: 햄버거 메뉴 안에서 게시판으로 이동한다', (tester) async {
     _setWidth(tester, 390);
     String? picked;

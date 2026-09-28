@@ -130,8 +130,9 @@ class _LcsContextCardState extends ConsumerState<LcsContextCard> {
 
   Widget _preview(BuildContext context, LcsDraft d) {
     final c = context.dpColors;
-    return Card(
-      color: c.surface,
+    // `DpPanel` 은 언제나 `surface` 다 — 옛 `Card(color: c.surface)` 와 같은 값이라
+    // 인자를 넘길 것이 없다.
+    return DpPanel(
       child: Padding(
         padding: const EdgeInsets.all(DpSpacing.md),
         child: Column(
@@ -202,8 +203,9 @@ class LcsAnswererPanel extends ConsumerWidget {
     };
     if (snap == null || snap.content.isEmpty) return const SizedBox.shrink();
     final c = context.dpColors;
-    return Card(
-      color: c.surface,
+    // `DpPanel` 은 언제나 `surface` 다 — 옛 `Card(color: c.surface)` 와 같은 값이라
+    // 인자를 넘길 것이 없다.
+    return DpPanel(
       child: Padding(
         padding: const EdgeInsets.all(DpSpacing.md),
         child: Column(

@@ -81,10 +81,18 @@ ProviderContainer _container(
 void main() {
   testWidgets('목록을 렌더한다(작성자 이름 없이 메타 표시)', (tester) async {
     final c = _container([_p(1, title: 'async 질문')]);
-    await tester.pumpWidget(_host(c));
+    // 칼럼 라벨은 **게시판**에서 나온다(칼럼은 행마다 다른 라벨을 가질 수 없다).
+    // 옛 `CommunityPostRow` 는 행의 `boardType` 으로 답변/댓글을 골랐으므로,
+    // QNA 행을 기본(자유게시판) 목록에 넣어도 「답변」이 나왔다. 이제는 게시판을
+    // 명시해야 한다.
+    await tester.pumpWidget(
+      _host(c, router: _router(initialLocation: '/community?board=QNA')),
+    );
     await tester.pumpAndSettle();
     expect(find.text('async 질문'), findsOneWidget);
-    expect(find.textContaining('답변 1'), findsOneWidget);
+    // 「답변 N · 추천 M」 한 줄이 숫자 칼럼 둘로 갈라졌다(시안 `<thead>`).
+    expect(find.text('답변'), findsOneWidget); // 칼럼 라벨
+    expect(find.text('1'), findsOneWidget); // 답변 1 (추천은 0)
   });
 
   testWidgets('semanticChildCount는 광고를 제외한 게시글 수다', (tester) async {
@@ -176,8 +184,17 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('아직 질문이 없어요'), findsOneWidget);
-    await tester.tap(
+    // 빈 상태는 안내만 한다 — 작성 액션은 페이지 헤더의 상시 버튼 하나다
+    // (같은 접근명이 둘이면 스크린리더로 구분할 수 없다. P3 이월을 P4 가 닫았다).
+    expect(
       find.descendant(of: find.byType(DpEmpty), matching: find.text('질문하기')),
+      findsNothing,
+    );
+    await tester.tap(
+      find.descendant(
+        of: find.byType(DpPageHeader),
+        matching: find.text('질문하기'),
+      ),
     );
     await tester.pumpAndSettle();
     expect(find.text('작성 화면'), findsOneWidget);
@@ -204,8 +221,9 @@ void main() {
     expect(find.byKey(const ValueKey('page-header-title-menu')), findsNothing);
     expect(find.text('자유글'), findsOneWidget);
     expect(find.text('자유게시판'), findsOneWidget); // 헤더뿐 — 행 배지 없음
-    // FREE는 "댓글" 라벨
-    expect(find.textContaining('댓글 1'), findsOneWidget);
+    // FREE는 "댓글" 칼럼 라벨 + 숫자 칼럼(옛 「댓글 N · 추천 M」 한 줄을 대체).
+    expect(find.text('댓글'), findsOneWidget);
+    expect(find.text('1'), findsOneWidget);
 
     // FREE 항목 탭 → 일반 상세 라우트
     await tester.tap(find.text('자유글'));
@@ -358,13 +376,37 @@ void main() {
     expect(find.text('게시판 목록'), findsOneWidget);
   });
 
-  testWidgets('피드 행이 DpListRow로 렌더된다', (tester) async {
-    final c = _container([_p(1, title: 'DpListRow 행', boardType: 'FREE')]);
+  testWidgets('커뮤니티 목록: 390px 에서 본문이 가로로 넘치지 않고 표만 스크롤한다', (tester) async {
+    tester.view.physicalSize = const Size(390, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final c = _container([_p(1, title: '좁은 폭 글', boardType: 'FREE')]);
     await tester.pumpWidget(_host(c));
     await tester.pumpAndSettle();
 
-    expect(find.byType(DpListRow), findsOneWidget);
-    expect(find.text('DpListRow 행'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    expect(
+      tester.getSize(find.byType(DpWebTable)).width,
+      lessThanOrEqualTo(390),
+    );
+    // 칼럼 폭 합이 minWidth(640)보다 좁은 화면이라 표가 자체 가로 스크롤로 들어간다.
+    expect(find.byKey(const ValueKey('dp-web-table-scroll')), findsOneWidget);
+    // 그 스크롤 영역은 키보드로 닿을 수 있어야 한다(axe scrollable-region-focusable).
+    expect(
+      find.byKey(const ValueKey('dp-web-table-scroll-focus')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('피드가 카드 나열이 아니라 표로 렌더된다', (tester) async {
+    final c = _container([_p(1, title: '표 행', boardType: 'FREE')]);
+    await tester.pumpWidget(_host(c));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(DpWebTable), findsOneWidget);
+    expect(find.byType(DpListRow), findsNothing);
+    expect(find.text('표 행'), findsOneWidget);
   });
 
   testWidgets('작성 버튼은 FAB 이 아니라 페이지 헤더 안에 있다', (tester) async {
@@ -385,11 +427,52 @@ void main() {
   });
 
   testWidgets('검색 중 게시판을 바꿔도 같은 검색어를 새 게시판에서 다시 조회한다', (tester) async {
-    // S3-P3 에서 이 계약을 들고 있던 유일한 경로(제목 메뉴)가 사라졌고,
-    // 셸 헤더는 q 를 떨군다. 사용자 결정으로 복원은 P4 다 —
-    // 커버리지를 0 으로 두지 않기 위해 계약만 남긴다. P4 에서 셸 헤더의
-    // 커뮤니티 하위 목적지가 현재 q 를 들고 가게 하면 이 테스트를 켠다.
-    fail('S3-P4 에서 구현한다');
-    // testWidgets 의 skip 은 bool 이다 — 사유는 위 주석과 이름에 남긴다.
-  }, skip: true);
+    // 계약의 두 반쪽: ① 셸이 이동할 때 q 를 들고 간다 — `carryCommunityQuery`
+    // 단위 테스트와 `app_shell_view_test` 의 배선 테스트가 잰다. ② 게시판이
+    // 바뀐 URL 을 받은 이 화면이 **새 게시판 범위로 다시 조회한다** — 여기서
+    // 잰다(`didUpdateWidget` 의 board 변경 분기).
+    final searchedBoards = <String?>[];
+    final c = ProviderContainer(
+      overrides: [
+        communityListProvider.overrideWithValue(
+          ({String? board, String? tag, String? sort}) async => [
+            _p(1, title: '게시판 목록', boardType: 'FREE'),
+          ],
+        ),
+        communitySearchProvider.overrideWithValue(({
+          required String q,
+          String? board,
+          String? tag,
+          bool? solved,
+          String? sort,
+          int page = 0,
+          int size = 20,
+        }) async {
+          searchedBoards.add(board);
+          return CommunitySearchResult(
+            items: [
+              CommunitySearchItem(id: 2, title: '$board 검색 결과', replyCount: 0),
+            ],
+            total: 1,
+          );
+        }),
+      ],
+    );
+    addTearDown(c.dispose);
+    final router = _router(initialLocation: '/community?board=FREE&q=stream');
+
+    await tester.pumpWidget(_host(c, router: router));
+    await tester.pumpAndSettle();
+    expect(find.text('FREE 검색 결과'), findsOneWidget);
+    expect(searchedBoards, ['FREE']);
+
+    // 셸이 만들어 주는 경로 그대로 — 게시판만 바뀌고 q 는 남는다.
+    router.go('/community?board=QNA&q=stream');
+    await tester.pumpAndSettle();
+
+    expect(searchedBoards, ['FREE', 'QNA']);
+    expect(find.text('QNA 검색 결과'), findsOneWidget);
+    // 검색 입력에도 그 낱말이 남아 있다.
+    expect(find.text('stream'), findsOneWidget);
+  });
 }

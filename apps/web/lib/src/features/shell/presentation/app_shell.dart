@@ -50,6 +50,30 @@ String _communityBoardLabel(Uri uri) => switch (uri.queryParameters['board']) {
 /// 경로 → 브레드크럼. **긴 경로를 먼저 검사한다**(`/community/new/post`가
 /// `/community/new`보다 앞). 알 수 없는 경로는 빈 목록을 반환한다 — 그러면
 /// `DpBreadcrumb` 이 자리를 차지하지 않는다.
+/// 셸 목적지로 이동할 때 커뮤니티 검색어를 이어 간다.
+///
+/// 게시판 이동은 셸의 몫이고(S3-P2), 셸의 목적지 id 는 `/community?board=QNA`
+/// 처럼 **정적**이라 현재 검색어가 떨어진다. 검색 중에 게시판만 바꾸는 것은
+/// 「이 낱말을 저 게시판에서 찾아 달라」는 뜻이므로 `q` 를 들고 간다.
+///
+/// 게시판 목록 경로끼리의 이동에서만 이어 간다 — 상세(`/community/1`)나 작성
+/// 화면에는 `q` 가 없고, 커뮤니티 밖으로 나가면 검색 맥락이 끝난다.
+String carryCommunityQuery({
+  required String location,
+  required String targetId,
+}) {
+  final from = Uri.parse(location);
+  final to = Uri.parse(targetId);
+  if (from.path != '/community' || to.path != '/community') return targetId;
+  if (to.queryParameters.containsKey('q')) return targetId;
+  final q = from.queryParameters['q'];
+  if (q == null || q.isEmpty) return targetId;
+  return Uri(
+    path: to.path,
+    queryParameters: {...to.queryParameters, 'q': q},
+  ).toString();
+}
+
 List<DpCrumb> breadcrumbFor(String location) {
   final uri = Uri.parse(location);
   final path = uri.path;
@@ -201,7 +225,12 @@ class AppShell extends ConsumerWidget {
                 id: destination.id,
                 label: destination.label,
                 icon: destination.icon,
-                onInvoke: () => context.go(destination.id),
+                onInvoke: () => context.go(
+                  carryCommunityQuery(
+                    location: location,
+                    targetId: destination.id,
+                  ),
+                ),
               ),
           ],
           child: AppShellView(
@@ -253,7 +282,8 @@ class AppShellView extends StatelessWidget {
       brand: DpRailBrand(mark: const DpBrandMark(size: 24), wordmark: 'Leva'),
       items: kWebNavItems,
       selectedId: webNavSelectedIdFor(location),
-      onSelect: (id) => onSelect?.call(id),
+      onSelect: (id) =>
+          onSelect?.call(carryCommunityQuery(location: location, targetId: id)),
       accountEntries: [
         (label: '마이페이지', onSelect: () => onSelect?.call('/mypage')),
         (label: '설정', onSelect: () => onSelect?.call('/settings')),
