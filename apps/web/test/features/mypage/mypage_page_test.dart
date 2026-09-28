@@ -156,4 +156,22 @@ void main() {
       expect(find.textContaining('1일 안에'), findsNothing);
     }
   });
+
+  testWidgets('마이페이지: 시안 .cols 2열(본문 | 사이드)을 그린다', (tester) async {
+    tester.view.physicalSize = const Size(1280, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(_host(loaded));
+    await tester.pump();
+
+    expect(find.byType(DpCols), findsOneWidget);
+    // 카드 나열이 아니라 패널 + 사이드다 — ListTile 은 쓰지 않는다.
+    expect(find.byType(ListTile), findsNothing);
+
+    // AI 멘토는 사이드로 옮겼다 — 본문(프로필 편집)보다 오른쪽에 있다.
+    final form = tester.getRect(find.text('프로필 편집'));
+    final mentor = tester.getRect(find.text('AI 멘토 초대'));
+    expect(mentor.left, greaterThan(form.left));
+  });
 }

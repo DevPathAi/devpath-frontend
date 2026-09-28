@@ -56,8 +56,12 @@ void main() {
     expect(find.text('학습 리마인더'), findsOneWidget);
     expect(find.text('주간 리포트 이메일'), findsOneWidget);
     // 계정 섹션
-    expect(find.text('로그아웃'), findsOneWidget);
-    expect(find.text('계정 삭제'), findsOneWidget);
+    // 시안 `.rowline` 은 좌측 라벨과 우측 컨트롤을 둘 다 둔다 — 같은 문구가
+    // 행 이름과 버튼에 한 번씩 나오므로 버튼을 특정해 단언한다.
+    expect(find.widgetWithText(OutlinedButton, '로그아웃'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '계정 삭제'), findsOneWidget);
+    expect(find.text('로그아웃'), findsNWidgets(2));
+    expect(find.text('계정 삭제'), findsNWidgets(2));
     // 선택 동의 표시(철회 가능)
     expect(find.text('마케팅 정보 수신'), findsOneWidget);
   });
