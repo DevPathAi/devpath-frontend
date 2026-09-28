@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' show SemanticsRole;
 
 import 'package:dp_core/dp_core.dart';
 import 'package:dp_design/dp_design.dart';
@@ -15,6 +16,9 @@ import '../../../providers/api_providers.dart';
 import '../application/diagnostic_controller.dart';
 import '../state/diagnostic_continuation.dart';
 import '../state/diagnostic_state.dart';
+
+/// 시안 `.steps` 라벨 — 시작·문항·결과 세 화면이 같은 배열을 쓴다.
+const _diagnosticSteps = ['1 트랙 선택', '2 실력 진단', '3 학습 경로'];
 
 class DiagnosticPage extends ConsumerStatefulWidget {
   const DiagnosticPage({super.key});
@@ -188,21 +192,14 @@ class _StartView extends StatelessWidget {
     final selectedTrack = state.track;
     final isMember = auth is AuthAuthenticated;
     final colors = context.dpColors;
-    return Container(
+    return DpPanel(
       key: const ValueKey('diagnostic-onboarding-surface'),
       padding: const EdgeInsets.all(DpSpacing.xl),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        border: Border.all(color: colors.border),
-        borderRadius: BorderRadius.circular(DpRadius.card),
-      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const _DiagnosticJourney(),
-          const SizedBox(height: DpSpacing.xl),
-          Divider(color: colors.border, height: 1),
+          const DpSteps(labels: _diagnosticSteps, currentIndex: 0),
           const SizedBox(height: DpSpacing.xl),
           LayoutBuilder(
             builder: (context, constraints) {
@@ -297,21 +294,29 @@ class _DiagnosticTrackForm extends StatelessWidget {
           style: text.bodyMedium?.copyWith(color: colors.textSecondary),
         ),
         const SizedBox(height: DpSpacing.md),
-        DropdownButtonFormField<String>(
+        // 시안 `dstart` 의 `.opt` — 트랙은 이 화면의 본 결정이라 접어 두지 않고
+        // 보이는 보기 행으로 둔다. 라디오 그룹으로 묶어야 브라우저 접근성
+        // 트리에서 `role="radio"` 가 부모(radiogroup)를 갖는다.
+        Semantics(
           key: const ValueKey('diagnostic-track'),
-          isExpanded: true,
-          initialValue: selectedTrack,
-          decoration: const InputDecoration(
-            labelText: '진단할 트랙',
-            hintText: '트랙을 선택하세요',
+          container: true,
+          role: SemanticsRole.radioGroup,
+          label: '진단할 트랙',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final entry in trackLabels.entries) ...[
+                DpOptionRow(
+                  key: ValueKey('diagnostic-track-${entry.key}'),
+                  label: Text(entry.value),
+                  selected: selectedTrack == entry.key,
+                  onSelect: () => notifier.selectTrack(entry.key),
+                ),
+                const SizedBox(height: DpSpacing.sm),
+              ],
+            ],
           ),
-          items: [
-            for (final entry in trackLabels.entries)
-              DropdownMenuItem(value: entry.key, child: Text(entry.value)),
-          ],
-          onChanged: (value) {
-            if (value != null) notifier.selectTrack(value);
-          },
         ),
         if (selectedTrack == null) ...[
           const SizedBox(height: DpSpacing.sm),
@@ -335,91 +340,24 @@ class _DiagnosticTrackForm extends StatelessWidget {
   }
 }
 
-class _DiagnosticJourney extends StatelessWidget {
-  const _DiagnosticJourney();
-
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text('진단 순서', style: Theme.of(context).textTheme.labelLarge),
-      const SizedBox(height: DpSpacing.sm),
-      const Wrap(
-        spacing: DpSpacing.sm,
-        runSpacing: DpSpacing.sm,
-        children: [
-          _JourneyStep(label: '1 트랙 선택', current: true),
-          _JourneyStep(label: '2 실력 진단'),
-          _JourneyStep(label: '3 학습 경로'),
-        ],
-      ),
-    ],
-  );
-}
-
-class _JourneyStep extends StatelessWidget {
-  const _JourneyStep({required this.label, this.current = false});
-
-  final String label;
-  final bool current;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.dpColors;
-    return Semantics(
-      label: current ? '현재 단계: 트랙 선택' : null,
-      selected: current,
-      excludeSemantics: current,
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: DpSpacing.md,
-          vertical: DpSpacing.sm,
-        ),
-        decoration: BoxDecoration(
-          color: current ? colors.accentSoft : colors.surfaceMuted,
-          border: Border.all(
-            color: current ? colors.accentLine : colors.border,
-          ),
-          borderRadius: BorderRadius.circular(DpRadius.chip),
-        ),
-        child: Text(
-          label,
-          style: Theme.of(context).textTheme.labelMedium?.copyWith(
-            color: current ? colors.primaryTextStrong : colors.textSecondary,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
+/// 시안 `dstart` 의 「결과 형태 미리보기」 패널 — 키-값 3행.
+///
+/// 키는 결과 화면이 **실제로 보여주는 것**과 같아야 한다. 시안 예시의
+/// 「강점·보강 개념」은 결과 모델에 개념별 점수가 없어 약속할 수 없다.
 class _DiagnosticOutcomes extends StatelessWidget {
   const _DiagnosticOutcomes();
 
   @override
-  Widget build(BuildContext context) {
-    final colors = context.dpColors;
-    final text = Theme.of(context).textTheme;
-    return Container(
-      padding: const EdgeInsets.all(DpSpacing.md),
-      decoration: BoxDecoration(
-        color: colors.surfaceMuted,
-        borderRadius: BorderRadius.circular(DpRadius.input),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('진단 후 바로 확인', style: text.labelLarge),
-          const SizedBox(height: DpSpacing.sm),
-          const Wrap(
-            spacing: DpSpacing.xl,
-            runSpacing: DpSpacing.sm,
-            children: [Text('현재 레벨'), Text('진단 신뢰도'), Text('맞춤 학습 경로')],
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => const DpPanel(
+    title: DpPanelTitle('진단 후 바로 확인'),
+    child: DpKeyValues(
+      entries: [
+        (key: '현재 레벨', value: Text('1~5 단계')),
+        (key: '진단 신뢰도', value: Text('응답 일관성으로 계산한 %')),
+        (key: '맞춤 학습 경로', value: Text('12주 주차 계획')),
+      ],
+    ),
+  );
 }
 
 class _QuestionView extends StatelessWidget {
@@ -474,6 +412,10 @@ class _QuestionView extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (missionSpineEnabled) ...[
+          const DpSteps(labels: _diagnosticSteps, currentIndex: 1),
+          const SizedBox(height: DpSpacing.xl),
+        ],
         Text(
           missionSpineEnabled
               ? '${next.index} / ${next.total} · ${next.total - next.index}문항 남음'
@@ -517,26 +459,36 @@ class _QuestionView extends StatelessWidget {
             child: const Text('답안 제출'),
           )
         else
-          for (var index = 0; index < options.length; index++) ...[
-            OutlinedButton(
-              key: answerFailed && selectedOptionIndex == index
-                  ? ValueKey('diagnostic-option-selected-$index')
-                  : ValueKey('diagnostic-option-$index'),
-              onPressed: busy || answerFailed
-                  ? null
-                  : () => notifier.submitAnswer(
-                      question.id,
-                      '{"correct":$index}',
-                      timeSpentSec: 5,
-                    ),
-              child: Text(
-                answerFailed && selectedOptionIndex == index
-                    ? '✓ ${options[index]}'
-                    : options[index],
-              ),
+          // 시안 `dq` 의 `.opt` — 보기 행을 누르는 것이 답변이다. 라디오 그룹으로
+          // 묶어 `role="radio"` 가 부모를 갖게 한다(axe `aria-required-parent`).
+          Semantics(
+            container: true,
+            role: SemanticsRole.radioGroup,
+            label: '보기',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (var index = 0; index < options.length; index++) ...[
+                  DpOptionRow(
+                    key: answerFailed && selectedOptionIndex == index
+                        ? ValueKey('diagnostic-option-selected-$index')
+                        : ValueKey('diagnostic-option-$index'),
+                    label: Text(options[index]),
+                    selected: answerFailed && selectedOptionIndex == index,
+                    onSelect: busy || answerFailed
+                        ? null
+                        : () => notifier.submitAnswer(
+                            question.id,
+                            '{"correct":$index}',
+                            timeSpentSec: 5,
+                          ),
+                  ),
+                  const SizedBox(height: DpSpacing.sm),
+                ],
+              ],
             ),
-            const SizedBox(height: DpSpacing.sm),
-          ],
+          ),
         if (!advanceFailed && !answerFailed) ...[
           const SizedBox(height: DpSpacing.md),
           const Divider(),
@@ -653,6 +605,8 @@ class _ResultPreview extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
+        const DpSteps(labels: _diagnosticSteps, currentIndex: 2),
+        const SizedBox(height: DpSpacing.xl),
         Text('진단 결과', style: Theme.of(context).textTheme.headlineSmall),
         const SizedBox(height: DpSpacing.sm),
         Text(
@@ -662,13 +616,8 @@ class _ResultPreview extends StatelessWidget {
           ),
         ),
         const SizedBox(height: DpSpacing.lg),
-        Container(
+        DpPanel(
           padding: const EdgeInsets.all(DpSpacing.lg),
-          decoration: BoxDecoration(
-            color: context.dpColors.surface,
-            border: Border.all(color: context.dpColors.border),
-            borderRadius: BorderRadius.circular(16),
-          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -689,19 +638,10 @@ class _ResultPreview extends StatelessWidget {
           ),
         ),
         const SizedBox(height: DpSpacing.md),
-        Container(
-          padding: const EdgeInsets.all(DpSpacing.md),
-          decoration: BoxDecoration(
-            color: context.dpColors.surfaceMuted,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('결과 형태 미리보기'),
-              SizedBox(height: DpSpacing.xs),
-              Text('저장 후 이 결과를 기준으로 첫 주 경로와 오늘의 미션을 구성합니다.'),
-            ],
+        const DpPanel(
+          title: DpPanelTitle('결과 형태 미리보기'),
+          child: DpKeyValues(
+            entries: [(key: '다음 단계', value: Text('첫 주 경로와 오늘의 미션 구성'))],
           ),
         ),
         if (state.pathBranch == DiagnosticPathBranch.existingActivePath) ...[
@@ -728,56 +668,89 @@ class _ResultPreview extends StatelessWidget {
     );
   }
 
+  /// 시안 `dresult` 의 `.next` 밴드. 화면의 하나뿐인 primary action 이다.
+  ///
+  /// 이 화면의 다음 행동은 상태에 따라 아홉 갈래로 나뉜다 — 계획이 예로 든
+  /// 「경로 만들기」 단일 버튼은 이 화면에 없다. `DpNextActionState`
+  /// (ready·pending·disabled·retry)로 그 갈래를 남김없이 옮겼고 각 갈래의
+  /// 문구는 그대로 두었다. 밴드가 `expectedOutcome` 을 함께 읽어 준다.
   Widget _primaryAction(BuildContext context) {
     final failureKind = state.failure?.kind;
+    final busy = state.busy;
+
     if (failureKind == DiagnosticFailureKind.pathGeneration) {
-      return FilledButton(
-        onPressed: state.busy ? null : notifier.retryPathProbe,
-        child: const Text('경로 상태 다시 확인'),
+      return DpNextActionBand(
+        actionId: 'diagnostic_retry_path_probe',
+        label: '경로 상태 다시 확인',
+        retryLabel: '경로 상태 다시 확인',
+        expectedOutcome: '경로 생성이 끝났는지 다시 확인합니다.',
+        state: busy ? DpNextActionState.pending : DpNextActionState.retry,
+        pendingLabel: '경로 상태 확인 중',
+        onPressed: (_) => notifier.retryPathProbe(),
       );
     }
     if (failureKind == DiagnosticFailureKind.guestExpired ||
         failureKind == DiagnosticFailureKind.ownership) {
-      return FilledButton(
-        onPressed: notifier.restart,
-        child: const Text('새 진단 시작'),
+      return DpNextActionBand(
+        actionId: 'diagnostic_restart',
+        label: '새 진단 시작',
+        expectedOutcome: '이 진단을 버리고 처음부터 다시 시작합니다.',
+        state: DpNextActionState.ready,
+        onPressed: (_) => notifier.restart(),
       );
     }
     if (state.saved) {
       if (state.pathBranch == DiagnosticPathBranch.unknown) {
-        return FilledButton(
-          onPressed: null,
-          child: Text(state.busy ? '경로 확인 중' : '경로 상태 확인 필요'),
+        return DpNextActionBand(
+          actionId: 'diagnostic_path_branch_unknown',
+          label: '경로 상태 확인 필요',
+          expectedOutcome: '경로 상태를 확인하면 학습 경로로 넘어갈 수 있습니다.',
+          state: busy ? DpNextActionState.pending : DpNextActionState.disabled,
+          pendingLabel: '경로 확인 중',
+          disabledReason: '경로 상태를 아직 확인하지 못했어요.',
         );
       }
       final existing =
           state.pathBranch == DiagnosticPathBranch.existingActivePath;
-      return FilledButton(
-        onPressed: state.busy
+      return DpNextActionBand(
+        actionId: 'diagnostic_go_path',
+        label: existing ? '기존 경로로 계속' : '학습 경로로 계속',
+        expectedOutcome: existing
+            ? '지금 하던 경로를 그대로 이어서 엽니다.'
+            : '방금 만든 12주 학습 경로를 엽니다.',
+        state: busy ? DpNextActionState.disabled : DpNextActionState.ready,
+        disabledReason: '경로를 확인하는 중이에요.',
+        onPressed: busy
             ? null
-            : () {
+            : (_) {
                 notifier.completePathHandoff();
                 context.go('/path');
               },
-        child: Text(existing ? '기존 경로로 계속' : '학습 경로로 계속'),
       );
     }
     if (state.phase == DiagnosticContinuationPhase.consent) {
-      return FilledButton(
-        onPressed: state.busy ? null : () => context.go('/consent'),
-        child: const Text('필수 동의 확인'),
+      return DpNextActionBand(
+        actionId: 'diagnostic_go_consent',
+        label: '필수 동의 확인',
+        expectedOutcome: '필수 동의를 마치면 결과가 계정에 저장됩니다.',
+        state: busy ? DpNextActionState.disabled : DpNextActionState.ready,
+        disabledReason: '동의 상태를 확인하는 중이에요.',
+        onPressed: busy ? null : (_) => context.go('/consent'),
       );
     }
-    return FilledButton(
-      onPressed: state.busy ? null : notifier.saveAndContinue,
-      child: Text(
-        state.busy
-            ? '결과 저장 중'
-            : failureKind == DiagnosticFailureKind.claim ||
-                  failureKind == DiagnosticFailureKind.resultMismatch
-            ? '저장 다시 시도'
-            : '저장하고 계속',
-      ),
+    final isRetry =
+        failureKind == DiagnosticFailureKind.claim ||
+        failureKind == DiagnosticFailureKind.resultMismatch;
+    return DpNextActionBand(
+      actionId: 'diagnostic_save_and_continue',
+      label: isRetry ? '저장 다시 시도' : '저장하고 계속',
+      retryLabel: '저장 다시 시도',
+      expectedOutcome: '결과를 계정에 저장하고 12주 학습 경로를 만듭니다.',
+      state: busy
+          ? DpNextActionState.pending
+          : (isRetry ? DpNextActionState.retry : DpNextActionState.ready),
+      pendingLabel: '결과 저장 중',
+      onPressed: (_) => notifier.saveAndContinue(),
     );
   }
 }

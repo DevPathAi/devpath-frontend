@@ -26,7 +26,10 @@ class DpOptionRow extends StatefulWidget {
   final Widget label;
   final Widget? description;
   final bool selected;
-  final VoidCallback onSelect;
+
+  /// null 이면 잠긴다(제출 중·답변 실패 등). 포커스 순회에서도 빠진다 —
+  /// 누를 수 없는 보기에 탭이 멈추면 사용자가 원인을 알 수 없다.
+  final VoidCallback? onSelect;
 
   @override
   State<DpOptionRow> createState() => _DpOptionRowState();
@@ -41,6 +44,8 @@ class _DpOptionRowState extends State<DpOptionRow> {
     final c = context.dpColors;
     final text = Theme.of(context).textTheme;
     final selected = widget.selected;
+    final onSelect = widget.onSelect;
+    final enabled = onSelect != null;
 
     final body = Container(
       key: const ValueKey('dp-option-row'),
@@ -51,7 +56,7 @@ class _DpOptionRowState extends State<DpOptionRow> {
       decoration: BoxDecoration(
         color: selected
             ? c.accentSoft
-            : (_hovered ? c.surfaceMuted : c.surface),
+            : (_hovered && enabled ? c.surfaceMuted : c.surface),
         border: Border.all(color: selected ? c.primary : c.border),
         borderRadius: BorderRadius.circular(DpRadius.button),
       ),
@@ -70,7 +75,9 @@ class _DpOptionRowState extends State<DpOptionRow> {
                 ? Icons.radio_button_checked
                 : Icons.radio_button_unchecked,
             size: 18,
-            color: selected ? c.primary : c.textSecondary,
+            color: enabled
+                ? (selected ? c.primary : c.textSecondary)
+                : c.textSecondary,
           ),
           const SizedBox(width: DpSpacing.sm),
           Expanded(
@@ -80,7 +87,7 @@ class _DpOptionRowState extends State<DpOptionRow> {
               children: [
                 DefaultTextStyle.merge(
                   style: text.bodyMedium?.copyWith(
-                    color: c.textPrimary,
+                    color: enabled ? c.textPrimary : c.textSecondary,
                     fontWeight: FontWeight.w600,
                   ),
                   child: widget.label,
@@ -103,23 +110,25 @@ class _DpOptionRowState extends State<DpOptionRow> {
       child: Semantics(
         inMutuallyExclusiveGroup: true,
         checked: selected,
-        onTap: widget.onSelect,
+        enabled: enabled,
+        onTap: onSelect,
         child: MouseRegion(
-          cursor: SystemMouseCursors.click,
+          cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
           onEnter: (_) => setState(() => _hovered = true),
           onExit: (_) => setState(() => _hovered = false),
           child: FocusableActionDetector(
+            enabled: enabled,
             onFocusChange: (v) => setState(() => _focused = v),
             actions: <Type, Action<Intent>>{
               ActivateIntent: CallbackAction<ActivateIntent>(
                 onInvoke: (_) {
-                  widget.onSelect();
+                  widget.onSelect?.call();
                   return null;
                 },
               ),
             },
             child: GestureDetector(
-              onTap: widget.onSelect,
+              onTap: onSelect,
               // 이 제스처의 노드가 라벨 조각을 흡수하지 않게 뺀다(P3 실측).
               excludeFromSemantics: true,
               child: body,

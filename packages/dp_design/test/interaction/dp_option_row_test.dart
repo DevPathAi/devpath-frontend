@@ -100,4 +100,39 @@ void main() {
     await tester.pumpAndSettle();
     expect(selected, 1, reason: '라디오 폼 컨트롤은 키보드로 활성화돼야 한다');
   });
+
+  testWidgets('DpOptionRow: onSelect 가 null 이면 눌러도·Tab 해도 반응하지 않는다', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    await tester.pumpWidget(
+      _host(
+        const DpOptionRow(
+          label: Text('백엔드 (Spring)'),
+          selected: false,
+          onSelect: null,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('백엔드 (Spring)'));
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+
+    // 잠긴 보기는 순회 대상이 아니다 — 제출 중에 탭이 멈출 곳이 아니다.
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pumpAndSettle();
+    expect(
+      FocusManager.instance.primaryFocus?.context?.widget,
+      isA<FocusScope>(),
+      reason: '비활성 보기는 포커스를 받지 않는다',
+    );
+
+    expect(
+      tester.getSemantics(find.text('백엔드 (Spring)')),
+      isSemantics(hasEnabledState: true, isEnabled: false),
+    );
+    handle.dispose();
+  });
 }
