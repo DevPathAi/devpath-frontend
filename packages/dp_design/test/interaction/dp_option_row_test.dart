@@ -135,4 +135,53 @@ void main() {
     );
     handle.dispose();
   });
+
+  testWidgets('DpOptionRow: 누르는 즉시 행동인 묶음은 버튼 역할로 선언한다', (tester) async {
+    final handle = tester.ensureSemantics();
+    await tester.pumpWidget(
+      _host(
+        DpOptionRow(
+          role: DpOptionRole.button,
+          label: const Text('singleton'),
+          selected: false,
+          onSelect: () {},
+        ),
+      ),
+    );
+
+    // 라디오는 「고른 뒤 확정」을 약속한다 — 누르면 바로 제출되는 보기는 버튼이다.
+    expect(
+      tester.getSemantics(find.text('singleton')),
+      isSemantics(
+        isButton: true,
+        isInMutuallyExclusiveGroup: false,
+        hasCheckedState: false,
+      ),
+    );
+    handle.dispose();
+  });
+
+  testWidgets('DpOptionRow: 기본 역할은 라디오다', (tester) async {
+    final handle = tester.ensureSemantics();
+    await tester.pumpWidget(
+      _host(
+        DpOptionRow(
+          label: const Text('백엔드 (Spring)'),
+          selected: true,
+          onSelect: () {},
+        ),
+      ),
+    );
+
+    expect(
+      tester.getSemantics(find.text('백엔드 (Spring)')),
+      isSemantics(
+        isInMutuallyExclusiveGroup: true,
+        hasCheckedState: true,
+        isChecked: true,
+        isButton: false,
+      ),
+    );
+    handle.dispose();
+  });
 }

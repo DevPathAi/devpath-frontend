@@ -185,4 +185,31 @@ void main() {
     final panel = tester.getRect(find.text('GitHub로 계속하기'));
     expect(panel.top, greaterThan(story.top));
   });
+
+  testWidgets('로그인: 넓은 화면에서도 본문이 contentMaxWidth 를 넘지 않는다', (tester) async {
+    await tester.pumpWidget(_app(tester, size: const Size(1920, 1200)));
+    await tester.pumpAndSettle();
+
+    // 로그인은 셸 밖 bare 라우트라 폭을 줄 셸이 없다 — 화면이 직접 캡을 둔다.
+    final box = tester.widget<ConstrainedBox>(
+      find.byKey(const ValueKey('login-content')),
+    );
+    expect(box.constraints.maxWidth, 1120);
+
+    // 그 결과 로그인 패널이 800px 버튼으로 늘어나지 않는다.
+    final panel = tester.getSize(
+      find.byKey(const ValueKey('login-access-panel')),
+    );
+    expect(panel.width, lessThan(600));
+  });
+
+  testWidgets('로그인: medium 1열에서 로그인 패널이 readable 760 을 넘지 않는다', (tester) async {
+    await tester.pumpWidget(_app(tester, size: const Size(839, 1200)));
+    await tester.pumpAndSettle();
+
+    final panel = tester.getSize(
+      find.byKey(const ValueKey('login-access-panel')),
+    );
+    expect(panel.width, lessThanOrEqualTo(760));
+  });
 }

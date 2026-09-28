@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+void _noop(bool _) {}
+
 Widget _host(Widget child) => MaterialApp(
   theme: DpTheme.light(),
   home: Scaffold(body: child),
@@ -112,5 +114,44 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
     expect(value, isFalse, reason: '키보드로도 토글돼야 한다');
+  });
+
+  testWidgets('DpCheckRow: 390px·200% 배율에서 trailing 이 라벨을 짜부수지 않는다', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 2000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+    await tester.pumpWidget(
+      _host(
+        // 실제 동의 화면의 행 폭과 같게 좁힌다 — 390px 화면에서 페이지 패딩과
+        // 패널 테두리를 빼면 행이 340 이다. 뷰포트만 390 으로 두면 행이 전폭을
+        // 받아 이 결함이 재현되지 않는다(판별력 없는 테스트가 된다).
+        const Center(
+          child: SizedBox(
+            width: 340,
+            child: DpCheckRow(
+              label: Text('개인정보 수집·이용 동의'),
+              description: Text('학습 진단·경로 제공을 위한 최소한의 정보를 수집합니다.'),
+              value: false,
+              onChanged: _noop,
+              trailing: DpLink.inline(text: '전문 보기'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    // `takeException` 은 이 결함을 보지 못한다 — RenderFlex 오버플로 없이 라벨이
+    // 글자당 한 줄로 눌린다(실측: `Row` 형태에서 폭 38.25 · 높이 495).
+    final label = tester.getRect(find.text('개인정보 수집·이용 동의'));
+    expect(
+      label.width,
+      greaterThan(150),
+      reason: 'non-flex trailing 이 주축 무한 제약으로 측정되면 라벨이 글자당 한 줄이 된다',
+    );
   });
 }

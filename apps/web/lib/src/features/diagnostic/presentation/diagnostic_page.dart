@@ -65,6 +65,8 @@ class _DiagnosticPageState extends ConsumerState<DiagnosticPage> {
               children: [
                 brandRow(context),
                 DpPageHeader(
+                  // 셸 밖 화면이라 거터를 줄 셸이 없다 — 헤더가 스스로 준다.
+                  gutter: true,
                   title: '실력 진단',
                   description: missionSpineEnabled
                       ? '15문항으로 현재 수준과 다음 학습 출발점을 확인합니다'
@@ -294,6 +296,11 @@ class _DiagnosticTrackForm extends StatelessWidget {
           style: text.bodyMedium?.copyWith(color: colors.textSecondary),
         ),
         const SizedBox(height: DpSpacing.md),
+        // 드롭다운의 `labelText: '진단할 트랙'` 이 사라진 자리를 보이는 제목이
+        // 대신한다. 그룹의 접근성 이름은 아래 `Semantics.label` 이 주므로 이
+        // 텍스트는 시맨틱스에서 빼 같은 이름이 두 번 읽히지 않게 한다.
+        ExcludeSemantics(child: Text('진단할 트랙', style: text.labelLarge)),
+        const SizedBox(height: DpSpacing.sm),
         // 시안 `dstart` 의 `.opt` — 트랙은 이 화면의 본 결정이라 접어 두지 않고
         // 보이는 보기 행으로 둔다. 라디오 그룹으로 묶어야 브라우저 접근성
         // 트리에서 `role="radio"` 가 부모(radiogroup)를 갖는다.
@@ -459,11 +466,12 @@ class _QuestionView extends StatelessWidget {
             child: const Text('답안 제출'),
           )
         else
-          // 시안 `dq` 의 `.opt` — 보기 행을 누르는 것이 답변이다. 라디오 그룹으로
-          // 묶어 `role="radio"` 가 부모를 갖게 한다(axe `aria-required-parent`).
+          // 시안 `dq` 의 `.opt` — 보기 행을 누르는 것이 **곧 답변**이다. 그래서
+          // 라디오가 아니라 버튼으로 선언한다: 라디오는 「고른 뒤 확정」을
+          // 약속하는데 이 화면에는 확정 단계가 없고, 정상 흐름에서 아무것도
+          // checked 가 되지 않는다(답변 실패 때만 선택 상태가 남는다).
           Semantics(
             container: true,
-            role: SemanticsRole.radioGroup,
             label: '보기',
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -474,6 +482,7 @@ class _QuestionView extends StatelessWidget {
                     key: answerFailed && selectedOptionIndex == index
                         ? ValueKey('diagnostic-option-selected-$index')
                         : ValueKey('diagnostic-option-$index'),
+                    role: DpOptionRole.button,
                     label: Text(options[index]),
                     selected: answerFailed && selectedOptionIndex == index,
                     onSelect: busy || answerFailed
@@ -641,7 +650,9 @@ class _ResultPreview extends StatelessWidget {
         const DpPanel(
           title: DpPanelTitle('결과 형태 미리보기'),
           child: DpKeyValues(
-            entries: [(key: '다음 단계', value: Text('첫 주 경로와 오늘의 미션 구성'))],
+            entries: [
+              (key: '다음 단계', value: Text('저장 후 첫 주 경로와 오늘의 미션을 구성합니다')),
+            ],
           ),
         ),
         if (state.pathBranch == DiagnosticPathBranch.existingActivePath) ...[

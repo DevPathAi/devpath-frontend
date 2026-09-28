@@ -718,4 +718,73 @@ void main() {
     final viewport = tester.getRect(find.byType(Scaffold));
     expect(second.right, lessThanOrEqualTo(viewport.right));
   });
+
+  testWidgets('진단: 페이지 헤더가 본문과 같은 좌측선을 갖는다', (tester) async {
+    tester.view.physicalSize = const Size(390, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final controller = _FixedDiagnosticController(const DiagnosticState());
+    await tester.pumpWidget(_host(controller));
+    await tester.pump();
+
+    // 셸 밖 화면이라 헤더가 거터를 스스로 줘야 한다 — 없으면 화면 끝에 붙는다.
+    expect(tester.getTopLeft(find.text('실력 진단')).dx, greaterThanOrEqualTo(16));
+  });
+
+  testWidgets('진단 시작: 트랙 묶음에 보이는 제목이 있다', (tester) async {
+    tallView(tester);
+    final controller = _FixedDiagnosticController(const DiagnosticState());
+    await tester.pumpWidget(_host(controller));
+    await tester.pump();
+
+    // 드롭다운의 `labelText` 가 사라진 자리를 보이는 제목이 대신한다.
+    expect(find.text('진단할 트랙'), findsOneWidget);
+  });
+
+  testWidgets('진단 문항: 누르면 즉시 제출되므로 보기는 버튼 역할이다', (tester) async {
+    final controller = _FixedDiagnosticController(
+      const DiagnosticState(
+        phase: DiagnosticContinuationPhase.questions,
+        track: 'BACKEND_SPRING',
+        nextQuestion: NextQuestion(
+          question: AssessmentQuestion(
+            id: 1,
+            type: 'MCQ',
+            content: 'Spring Bean의 기본 스코프는?',
+            bloomLevel: 'REMEMBER',
+            difficulty: 0.3,
+            options: '["singleton","prototype"]',
+          ),
+          index: 3,
+          total: 15,
+        ),
+      ),
+    );
+    await tester.pumpWidget(_host(controller));
+    await tester.pump();
+
+    final rows = tester.widgetList<DpOptionRow>(find.byType(DpOptionRow));
+    expect(rows, isNotEmpty);
+    expect(rows.every((r) => r.role == DpOptionRole.button), isTrue);
+  });
+
+  testWidgets('진단 시작: 트랙 보기는 라디오 역할이다 — 고른 것이 상태로 남는다', (tester) async {
+    tallView(tester);
+    final controller = _FixedDiagnosticController(const DiagnosticState());
+    await tester.pumpWidget(_host(controller));
+    await tester.pump();
+
+    final rows = tester.widgetList<DpOptionRow>(find.byType(DpOptionRow));
+    expect(rows, isNotEmpty);
+    expect(rows.every((r) => r.role == DpOptionRole.radio), isTrue);
+  });
+
+  testWidgets('진단 결과: 저장이 선행 조건임을 문구가 알린다', (tester) async {
+    tallView(tester);
+    final controller = _FixedDiagnosticController(_previewState());
+    await tester.pumpWidget(_host(controller, router: true));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('저장 후'), findsOneWidget);
+  });
 }

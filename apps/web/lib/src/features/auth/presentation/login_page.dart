@@ -81,7 +81,16 @@ class LoginPage extends ConsumerWidget {
                 const _LoginStory(),
                 const SizedBox(height: DpSpacing.xl),
               ],
-              access,
+              // 1열에서도 패널이 한없이 넓어지지 않게 읽기 폭으로 묶는다
+              // (medium 상단 839px 에서 791px 까지 늘어났다).
+              Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: context.appTokens.readableMaxWidth,
+                  ),
+                  child: access,
+                ),
+              ),
             ],
           );
 
@@ -93,9 +102,19 @@ class LoginPage extends ConsumerWidget {
             children: [
               brandRow(context, actions: [themeToggle]),
               const SizedBox(height: DpSpacing.xxl),
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: gutter),
-                child: layout,
+              // 셸 밖 bare 라우트라 본문 폭을 줄 셸이 없다 — 화면이 직접 캡을 둔다.
+              // 없으면 1920px 에서 로그인 버튼이 820px 로 늘어난다.
+              Center(
+                child: ConstrainedBox(
+                  key: const ValueKey('login-content'),
+                  constraints: BoxConstraints(
+                    maxWidth: context.appTokens.contentMaxWidth,
+                  ),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: gutter),
+                    child: layout,
+                  ),
+                ),
               ),
               const SizedBox(height: DpSpacing.xxl),
             ],

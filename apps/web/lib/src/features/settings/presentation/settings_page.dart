@@ -16,6 +16,21 @@ const Map<String, ({String label, bool required})> _consentMeta = {
   'ERROR_LOG': (label: '오류 진단 로그 수집', required: false),
 };
 
+/// 서버가 보내는 ISO-8601 문자열을 읽히는 날짜로 바꾼다.
+///
+/// 해석할 수 없으면 null 을 돌려 설명 줄을 생략한다 — 원시 타임스탬프
+/// (`2026-07-01T09:00:00Z`)를 사용자 문구로 내보내지 않는다. 표시는 현지 시각
+/// 기준이다(동의한 시점을 사용자의 달력으로 읽는 것이 맞다).
+String? _agreedAtLabel(String? raw) {
+  if (raw == null) return null;
+  final parsed = DateTime.tryParse(raw);
+  if (parsed == null) return null;
+  final at = parsed.toLocal();
+  final month = at.month.toString().padLeft(2, '0');
+  final day = at.day.toString().padLeft(2, '0');
+  return '${at.year}.$month.$day 동의';
+}
+
 /// 설정 화면: 동의 관리(철회)·알림 설정·로그아웃·계정 삭제.
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -176,7 +191,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }) {
     final meta = _consentMeta[type]!;
     final agreed = item?.agreed ?? false;
-    final agreedAt = item?.agreedAt;
+    final agreedAt = _agreedAtLabel(item?.agreedAt);
     return DpRowLine(
       label: Row(
         mainAxisSize: MainAxisSize.min,
@@ -186,7 +201,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           DpTag(label: meta.required ? '필수' : '선택'),
         ],
       ),
-      description: agreedAt == null ? null : Text('$agreedAt 동의'),
+      description: agreedAt == null ? null : Text(agreedAt),
       trailing: meta.required
           ? Icon(DpIcons.stepDone, color: context.dpColors.success)
           // 선택 동의: 현재 동의된 항목만 철회 가능(재동의는 후속).

@@ -166,10 +166,24 @@ class _BodyState extends ConsumerState<_Body> {
                       children: [
                         Text(
                           (p.bio?.isNotEmpty ?? false) ? p.bio! : '소개가 아직 없어요',
+                          key: const ValueKey('mypage-prof-bio'),
+                          // 편집 폼의 maxLength 가 500 이다 — 줄 수를 묶지 않으면
+                          // 긴 소개가 머리에서 아래 폼을 밀어낸다.
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
                           style: text.titleMedium?.copyWith(
                             color: (p.bio?.isNotEmpty ?? false)
                                 ? c.textPrimary
                                 : c.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: DpSpacing.xs),
+                        // `CircleAvatar` 에는 시맨틱스 라벨이 없다 — 이 문구가
+                        // 없으면 사진 유무를 알 방법이 사라진다.
+                        Text(
+                          p.avatar == null ? '프로필 사진 없음' : '프로필 사진',
+                          style: text.bodySmall?.copyWith(
+                            color: c.textSecondary,
                           ),
                         ),
                         if (trackLabel != null ||

@@ -189,6 +189,9 @@ class _ConsentPageState extends ConsumerState<ConsentPage> {
               children: [
                 brandRow(context),
                 DpPageHeader(
+                  // 셸 밖 화면이라 거터를 줄 셸이 없다 — 헤더가 스스로 준다.
+                  // 없으면 제목이 화면 끝(x=0)에 붙어 형제들과 좌측선이 갈린다.
+                  gutter: true,
                   title: isReturningUser ? '서비스 이용약관 재동의' : '가입 전 동의',
                   description: isReturningUser
                       ? '약관이 새로 게시되어 다시 동의를 받습니다'

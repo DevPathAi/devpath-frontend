@@ -9,17 +9,27 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// SettingsReady 상태로 고정(load no-op)해 렌더만 검증.
 class _ReadyController extends SettingsController {
+  _ReadyController({this.agreedAt = '2026-07-01T09:00:00Z'});
+
+  /// 서버가 보내는 원시 문자열. 해석 불가 값도 화면이 견뎌야 한다.
+  final String? agreedAt;
+
   @override
-  SettingsState build() => const SettingsReady(
+  SettingsState build() => SettingsReady(
     consents: ConsentsView(
       consentStatus: 'DONE',
       items: [
-        ConsentItemView(type: 'TERMS', agreed: true, version: 'v1'),
-        ConsentItemView(type: 'MARKETING', agreed: true, version: 'v1'),
+        ConsentItemView(
+          type: 'TERMS',
+          agreed: true,
+          version: 'v1',
+          agreedAt: agreedAt,
+        ),
+        const ConsentItemView(type: 'MARKETING', agreed: true, version: 'v1'),
       ],
       birthYear: 2000,
     ),
-    prefs: NotificationPrefs(
+    prefs: const NotificationPrefs(
       timezone: 'Asia/Seoul',
       preferredTimeSlot: '09:00',
       reminderEnabled: true,
@@ -35,16 +45,24 @@ Widget _app(
   WidgetTester tester, {
   Size size = const Size(1280, 2400),
   TextScaler? textScaler,
+  bool badDate = false,
 }) {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
   if (textScaler != null) {
-    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    // 인자를 그대로 쓴다 — 상수 2 를 박아 두면 300% 를 검증했다고 믿게 된다.
+    tester.platformDispatcher.textScaleFactorTestValue = textScaler.scale(1);
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
   }
   return ProviderScope(
-    overrides: [settingsControllerProvider.overrideWith(_ReadyController.new)],
+    overrides: [
+      settingsControllerProvider.overrideWith(
+        () => _ReadyController(
+          agreedAt: badDate ? '언젠가' : '2026-07-01T09:00:00Z',
+        ),
+      ),
+    ],
     child: MaterialApp(theme: DpTheme.light(), home: const SettingsPage()),
   );
 }
@@ -92,5 +110,22 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.byType(DpRowLine), findsWidgets);
+  });
+
+  testWidgets('설정: 동의 시각을 날짜로 읽히게 그린다 — 원시 ISO 문자열 금지', (tester) async {
+    await tester.pumpWidget(_app(tester));
+    await tester.pumpAndSettle();
+
+    expect(find.text('2026.07.01 동의'), findsOneWidget);
+    expect(find.textContaining('T09:00:00Z'), findsNothing);
+  });
+
+  testWidgets('설정: 날짜를 해석할 수 없으면 설명을 생략한다', (tester) async {
+    await tester.pumpWidget(_app(tester, badDate: true));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('언젠가'), findsNothing);
+    expect(find.textContaining('동의'), findsWidgets);
+    expect(tester.takeException(), isNull);
   });
 }

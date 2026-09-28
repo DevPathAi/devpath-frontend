@@ -157,4 +157,33 @@ void main() {
     );
     expect(box.constraints.maxWidth, 760);
   });
+
+  testWidgets('베타 대기: 시안 .narrow.center — 내용이 세로 중앙에 온다', (tester) async {
+    tester.view.physicalSize = const Size(1280, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final api = _StatusApiClient([
+      {'status': 'PENDING'},
+    ]);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          apiClientProvider.overrideWithValue(api),
+          oauthLauncherProvider.overrideWithValue(_CapturingLauncher()),
+          appConfigProvider.overrideWithValue(
+            const AppConfig(baseUrl: 'http://x', useMock: false),
+          ),
+        ],
+        child: MaterialApp(
+          theme: DpTheme.light(),
+          home: const BetaPendingPage(),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final block = tester.getRect(find.byKey(const ValueKey('beta-narrow')));
+    expect(block.center.dy, closeTo(1200 / 2, 80));
+  });
 }

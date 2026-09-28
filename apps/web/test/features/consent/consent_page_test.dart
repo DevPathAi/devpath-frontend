@@ -478,5 +478,26 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.byType(DpCheckRow), findsNWidgets(5));
+
+    // `takeException` 만으로는 부족하다 — 오버플로 예외 없이 라벨이 글자당 한
+    // 줄로 눌리는 결함이 있었다(실측: 폭 38.25 · 높이 495). 폭을 직접 잰다.
+    final label = tester.getRect(find.text('개인정보 수집·이용 동의'));
+    expect(label.width, greaterThan(150), reason: '「전문 보기」가 라벨을 짜부수면 안 된다');
+  });
+
+  testWidgets('동의: 페이지 헤더가 본문과 같은 좌측선을 갖는다', (tester) async {
+    tester.view.physicalSize = const Size(390, 4000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      ProviderScope(overrides: [..._prefill(_newUserPrefill())], child: _app()),
+    );
+    await tester.pumpAndSettle();
+
+    // 셸 밖 화면이라 헤더가 거터를 스스로 줘야 한다 — 없으면 화면 끝에 붙는다.
+    expect(
+      tester.getTopLeft(find.text('가입 전 동의')).dx,
+      greaterThanOrEqualTo(16),
+    );
   });
 }

@@ -58,6 +58,9 @@ class _DpCheckRowState extends State<DpCheckRow> {
             )
           : null,
       child: Row(
+        // `Wrap` 안에서 고유 폭을 갖도록 min + Flexible 로 둔다 — `Expanded` 는
+        // 항상 전폭을 먹어 `trailing` 을 늘 다음 줄로 밀어낸다.
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 시각만 남긴다 — 포인터는 행 제스처가 받고, 포커스·시맨틱스는 행이 갖는다.
@@ -73,7 +76,7 @@ class _DpCheckRowState extends State<DpCheckRow> {
             ),
           ),
           const SizedBox(width: DpSpacing.sm),
-          Expanded(
+          Flexible(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -110,47 +113,49 @@ class _DpCheckRowState extends State<DpCheckRow> {
             ? null
             : Border(bottom: BorderSide(color: c.border)),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      // `Row` 로 두면 non-flex 인 `trailing` 이 주축 무한 제약으로 측정돼
+      // 좁은 폭·큰 배율에서 라벨이 줄당 두 글자로 눌린다(오버플로 예외는 나지
+      // 않아 `takeException` 으로는 보이지 않는다). `DpRowLine` 이 같은 문제를
+      // `Wrap` 으로 풀었다 — 자리가 없으면 `trailing` 이 아래 줄로 내려간다.
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.start,
+        spacing: DpSpacing.lg,
+        runSpacing: DpSpacing.sm,
         children: [
           // 체크 상태와 라벨을 한 노드로 묶는다 — 체크박스만 읽히면 무엇에
           // 동의하는지 알 수 없다. 우측 `trailing` 은 이 노드 밖에 남는다.
-          Expanded(
-            child: MergeSemantics(
-              child: Semantics(
-                checked: widget.value,
-                enabled: enabled,
-                onTap: enabled ? () => onChanged(!widget.value) : null,
-                child: MouseRegion(
-                  cursor: enabled
-                      ? SystemMouseCursors.click
-                      : SystemMouseCursors.basic,
-                  child: FocusableActionDetector(
-                    enabled: enabled,
-                    onFocusChange: (v) => setState(() => _focused = v),
-                    actions: <Type, Action<Intent>>{
-                      ActivateIntent: CallbackAction<ActivateIntent>(
-                        onInvoke: (_) {
-                          onChanged?.call(!widget.value);
-                          return null;
-                        },
-                      ),
-                    },
-                    child: GestureDetector(
-                      onTap: enabled ? () => onChanged(!widget.value) : null,
-                      // 제스처 노드가 라벨 조각을 흡수하지 않게 뺀다(P3 실측).
-                      excludeFromSemantics: true,
-                      child: inner,
+          MergeSemantics(
+            child: Semantics(
+              checked: widget.value,
+              enabled: enabled,
+              onTap: enabled ? () => onChanged(!widget.value) : null,
+              child: MouseRegion(
+                cursor: enabled
+                    ? SystemMouseCursors.click
+                    : SystemMouseCursors.basic,
+                child: FocusableActionDetector(
+                  enabled: enabled,
+                  onFocusChange: (v) => setState(() => _focused = v),
+                  actions: <Type, Action<Intent>>{
+                    ActivateIntent: CallbackAction<ActivateIntent>(
+                      onInvoke: (_) {
+                        onChanged?.call(!widget.value);
+                        return null;
+                      },
                     ),
+                  },
+                  child: GestureDetector(
+                    onTap: enabled ? () => onChanged(!widget.value) : null,
+                    // 제스처 노드가 라벨 조각을 흡수하지 않게 뺀다(P3 실측).
+                    excludeFromSemantics: true,
+                    child: inner,
                   ),
                 ),
               ),
             ),
           ),
-          if (widget.trailing != null) ...[
-            const SizedBox(width: DpSpacing.sm),
-            widget.trailing!,
-          ],
+          if (widget.trailing != null) widget.trailing!,
         ],
       ),
     );
