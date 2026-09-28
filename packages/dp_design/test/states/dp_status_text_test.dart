@@ -55,5 +55,9 @@ void main() {
     expect(style.fontSize, 12);
     expect(style.fontWeight, FontWeight.w600);
     expect(style.height, closeTo(16 / 12, 0.001));
+    // 선언(height: 16/12 × fontSize 12)뿐 아니라 그려진 줄 상자도 고정한다 —
+    // 계획 Task 6 Step 1 이 요구한 렌더 단언. `labelMedium` 의 height 16/12 ×
+    // fontSize 12 = 16 논리픽셀 — 실측값도 정확히 16.0 이었다(허용오차 0.5).
+    expect(tester.getSize(find.text('✓ 완료')).height, closeTo(16, 0.5));
   });
 }

@@ -135,7 +135,9 @@ class _BodyState extends ConsumerState<_Body> {
     final mentorAccess = ref.watch(mentorAccessControllerProvider);
     final trackLabel = trackLabels[p.targetTrack];
     final goalLabel = _goalLabels[p.learningGoal];
-    // 오늘 화면(`today_panels.dart`)이 쓰는 것과 같은 값·문구다. 요청은 늘지
+    // 값은 오늘 화면(`today_panels.dart`)과 같은 `DashboardSummary` 를 쓴다.
+    // **문구는 다르다** — 그 화면은 키-값으로 「연속 학습 / N일」을 그리고,
+    // 여기 배지는 시안 `.prof` 의 `7일 연속` 형태로 합성한다. 요청은 늘지
     // 않는다 — `MyPageLoaded` 가 이미 `dashboard` 를 들고 있다.
     final summary = st.dashboard;
     final badgeLabels = <String>[
@@ -299,6 +301,11 @@ class _BodyState extends ConsumerState<_Body> {
                   key: const ValueKey('mypage-profile-kv'),
                   title: const DpPanelTitle('프로필'),
                   // 시안 사이드 `.kv`: 목표 트랙 · 목표 · 경력(년).
+                  //
+                  // **남은 divergence**: 시안의 마이페이지에는 편집 폼이 없다
+                  // (헤더의 `프로필 편집` 버튼으로 빠진다). 이 화면은 편집을
+                  // 인라인으로 두므로 같은 세 값이 아래 「프로필 편집」 패널에도
+                  // 나온다. 편집을 별도 라우트로 빼는 것은 S3-P5 범위 밖이다.
                   child: DpKeyValues(
                     entries: [
                       if (trackLabel != null)
