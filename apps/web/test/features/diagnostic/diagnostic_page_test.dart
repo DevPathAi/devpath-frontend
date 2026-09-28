@@ -285,6 +285,39 @@ void main() {
     expect(hint.top - lastRow.bottom, closeTo(8, 0.5));
   });
 
+  // 시안 `.form{gap:14px}` 는 행 **사이**에만 간격을 준다. 보기 루프도 트랙
+  // 루프와 같은 결함이 있었다 — 마지막 보기 행 뒤 여분 8px 이 남았다(P4 독립
+  // 리뷰 Important — 트랙 쪽만 회귀 테스트가 있었다).
+  testWidgets('보기 목록 마지막 행 뒤에 여분 간격이 없다', (tester) async {
+    final controller = _FixedDiagnosticController(
+      const DiagnosticState(
+        phase: DiagnosticContinuationPhase.questions,
+        track: 'BACKEND_SPRING',
+        nextQuestion: NextQuestion(
+          question: AssessmentQuestion(
+            id: 1,
+            type: 'MCQ',
+            content: 'Spring Bean의 기본 스코프는?',
+            bloomLevel: 'REMEMBER',
+            difficulty: 0.3,
+            options: '["singleton","prototype","request","session"]',
+          ),
+          index: 3,
+          total: 15,
+        ),
+      ),
+    );
+    await tester.pumpWidget(_host(controller));
+    await tester.pump();
+
+    final rows = find.byType(DpOptionRow);
+    expect(rows, findsNWidgets(4));
+    final lastRow = tester.getRect(rows.last);
+    final divider = tester.getRect(find.byType(Divider));
+    // 마지막 행과 구분선 사이는 DpSpacing.md(12) 하나뿐이어야 한다.
+    expect(divider.top - lastRow.bottom, closeTo(12, 0.5));
+  });
+
   // 트랙 보기가 8행이라(시안 예시는 3개) 폰에서 CTA 가 뷰포트 밖으로 밀린다.
   // 스크롤되므로 결함은 아니지만, 행이 더 늘면 사용자가 CTA 를 찾기 어려워진다 —
   // 지금 깊이를 고정해 다음 변경이 조용히 더 밀지 못하게 한다. 실측(M10a 수정
