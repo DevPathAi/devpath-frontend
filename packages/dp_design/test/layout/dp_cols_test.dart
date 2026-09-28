@@ -161,18 +161,13 @@ void main() {
       (840, true),
       (1240, true),
     ]) {
-      tester.view.devicePixelRatio = 1;
-      tester.view.physicalSize = Size(width, 900);
-      addTearDown(tester.view.reset);
+      _size(tester, Size(width, 900));
 
       await tester.pumpWidget(
-        MaterialApp(
-          theme: DpTheme.light(),
-          home: const Scaffold(
-            body: DpCols(
-              main: SizedBox(key: ValueKey('cols-main'), height: 40),
-              side: SizedBox(key: ValueKey('cols-side'), height: 40),
-            ),
+        _host(
+          const DpCols(
+            main: SizedBox(key: ValueKey('cols-main'), height: 40),
+            side: SizedBox(key: ValueKey('cols-side'), height: 40),
           ),
         ),
       );
