@@ -64,49 +64,65 @@ class _BetaPendingPageState extends ConsumerState<BetaPendingPage> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.dpColors;
+    final text = Theme.of(context).textTheme;
     return Scaffold(
-      body: Center(
+      body: SafeArea(
         child: SingleChildScrollView(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 440),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                brandRow(context),
-                const DpPageHeader(title: '베타 대기', description: '승인되면 알려드립니다'),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: DpSpacing.xl),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        _expired ? Icons.lock_clock : Icons.hourglass_top,
-                        size: 48,
-                      ),
-                      const SizedBox(height: DpSpacing.lg),
-                      Text(
-                        _expired
-                            ? '대기 세션이 만료되었어요. 승인 여부는 이메일로 안내됩니다. 다시 로그인해 확인하세요.'
-                            : '베타 대기자 명단에 등록되었어요. 승인되면 이메일로 알려드리고, 이 화면에서 자동으로 입장합니다.',
-                        textAlign: TextAlign.center,
-                      ),
-                      if (_expired) ...[
-                        const SizedBox(height: DpSpacing.xl),
-                        FilledButton(
-                          onPressed: () => context.go('/login'),
-                          child: const Text('다시 로그인'),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // 셸 밖 화면의 유일한 제품 정체성 표시.
+              brandRow(context),
+              const SizedBox(height: DpSpacing.xxl),
+              // 시안 `beta` 는 `.narrow.center` 다 — 좌측 정렬 페이지 헤더와
+              // 맞지 않아 상태를 태그로, 제목을 headlineSmall 로 직접 그린다.
+              Center(
+                child: ConstrainedBox(
+                  key: const ValueKey('beta-narrow'),
+                  constraints: BoxConstraints(
+                    maxWidth: context.appTokens.readableMaxWidth,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(DpSpacing.xl),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // 아이콘이 아니라 태그로 상태를 알린다 — 스크린리더가
+                        // 읽을 수 있고 시안의 면 문법과도 맞는다.
+                        DpTag(label: _expired ? '대기 만료' : '베타 대기'),
+                        const SizedBox(height: DpSpacing.md),
+                        Text(
+                          _expired ? '다시 로그인해 확인해 주세요' : '승인되면 알려드립니다',
+                          style: text.headlineSmall,
+                          textAlign: TextAlign.center,
                         ),
-                      ] else ...[
+                        const SizedBox(height: DpSpacing.sm),
+                        Text(
+                          _expired
+                              ? '대기 세션이 만료되었어요. 승인 여부는 이메일로 안내됩니다.'
+                              : '베타 대기자 명단에 등록되었어요. 승인되면 이메일로 알려드리고, 이 화면에서 자동으로 입장합니다.',
+                          style: text.bodyMedium?.copyWith(
+                            color: c.textSecondary,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
                         const SizedBox(height: DpSpacing.xl),
-                        const CircularProgressIndicator(),
+                        if (_expired)
+                          FilledButton(
+                            onPressed: () => context.go('/login'),
+                            child: const Text('다시 로그인'),
+                          )
+                        else
+                          const DpLoading(label: '승인을 기다리는 중'),
                       ],
-                      const SizedBox(height: DpSpacing.xl),
-                    ],
+                    ),
                   ),
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(height: DpSpacing.xxl),
+            ],
           ),
         ),
       ),

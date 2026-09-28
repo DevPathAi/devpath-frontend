@@ -243,11 +243,11 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    // `DpCheckRow` 는 행 키로 읽는다 — 라벨이 Widget(제목 + 필수/선택 태그)이라
+    // `widgetWithText` 로 행을 특정할 수 없다.
     bool privacyChecked() => tester
-        .widget<CheckboxListTile>(
-          find.widgetWithText(CheckboxListTile, '개인정보 수집·이용 동의'),
-        )
-        .value!;
+        .widget<DpCheckRow>(find.byKey(const ValueKey('consent-privacy-row')))
+        .value;
 
     await tester.tap(find.byKey(const ValueKey('consent-privacy-doc')));
     await tester.pump();
@@ -340,9 +340,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final marketing = tester
-        .widget<CheckboxListTile>(
-          find.widgetWithText(CheckboxListTile, '마케팅 정보 수신 동의'),
-        )
+        .widget<DpCheckRow>(find.byKey(const ValueKey('consent-marketing-row')))
         .value;
 
     expect(marketing, isTrue);
@@ -360,12 +358,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    bool checkedOf(String label) => tester
-        .widget<CheckboxListTile>(find.widgetWithText(CheckboxListTile, label))
-        .value!;
+    bool checkedOf(String name) => tester
+        .widget<DpCheckRow>(find.byKey(ValueKey('consent-$name-row')))
+        .value;
 
-    expect(checkedOf('서비스 이용약관 동의'), isFalse);
-    expect(checkedOf('개인정보 수집·이용 동의'), isFalse);
+    expect(checkedOf('terms'), isFalse);
+    expect(checkedOf('privacy'), isFalse);
   });
 
   testWidgets('birthYear가 있으면 입력란에 채워진다', (tester) async {
@@ -437,5 +435,48 @@ void main() {
     await tester.pump();
 
     expect(recorder.submits, 1);
+  });
+
+  testWidgets('동의: 본문 폭이 시안 .narrow(readableMaxWidth 760)다', (tester) async {
+    bigView(tester);
+    await tester.pumpWidget(
+      ProviderScope(overrides: [..._prefill(_newUserPrefill())], child: _app()),
+    );
+    await tester.pumpAndSettle();
+
+    final box = tester.widget<ConstrainedBox>(
+      find.byKey(const ValueKey('consent-narrow')),
+    );
+    expect(box.constraints.maxWidth, 760);
+  });
+
+  testWidgets('동의: 체크 행 5개를 DpCheckRow 로 그린다 — 필수 2 + 선택 3', (tester) async {
+    bigView(tester);
+    await tester.pumpWidget(
+      ProviderScope(overrides: [..._prefill(_newUserPrefill())], child: _app()),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(DpCheckRow), findsNWidgets(5));
+    expect(find.byType(CheckboxListTile), findsNothing);
+    // 시안 `.chk` 는 항목마다 필수/선택을 스스로 알린다 — 한 행만 읽어도 안다.
+    expect(find.widgetWithText(DpTag, '필수'), findsNWidgets(2));
+    expect(find.widgetWithText(DpTag, '선택'), findsNWidgets(3));
+  });
+
+  testWidgets('동의: 390px · 200% 배율에서 체크 행이 깨지지 않는다', (tester) async {
+    tester.view.physicalSize = const Size(390, 4000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+    await tester.pumpWidget(
+      ProviderScope(overrides: [..._prefill(_newUserPrefill())], child: _app()),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.byType(DpCheckRow), findsNWidgets(5));
   });
 }

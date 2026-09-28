@@ -89,6 +89,13 @@ class _ConsentPageState extends ConsumerState<ConsentPage> {
     super.dispose();
   }
 
+  static final _required = _ConsentKind.values
+      .where((k) => k.required)
+      .toList(growable: false);
+  static final _optional = _ConsentKind.values
+      .where((k) => !k.required)
+      .toList(growable: false);
+
   bool get _requiredAllChecked => _ConsentKind.values
       .where((k) => k.required)
       .every((k) => _agreed[k] == true);
@@ -156,7 +163,7 @@ class _ConsentPageState extends ConsumerState<ConsentPage> {
     });
 
     if (prefill.isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(body: DpLoading(label: '동의 항목을 불러오는 중'));
     }
 
     // 기존 이용자 판별: 조회된 동의 이력(items)이 있으면 재동의로 본다.
@@ -170,7 +177,12 @@ class _ConsentPageState extends ConsumerState<ConsentPage> {
       body: Center(
         child: SingleChildScrollView(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 440),
+            // 시안 `.narrow{max-width:760px}`. 440 은 `.chk` 의 라벨+설명+
+            // 「전문 보기」 3열을 한 줄에 담기 좁았다.
+            key: const ValueKey('consent-narrow'),
+            constraints: BoxConstraints(
+              maxWidth: context.appTokens.readableMaxWidth,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,
@@ -188,11 +200,18 @@ class _ConsentPageState extends ConsumerState<ConsentPage> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      for (final k in _ConsentKind.values.where(
-                        (k) => k.required,
-                      ))
-                        _consentTile(k),
-                      const Divider(height: DpSpacing.xl),
+                      // 시안 `.chk` 패널 — 필수 항목.
+                      DpPanel(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            for (final k in _required)
+                              _consentTile(k, last: k == _required.last),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: DpSpacing.xl),
                       TextField(
                         controller: _birthYear,
                         focusNode: _birthYearFocus,
@@ -217,10 +236,18 @@ class _ConsentPageState extends ConsumerState<ConsentPage> {
                           color: c.textSecondary,
                         ),
                       ),
-                      for (final k in _ConsentKind.values.where(
-                        (k) => !k.required,
-                      ))
-                        _consentTile(k),
+                      const SizedBox(height: DpSpacing.sm),
+                      // 시안 `.chk` 패널 — 선택 항목.
+                      DpPanel(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            for (final k in _optional)
+                              _consentTile(k, last: k == _optional.last),
+                          ],
+                        ),
+                      ),
                       if (state is ConsentError) ...[
                         const SizedBox(height: DpSpacing.md),
                         Text(
@@ -264,22 +291,32 @@ class _ConsentPageState extends ConsumerState<ConsentPage> {
     );
   }
 
-  Widget _consentTile(_ConsentKind k) => CheckboxListTile(
+  /// 시안 `.chk` 한 행 — 체크 + 라벨·설명 + 우측 「전문 보기」.
+  /// `DpCheckRow` 는 체크+라벨을 한 노드로 묶고 우측 링크는 별개 노드로 남긴다
+  /// (`CheckboxListTile` 은 셋을 병합해 스크린리더가 링크를 놓쳤다).
+  Widget _consentTile(_ConsentKind k, {required bool last}) => DpCheckRow(
+    key: ValueKey('consent-${k.name}-row'),
     value: _agreed[k] ?? false,
-    onChanged: (v) => setState(() => _agreed[k] = v ?? false),
-    controlAffinity: ListTileControlAffinity.leading,
-    contentPadding: EdgeInsets.zero,
-    title: Text(k.title),
-    subtitle: Text(k.desc),
+    onChanged: (v) => setState(() => _agreed[k] = v),
+    last: last,
+    label: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Flexible(child: Text(k.title)),
+        const SizedBox(width: DpSpacing.sm),
+        DpTag(label: k.required ? '필수' : '선택'),
+      ],
+    ),
+    description: Text(k.desc),
     // 전문은 새 탭으로 연다. 동의 화면을 떠나면 여기까지 온 맥락(OAuth 직후)이
-    // 끊긴다.
-    secondary: k.docUrl == null
+    // 끊긴다. 같은 문구의 링크가 둘이라 `semanticsLabel` 로 구분한다.
+    trailing: k.docUrl == null
         ? null
-        : TextButton(
+        : DpLink.inline(
             key: ValueKey('consent-${k.name}-doc'),
-            onPressed: () =>
-                ref.read(externalLinkOpenerProvider).open(k.docUrl!),
-            child: Text('전문 보기', semanticsLabel: '${k.title} 전문 보기'),
+            text: '전문 보기',
+            semanticsLabel: '${k.title} 전문 보기',
+            onTap: () => ref.read(externalLinkOpenerProvider).open(k.docUrl!),
           ),
   );
 }
@@ -292,7 +329,11 @@ class _BlockedView extends ConsumerWidget {
     return Scaffold(
       body: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 360),
+          // 시안 `.narrow` — 차단 안내도 같은 폭을 쓴다.
+          key: const ValueKey('consent-blocked-narrow'),
+          constraints: BoxConstraints(
+            maxWidth: context.appTokens.readableMaxWidth,
+          ),
           child: Padding(
             padding: const EdgeInsets.all(DpSpacing.xl),
             child: Column(
