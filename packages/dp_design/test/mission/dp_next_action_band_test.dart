@@ -48,6 +48,21 @@ DpNextActionBand _band({
 );
 
 void main() {
+  // DESIGN.md §3: 장식용 그림자 금지 — 시안 `.next` 도 테두리 한 겹뿐이다.
+  testWidgets('밴드는 그림자를 갖지 않는다', (tester) async {
+    await tester.pumpWidget(_host(_band(onPressed: (_) {})));
+
+    final box = tester.widget<DecoratedBox>(
+      find
+          .descendant(
+            of: find.byType(DpNextActionBand),
+            matching: find.byType(DecoratedBox),
+          )
+          .first,
+    );
+    expect((box.decoration as BoxDecoration).boxShadow, isNull);
+  });
+
   testWidgets(
     'ready action relates its label to the expected outcome and returns ID',
     (tester) async {

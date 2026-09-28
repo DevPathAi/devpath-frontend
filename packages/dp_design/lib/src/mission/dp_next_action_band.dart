@@ -83,13 +83,8 @@ class _DpNextActionBandState extends State<DpNextActionBand> {
         color: context.dpColors.surface,
         border: Border.all(color: context.dpColors.border),
         borderRadius: BorderRadius.circular(context.appTokens.panelRadius),
-        boxShadow: [
-          BoxShadow(
-            color: context.dpColors.textPrimary.withValues(alpha: 0.04),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        // 그림자 없음 — DESIGN.md §3(장식용 그림자 금지)이고 시안 `.next` 는
+        // 테두리 한 겹뿐이다.
       ),
       child: Padding(
         padding: const EdgeInsets.all(DpSpacing.xl),
