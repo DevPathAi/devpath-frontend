@@ -9,6 +9,7 @@ import 'package:devpath_web/src/features/diagnostic/state/diagnostic_state.dart'
 import 'package:dp_core/dp_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dp_design/dp_design.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
@@ -70,7 +71,7 @@ void main() {
           authControllerProvider.overrideWith(() => auth),
           diagnosticControllerProvider.overrideWith(() => continuation),
         ],
-        child: MaterialApp.router(routerConfig: router),
+        child: MaterialApp.router(theme: DpTheme.light(), routerConfig: router),
       ),
     );
     await tester.pump();
@@ -108,7 +109,7 @@ void main() {
           authControllerProvider.overrideWith(() => auth),
           diagnosticControllerProvider.overrideWith(() => continuation),
         ],
-        child: MaterialApp.router(routerConfig: router),
+        child: MaterialApp.router(theme: DpTheme.light(), routerConfig: router),
       ),
     );
     await tester.pump();
@@ -141,10 +142,87 @@ void main() {
           authControllerProvider.overrideWith(() => auth),
           diagnosticControllerProvider.overrideWith(() => continuation),
         ],
-        child: MaterialApp.router(routerConfig: router),
+        child: MaterialApp.router(theme: DpTheme.light(), routerConfig: router),
       ),
     );
     await tester.pump();
+    expect(find.bySemanticsLabel('로그인을 확인하는 중'), findsOneWidget);
+  });
+
+  testWidgets('인증 콜백은 시안 beta 파생 — 본문이 readable 760 중앙 한 열이다', (tester) async {
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final auth = _CallbackAuthController();
+    final continuation = _ContinuationController();
+    final router = GoRouter(
+      initialLocation: '/auth/callback',
+      routes: [
+        GoRoute(
+          path: '/auth/callback',
+          builder: (_, _) => const AuthCallbackPage(),
+        ),
+        GoRoute(path: '/diagnostic', builder: (_, _) => const Text('PREVIEW')),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authControllerProvider.overrideWith(() => auth),
+          diagnosticControllerProvider.overrideWith(() => continuation),
+        ],
+        child: MaterialApp.router(theme: DpTheme.light(), routerConfig: router),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    // 옛 420 고정폭이 아니라 토큰(`AppTokens.readableMaxWidth` = 760)을 쓴다.
+    // `ConstrainedBox` 자체는 자식의 고유 폭을 갖기 때문에 렌더 폭이 아니라
+    // 제약을 단언한다.
+    final box = tester.widget<ConstrainedBox>(
+      find.byKey(const ValueKey('auth-callback-narrow')),
+    );
+    expect(box.constraints.maxWidth, 760);
+
+    // 그리고 그 블록은 가로 중앙에 놓인다.
+    final rect = tester.getRect(
+      find.byKey(const ValueKey('auth-callback-narrow')),
+    );
+    expect(rect.center.dx, closeTo(1280 / 2, 0.5));
+  });
+
+  testWidgets('인증 콜백 진행 중 상태도 같은 narrow 프레임을 쓴다', (tester) async {
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final auth = _PendingAuthController();
+    final continuation = _ContinuationController();
+    final router = GoRouter(
+      initialLocation: '/auth/callback',
+      routes: [
+        GoRoute(
+          path: '/auth/callback',
+          builder: (_, _) => const AuthCallbackPage(),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authControllerProvider.overrideWith(() => auth),
+          diagnosticControllerProvider.overrideWith(() => continuation),
+        ],
+        child: MaterialApp.router(theme: DpTheme.light(), routerConfig: router),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('auth-callback-narrow')), findsOneWidget);
     expect(find.bySemanticsLabel('로그인을 확인하는 중'), findsOneWidget);
   });
 }

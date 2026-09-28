@@ -43,48 +43,67 @@ class _AuthCallbackPageState extends ConsumerState<AuthCallbackPage> {
               .markOAuthFailure('로그인을 완료하지 못했어요. 진단 결과는 이 탭에 그대로 남아 있어요.');
         });
       }
-      return Scaffold(
-        body: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    '로그인을 완료하지 못했어요',
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                  const SizedBox(height: 8),
-                  const Text('진단 결과는 이 탭에 남아 있습니다. 다시 확인하거나 결과로 돌아갈 수 있어요.'),
-                  const SizedBox(height: 8),
-                  Text(
-                    failureCopy,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  FilledButton(
-                    onPressed: () => ref
-                        .read(authControllerProvider.notifier)
-                        .bootstrapFromCallback(),
-                    child: const Text('로그인 다시 확인'),
-                  ),
-                  const SizedBox(height: 8),
-                  OutlinedButton(
-                    onPressed: () => context.go('/diagnostic'),
-                    child: const Text('진단 결과로 돌아가기'),
-                  ),
-                ],
-              ),
-            ),
+      return _CallbackFrame(
+        children: [
+          Text(
+            '로그인을 완료하지 못했어요',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.headlineSmall,
           ),
-        ),
+          const SizedBox(height: DpSpacing.sm),
+          const Text(
+            '진단 결과는 이 탭에 남아 있습니다. 다시 확인하거나 결과로 돌아갈 수 있어요.',
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: DpSpacing.sm),
+          Text(
+            failureCopy,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: context.dpColors.danger),
+          ),
+          const SizedBox(height: DpSpacing.xl),
+          FilledButton(
+            onPressed: () => ref
+                .read(authControllerProvider.notifier)
+                .bootstrapFromCallback(),
+            child: const Text('로그인 다시 확인'),
+          ),
+          const SizedBox(height: DpSpacing.sm),
+          OutlinedButton(
+            onPressed: () => context.go('/diagnostic'),
+            child: const Text('진단 결과로 돌아가기'),
+          ),
+        ],
       );
     }
-    return const Scaffold(body: DpLoading(label: '로그인을 확인하는 중'));
+    return const _CallbackFrame(children: [DpLoading(label: '로그인을 확인하는 중')]);
   }
+}
+
+/// 시안 `beta` 파생 — `.narrow.center` 중앙 정렬 한 열.
+/// 진행·실패 두 상태가 같은 프레임을 쓴다(폭이 상태에 따라 달라지면 눈에 띈다).
+class _CallbackFrame extends StatelessWidget {
+  const _CallbackFrame({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    body: Center(
+      child: ConstrainedBox(
+        key: const ValueKey('auth-callback-narrow'),
+        constraints: BoxConstraints(
+          maxWidth: context.appTokens.readableMaxWidth,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(DpSpacing.xl),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: children,
+          ),
+        ),
+      ),
+    ),
+  );
 }
