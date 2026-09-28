@@ -214,4 +214,76 @@ void main() {
     expect(bio.maxLines, 3);
     expect(bio.overflow, TextOverflow.ellipsis);
   });
+
+  testWidgets('마이페이지: 머리는 배지, 프로필 3필드는 사이드 kv 로', (tester) async {
+    tester.view.physicalSize = const Size(1200, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      _host(
+        const MyPageLoaded(
+          profile: ProfileView(
+            bio: '백엔드 지망',
+            targetTrack: 'BACKEND_SPRING',
+            experienceYears: 2,
+          ),
+          dashboard: DashboardSummary(
+            streakDays: 3,
+            progressPercent: 40,
+            completedContentCount: 7,
+            badges: ['첫 경로'],
+          ),
+          activity: MyActivity(questionCount: 2, answerCount: 5),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    // 머리(`.prof`) 태그는 배지다 — 오늘 화면과 같은 문구.
+    expect(find.text('첫 경로'), findsOneWidget);
+    expect(find.text('3일 연속'), findsOneWidget);
+
+    // 프로필 3필드는 사이드 kv 패널로 옮겼다.
+    final kvPanel = find.byKey(const ValueKey('mypage-profile-kv'));
+    expect(kvPanel, findsOneWidget);
+    expect(
+      find.descendant(of: kvPanel, matching: find.text('백엔드 (Spring)')),
+      findsOneWidget,
+    );
+
+    // 머리 안에는 「경력」 문구가 없다 — 프로필 필드가 자리를 옮겼다는 뜻.
+    final head = find.byKey(const ValueKey('mypage-prof'));
+    expect(
+      find.descendant(of: head, matching: find.textContaining('경력')),
+      findsNothing,
+    );
+
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('마이페이지: 프로필 3필드가 전부 비면 사이드 kv 패널을 만들지 않는다', (tester) async {
+    tester.view.physicalSize = const Size(1200, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      _host(
+        const MyPageLoaded(
+          profile: ProfileView(bio: '소개만 있음'),
+          dashboard: DashboardSummary(
+            streakDays: 3,
+            progressPercent: 40,
+            completedContentCount: 7,
+          ),
+          activity: MyActivity(questionCount: 2, answerCount: 5),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('mypage-profile-kv')), findsNothing);
+
+    expect(tester.takeException(), isNull);
+  });
 }
