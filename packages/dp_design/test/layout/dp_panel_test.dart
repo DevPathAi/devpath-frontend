@@ -27,6 +27,35 @@ void main() {
     expect((d.border! as Border).top.width, 1);
     expect((d.border! as Border).top.color, c.border);
     expect(d.borderRadius, BorderRadius.circular(DpRadius.card));
+    // 패널은 그림자를 쓰지 않는다 — 시안의 면 구분은 테두리 한 겹뿐이고
+    // DESIGN.md §3 도 장식용 그림자를 금지한다.
+    expect(d.boxShadow, isNull);
+  });
+
+  // 패널은 색을 가진 Container 다 — Material ListTile 은 가장 가까운 Material
+  // (보통 Scaffold)에 잉크를 그리므로 패널 표면이 그 잉크를 덮고 프레임워크
+  // 단언에 걸린다. 패널이 스스로 투명 Material 을 두면 호출부가 그 함정을
+  // 몰라도 된다(P4 Task 3 의 실패 7건이 전부 이 원인이었다).
+  testWidgets('패널 안의 Material ListTile 이 단언 없이 그려진다', (tester) async {
+    await tester.pumpWidget(
+      _host(
+        DpPanel(
+          title: const DpPanelTitle('제목'),
+          child: ListTile(title: const Text('행'), onTap: () {}),
+        ),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(
+      find.descendant(
+        of: find.byType(DpPanel),
+        matching: find.byWidgetPredicate(
+          (w) => w is Material && w.type == MaterialType.transparency,
+        ),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('title 이 없으면 제목행을 그리지 않는다', (tester) async {

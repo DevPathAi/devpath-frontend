@@ -56,6 +56,17 @@ void main() {
         expect(contrast(p.textSecondary, p.surface), greaterThanOrEqualTo(4.5));
       });
 
+      test('DpNextActionBand: 비활성 이유는 accentSoft 위 textSecondary 4.5:1', () {
+        // 밴드 배경이 시안 `.next{background:var(--soft)}` 를 따라 accentSoft 가
+        // 되면서 `disabledReason`(textSecondary)이 그 위에 놓인다. 앞 단계에서
+        // 「실재하지 않는 조합」이라 뺐던 것이 이제 실재한다 — 같은 원칙으로
+        // 되돌린다. 한쪽 테마만 보면 미달을 놓치므로 두 테마에서 잰다.
+        expect(
+          contrast(p.textSecondary, p.accentSoft),
+          greaterThanOrEqualTo(4.5),
+        );
+      });
+
       test('★채움 위 텍스트 4.5:1 — 다크는 onPrimary 가 어두운 색이다', () {
         // 밝은 인디고 채움 위에는 어두운 전경이 필요하다. 이 단언이 그 반전을 지킨다.
         expect(contrast(p.onPrimary, p.primary), greaterThanOrEqualTo(4.5));

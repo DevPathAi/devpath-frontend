@@ -80,16 +80,13 @@ class _DpNextActionBandState extends State<DpNextActionBand> {
   Widget build(BuildContext context) {
     final band = DecoratedBox(
       decoration: BoxDecoration(
-        color: context.dpColors.surface,
-        border: Border.all(color: context.dpColors.border),
+        // 시안 `.next{background:var(--soft);border:1px solid var(--line)}`.
+        // `accentSoft`·`accentLine` 이 각각 그 두 토큰과 값이 같다.
+        color: context.dpColors.accentSoft,
+        border: Border.all(color: context.dpColors.accentLine),
         borderRadius: BorderRadius.circular(context.appTokens.panelRadius),
-        boxShadow: [
-          BoxShadow(
-            color: context.dpColors.textPrimary.withValues(alpha: 0.04),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        // 그림자 없음 — DESIGN.md §3(장식용 그림자 금지)이고 시안 `.next` 는
+        // 배경 + 테두리 한 겹뿐이다.
       ),
       child: Padding(
         padding: const EdgeInsets.all(DpSpacing.xl),
@@ -201,14 +198,24 @@ class _PrimaryAction extends StatelessWidget {
       DpNextActionState.completed => colors.primaryTextStrong,
       DpNextActionState.disabled => colors.textSecondary,
     };
-    final semanticLabel = '$displayedLabel, 예상 결과: ${widget.expectedOutcome}';
+    // disabled 는 사용자가 실행할 수 없다 — 그 자리에서 「예상 결과」를 읽으면
+    // 지킬 수 없는 약속이 된다(P4 독립 리뷰 M7). 대신 왜 못 누르는지를 읽는다.
+    // 보이는 텍스트는 그대로 둔다: 예상 결과 줄과 그 아래 이유 줄이 함께 화면이
+    // 무엇을 기다리는지 설명한다.
+    // `assert` 는 릴리스에서 제거되므로 null 이면 스크린리더가 "null" 을 읽는다.
+    // 이유가 없으면 최소한 「왜 못 누르는지 모른다」가 아니라 「못 누른다」는
+    // 사실이라도 정확히 전한다.
+    final semanticLabel = widget.state == DpNextActionState.disabled
+        ? '$displayedLabel, 사용할 수 없음: ${widget.disabledReason ?? '지금은 사용할 수 없습니다'}'
+        : '$displayedLabel, 예상 결과: ${widget.expectedOutcome}';
     final enabled = actionable;
 
     return Semantics(
       label: semanticLabel,
-      hint: widget.state == DpNextActionState.disabled
-          ? widget.disabledReason
-          : null,
+      // `hint` 를 쓰지 않는다: disabled 의 이유는 이미 `label` 이 담는다.
+      // 둘 다 담으면 스크린리더가 같은 문장을 두 번 읽는다. `label` 은 항상
+      // 낭독되지만 `hint` 는 상세도 설정에 따라 생략될 수 있으므로, 반드시
+      // 들려야 하는 이유는 `label` 쪽에 둔다.
       button: true,
       enabled: enabled,
       liveRegion:

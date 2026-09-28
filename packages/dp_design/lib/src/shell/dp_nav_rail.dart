@@ -240,15 +240,19 @@ class DpNavRail extends StatelessWidget {
                 icon,
                 if (extended) ...[
                   const SizedBox(width: DpSpacing.md),
+                  // 래퍼 `Semantics(label: d.label)` 가 이미 라벨을 소유한다 —
+                  // 보이는 Text 까지 트리에 올라가면 스크린리더가 두 번 읽는다.
                   Expanded(
-                    child: Text(
-                      d.label,
-                      overflow: TextOverflow.ellipsis,
-                      style: text.bodyMedium?.copyWith(
-                        color: selected ? c.headerText : c.headerMuted,
-                        fontWeight: selected
-                            ? FontWeight.w600
-                            : FontWeight.w400,
+                    child: ExcludeSemantics(
+                      child: Text(
+                        d.label,
+                        overflow: TextOverflow.ellipsis,
+                        style: text.bodyMedium?.copyWith(
+                          color: selected ? c.headerText : c.headerMuted,
+                          fontWeight: selected
+                              ? FontWeight.w600
+                              : FontWeight.w400,
+                        ),
                       ),
                     ),
                   ),

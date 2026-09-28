@@ -151,4 +151,40 @@ void main() {
     final b = tester.getRect(find.byKey(const ValueKey('side-b')));
     expect(b.top - a.bottom, DpSpacing.lg);
   });
+
+  // 주석과 코드가 서로 다른 경계를 말하던 모순(P4 독립 리뷰 I6)이 다시 열리지
+  // 않게 네 경계값을 직접 고정한다. 839→1열 / 840→2열 이 계약이다.
+  testWidgets('2열 경계는 840 이다 — 839 는 1열, 840 은 2열', (tester) async {
+    for (final (width, expectTwoColumn) in <(double, bool)>[
+      (599, false),
+      (839, false),
+      (840, true),
+      (1240, true),
+    ]) {
+      _size(tester, Size(width, 900));
+
+      await tester.pumpWidget(
+        _host(
+          const DpCols(
+            main: SizedBox(key: ValueKey('cols-main'), height: 40),
+            side: SizedBox(key: ValueKey('cols-side'), height: 40),
+          ),
+        ),
+      );
+
+      final mainRect = tester.getRect(find.byKey(const ValueKey('cols-main')));
+      final sideRect = tester.getRect(find.byKey(const ValueKey('cols-side')));
+      // 2열이면 사이드가 주 내용 오른쪽에 있고, 1열이면 아래에 있다.
+      expect(
+        sideRect.left > mainRect.left,
+        expectTwoColumn,
+        reason: 'width=$width 에서 2열 기대=$expectTwoColumn',
+      );
+      expect(
+        sideRect.top > mainRect.top,
+        !expectTwoColumn,
+        reason: 'width=$width',
+      );
+    }
+  });
 }

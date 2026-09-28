@@ -135,6 +135,16 @@ class _BodyState extends ConsumerState<_Body> {
     final mentorAccess = ref.watch(mentorAccessControllerProvider);
     final trackLabel = trackLabels[p.targetTrack];
     final goalLabel = _goalLabels[p.learningGoal];
+    // 값은 오늘 화면(`today_panels.dart`)과 같은 `DashboardSummary` 를 쓴다.
+    // **문구는 다르다** — 그 화면은 키-값으로 「연속 학습 / N일」을 그리고,
+    // 여기 배지는 시안 `.prof` 의 `7일 연속` 형태로 합성한다. 요청은 늘지
+    // 않는다 — `MyPageLoaded` 가 이미 `dashboard` 를 들고 있다.
+    final summary = st.dashboard;
+    final badgeLabels = <String>[
+      ...?summary?.badges,
+      if (summary != null && summary.streakDays > 0)
+        '${summary.streakDays}일 연속',
+    ];
 
     return SliverPadding(
       // 좌우 패딩은 셸이 준다 — 화면은 위아래만 준다.
@@ -145,8 +155,9 @@ class _BodyState extends ConsumerState<_Body> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: [
-              // 시안 `.prof` — 패널이 아니다(배경·테두리 없음). 아바타 + 소개 + 태그.
+              // 시안 `.prof` — 패널이 아니다(배경·테두리 없음). 아바타 + 소개 + 배지.
               Row(
+                key: const ValueKey('mypage-prof'),
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   CircleAvatar(
@@ -186,18 +197,14 @@ class _BodyState extends ConsumerState<_Body> {
                             color: c.textSecondary,
                           ),
                         ),
-                        if (trackLabel != null ||
-                            goalLabel != null ||
-                            p.experienceYears != null) ...[
+                        if (badgeLabels.isNotEmpty) ...[
                           const SizedBox(height: DpSpacing.sm),
                           Wrap(
+                            key: const ValueKey('mypage-prof-badges'),
                             spacing: DpSpacing.sm,
                             runSpacing: DpSpacing.sm,
                             children: [
-                              if (trackLabel != null) DpTag(label: trackLabel),
-                              if (goalLabel != null) DpTag(label: goalLabel),
-                              if (p.experienceYears != null)
-                                DpTag(label: '경력 ${p.experienceYears}년'),
+                              for (final b in badgeLabels) DpTag(label: b),
                             ],
                           ),
                         ],
@@ -287,6 +294,29 @@ class _BodyState extends ConsumerState<_Body> {
           ),
           side: DpSide(
             children: [
+              if (trackLabel != null ||
+                  goalLabel != null ||
+                  p.experienceYears != null)
+                DpPanel(
+                  key: const ValueKey('mypage-profile-kv'),
+                  title: const DpPanelTitle('프로필'),
+                  // 시안 사이드 `.kv`: 목표 트랙 · 목표 · 경력(년).
+                  //
+                  // **남은 divergence**: 시안의 마이페이지에는 편집 폼이 없다
+                  // (헤더의 `프로필 편집` 버튼으로 빠진다). 이 화면은 편집을
+                  // 인라인으로 두므로 같은 세 값이 아래 「프로필 편집」 패널에도
+                  // 나온다. 편집을 별도 라우트로 빼는 것은 S3-P5 범위 밖이다.
+                  child: DpKeyValues(
+                    entries: [
+                      if (trackLabel != null)
+                        (key: '목표 트랙', value: Text(trackLabel)),
+                      if (goalLabel != null)
+                        (key: '목표', value: Text(goalLabel)),
+                      if (p.experienceYears != null)
+                        (key: '경력(년)', value: Text('${p.experienceYears}')),
+                    ],
+                  ),
+                ),
               DpPanel(
                 title: const DpPanelTitle('AI 멘토 초대'),
                 padding: const EdgeInsets.all(DpSpacing.lg),

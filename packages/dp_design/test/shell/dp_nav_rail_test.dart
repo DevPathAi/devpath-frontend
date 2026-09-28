@@ -213,6 +213,26 @@ void main() {
     expect(activeLabel.style?.color, DpColors.light.headerText);
   });
 
+  testWidgets('펼친 레일 항목의 라벨은 한 번만 읽힌다', (tester) async {
+    final handle = tester.ensureSemantics();
+    await tester.pumpWidget(
+      _host(
+        DpNavRail(destinations: _dests, selectedIndex: 0, onSelect: (_) {}),
+      ),
+    );
+
+    // 래퍼 Semantics가 라벨을 소유하고, 보이는 Text는 시맨틱스에서
+    // 빠져야 한다. ExcludeSemantics 적용 전에는 라벨이 두 번 올라간다.
+    final semantics = tester.getSemantics(
+      find.byKey(const ValueKey('rail-item-semantics-0')),
+    );
+
+    // 라벨이 정확히 한 번만 있어야 한다 — 중복이 없어야 한다
+    expect(semantics.label, '대시보드');
+
+    handle.dispose();
+  });
+
   testWidgets('접힘 상태 항목에 접근 가능한 툴팁이 있다', (tester) async {
     await tester.pumpWidget(
       _host(

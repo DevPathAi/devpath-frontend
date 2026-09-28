@@ -87,27 +87,20 @@ class PathPlanView extends StatelessWidget {
         const SizedBox(height: DpSpacing.xl),
         DpPanel(
           title: const DpPanelTitle('이번 주 과제'),
-          // `DpPanel` 은 색을 가진 `DecoratedBox` 다 — 그 안의 Material
-          // `ListTile` 은 가장 가까운 Material(Scaffold) 에 잉크를 그리므로
-          // 패널 표면에 가려진다(프레임워크가 단언으로 잡는다). 패널 안쪽에
-          // 투명 Material 을 한 겹 둬 잉크가 패널 위에 오게 한다.
-          child: Material(
-            type: MaterialType.transparency,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    DpSpacing.lg,
-                    DpSpacing.md,
-                    DpSpacing.lg,
-                    0,
-                  ),
-                  child: Text(thisWeek.expectedOutcome, style: text.bodySmall),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  DpSpacing.lg,
+                  DpSpacing.md,
+                  DpSpacing.lg,
+                  0,
                 ),
-                for (final t in thisWeek.tasks) _TaskTile(task: t),
-              ],
-            ),
+                child: Text(thisWeek.expectedOutcome, style: text.bodySmall),
+              ),
+              for (final t in thisWeek.tasks) _TaskTile(task: t),
+            ],
           ),
         ),
       ],
@@ -117,32 +110,29 @@ class PathPlanView extends StatelessWidget {
       const SizedBox(height: DpSpacing.xl),
       DpPanel(
         title: const DpPanelTitle('12주 타임라인'),
-        child: Material(
-          type: MaterialType.transparency,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (final m in plan.milestones)
-                ListTile(
-                  dense: true,
-                  leading: CircleAvatar(
-                    radius: 14,
-                    backgroundColor: m.locked ? c.surface : c.primary,
-                    child: Text(
-                      '${m.weekNum}',
-                      style: text.labelLarge?.copyWith(
-                        color: m.locked ? c.textSecondary : c.onPrimary,
-                      ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final m in plan.milestones)
+              ListTile(
+                dense: true,
+                leading: CircleAvatar(
+                  radius: 14,
+                  backgroundColor: m.locked ? c.surface : c.primary,
+                  child: Text(
+                    '${m.weekNum}',
+                    style: text.labelLarge?.copyWith(
+                      color: m.locked ? c.textSecondary : c.onPrimary,
                     ),
                   ),
-                  title: Text(m.title, style: text.bodyMedium),
-                  subtitle: Text(
-                    '${m.goalDescription}\n${m.whyThisOrder}',
-                    style: text.bodySmall?.copyWith(color: c.textSecondary),
-                  ),
                 ),
-            ],
-          ),
+                title: Text(m.title, style: text.bodyMedium),
+                subtitle: Text(
+                  '${m.goalDescription}\n${m.whyThisOrder}',
+                  style: text.bodySmall?.copyWith(color: c.textSecondary),
+                ),
+              ),
+          ],
         ),
       ),
     ];

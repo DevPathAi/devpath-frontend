@@ -31,7 +31,7 @@ class DpRowLine extends StatelessWidget {
     return Container(
       key: const ValueKey('dp-row-line'),
       padding: const EdgeInsets.symmetric(
-        vertical: 10,
+        vertical: DpWebDensity.rowVerticalPadding,
         horizontal: DpSpacing.lg,
       ),
       decoration: BoxDecoration(
@@ -56,7 +56,7 @@ class DpRowLine extends StatelessWidget {
               ),
               if (description != null)
                 DefaultTextStyle.merge(
-                  style: TextStyle(fontSize: 13, color: c.textSecondary),
+                  style: text.bodySmall!.copyWith(color: c.textSecondary),
                   child: description!,
                 ),
             ],

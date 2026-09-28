@@ -91,7 +91,7 @@ class _DpCheckRowState extends State<DpCheckRow> {
                 if (widget.description != null) ...[
                   const SizedBox(height: 2),
                   DefaultTextStyle.merge(
-                    style: TextStyle(fontSize: 13, color: c.textSecondary),
+                    style: text.bodySmall!.copyWith(color: c.textSecondary),
                     child: widget.description!,
                   ),
                 ],
@@ -105,7 +105,7 @@ class _DpCheckRowState extends State<DpCheckRow> {
     return Container(
       key: const ValueKey('dp-check-row'),
       padding: const EdgeInsets.symmetric(
-        vertical: 10,
+        vertical: DpWebDensity.rowVerticalPadding,
         horizontal: DpSpacing.lg,
       ),
       decoration: BoxDecoration(

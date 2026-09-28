@@ -154,4 +154,35 @@ void main() {
       reason: 'non-flex trailing 이 주축 무한 제약으로 측정되면 라벨이 글자당 한 줄이 된다',
     );
   });
+
+  // 체크박스는 `ExcludeFocus` 로 포커스에서 빠져 있고 행 래퍼가 정지를 소유한다.
+  // 그 `ExcludeFocus` 를 지워도 기존 테스트는 전부 통과했다 — 정지 **개수**를
+  // 고정해야 회귀를 잡는다(P4 독립 리뷰 M11).
+  testWidgets('DpCheckRow: 행 두 개의 탭 정지는 정확히 두 개다', (tester) async {
+    await tester.pumpWidget(
+      _host(
+        Column(
+          children: [
+            DpCheckRow(label: const Text('첫째'), value: false, onChanged: _noop),
+            DpCheckRow(
+              label: const Text('둘째'),
+              value: false,
+              onChanged: _noop,
+              last: true,
+            ),
+          ],
+        ),
+      ),
+    );
+
+    final stops = <int>[];
+    for (var i = 0; i < 5; i++) {
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      final node = FocusManager.instance.primaryFocus;
+      if (node != null) stops.add(identityHashCode(node));
+    }
+    // 5번 Tab 을 눌러도 서로 다른 정지는 두 개뿐이어야 한다(그 뒤 순환).
+    expect(stops.toSet().length, 2);
+  });
 }
