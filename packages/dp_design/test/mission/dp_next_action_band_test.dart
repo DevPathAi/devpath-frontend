@@ -63,6 +63,23 @@ void main() {
     expect((box.decoration as BoxDecoration).boxShadow, isNull);
   });
 
+  // 시안 `.next{background:var(--soft);border:1px solid var(--line)}`.
+  testWidgets('밴드 바깥 배경은 accentSoft, 테두리는 accentLine 이다', (tester) async {
+    await tester.pumpWidget(_host(_band(onPressed: (_) {})));
+
+    final box = tester.widget<DecoratedBox>(
+      find
+          .descendant(
+            of: find.byType(DpNextActionBand),
+            matching: find.byType(DecoratedBox),
+          )
+          .first,
+    );
+    final decoration = box.decoration as BoxDecoration;
+    expect(decoration.color, DpColors.light.accentSoft);
+    expect((decoration.border! as Border).top.color, DpColors.light.accentLine);
+  });
+
   testWidgets(
     'ready action relates its label to the expected outcome and returns ID',
     (tester) async {

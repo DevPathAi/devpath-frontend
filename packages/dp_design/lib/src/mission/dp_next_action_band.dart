@@ -80,11 +80,13 @@ class _DpNextActionBandState extends State<DpNextActionBand> {
   Widget build(BuildContext context) {
     final band = DecoratedBox(
       decoration: BoxDecoration(
-        color: context.dpColors.surface,
-        border: Border.all(color: context.dpColors.border),
+        // 시안 `.next{background:var(--soft);border:1px solid var(--line)}`.
+        // `accentSoft`·`accentLine` 이 각각 그 두 토큰과 값이 같다.
+        color: context.dpColors.accentSoft,
+        border: Border.all(color: context.dpColors.accentLine),
         borderRadius: BorderRadius.circular(context.appTokens.panelRadius),
         // 그림자 없음 — DESIGN.md §3(장식용 그림자 금지)이고 시안 `.next` 는
-        // 테두리 한 겹뿐이다.
+        // 배경 + 테두리 한 겹뿐이다.
       ),
       child: Padding(
         padding: const EdgeInsets.all(DpSpacing.xl),
@@ -200,8 +202,11 @@ class _PrimaryAction extends StatelessWidget {
     // 지킬 수 없는 약속이 된다(P4 독립 리뷰 M7). 대신 왜 못 누르는지를 읽는다.
     // 보이는 텍스트는 그대로 둔다: 예상 결과 줄과 그 아래 이유 줄이 함께 화면이
     // 무엇을 기다리는지 설명한다.
+    // `assert` 는 릴리스에서 제거되므로 null 이면 스크린리더가 "null" 을 읽는다.
+    // 이유가 없으면 최소한 「왜 못 누르는지 모른다」가 아니라 「못 누른다」는
+    // 사실이라도 정확히 전한다.
     final semanticLabel = widget.state == DpNextActionState.disabled
-        ? '$displayedLabel, 사용할 수 없음: ${widget.disabledReason}'
+        ? '$displayedLabel, 사용할 수 없음: ${widget.disabledReason ?? '지금은 사용할 수 없습니다'}'
         : '$displayedLabel, 예상 결과: ${widget.expectedOutcome}';
     final enabled = actionable;
 
