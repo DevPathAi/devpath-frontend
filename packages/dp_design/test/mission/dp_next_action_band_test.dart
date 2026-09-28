@@ -318,9 +318,7 @@ void main() {
     await tester.pumpWidget(_host(_band(state: DpNextActionState.disabled)));
 
     expect(
-      find.bySemanticsLabel(
-        '이 맥락으로 실습 시작, 사용할 수 없음: 현재 과제를 먼저 열어야 합니다.',
-      ),
+      find.bySemanticsLabel('이 맥락으로 실습 시작, 사용할 수 없음: 현재 과제를 먼저 열어야 합니다.'),
       findsOneWidget,
     );
     expect(find.bySemanticsLabel(RegExp('예상 결과')), findsNothing);
