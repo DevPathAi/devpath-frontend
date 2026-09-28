@@ -207,9 +207,10 @@ class _PrimaryAction extends StatelessWidget {
 
     return Semantics(
       label: semanticLabel,
-      hint: widget.state == DpNextActionState.disabled
-          ? widget.disabledReason
-          : null,
+      // `hint` 를 쓰지 않는다: disabled 의 이유는 이미 `label` 이 담는다.
+      // 둘 다 담으면 스크린리더가 같은 문장을 두 번 읽는다. `label` 은 항상
+      // 낭독되지만 `hint` 는 상세도 설정에 따라 생략될 수 있으므로, 반드시
+      // 들려야 하는 이유는 `label` 쪽에 둔다.
       button: true,
       enabled: enabled,
       liveRegion:

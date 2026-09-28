@@ -324,6 +324,11 @@ void main() {
       findsOneWidget,
     );
     expect(find.bySemanticsLabel(RegExp('예상 결과')), findsNothing);
+
+    // label 과 hint 가 같은 이유를 담으면 스크린리더가 두 번 읽는다.
+    // hint 를 제거했으므로, 노드의 hint 가 비어 있어야 한다.
+    final bandNode = tester.getSemantics(find.byType(DpNextActionBand));
+    expect(bandNode.getSemanticsData().hint, isEmpty);
     semantics.dispose();
   });
 
