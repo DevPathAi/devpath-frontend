@@ -144,6 +144,14 @@ void main() {
     addTearDown(tester.view.reset);
   }
 
+  /// 폰 폭. 트랙 보기 8행 때문에 시작 화면의 CTA 는 여기서 접힌다 — 그 깊이를
+  /// 고정하는 테스트가 아래에 있다.
+  void phoneView(WidgetTester tester) {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+  }
+
   testWidgets('flag OFF guest 완료는 결과를 숨기고 legacy 로그인 gate를 보인다', (
     tester,
   ) async {
@@ -258,6 +266,39 @@ void main() {
     expect(hint.left, greaterThanOrEqualTo(viewport.left));
     expect(hint.right, lessThanOrEqualTo(viewport.right));
     expect(hint.height, greaterThanOrEqualTo(32));
+  });
+
+  // 시안 `.form{gap:14px}` 는 행 **사이**에만 간격을 준다. 루프가 각 행 뒤에
+  // 간격을 붙이면 마지막 행 뒤에 여분이 남아 다음 요소가 8px 더 밀린다.
+  testWidgets('트랙 목록 마지막 행 뒤에 여분 간격이 없다', (tester) async {
+    final controller = _FixedDiagnosticController(const DiagnosticState());
+    await tester.pumpWidget(_host(controller));
+    await tester.pump();
+
+    final rows = find.byType(DpOptionRow);
+    expect(rows, findsWidgets);
+    final lastRow = tester.getRect(rows.last);
+    final hint = tester.getRect(
+      find.byKey(const ValueKey('diagnostic-track-hint')),
+    );
+    // 마지막 행과 힌트 사이는 DpSpacing.sm(8) 하나뿐이어야 한다.
+    expect(hint.top - lastRow.bottom, closeTo(8, 0.5));
+  });
+
+  // 트랙 보기가 8행이라(시안 예시는 3개) 폰에서 CTA 가 뷰포트 밖으로 밀린다.
+  // 스크롤되므로 결함은 아니지만, 행이 더 늘면 사용자가 CTA 를 찾기 어려워진다 —
+  // 지금 깊이를 고정해 다음 변경이 조용히 더 밀지 못하게 한다. 실측(M10a 수정
+  // 반영 뒤): 1배율 390x844 뷰포트에서 CTA.top = 1337px(트랙 8행 + 개요 섹션
+  // 포함). 행 두어 개가 늘어도 통과하도록 여유를 두어 1500 을 상한으로 둔다.
+  testWidgets('390 폭에서 진단 시작 CTA 깊이가 고정 범위 안에 있다', (tester) async {
+    phoneView(tester);
+    final controller = _FixedDiagnosticController(const DiagnosticState());
+    await tester.pumpWidget(_host(controller));
+    await tester.pump();
+
+    final cta = find.widgetWithText(FilledButton, '진단 시작하기');
+    expect(cta, findsOneWidget);
+    expect(tester.getRect(cta).top, lessThan(1500));
   });
 
   testWidgets('선택한 트랙으로만 guest 진단을 시작한다', (tester) async {

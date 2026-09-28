@@ -313,14 +313,16 @@ class _DiagnosticTrackForm extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: [
-              for (final entry in trackLabels.entries) ...[
+              for (final (index, entry) in trackLabels.entries.indexed) ...[
+                // 간격은 행 **사이**에만 둔다 — 뒤에 붙이면 마지막 행 다음에
+                // 여분이 남아 다음 요소가 8px 밀린다(시안 `.form{gap:14px}`).
+                if (index > 0) const SizedBox(height: DpSpacing.sm),
                 DpOptionRow(
                   key: ValueKey('diagnostic-track-${entry.key}'),
                   label: Text(entry.value),
                   selected: selectedTrack == entry.key,
                   onSelect: () => notifier.selectTrack(entry.key),
                 ),
-                const SizedBox(height: DpSpacing.sm),
               ],
             ],
           ),
@@ -478,6 +480,9 @@ class _QuestionView extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 for (var index = 0; index < options.length; index++) ...[
+                  // 간격은 행 **사이**에만 둔다 — 뒤에 붙이면 마지막 행 다음에
+                  // 여분이 남아 다음 요소가 8px 밀린다(시안 `.form{gap:14px}`).
+                  if (index > 0) const SizedBox(height: DpSpacing.sm),
                   DpOptionRow(
                     key: answerFailed && selectedOptionIndex == index
                         ? ValueKey('diagnostic-option-selected-$index')
@@ -493,7 +498,6 @@ class _QuestionView extends StatelessWidget {
                             timeSpentSec: 5,
                           ),
                   ),
-                  const SizedBox(height: DpSpacing.sm),
                 ],
               ],
             ),
