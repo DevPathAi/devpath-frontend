@@ -31,31 +31,40 @@ class DpPanel extends StatelessWidget {
         borderRadius: BorderRadius.circular(DpRadius.card),
       ),
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (title != null)
-            Container(
-              key: const ValueKey('dp-panel-title'),
-              padding: const EdgeInsets.symmetric(
-                vertical: DpSpacing.md,
-                horizontal: DpSpacing.lg,
+      // 패널이 스스로 잉크 표면을 갖는다. `MaterialType.transparency` 는 아무
+      // 배경도 그리지 않으므로 표면 색·테두리는 위 Container 것 그대로이고,
+      // 잉크만 이 경계 안에서 일어나 위의 clipBehavior 로 잘린다. 이 한 겹이
+      // 없으면 안쪽의 `ListTile`·`InkWell` 이 가장 가까운 Material(보통
+      // `Scaffold`)에 그려 패널 표면이 그 잉크를 덮고, `ListTile` 은 프레임워크
+      // 단언에 걸린다(P4 Task 3 의 실패 7건이 전부 이 원인이었다).
+      child: Material(
+        type: MaterialType.transparency,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (title != null)
+              Container(
+                key: const ValueKey('dp-panel-title'),
+                padding: const EdgeInsets.symmetric(
+                  vertical: DpSpacing.md,
+                  horizontal: DpSpacing.lg,
+                ),
+                decoration: BoxDecoration(
+                  border: Border(bottom: BorderSide(color: c.border)),
+                ),
+                // heading 플래그는 제목행 전체가 아니라 `DpPanelTitle` 이 자기
+                // 텍스트에만 붙인다. 여기서 감싸면 제목 옆에 액션이 함께 있을 때
+                // 자식 노드가 둘이라 병합되지 않고 **라벨 없는 header 컨테이너**가
+                // 생긴다(2026-09-17 함정 1 「heading+button 병합」과 같은 뿌리).
+                child: DefaultTextStyle.merge(
+                  style: text.titleSmall?.copyWith(color: c.textPrimary),
+                  child: title!,
+                ),
               ),
-              decoration: BoxDecoration(
-                border: Border(bottom: BorderSide(color: c.border)),
-              ),
-              // heading 플래그는 제목행 전체가 아니라 `DpPanelTitle` 이 자기
-              // 텍스트에만 붙인다. 여기서 감싸면 제목 옆에 액션이 함께 있을 때
-              // 자식 노드가 둘이라 병합되지 않고 **라벨 없는 header 컨테이너**가
-              // 생긴다(2026-09-17 함정 1 「heading+button 병합」과 같은 뿌리).
-              child: DefaultTextStyle.merge(
-                style: text.titleSmall?.copyWith(color: c.textPrimary),
-                child: title!,
-              ),
-            ),
-          Padding(padding: padding ?? EdgeInsets.zero, child: child),
-        ],
+            Padding(padding: padding ?? EdgeInsets.zero, child: child),
+          ],
+        ),
       ),
     );
   }
