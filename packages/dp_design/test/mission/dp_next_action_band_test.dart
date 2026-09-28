@@ -311,4 +311,32 @@ void main() {
       throwsAssertionError,
     );
   });
+
+  // 누를 수 없는 밴드가 예상 결과를 약속으로 읽으면 안 된다(P4 독립 리뷰 M7).
+  testWidgets('disabled 밴드의 라벨은 예상 결과 대신 이유를 읽는다', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(_host(_band(state: DpNextActionState.disabled)));
+
+    expect(
+      find.bySemanticsLabel(
+        '이 맥락으로 실습 시작, 사용할 수 없음: 현재 과제를 먼저 열어야 합니다.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.bySemanticsLabel(RegExp('예상 결과')), findsNothing);
+    semantics.dispose();
+  });
+
+  testWidgets('ready 밴드는 예상 결과를 그대로 읽는다', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(_host(_band(onPressed: (_) {})));
+
+    expect(
+      find.bySemanticsLabel(
+        '이 맥락으로 실습 시작, 예상 결과: 현재 과제와 starter code가 실습으로 이어집니다.',
+      ),
+      findsOneWidget,
+    );
+    semantics.dispose();
+  });
 }

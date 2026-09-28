@@ -196,7 +196,13 @@ class _PrimaryAction extends StatelessWidget {
       DpNextActionState.completed => colors.primaryTextStrong,
       DpNextActionState.disabled => colors.textSecondary,
     };
-    final semanticLabel = '$displayedLabel, 예상 결과: ${widget.expectedOutcome}';
+    // disabled 는 사용자가 실행할 수 없다 — 그 자리에서 「예상 결과」를 읽으면
+    // 지킬 수 없는 약속이 된다(P4 독립 리뷰 M7). 대신 왜 못 누르는지를 읽는다.
+    // 보이는 텍스트는 그대로 둔다: 예상 결과 줄과 그 아래 이유 줄이 함께 화면이
+    // 무엇을 기다리는지 설명한다.
+    final semanticLabel = widget.state == DpNextActionState.disabled
+        ? '$displayedLabel, 사용할 수 없음: ${widget.disabledReason}'
+        : '$displayedLabel, 예상 결과: ${widget.expectedOutcome}';
     final enabled = actionable;
 
     return Semantics(
