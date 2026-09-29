@@ -4,7 +4,7 @@
 // deep link · 새로고침 · back/forward · 키보드 순회 · focus 복귀 · overflow ·
 // 24px 타깃(WCAG 2.2 AA 2.5.8, 계약 2.0.0) · reduced-motion · axe 를 검증한다. 외부 네트워크 요청은 차단하고 기록한다.
 //
-// 사용: node run.mjs --dist=<build/web> --out=<report.json> [--built-from=<sha>] [--only=<id,id>]
+// 사용: node run.mjs --dist=<build/web> --out=<report.json> [--built-from=<sha>] [--only=<id,id>] [--routes=/a,/b]
 import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -12,6 +12,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { SCHEMA_VERSION, summarize, validateReport } from './report.mjs';
+import { routesOf } from './routes.mjs';
 import { serve } from './serve.mjs';
 
 const require = createRequire(import.meta.url);
@@ -19,16 +20,6 @@ const { chromium } = require('playwright');
 const here = dirname(fileURLToPath(import.meta.url));
 
 export const WIDTHS = [390, 768, 1024, 1440];
-export const ROUTES = [
-  '/dashboard',
-  '/path',
-  '/community',
-  '/community?board=QNA',
-  '/community?board=FEEDBACK',
-  '/mentor',
-  '/sandbox',
-  '/content/future-async-await',
-];
 const HEIGHT = 900;
 const MIN_TARGET = 24; // = DpDensity.minTarget (packages/dp_design/lib/src/theme/dp_spacing.dart)
 const AXE_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'best-practice'];
@@ -43,7 +34,7 @@ function parseArgs(argv) {
     if (match) options[match[1]] = match[2];
   }
   if (!options.dist || !options.out) {
-    throw new Error('usage: node run.mjs --dist=<build/web> --out=<report.json> [--built-from=<sha>] [--only=<ids>]');
+    throw new Error('usage: node run.mjs --dist=<build/web> --out=<report.json> [--built-from=<sha>] [--only=<ids>] [--routes=/a,/b]');
   }
   return options;
 }
@@ -197,6 +188,7 @@ export async function run(options) {
   const dist = resolve(options.dist);
   const builtFrom = options['built-from'] ?? gitSha();
   const only = options.only ? new Set(options.only.split(',')) : null;
+  const sweepRoutes = routesOf(options);
   const expectations = JSON.parse(await readFile(resolve(here, 'expectations.json'), 'utf8'));
   const server = await serve(dist);
   const browser = await chromium.launch();
@@ -387,7 +379,7 @@ export async function run(options) {
             try {
               const failures = [];
               const routes = {};
-              for (const route of ROUTES) {
+              for (const route of sweepRoutes) {
                 // goto 안의 ready() 는 networkidle 을 기다린다. 여기서 그냥 던지면
                 // "어느 라우트에서" "브라우저가 무엇을 불평하며" 안 가라앉았는지가
                 // 통째로 사라진다(2026-09-26 실측: 390x200% 가 이 자리에서 30초 타임아웃).
@@ -482,7 +474,7 @@ export async function run(options) {
           try {
             const failures = [];
             const routes = {};
-            for (const route of ROUTES) {
+            for (const route of sweepRoutes) {
               await goto(page, server.base, route);
               const violations = await axeScan(page);
               routes[route] = violations;

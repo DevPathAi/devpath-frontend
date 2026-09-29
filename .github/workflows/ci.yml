@@ -843,6 +843,66 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
+  # 온보딩·미인증 화면은 라우터 게이트가 onboarded 빌드에서 전부 돌려보낸다
+  # (apps/web/test/app/gate_redirect_test.dart 의 「온보딩 라우트는 전부 돌려보낸다」가
+  # 그 표를 고정한다). 그래서 프로필별로 따로 빌드해 라우트 순회 시나리오만 돌린다 —
+  # 같은 ROUTES 에 적으면 리다이렉트 대상 화면을 두 번 재는 테스트가 된다.
+  browser-ux-onboarding:
+    runs-on: ubuntu-24.04
+    env:
+      RENDERER_IMAGE: mcr.microsoft.com/playwright:v1.55.0-noble@sha256:ffc33305f7b4b04057ae4a0caa70aad4fde87454fb403a1a22e7f931707dfcf9
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - profile: guest
+            routes: /login,/diagnostic,/beta-pending,/auth/callback
+          - profile: consent
+            routes: /consent
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: '3.44.1'
+          channel: stable
+          cache: true
+      - name: Resolve and bootstrap locked workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          lock_sha256_before="$(sha256sum pubspec.lock | awk '{print $1}')"
+          dart pub get --enforce-lockfile
+          dart run melos bootstrap --enforce-lockfile
+          test "$(sha256sum pubspec.lock | awk '{print $1}')" = "${lock_sha256_before}"
+      - name: Build mock web release for ${{ matrix.profile }}
+        shell: bash
+        working-directory: apps/web
+        run: |
+          set -euo pipefail
+          flutter build web --release --no-pub --no-web-resources-cdn             --dart-define=USE_MOCK=true             --dart-define=MISSION_SPINE_ENABLED=true             --dart-define=MOCK_PROFILE=${{ matrix.profile }}             --dart-define=HOME_BASE_URL=http://127.0.0.1:1
+      - name: Install pinned runner dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull --platform linux/amd64 "${RENDERER_IMAGE}"
+          docker run --rm --platform linux/amd64             -v "${GITHUB_WORKSPACE}:/work"             -w /work/tools/browser_ux             "${RENDERER_IMAGE}"             npm ci --ignore-scripts --no-audit --no-fund
+      - name: Run route sweep without network
+        shell: bash
+        env:
+          SWEEP_ROUTES: ${{ matrix.routes }}
+          PROFILE: ${{ matrix.profile }}
+        run: |
+          set -euo pipefail
+          docker run --rm --platform linux/amd64 --network none --ipc=host             -v "${GITHUB_WORKSPACE}:/work"             -w /work/tools/browser_ux             "${RENDERER_IMAGE}"             node run.mjs               --dist=/work/apps/web/build/web               --out="/work/evidence/browser-ux/${PROFILE}.json"               --routes="${SWEEP_ROUTES}"               --only=axe,overflow-and-targets               --built-from="${GITHUB_SHA}"
+      - name: Preserve route sweep report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: leva-browser-ux-${{ matrix.profile }}-${{ github.sha }}-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: evidence/browser-ux/
+          if-no-files-found: warn
+          retention-days: 30
+
   # N04: mock 릴리스 빌드의 Core Web Vitals 근사치(ready/LCP·INP·CLS)와 초기 전송량을
   # 고정 조건(CPU 4×·느린 네트워크)에서 재고 perf/baseline.json 대비 +5% 회귀와 절대 예산을 게이트로 건다.
   perf-gate:
