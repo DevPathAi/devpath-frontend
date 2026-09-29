@@ -157,6 +157,17 @@ Material 3 타입 스케일(Pretendard 적용):
 > 학습·문서 읽기 본문은 `bodyLarge` 16px을 기본으로 하고 18px까지 허용한다. 메타는 `bodySmall` 13px,
 > 11px `labelSmall`은 짧은 UI 레이블에만 쓰며 모든 읽어야 하는 텍스트는 대비 ≥4.5:1을 유지한다.
 
+> **웹 문법(S3)의 파생 스타일.** 시안은 `.meta`(12px)·`.ex`(13px)·`.steps li`(13px)·`.chk p`(13px)
+> 에서 `font-size` 만 덮고 `line-height` 는 `body{line-height:1.6}` 을 그대로 물려받는다. 그 자리들은
+> 위 표의 슬롯을 고르는 것이 아니라 **본문에서 크기만 줄인 것**이다. 그래서 `context.dpMeta`(12 / 1.6)와
+> `context.dpBody(<크기>)` 를 쓴다(`dp_design` 의 `DpDerivedTextX`). 화면에 `TextStyle(fontSize: …)`
+> 리터럴을 두지 않는다 — 흩어지면 시안과 대조할 수 없다(S3-P5 가 `apps/web` 의 14곳을 걷었다).
+>
+> 한 줄로 끝나는 상태·태그·표 머리는 계속 `labelMedium` 이다(`DpStatusText`·`DpTag`).
+> **미결 divergence**: 그 `labelMedium`(12 / 16)과 `bodySmall`(13 / 20)은 시안의 1.6(각 19.2 · 20.8)보다
+> 좁다. 어느 쪽으로 통일하든 시맨틱 토큰 계약(현 2.0.0)의 버전을 올려야 하므로 S3-P5 는 사실만 적고 값을
+> 바꾸지 않았다.
+
 ## 3. 간격 · 라운드 · 고도
 
 - **간격(8pt 그리드)**: `4 · 8 · 12 · 16 · 24 · 32 · 48`. 컴포넌트 내부 패딩 12~16, 섹션 간 16~24.
@@ -174,7 +185,14 @@ Material 3 타입 스케일(Pretendard 적용):
 | `railCollapsedWidth` | 80 | admin 접힘 레일 폭 |
 | `panelRadius` | 8 | 패널 반경(=카드) |
 
-> 소비: `context.appTokens`. 최대폭 제약은 `DpMaxWidth`, 상태 스타일은 `DpStateStyle`, 클릭 카드 베이스는 `DpInteractiveCard`, 텍스트 선택은 `DpSelectable`, 스크롤바는 `DpScrollbar`. (UI/UX 고도화 로드맵 Phase 0 산출.)
+> 소비: `context.appTokens`. 최대폭 제약은 `DpMaxWidth`, 상태 스타일은 `DpStateStyle`, 텍스트 선택은 `DpSelectable`, 스크롤바는 `DpScrollbar`. (UI/UX 고도화 로드맵 Phase 0 산출.)
+>
+> **웹 문법(S3)**: 면은 `DpPanel`(표면 + 1px 테두리 + 반경 8)이 담당하고 클릭 카드 베이스는 쓰지 않는다
+> — S3-P3 가 카드 나열을 구분선 행(`DpListRow`·`DpRowLine`·`DpListLines`)과 표(`DpWebTable`)로 바꿨고,
+> `DpInteractiveCard` 는 프로덕션 소비처가 **0곳**이다(S3-P5 실측 — 위젯 정의와 그 테스트만 남았다).
+> `DpPanel` 은 안쪽에 `Material(type: transparency)` 를 스스로 둬 `ListTile`·`InkWell` 의 잉크가 패널
+> 경계 안에서 일어나게 한다(S3-P5). 8pt 스케일에 없는 시안 치수는 `DpWebDensity` 에 이름으로 둔다 —
+> 행 세로 패딩 10(`.rowline`·`.chk`·`.list li`) · 키-값 간격 6(`.kv`) · 단계 세로 패딩 6(`.steps li`).
 
 ## 4. 아이콘
 
@@ -199,6 +217,12 @@ Material 3 타입 스케일(Pretendard 적용):
 - 하단 내비는 시스템 `NavigationBar`를 직접 쓰지 않고 `DpMobileNavigation`이 소유한다. 비내비 경로에서는
   선택 상태를 억지로 표시하지 않으며, 안전영역과 §6 의 최소 타깃을 유지한다. — **`apps/admin` 전용이다.**
   `apps/web` 은 S3-P2 부터 폭과 무관하게 하단 내비를 쓰지 않는다.
+- **본문 2열(`DpCols`)의 경계는 840**(= Expanded 의 시작)이다. 시안의 컨테이너 질의는
+  720(`@container (max-width:720px)`)이지만 그 한 규칙이 `.cols`(2:1 분할)와 `.login`(1.1:0.9 대등
+  분할)을 함께 묶고 있고, 2:1 에서는 720 에서 사이드가 약 220px 로 눌려 패널 제목조차 줄바꿈한다.
+  시안 갤러리는 1440·390 두 폭만 보여 720~839 는 시각 검토된 적이 없으므로, 검토되지 않은 구간에서는
+  더 보수적인 경계를 택했다. 셸의 720(햄버거 ↔ 주 메뉴)과는 성격이 다른 경계다.
+  (S3-P5 사용자 결정 2026-09-28. 코드: `packages/dp_design/lib/src/layout/dp_cols.dart`.)
 
 ## 6. 접근성 베이스라인 (필수)
 
