@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/dp_colors.dart';
 import '../theme/dp_spacing.dart';
+import '../theme/dp_typography.dart';
 import 'dp_window_class.dart';
 
 /// 진행 단계 표시(시안 `.steps`) — 테두리 한 겹 안에 단계가 나란히 놓인다.
@@ -79,7 +80,7 @@ class _Step extends StatelessWidget {
     final c = context.dpColors;
     return Container(
       padding: const EdgeInsets.symmetric(
-        vertical: DpSpacing.xs,
+        vertical: DpWebDensity.stepVerticalPadding,
         horizontal: DpSpacing.md,
       ),
       decoration: BoxDecoration(
@@ -97,10 +98,15 @@ class _Step extends StatelessWidget {
         selected: current,
         child: Text(
           label,
-          style: TextStyle(
-            color: current ? c.primaryTextStrong : c.textSecondary,
-            fontWeight: current ? FontWeight.w600 : FontWeight.w400,
-          ),
+          // 시안 `.steps li{font-size:13px}`. 시안은 `line-height` 를 덮지 않아
+          // `body{line-height:1.6}` 을 물려받으므로 bodySmall(13 / 20)이 아니라
+          // 본문에서 크기만 줄인 것이다 — context.dpBody(13) 이 그 뜻이다.
+          style: context
+              .dpBody(13)
+              .copyWith(
+                color: current ? c.primaryTextStrong : c.textSecondary,
+                fontWeight: current ? FontWeight.w600 : FontWeight.w400,
+              ),
         ),
       ),
     );

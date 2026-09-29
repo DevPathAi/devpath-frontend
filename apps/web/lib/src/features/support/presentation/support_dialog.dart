@@ -111,7 +111,7 @@ class _SupportDialogState extends ConsumerState<SupportDialog> {
                   title: const Text('함께 보낼 정보'),
                   subtitle: Text(
                     '최근 실패 ${failures.length}건 · 화면 경로 · 브라우저 정보',
-                    style: TextStyle(fontSize: 12, color: c.textSecondary),
+                    style: context.dpMeta.copyWith(color: c.textSecondary),
                   ),
                   children: [
                     for (final f in failures)
@@ -123,8 +123,7 @@ class _SupportDialogState extends ConsumerState<SupportDialog> {
                           '${f.statusCode ?? '네트워크 실패'}'
                           '${f.errorCode == null ? '' : ' · ${f.errorCode}'}'
                           '${f.message == null ? '' : '\n${f.message}'}',
-                          style: TextStyle(
-                            fontSize: 12,
+                          style: context.dpMeta.copyWith(
                             color: c.textSecondary,
                           ),
                         ),
@@ -136,8 +135,7 @@ class _SupportDialogState extends ConsumerState<SupportDialog> {
                         ),
                         child: Text(
                           '기록된 API 실패가 없습니다.',
-                          style: TextStyle(
-                            fontSize: 12,
+                          style: context.dpMeta.copyWith(
                             color: c.textSecondary,
                           ),
                         ),
@@ -149,14 +147,14 @@ class _SupportDialogState extends ConsumerState<SupportDialog> {
                 const SizedBox(height: DpSpacing.xs),
                 Text(
                   _validationMessage!,
-                  style: TextStyle(color: c.danger, fontSize: 12),
+                  style: context.dpMeta.copyWith(color: c.danger),
                 ),
               ],
               if (_submitError != null) ...[
                 const SizedBox(height: DpSpacing.xs),
                 Text(
                   _submitError!,
-                  style: TextStyle(color: c.danger, fontSize: 12),
+                  style: context.dpMeta.copyWith(color: c.danger),
                 ),
               ],
             ],

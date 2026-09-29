@@ -281,7 +281,7 @@ class _CommentCardState extends State<_CommentCard> {
                 Expanded(
                   child: Text(
                     comment.authorId == null ? '익명' : '작성자 ${comment.authorId}',
-                    style: TextStyle(color: c.textSecondary, fontSize: 12),
+                    style: context.dpMeta.copyWith(color: c.textSecondary),
                   ),
                 ),
                 ContentMenuButton(
@@ -355,7 +355,7 @@ class _CommentCardState extends State<_CommentCard> {
             const SizedBox(height: DpSpacing.xs),
             Text(
               comment.createdAt,
-              style: TextStyle(color: c.textSecondary, fontSize: 11),
+              style: context.dpBody(11).copyWith(color: c.textSecondary),
             ),
           ],
         ),
