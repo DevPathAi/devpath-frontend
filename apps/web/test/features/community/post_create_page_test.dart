@@ -65,6 +65,57 @@ void _wideView(WidgetTester tester) {
 }
 
 void main() {
+  testWidgets('자유글 작성: 폼 폭이 readableMaxWidth(760) 를 넘지 않는다', (tester) async {
+    _wideView(tester);
+    final c = ProviderContainer(
+      overrides: [
+        postCreateProvider.overrideWithValue(
+          ({
+            required boardType,
+            required title,
+            required bodyMd,
+            required tags,
+          }) async => _created(30, boardType),
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+    await tester.pumpWidget(_host(c));
+    await tester.pumpAndSettle();
+
+    final title = tester.getRect(find.byType(TextField).first);
+    expect(title.width, lessThanOrEqualTo(760));
+    expect(title.left, 0);
+  });
+
+  testWidgets('자유글 작성: 390px 에서 폼이 가로로 넘치지 않는다', (tester) async {
+    tester.view.physicalSize = const Size(390, 2000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final c = ProviderContainer(
+      overrides: [
+        postCreateProvider.overrideWithValue(
+          ({
+            required boardType,
+            required title,
+            required bodyMd,
+            required tags,
+          }) async => _created(30, boardType),
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+    await tester.pumpWidget(_host(c));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(
+      tester.getRect(find.byType(TextField).first).width,
+      lessThanOrEqualTo(390),
+    );
+  });
+
   testWidgets('FREE 프리셋: 제목/태그 TextField + 본문 에디터 + 게시 버튼 렌더', (tester) async {
     _wideView(tester);
     final c = ProviderContainer(

@@ -12,7 +12,6 @@ void main() {
         home: Scaffold(
           body: DpListRow(
             title: 'Riverpod 3 마이그레이션 질문',
-            accentColor: const Color(0xFF4F6EF7),
             badges: const [Text('Q&A')],
             trailing: const Text('답변 3'),
             onTap: () => tapped = true,
@@ -30,19 +29,28 @@ void main() {
     expect(tapped, isTrue);
   });
 
-  testWidgets('DpListRow: hover/focus 베이스(FocusableActionDetector) 존재', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: DpTheme.light(),
-        home: Scaffold(
-          body: DpListRow(title: '글', onTap: () {}),
+  testWidgets(
+    'DpListRow: 제목 링크가 hover/focus 베이스(FocusableActionDetector)를 갖는다',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: DpTheme.light(),
+          home: Scaffold(
+            body: DpListRow(title: '글', onTap: () {}),
+          ),
         ),
-      ),
-    );
-    expect(find.byType(FocusableActionDetector), findsWidgets);
-  });
+      );
+      // 그 `FocusableActionDetector` 는 이제 행이 아니라 `DpLink` 내부의 것이다
+      // (P3 에서 행을 카드 → 구분선 행으로 바꾸고 접근성 컨트롤을 제목 링크로 옮겼다).
+      expect(
+        find.descendant(
+          of: find.byType(DpLink),
+          matching: find.byType(FocusableActionDetector),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets('DpListRow: preview 지정 시 hover로 미리보기 등장', (tester) async {
     await tester.pumpWidget(
@@ -134,4 +142,68 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('카드가 아니라 하단 구분선을 가진 행이다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: DpTheme.light(),
+        home: const Scaffold(body: DpListRow(title: '오늘 배운 것 공유')),
+      ),
+    );
+
+    expect(find.byType(DpInteractiveCard), findsNothing);
+    final row = tester.widget<Container>(
+      find.byKey(const ValueKey('dp-list-row')),
+    );
+    final d = row.decoration! as BoxDecoration;
+    expect(d.border!.bottom.color, DpColors.light.border);
+    expect(d.borderRadius, isNull);
+  });
+
+  testWidgets('last 면 구분선이 없다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: DpTheme.light(),
+        home: const Scaffold(body: DpListRow(title: '마지막 글', last: true)),
+      ),
+    );
+
+    final row = tester.widget<Container>(
+      find.byKey(const ValueKey('dp-list-row')),
+    );
+    expect((row.decoration! as BoxDecoration).border, isNull);
+  });
+
+  testWidgets('행 여백은 표와 같은 8×16 이다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: DpTheme.light(),
+        home: const Scaffold(body: DpListRow(title: '여백 확인')),
+      ),
+    );
+
+    final row = tester.widget<Container>(
+      find.byKey(const ValueKey('dp-list-row')),
+    );
+    expect(
+      row.padding,
+      const EdgeInsets.symmetric(
+        vertical: DpDensity.rowPadding,
+        horizontal: DpSpacing.lg,
+      ),
+    );
+  });
+
+  testWidgets('제목은 DpLink.title 로 그려진다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: DpTheme.light(),
+        home: Scaffold(
+          body: DpListRow(title: '제목', onTap: () {}),
+        ),
+      ),
+    );
+
+    expect(find.byType(DpLink), findsOneWidget);
+  });
 }

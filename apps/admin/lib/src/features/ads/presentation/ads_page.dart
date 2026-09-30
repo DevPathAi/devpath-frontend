@@ -50,6 +50,7 @@ class _AdsPageState extends ConsumerState<AdminAdsPage> {
       body: Column(
         children: [
           DpPageHeader(
+            gutter: true,
             // 제목은 kAdminDestinations가 유일한 출처다(admin_shell.dart).
             title: adminHeaderTitleFor('/ads'),
             description: '하우스·스폰서 광고를 운영합니다',

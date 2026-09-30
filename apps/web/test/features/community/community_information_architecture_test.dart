@@ -12,11 +12,12 @@ void main() {
     );
   });
 
-  test('셸은 커뮤니티 아래 세 게시판을 직접 목적지로 노출한다', () {
+  test('셸은 커뮤니티 아래 세 게시판을 드롭다운 자식으로 노출한다', () {
     expect(
-      kShellDestinations
-          .where((item) => item.section == '커뮤니티')
-          .map((item) => item.label),
+      kWebNavItems
+          .firstWhere((item) => item.id == '/community')
+          .children
+          .map((child) => child.label),
       ['자유게시판', 'Q/A', '피드백'],
     );
   });

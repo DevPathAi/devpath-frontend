@@ -19,12 +19,12 @@ final Map<String, Color Function(DpColors)> _allFields = {
   'textPrimary': (c) => c.textPrimary,
   'textSecondary': (c) => c.textSecondary,
   'textFaint': (c) => c.textFaint,
-  'railBg': (c) => c.railBg,
-  'railText': (c) => c.railText,
-  'railMuted': (c) => c.railMuted,
-  'railFaint': (c) => c.railFaint,
-  'railActive': (c) => c.railActive,
-  'railBorder': (c) => c.railBorder,
+  'headerBg': (c) => c.headerBg,
+  'headerText': (c) => c.headerText,
+  'headerMuted': (c) => c.headerMuted,
+  'headerFaint': (c) => c.headerFaint,
+  'headerActive': (c) => c.headerActive,
+  'headerBorder': (c) => c.headerBorder,
   'success': (c) => c.success,
   'warning': (c) => c.warning,
   'danger': (c) => c.danger,
@@ -59,7 +59,7 @@ void main() {
 
   test('lerp(t=0) 은 출발 토큰을 그대로 돌려준다', () {
     final mid = DpColors.light.lerp(DpColors.dark, 0.0);
-    expect(mid.railFaint, DpColors.light.railFaint);
+    expect(mid.headerFaint, DpColors.light.headerFaint);
     expect(mid.chart4, DpColors.light.chart4);
   });
 
@@ -67,14 +67,29 @@ void main() {
     final c = DpColors.light.copyWith(chart4: const Color(0xFF123456));
     expect(c.chart4, const Color(0xFF123456));
     expect(c.chart1, DpColors.light.chart1);
-    expect(c.railBg, DpColors.light.railBg);
+    expect(c.headerBg, DpColors.light.headerBg);
     expect(c.surfaceMuted, DpColors.light.surfaceMuted);
   });
 
   test('Leva v2 팔레트 기준값 — 인디고와 푸른 무채색', () {
     expect(DpColors.light.bg, const Color(0xFFF6F7FB));
     expect(DpColors.light.primary, const Color(0xFF5653E7));
-    expect(DpColors.light.railBg, const Color(0xFF11131B));
+    expect(DpColors.light.headerBg, const Color(0xFF11131B));
     expect(DpColors.dark.onPrimary, const Color(0xFF17163D));
+  });
+
+  test('header* 는 rail* 의 값을 그대로 승계한다(계약 2.0.0 이름 변경, 값 불변)', () {
+    expect(DpColors.light.headerBg, const Color(0xFF11131B));
+    expect(DpColors.light.headerText, const Color(0xFFF5F7FB));
+    expect(DpColors.light.headerMuted, const Color(0xFFB7BDCA));
+    expect(DpColors.light.headerFaint, const Color(0xFF959DAD));
+    expect(DpColors.light.headerActive, const Color(0xFF272B3F));
+    expect(DpColors.light.headerBorder, const Color(0xFF2A2F3C));
+    expect(DpColors.dark.headerBg, const Color(0xFF090B10));
+    expect(DpColors.dark.headerText, const Color(0xFFF4F5F8));
+    expect(DpColors.dark.headerMuted, const Color(0xFFB6BCC8));
+    expect(DpColors.dark.headerFaint, const Color(0xFF929AA8));
+    expect(DpColors.dark.headerActive, const Color(0xFF23263B));
+    expect(DpColors.dark.headerBorder, const Color(0xFF292D38));
   });
 }

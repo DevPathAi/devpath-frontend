@@ -216,6 +216,11 @@ List<String> _workflowPinErrors(String source) {
     '$_checkout # v6.1.0',
     '$_flutterAction # v2.23.0',
     '$_uploadArtifact # v4.6.2',
+    // browser-ux-onboarding(S3-P5): 프로필별 빌드로 온보딩·미인증 라우트만 순회한다.
+    // matrix 잡이라 pin 은 한 벌만 적힌다(행마다 반복되지 않는다).
+    '$_checkout # v6.1.0',
+    '$_flutterAction # v2.23.0',
+    '$_uploadArtifact # v4.6.2',
     // perf-gate(N04): 같은 구성.
     '$_checkout # v6.1.0',
     '$_flutterAction # v2.23.0',
@@ -238,8 +243,8 @@ List<String> _workflowPinErrors(String source) {
   if (RegExp(r'\b[a-z0-9-]+-latest\b').hasMatch(source)) {
     errors.add('latest runner labels are forbidden');
   }
-  if (_count(source, 'runs-on: ubuntu-24.04') != 7) {
-    errors.add('all seven CI jobs must use ubuntu-24.04');
+  if (_count(source, 'runs-on: ubuntu-24.04') != 8) {
+    errors.add('all eight CI jobs must use ubuntu-24.04');
   }
   final setupBuildxSteps = _actionStepBodies(source, _setupBuildx);
   if (setupBuildxSteps.length != 3 ||

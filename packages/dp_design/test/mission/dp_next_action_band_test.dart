@@ -48,6 +48,38 @@ DpNextActionBand _band({
 );
 
 void main() {
+  // DESIGN.md §3: 장식용 그림자 금지 — 시안 `.next` 도 테두리 한 겹뿐이다.
+  testWidgets('밴드는 그림자를 갖지 않는다', (tester) async {
+    await tester.pumpWidget(_host(_band(onPressed: (_) {})));
+
+    final box = tester.widget<DecoratedBox>(
+      find
+          .descendant(
+            of: find.byType(DpNextActionBand),
+            matching: find.byType(DecoratedBox),
+          )
+          .first,
+    );
+    expect((box.decoration as BoxDecoration).boxShadow, isNull);
+  });
+
+  // 시안 `.next{background:var(--soft);border:1px solid var(--line)}`.
+  testWidgets('밴드 바깥 배경은 accentSoft, 테두리는 accentLine 이다', (tester) async {
+    await tester.pumpWidget(_host(_band(onPressed: (_) {})));
+
+    final box = tester.widget<DecoratedBox>(
+      find
+          .descendant(
+            of: find.byType(DpNextActionBand),
+            matching: find.byType(DecoratedBox),
+          )
+          .first,
+    );
+    final decoration = box.decoration as BoxDecoration;
+    expect(decoration.color, DpColors.light.accentSoft);
+    expect((decoration.border! as Border).top.color, DpColors.light.accentLine);
+  });
+
   testWidgets(
     'ready action relates its label to the expected outcome and returns ID',
     (tester) async {
@@ -295,5 +327,36 @@ void main() {
       ),
       throwsAssertionError,
     );
+  });
+
+  // 누를 수 없는 밴드가 예상 결과를 약속으로 읽으면 안 된다(P4 독립 리뷰 M7).
+  testWidgets('disabled 밴드의 라벨은 예상 결과 대신 이유를 읽는다', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(_host(_band(state: DpNextActionState.disabled)));
+
+    expect(
+      find.bySemanticsLabel('이 맥락으로 실습 시작, 사용할 수 없음: 현재 과제를 먼저 열어야 합니다.'),
+      findsOneWidget,
+    );
+    expect(find.bySemanticsLabel(RegExp('예상 결과')), findsNothing);
+
+    // label 과 hint 가 같은 이유를 담으면 스크린리더가 두 번 읽는다.
+    // hint 를 제거했으므로, 노드의 hint 가 비어 있어야 한다.
+    final bandNode = tester.getSemantics(find.byType(DpNextActionBand));
+    expect(bandNode.getSemanticsData().hint, isEmpty);
+    semantics.dispose();
+  });
+
+  testWidgets('ready 밴드는 예상 결과를 그대로 읽는다', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(_host(_band(onPressed: (_) {})));
+
+    expect(
+      find.bySemanticsLabel(
+        '이 맥락으로 실습 시작, 예상 결과: 현재 과제와 starter code가 실습으로 이어집니다.',
+      ),
+      findsOneWidget,
+    );
+    semantics.dispose();
   });
 }

@@ -314,4 +314,90 @@ void main() {
     );
     expect(handoff.takeReturnTo(), isNull);
   });
+
+  // browser-ux 의 ROUTES 에 라우트를 넣기 전에 그 빌드에서 실제로 도달하는지
+  // 증명한다. gateRedirect 는 순수 함수라 초 단위로 판정할 수 있다 — 도달하지
+  // 않는 라우트를 ROUTES 에 적으면 다른 화면을 두 번 재는 테스트가 된다.
+  group('browser-ux 라우트 도달', () {
+    final onboarded = AuthAuthenticated(_user(OnboardingStatus.done));
+    const guest = AuthUnauthenticated();
+    // consent 빌드의 픽스처는 온보딩도 PENDING 이다(mockAuthRefreshUser 는
+    // 'onboarded' 에만 DONE 을 준다). 동의 게이트가 온보딩 게이트보다 앞서므로
+    // 그 조합에서도 /consent 는 통과한다 — 빌드가 만들 상태로 재야 한다.
+    final consentPending = AuthAuthenticated(
+      _user(OnboardingStatus.pending, consent: ConsentStatus.pending),
+    );
+
+    test('onboarded 빌드: 커뮤니티 상세·작성·설정·마이페이지는 통과한다', () {
+      for (final location in const [
+        '/community/post/10',
+        '/community/post/10/edit',
+        '/community/1',
+        '/community/1/edit',
+        '/community/new',
+        '/community/new/post',
+        '/settings',
+        '/mypage',
+      ]) {
+        expect(
+          gateRedirect(onboarded, location, missionSpineEnabled: true),
+          isNull,
+          reason: location,
+        );
+      }
+    });
+
+    test('onboarded 빌드: 온보딩 라우트는 전부 돌려보낸다', () {
+      expect(
+        gateRedirect(onboarded, '/login', missionSpineEnabled: true),
+        '/dashboard',
+      );
+      expect(
+        gateRedirect(onboarded, '/consent', missionSpineEnabled: true),
+        '/path',
+      );
+      expect(
+        gateRedirect(onboarded, '/diagnostic', missionSpineEnabled: true),
+        '/path',
+      );
+      expect(
+        gateRedirect(onboarded, '/beta-pending', missionSpineEnabled: true),
+        '/dashboard',
+      );
+      expect(
+        gateRedirect(onboarded, '/auth/callback', missionSpineEnabled: true),
+        '/dashboard',
+      );
+    });
+
+    test('guest 빌드: 로그인·진단·베타 대기·콜백이 통과한다', () {
+      for (final location in const [
+        '/login',
+        '/diagnostic',
+        '/beta-pending',
+        '/auth/callback',
+      ]) {
+        expect(
+          gateRedirect(guest, location, missionSpineEnabled: true),
+          isNull,
+          reason: location,
+        );
+      }
+      expect(
+        gateRedirect(guest, '/mypage', missionSpineEnabled: true),
+        '/login',
+      );
+    });
+
+    test('consent 빌드: 동의 화면이 통과한다', () {
+      expect(
+        gateRedirect(consentPending, '/consent', missionSpineEnabled: true),
+        isNull,
+      );
+      expect(
+        gateRedirect(consentPending, '/mypage', missionSpineEnabled: true),
+        '/consent',
+      );
+    });
+  });
 }

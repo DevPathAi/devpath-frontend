@@ -11,7 +11,6 @@ import '../state/community_search_state.dart';
 import '../state/community_state.dart';
 import 'web_community_board_projection.dart';
 import 'widgets/community_search_bar.dart';
-import 'widgets/search_highlight.dart';
 import '../../support/presentation/supportable_error.dart';
 
 class CommunityHomePage extends ConsumerStatefulWidget {
@@ -113,11 +112,6 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
     void compose() => context.go(activeBoard.composePath);
 
     return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: compose,
-        icon: const Icon(DpIcons.edit),
-        label: Text(activeBoard.composeLabel),
-      ),
       body: CustomScrollView(
         // 스크린리더가 「N개 중 M번째」를 읽을 수 있게 목록 항목 수를 알린다.
         // `CustomScrollView`는 `ListView`와 달리 이 값을 자동으로 채우지 않는다.
@@ -130,31 +124,17 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
             : search.items.length,
         slivers: [
           SliverToBoxAdapter(
-            child: CommunityBoardHeader(
-              board: activeBoard,
-              // 셸의 게시판 목적지와 같은 URL 로 간다 — 게시판·검색 상태는
-              // `didUpdateWidget` 이 URL 에서 다시 맞춘다(이동 경로가 하나).
-              // 검색 중이면 검색어를 들고 가 새 게시판에서 같은 검색을 잇는다.
-              onSelectBoard: (board) => context.go(
-                Uri(
-                  path: '/community',
-                  queryParameters: {
-                    'board': board.value,
-                    if (search.query.isNotEmpty) 'q': search.query,
-                  },
-                ).toString(),
-              ),
-            ),
+            child: CommunityBoardHeader(board: activeBoard, onCompose: compose),
           ),
           PinnedHeaderSliver(
             child: ColoredBox(
               color: Theme.of(context).scaffoldBackgroundColor,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  DpSpacing.lg,
-                  DpSpacing.md,
-                  DpSpacing.lg,
-                  DpSpacing.sm,
+                // 좌우 거터는 셸이 준다 — 여기서 또 주면 필터 줄이 헤더보다
+                // 더 들여쓰인다.
+                padding: const EdgeInsets.only(
+                  top: DpSpacing.md,
+                  bottom: DpSpacing.sm,
                 ),
                 child: Row(
                   children: [
@@ -210,81 +190,62 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
           ),
         ];
       case CommunitySearchPhase.loaded:
-        if (search.items.isEmpty) {
-          return [
-            SliverFillRemaining(
-              key: const ValueKey('search-empty'),
-              child: DpEmpty(
-                icon: DpIcons.search,
-                title: '검색 결과가 없어요',
-                message: '"${search.query}"와 맞는 글을 찾지 못했어요. 다른 낱말로 찾아보세요.',
-              ),
-            ),
-          ];
-        }
+        final compact = context.windowClass == DpWindowClass.compact;
         return [
-          SliverPadding(
-            padding: const EdgeInsets.all(DpSpacing.lg),
-            sliver: SliverList.separated(
-              itemCount: search.items.length + (search.hasMore ? 1 : 0),
-              separatorBuilder: (_, _) => const SizedBox(height: DpSpacing.sm),
-              itemBuilder: (_, i) {
-                if (i == search.items.length) {
-                  return Padding(
-                    padding: const EdgeInsets.only(top: DpSpacing.sm),
-                    child: OutlinedButton(
-                      key: const ValueKey('search-more'),
-                      onPressed: search.loadingMore
-                          ? null
-                          : () => ref
-                                .read(
-                                  communitySearchControllerProvider.notifier,
-                                )
-                                .loadMore(board: board.value),
-                      child: Text(
-                        search.loadingMore
-                            ? '불러오는 중…'
-                            : '더 보기 (${search.items.length}/${search.total})',
+          SliverToBoxAdapter(
+            child: DpPanel(
+              child: DpWebTable(
+                columns: communityBoardColumns(board, compact: compact),
+                // 빈 검색 결과는 이제 표의 `empty` 다 — 키는 그대로 둔다
+                // (그 키로 상태를 찾는 테스트의 계약을 깨지 않는다).
+                empty: Padding(
+                  key: const ValueKey('search-empty'),
+                  padding: const EdgeInsets.symmetric(vertical: DpSpacing.xl),
+                  child: DpEmpty(
+                    icon: DpIcons.search,
+                    title: '검색 결과가 없어요',
+                    message: '"${search.query}"와 맞는 글을 찾지 못했어요. 다른 낱말로 찾아보세요.',
+                  ),
+                ),
+                rows: [
+                  for (final item in search.items)
+                    communitySearchRow(
+                      context: context,
+                      item: item,
+                      board: board,
+                      compact: compact,
+                      onTap: () => context.go(
+                        item.boardType == 'QNA'
+                            ? '/community/${item.id}'
+                            : '/community/post/${item.id}?board=${item.boardType}',
                       ),
                     ),
-                  );
-                }
-                return _searchRow(context, search.items[i]);
-              },
+                ],
+              ),
             ),
           ),
+          // 표 중간에 버튼 행을 끼우면 칼럼 정렬이 깨진다 — 표 아래로 옮긴다.
+          if (search.hasMore)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.only(top: DpSpacing.md),
+                child: OutlinedButton(
+                  key: const ValueKey('search-more'),
+                  onPressed: search.loadingMore
+                      ? null
+                      : () => ref
+                            .read(communitySearchControllerProvider.notifier)
+                            .loadMore(board: board.value),
+                  child: Text(
+                    search.loadingMore
+                        ? '불러오는 중…'
+                        : '더 보기 (${search.items.length}/${search.total})',
+                  ),
+                ),
+              ),
+            ),
         ];
     }
-  }
-
-  /// 검색 결과 행. 목록 행(`_postRow`)과 같은 [DpListRow] 를 쓰되 매칭 근거(하이라이트)를
-  /// subtitle 로 항상 보여준다.
-  Widget _searchRow(BuildContext context, CommunitySearchItem item) {
-    final c = context.dpColors;
-    final isQna = item.boardType == 'QNA';
-    // 본문 매칭이 없으면 highlight 가 비어 오므로 excerpt 로 폴백한다.
-    final body = item.highlight.isNotEmpty ? item.highlight : item.excerpt;
-    return DpListRow(
-      accentColor: communityRowAccent(
-        c,
-        boardType: item.boardType,
-        solved: item.solved,
-      ),
-      title: item.title,
-      subtitle: body.isEmpty ? null : SearchHighlightText(body),
-      badges: [
-        if (isQna && item.solved) CommunityBadgeChip('✓ 해결됨', tone: c.success),
-      ],
-      trailing: Text(
-        '${isQna ? '답변' : '댓글'} ${item.replyCount} · 추천 ${item.upvoteCount}',
-        style: TextStyle(color: c.textSecondary, fontSize: 12),
-      ),
-      onTap: () => context.go(
-        isQna
-            ? '/community/${item.id}'
-            : '/community/post/${item.id}?board=${item.boardType}',
-      ),
-    );
   }
 
   List<Widget> _bodySlivers(
@@ -308,38 +269,40 @@ class _CommunityHomePageState extends ConsumerState<CommunityHomePage> {
           ),
         ];
       case CommunityPhase.loaded:
-        if (posts.isEmpty) {
-          return [
-            SliverFillRemaining(
-              child: CommunityBoardEmpty(board: board, onCompose: onCompose),
-            ),
-          ];
-        }
-        const feedAdAt = 5; // 5번째 게시글(인덱스 4) 뒤
-        final showAd = posts.length >= feedAdAt;
-        final count = posts.length + (showAd ? 1 : 0);
+        final compact = context.windowClass == DpWindowClass.compact;
+        // 5번째 게시글 뒤에 끼우던 피드 광고를 표 **아래**로 옮긴다 — 표 중간
+        // 광고 행은 칼럼 정렬을 깬다. 노출 조건(글이 5개 이상)은 그대로다.
+        const feedAdAt = 5;
         return [
-          SliverPadding(
-            padding: const EdgeInsets.all(DpSpacing.lg),
-            sliver: SliverList.separated(
-              itemCount: count,
-              separatorBuilder: (_, _) => const SizedBox(height: DpSpacing.sm),
-              itemBuilder: (_, i) {
-                if (showAd && i == feedAdAt) {
-                  return const AdSlotWidget(slot: 'COMMUNITY_FEED');
-                }
-                final p = posts[(showAd && i > feedAdAt) ? i - 1 : i];
-                return CommunityPostRow(
-                  post: p,
-                  onTap: () => context.go(
-                    p.boardType == 'QNA'
-                        ? '/community/${p.id}'
-                        : '/community/post/${p.id}?board=${p.boardType}',
-                  ),
-                );
-              },
+          SliverToBoxAdapter(
+            child: DpPanel(
+              child: DpWebTable(
+                columns: communityBoardColumns(board, compact: compact),
+                empty: CommunityBoardEmpty(board: board),
+                rows: [
+                  for (final post in posts)
+                    communityPostRow(
+                      context: context,
+                      post: post,
+                      board: board,
+                      compact: compact,
+                      onTap: () => context.go(
+                        post.boardType == 'QNA'
+                            ? '/community/${post.id}'
+                            : '/community/post/${post.id}?board=${post.boardType}',
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
+          if (posts.length >= feedAdAt)
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.only(top: DpSpacing.lg),
+                child: AdSlotWidget(slot: 'COMMUNITY_FEED'),
+              ),
+            ),
         ];
     }
   }

@@ -160,90 +160,97 @@ class _PostCreatePageState extends ConsumerState<PostCreatePage> {
     return Scaffold(
       body: CustomScrollView(
         slivers: [
-          SliverToBoxAdapter(
-            child: DpPageHeader(
-              title: _pageTitle,
-              description: '자유롭게 쓰거나 코드 피드백을 요청하세요',
-            ),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(
-              DpSpacing.lg,
-              DpSpacing.lg,
-              DpSpacing.lg,
-              0,
-            ),
-            sliver: SliverList.list(
-              children: [
-                TextField(
-                  controller: _titleCtrl,
-                  enabled: !_submitting,
-                  decoration: const InputDecoration(
-                    labelText: '제목',
-                    hintText: '제목을 입력하세요',
-                    border: OutlineInputBorder(),
+          // 시안 `write` 는 `.narrow{max-width:760px;margin-inline:0}` 한 열이다.
+          // sliver 목록이라 폭 제약을 sliver 로 준다 — 목록 전체를
+          // `SliverMainAxisGroup` 으로 한 sliver 로 묶고 그것만 자른다.
+          // `SliverConstrainedCrossAxis` 는 **좌측 정렬**로 자르므로
+          // `margin-inline:0` 과 같다. 좌우 패딩은 셸이 준다.
+          SliverConstrainedCrossAxis(
+            maxExtent: context.appTokens.readableMaxWidth,
+            sliver: SliverMainAxisGroup(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: DpPageHeader(
+                    title: _pageTitle,
+                    description: '자유롭게 쓰거나 코드 피드백을 요청하세요',
                   ),
                 ),
-                // 본문 안내 문구는 헤더 설명과 같은 말이라 제거했다(3-A Task 14-3).
-                // 헤더가 더 눈에 띄는 자리이고, 2단계 스펙 §5가 그 문구를 지정했다.
-                const SizedBox(height: DpSpacing.md),
-              ],
-            ),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: DpSpacing.lg),
-            sliver: SliverPersistentHeader(
-              pinned: true,
-              delegate: DpRichEditorToolbarHeader(controller: _bodyController),
-            ),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: DpSpacing.lg),
-            sliver: SliverToBoxAdapter(
-              child: DpRichEditorBody(
-                key: const ValueKey('post-body-editor'),
-                controller: _bodyController,
-                enabled: !_submitting,
-              ),
-            ),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(
-              DpSpacing.lg,
-              DpSpacing.md,
-              DpSpacing.lg,
-              DpSpacing.lg,
-            ),
-            sliver: SliverList.list(
-              children: [
-                // 태그는 수정 대상이 아니다 — 서버가 받지 않으므로(평판 귀속이 어긋난다)
-                // 편집 가능한 것처럼 보이면 저장 후 사라진 것처럼 읽힌다.
-                if (!widget.isEdit) ...[
-                  TextField(
-                    key: const ValueKey('post-tags-field'),
-                    controller: _tagsCtrl,
-                    enabled: !_submitting,
-                    decoration: const InputDecoration(
-                      labelText: '태그',
-                      hintText: '쉼표 또는 공백으로 구분 (예: dart, flutter)',
-                      border: OutlineInputBorder(),
+                SliverPadding(
+                  padding: const EdgeInsets.only(top: DpSpacing.lg),
+                  sliver: SliverList.list(
+                    children: [
+                      TextField(
+                        controller: _titleCtrl,
+                        enabled: !_submitting,
+                        decoration: const InputDecoration(
+                          labelText: '제목',
+                          hintText: '제목을 입력하세요',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      // 본문 안내 문구는 헤더 설명과 같은 말이라 제거했다(3-A Task 14-3).
+                      // 헤더가 더 눈에 띄는 자리이고, 2단계 스펙 §5가 그 문구를 지정했다.
+                      const SizedBox(height: DpSpacing.md),
+                    ],
+                  ),
+                ),
+                SliverPadding(
+                  padding: EdgeInsets.zero,
+                  sliver: SliverPersistentHeader(
+                    pinned: true,
+                    delegate: DpRichEditorToolbarHeader(
+                      controller: _bodyController,
                     ),
                   ),
-                  const SizedBox(height: DpSpacing.lg),
-                ],
-                // SliverList.list의 직접 자식은 가로로 늘어난다 — 감싸지 않으면
-                // 넓은 화면에서 버튼 하나가 콘텐츠 폭 전체를 차지한다(실측 1368px).
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: FilledButton.icon(
-                    key: const ValueKey('post-submit'),
-                    onPressed: _submitting ? null : _submit,
-                    icon: const Icon(DpIcons.send, size: 18),
-                    label: Text(
-                      _submitting
-                          ? (widget.isEdit ? '저장 중…' : '게시 중…')
-                          : (widget.isEdit ? '저장' : '게시'),
+                ),
+                SliverPadding(
+                  padding: EdgeInsets.zero,
+                  sliver: SliverToBoxAdapter(
+                    child: DpRichEditorBody(
+                      key: const ValueKey('post-body-editor'),
+                      controller: _bodyController,
+                      enabled: !_submitting,
                     ),
+                  ),
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.only(
+                    top: DpSpacing.md,
+                    bottom: DpSpacing.lg,
+                  ),
+                  sliver: SliverList.list(
+                    children: [
+                      // 태그는 수정 대상이 아니다 — 서버가 받지 않으므로(평판 귀속이 어긋난다)
+                      // 편집 가능한 것처럼 보이면 저장 후 사라진 것처럼 읽힌다.
+                      if (!widget.isEdit) ...[
+                        TextField(
+                          key: const ValueKey('post-tags-field'),
+                          controller: _tagsCtrl,
+                          enabled: !_submitting,
+                          decoration: const InputDecoration(
+                            labelText: '태그',
+                            hintText: '쉼표 또는 공백으로 구분 (예: dart, flutter)',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                        const SizedBox(height: DpSpacing.lg),
+                      ],
+                      // SliverList.list의 직접 자식은 가로로 늘어난다 — 감싸지 않으면
+                      // 넓은 화면에서 버튼 하나가 콘텐츠 폭 전체를 차지한다(실측 1368px).
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: FilledButton.icon(
+                          key: const ValueKey('post-submit'),
+                          onPressed: _submitting ? null : _submit,
+                          icon: const Icon(DpIcons.send, size: 18),
+                          label: Text(
+                            _submitting
+                                ? (widget.isEdit ? '저장 중…' : '게시 중…')
+                                : (widget.isEdit ? '저장' : '게시'),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],

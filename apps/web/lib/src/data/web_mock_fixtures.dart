@@ -7,10 +7,15 @@ import 'package:dp_core/dp_core.dart';
 /// 실흐름: OAuth 리다이렉트(login()) → 콜백 → POST /auth/refresh → 세션 복원.
 /// user.onboardingStatus=PENDING → 게이트가 콜백 부트스트랩 후 온보딩으로 보냄(시연).
 /// ※ POST /auth/login은 실흐름에 없으므로 픽스처에서 제거됨(Task 4).
-/// 빌드 시 `--dart-define=MOCK_PROFILE=<pending|onboarded>` 로 고르는 mock 유저 프로필.
+/// 빌드 시 `--dart-define=MOCK_PROFILE=<pending|onboarded|consent|guest>` 로 고르는
+/// mock 유저 프로필.
 ///
 /// 기본 `pending` 은 온보딩 게이트(진단) 시연용이다. 브라우저 UX·성능 자동화처럼
 /// 백엔드 없이 `/dashboard` 이후 화면에 도달해야 하는 실행은 `onboarded` 를 쓴다.
+/// `consent` 는 동의 화면(`/consent`)에, `guest` 는 미인증 화면(`/login`·
+/// `/diagnostic`·`/beta-pending`·`/auth/callback`)에 도달하기 위한 것이다 —
+/// 라우터 게이트가 그 화면들을 인증 상태에서 전부 돌려보내기 때문이다
+/// (`apps/web/test/app/gate_redirect_test.dart` 가 그 표를 고정한다).
 const String mockProfile = String.fromEnvironment(
   'MOCK_PROFILE',
   defaultValue: 'pending',
@@ -24,7 +29,7 @@ Map<String, dynamic> mockAuthRefreshUser({String profile = mockProfile}) => {
   'nickname': '지수',
   'role': 'LEARNER',
   'onboardingStatus': profile == 'onboarded' ? 'DONE' : 'PENDING',
-  'consentStatus': 'DONE',
+  'consentStatus': profile == 'consent' ? 'PENDING' : 'DONE',
 };
 
 /// `GET /community/posts` 픽스처를 게시판(`FREE`/`QNA`/`FEEDBACK`)별 결정적 목록으로 돌려준다.
@@ -74,7 +79,7 @@ const List<Map<String, Object?>> _communityPostFixtures = [
   },
 ];
 
-final Map<String, MockFixture> webMockFixtures = {
+final Map<String, MockFixture> _baseFixtures = {
   // ④ 오류 신고·문의 접수. 목 모드 기본값이 true 라 이 픽스처가 없으면 제보가 404로 실패한다.
   'POST /support/requests': (201, {'id': 42}),
   // 기본 목 실행에서도 AI 멘토 메뉴가 실제 대기 상태를 보여줘야 한다.
@@ -212,17 +217,6 @@ final Map<String, MockFixture> webMockFixtures = {
   // 선택 동의 항목)을 그대로 키에 박아야 한다. 성공 시 컨트롤러가 load()로
   // 재조회하므로 본문은 비워도 된다.
   'POST /consents/MARKETING/revoke': (200, <String, dynamic>{}),
-  // OAuth 콜백 후 세션 복원 엔드포인트.
-  // 최상위 필드: snake_case(access_token, refresh_token_cookie_set).
-  // user 객체: camelCase(dp_core User.fromJson 기준).
-  'POST /auth/refresh': (
-    200,
-    {
-      'access_token': 'mock-access-2',
-      'refresh_token_cookie_set': true,
-      'user': mockAuthRefreshUser(),
-    },
-  ),
   // PATH 생성 완료 후 결과 조회(스펙 §3 비동기 결과 조회 패턴)
   'GET /learning-paths/me': (200, mockLearningPath()),
   // 서버가 producer order로 판정한 authoritative Today projection.
@@ -622,6 +616,42 @@ final Map<String, MockFixture> webMockFixtures = {
     },
   ),
 };
+
+/// [profile] 이 쓰는 REST 픽스처. 프로필에 따라 갈리는 것은 세션 복원 하나다.
+///
+/// OAuth 콜백 후 세션 복원 엔드포인트. 최상위 필드는 snake_case
+/// (access_token, refresh_token_cookie_set), user 객체는 camelCase
+/// (dp_core `User.fromJson` 기준).
+///
+/// `guest` 는 여기서 **401** 을 돌려줘야 미인증이 된다 — 유저를 안 돌려주는 것만으로는
+/// 부족하다. `AuthController._performBootstrap` 이 `ApiException` 을 잡아
+/// `AuthUnauthenticated` 로 떨어뜨리는 경로가 유일한 미인증 진입점이다.
+Map<String, MockFixture> webMockFixturesFor(String profile) => {
+  ..._baseFixtures,
+  'POST /auth/refresh': profile == 'guest'
+      ? (
+          401,
+          {
+            'error': {
+              'code': 'UNAUTHORIZED',
+              'message': '로그인이 필요해요. 다시 로그인해 주세요.',
+            },
+          },
+        )
+      : (
+          200,
+          {
+            'access_token': 'mock-access-2',
+            'refresh_token_cookie_set': true,
+            'user': mockAuthRefreshUser(profile: profile),
+          },
+        ),
+};
+
+/// 이 빌드(`MOCK_PROFILE`)가 쓰는 픽스처.
+final Map<String, MockFixture> webMockFixtures = webMockFixturesFor(
+  mockProfile,
+);
 
 Map<String, dynamic> mockContent(String slug) {
   final isStream = slug == 'stream-subscription';

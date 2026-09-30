@@ -207,6 +207,24 @@ class _MentorPageState extends ConsumerState<MentorPage> {
 
   Widget _buildLegacy(BuildContext context, MentorState state) {
     final colors = context.dpColors;
+    final mainColumn = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (state.status == MentorStatus.killSwitch)
+          const DpKillSwitch()
+        else
+          Expanded(child: _conversation(state)),
+        if (state.status == MentorStatus.partial)
+          _PartialNotice(message: state.error, onRetry: _controller().retry),
+        if (state.status == MentorStatus.busy)
+          _PartialNotice(message: state.error, onRetry: _controller().retry),
+        if (state.status == MentorStatus.failed && state.error != null)
+          _InlineError(message: state.error!, color: colors.danger),
+        if (state.status != MentorStatus.killSwitch)
+          _LegacyComposer(controller: _input, onSend: _sendLegacy),
+      ],
+    );
+
     return Scaffold(
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -216,30 +234,20 @@ class _MentorPageState extends ConsumerState<MentorPage> {
             description: '막히는 부분을 물어보면 학습 맥락을 반영해 답합니다',
           ),
           Expanded(
-            child: Column(
-              children: [
-                if (state.status == MentorStatus.killSwitch)
-                  const DpKillSwitch()
-                else
-                  Expanded(child: _conversation(state)),
-                if (state.status == MentorStatus.partial)
-                  _PartialNotice(
-                    message: state.error,
-                    onRetry: _controller().retry,
+            // 참고 자료가 없으면 사이드가 빈칸이 된다 — 그때는 1열로 둔다.
+            child: state.references.isEmpty
+                ? mainColumn
+                : DpCols(
+                    stretch: true,
+                    main: mainColumn,
+                    side: SingleChildScrollView(
+                      child: DpSide(
+                        children: [
+                          _ReferencePanel(references: state.references),
+                        ],
+                      ),
+                    ),
                   ),
-                if (state.status == MentorStatus.busy)
-                  _PartialNotice(
-                    message: state.error,
-                    onRetry: _controller().retry,
-                  ),
-                if (state.status == MentorStatus.failed && state.error != null)
-                  _InlineError(message: state.error!, color: colors.danger),
-                if (state.references.isNotEmpty)
-                  _ReferencePanel(references: state.references),
-                if (state.status != MentorStatus.killSwitch)
-                  _LegacyComposer(controller: _input, onSend: _sendLegacy),
-              ],
-            ),
           ),
         ],
       ),
@@ -270,47 +278,62 @@ class _MentorPageState extends ConsumerState<MentorPage> {
 
     return Scaffold(
       body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            WebMentorContextProjection(
-              mission: mission,
-              task: task,
-              fields: _contextFields(state, previewMatches),
-              capsuleMode: capsuleMode,
-              capsuleStatus: _capsuleStatus(state),
-              statusMessage: state.contextError,
-              disclosureFocusNode: _capsuleDisclosureFocus,
-              onDisclosurePressed: () =>
-                  setState(() => _capsuleExpandedOverride = !capsuleExpanded),
-              onFieldEditRequested: (_) => _showContextEditor(),
-              onRetry: () => _controller().preparePreview(_input.text.trim()),
-            ),
-            Expanded(
-              child: state.status == MentorStatus.killSwitch
-                  ? const DpKillSwitch()
-                  : _conversation(state),
-            ),
-            if (state.status == MentorStatus.partial)
-              _PartialText(message: state.error),
-            if (state.status == MentorStatus.busy)
-              _PartialText(message: state.error),
-            if (state.status == MentorStatus.failed && state.error != null)
-              _InlineError(
-                message: state.error!,
-                color: context.dpColors.danger,
+        // 시안 `.cols` — 대화·작성칸이 좌측, 맥락이 사이드다. 대화는 자체
+        // 스크롤(`ListView` + `_scroll`)을 유지해야 하므로 `stretch` 로 높이를
+        // 채운다(스트리밍 중 자동 하단 이동이 그 컨트롤러에 달려 있다).
+        child: DpCols(
+          stretch: true,
+          main: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: state.status == MentorStatus.killSwitch
+                    ? const DpKillSwitch()
+                    : _conversation(state),
               ),
-            if (state.references.isNotEmpty)
-              _ReferencePanel(references: state.references),
-            if (state.status != MentorStatus.killSwitch)
-              _ContextualComposer(
-                controller: _input,
-                enabled: !_contextBusy(state),
-                pending: _contextBusy(state),
-                actionLabel: _contextualActionLabel(state),
-                onPressed: () => _handleContextualPrimary(state),
-              ),
-          ],
+              if (state.status == MentorStatus.partial)
+                _PartialText(message: state.error),
+              if (state.status == MentorStatus.busy)
+                _PartialText(message: state.error),
+              if (state.status == MentorStatus.failed && state.error != null)
+                _InlineError(
+                  message: state.error!,
+                  color: context.dpColors.danger,
+                ),
+              if (state.status != MentorStatus.killSwitch)
+                _ContextualComposer(
+                  controller: _input,
+                  enabled: !_contextBusy(state),
+                  pending: _contextBusy(state),
+                  actionLabel: _contextualActionLabel(state),
+                  onPressed: () => _handleContextualPrimary(state),
+                ),
+            ],
+          ),
+          // 시안 `.side` — 「선택한 학습 맥락」·「맥락 미리보기」가 여기다.
+          side: SingleChildScrollView(
+            child: DpSide(
+              children: [
+                WebMentorContextProjection(
+                  mission: mission,
+                  task: task,
+                  fields: _contextFields(state, previewMatches),
+                  capsuleMode: capsuleMode,
+                  capsuleStatus: _capsuleStatus(state),
+                  statusMessage: state.contextError,
+                  disclosureFocusNode: _capsuleDisclosureFocus,
+                  onDisclosurePressed: () => setState(
+                    () => _capsuleExpandedOverride = !capsuleExpanded,
+                  ),
+                  onFieldEditRequested: (_) => _showContextEditor(),
+                  onRetry: () =>
+                      _controller().preparePreview(_input.text.trim()),
+                ),
+                if (state.references.isNotEmpty)
+                  _ReferencePanel(references: state.references),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -637,7 +660,9 @@ class _Bubble extends StatelessWidget {
       alignment: alignment,
       child: Container(
         constraints: BoxConstraints(
-          maxWidth: MediaQuery.sizeOf(context).width * 0.86,
+          // 시안 `.msg{max-width:760px}`. 화면 폭 비율로 두면 2열에서 말풍선이
+          // 사이드 칼럼 폭까지 밀고 들어간다.
+          maxWidth: context.appTokens.readableMaxWidth,
         ),
         margin: const EdgeInsets.symmetric(vertical: DpSpacing.xs),
         padding: const EdgeInsets.all(DpSpacing.md),

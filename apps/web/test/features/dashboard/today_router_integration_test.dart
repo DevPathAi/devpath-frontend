@@ -1,3 +1,11 @@
+// S3-P2: 셸이 상단 헤더(56) + 고정 푸터(약 41)로 바뀌어 기본 800x600 테스트 화면에서는
+// Today 의 CTA 가 접힌 아래로 내려간다. 대시보드는 CustomScrollView 라 실제 사용자는
+// 스크롤로 닿는다 — 이 테스트들은 스크롤하지 않으므로 세로만 키운다.
+// 폭은 800 을 유지한다: 1200 으로 키우면 샌드박스가 >=1024 의 2페인 분기로 들어가고
+// 그 분기는 1033px 높이(옛 셸의 세로 예산)에서도 39px 넘친다 — P2 와 무관한 선행 결함이라
+// 여기서 건드리지 않는다.
+import 'dart:ui' show Size;
+
 import 'package:devpath_web/src/app/app.dart';
 import 'package:devpath_web/src/app/app_config.dart';
 import 'package:devpath_web/src/features/ads/data/ads_source.dart';
@@ -64,6 +72,9 @@ void main() {
   testWidgets('NO_ACTIVE_PATH CTA는 실제 router gate를 통과해 PathPage를 연다', (
     tester,
   ) async {
+    tester.view.physicalSize = const Size(800, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
     await tester.pumpWidget(_app(learningPathApi: _NoActivePathApi()));
     await tester.pumpAndSettle();
 
@@ -78,10 +89,15 @@ void main() {
   testWidgets('Today contentId 3 CTA는 실제 ContentPage를 목 모드에서 연다', (
     tester,
   ) async {
+    tester.view.physicalSize = const Size(800, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
 
-    expect(find.text('에러 처리 패턴 적용'), findsOneWidget);
+    // 제목은 미션 밴드와 「이번 주 과제」 표에 함께 나온다(시안의 의도된 반복) —
+    // 이 테스트의 계약은 「제목이 렌더된다」이지 「한 번만 나온다」가 아니다.
+    expect(find.text('에러 처리 패턴 적용'), findsWidgets);
     await tester.tap(find.text('미션 열기'));
     await tester.pumpAndSettle();
 

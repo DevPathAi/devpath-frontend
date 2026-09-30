@@ -3,6 +3,7 @@ import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 
 import '../state/community_state.dart';
+import 'widgets/search_highlight.dart';
 
 /// 사용자에게 노출하는 게시판. `all` 은 데이터 계층 호환용이라 화면에 나오지 않는다.
 const kCommunityBoards = [
@@ -60,7 +61,6 @@ class WebCommunityBoardProjection extends StatelessWidget {
     required this.posts,
     required this.onOpenPost,
     required this.onCompose,
-    this.onSelectBoard,
   });
 
   final CommunityBoard board;
@@ -68,134 +68,200 @@ class WebCommunityBoardProjection extends StatelessWidget {
   final ValueChanged<CommunityPostSummary> onOpenPost;
   final VoidCallback onCompose;
 
-  /// compact 제목 메뉴 선택. null 이면 메뉴는 열리되 이동하지 않는다(증거 캡처).
-  final ValueChanged<CommunityBoard>? onSelectBoard;
-
   static String descriptionFor(CommunityBoard board) => board.description;
 
   @override
-  Widget build(BuildContext context) => CustomScrollView(
-    semanticChildCount: posts.length,
-    slivers: [
-      SliverToBoxAdapter(
-        child: CommunityBoardHeader(
-          board: board,
-          onSelectBoard: onSelectBoard ?? (_) {},
+  Widget build(BuildContext context) {
+    // 시안 `.hide-n` — 좁은 폭에서 감추는 칼럼.
+    final compact = context.windowClass == DpWindowClass.compact;
+    return CustomScrollView(
+      semanticChildCount: posts.length,
+      slivers: [
+        SliverToBoxAdapter(
+          child: CommunityBoardHeader(board: board, onCompose: onCompose),
         ),
-      ),
-      if (posts.isEmpty)
-        SliverFillRemaining(
-          child: CommunityBoardEmpty(board: board, onCompose: onCompose),
-        )
-      else
-        SliverPadding(
-          padding: const EdgeInsets.all(DpSpacing.lg),
-          sliver: SliverList.separated(
-            itemCount: posts.length,
-            separatorBuilder: (_, _) => const SizedBox(height: DpSpacing.sm),
-            itemBuilder: (context, index) => CommunityPostRow(
-              post: posts[index],
-              onTap: () => onOpenPost(posts[index]),
+        // 좌우 패딩은 셸이 준다 — 표는 자기 행 패딩을 갖는다.
+        SliverToBoxAdapter(
+          child: DpPanel(
+            child: DpWebTable(
+              columns: communityBoardColumns(board, compact: compact),
+              empty: CommunityBoardEmpty(board: board),
+              rows: [
+                for (final post in posts)
+                  communityPostRow(
+                    context: context,
+                    post: post,
+                    board: board,
+                    compact: compact,
+                    onTap: () => onOpenPost(post),
+                  ),
+              ],
             ),
           ),
         ),
+      ],
+    );
+  }
+}
+
+/// 게시판별 표 칼럼(시안 `free`/`qna`/`feedback` 의 `<thead>`).
+///
+/// **「작성」 칼럼이 없다.** 서버 `PostSummaryView` 가 작성 시각도 작성자 표시
+/// 이름도 보내지 않는다(`id·boardType·title·authorId·solved·upvoteCount·
+/// replyCount·excerpt`). 시안의 그 칼럼은 백엔드 계약 변경이 있어야 한다.
+///
+/// [compact] 는 시안 `.hide-n` — 좁은 폭에서 감추는 칼럼을 목록에서 뺀다.
+/// 최상위 함수인 이유: 표와 테스트가 **같은 정의 하나**를 쓰게 한다.
+List<DpTableColumn> communityBoardColumns(
+  CommunityBoard board, {
+  required bool compact,
+}) {
+  final isQna = board == CommunityBoard.qna;
+  return [
+    (label: isQna ? '질문' : '제목', width: null, numeric: false),
+    if (isQna) (label: '상태', width: 80, numeric: false),
+    if (!compact) (label: isQna ? '답변' : '댓글', width: 56, numeric: true),
+    (label: '추천', width: 56, numeric: true),
+  ];
+}
+
+/// 목록 한 행. 셀 개수는 [communityBoardColumns] 와 반드시 같아야 한다
+/// (`DpWebTable` 의 assert 가 어긋남을 배치 전에 잡는다).
+DpTableRowSpec communityPostRow({
+  required BuildContext context,
+  required CommunityPostSummary post,
+  required CommunityBoard board,
+  required bool compact,
+  required VoidCallback onTap,
+}) {
+  final isQna = board == CommunityBoard.qna;
+  return (
+    cells: [
+      _titleCell(
+        context: context,
+        title: post.title,
+        preview: post.excerpt.isEmpty ? null : Text(post.excerpt),
+        onTap: onTap,
+      ),
+      if (isQna)
+        post.solved
+            ? const DpStatusText(text: '✓ 해결됨', tone: DpStatusTone.done)
+            : DpStatusText(
+                text: post.replyCount == 0 ? '답변 대기' : '답변 중',
+                tone: DpStatusTone.idle,
+              ),
+      if (!compact) Text('${post.replyCount}'),
+      Text('${post.upvoteCount}'),
+    ],
+    onTap: onTap,
+  );
+}
+
+/// 검색 결과 한 행. 미리보기 자리에 매칭 근거(하이라이트)를 항상 보여 준다.
+DpTableRowSpec communitySearchRow({
+  required BuildContext context,
+  required CommunitySearchItem item,
+  required CommunityBoard board,
+  required bool compact,
+  required VoidCallback onTap,
+}) {
+  final isQna = board == CommunityBoard.qna;
+  // 본문 매칭이 없으면 highlight 가 비어 오므로 excerpt 로 폴백한다.
+  final body = item.highlight.isNotEmpty ? item.highlight : item.excerpt;
+  return (
+    cells: [
+      _titleCell(
+        context: context,
+        title: item.title,
+        preview: body.isEmpty ? null : SearchHighlightText(body),
+        onTap: onTap,
+      ),
+      if (isQna)
+        item.solved
+            ? const DpStatusText(text: '✓ 해결됨', tone: DpStatusTone.done)
+            : DpStatusText(
+                text: item.replyCount == 0 ? '답변 대기' : '답변 중',
+                tone: DpStatusTone.idle,
+              ),
+      if (!compact) Text('${item.replyCount}'),
+      Text('${item.upvoteCount}'),
+    ],
+    onTap: onTap,
+  );
+}
+
+/// 제목 셀 — 시안 `a.ttl` + `.ex`. 접근성 컨트롤은 이 링크 하나다
+/// (행 제스처는 `DpWebTable` 이 시맨틱스에서 뺀다).
+Widget _titleCell({
+  required BuildContext context,
+  required String title,
+  required Widget? preview,
+  required VoidCallback onTap,
+}) {
+  final c = context.dpColors;
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      DpLink.title(text: title, onTap: onTap),
+      if (preview != null) ...[
+        const SizedBox(height: DpSpacing.xs),
+        DefaultTextStyle.merge(
+          style: context.dpBody(13).copyWith(color: c.textSecondary),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          child: preview,
+        ),
+      ],
     ],
   );
 }
 
 /// 게시판 페이지 헤더.
 ///
-/// 게시판 이동은 셸의 몫이다: 레일이 보이는 폭에서는 세 게시판이 레일의 직접 목적지라
-/// 본문에서 다시 나누지 않는다. compact 하단 바에는 `커뮤니티` 하나뿐이라, 그 폭에서만
-/// 제목이 세 게시판을 고르는 메뉴가 된다.
+/// 게시판 이동은 셸의 몫이다 — 어느 폭에서도 본문에서 다시 나누지 않는다.
+/// 좁은 폭에서는 셸 헤더의 햄버거 메뉴가 세 게시판을 보여 준다(S3-P2).
 class CommunityBoardHeader extends StatelessWidget {
-  const CommunityBoardHeader({
-    super.key,
-    required this.board,
-    required this.onSelectBoard,
-  });
+  const CommunityBoardHeader({super.key, required this.board, this.onCompose});
 
   final CommunityBoard board;
-  final ValueChanged<CommunityBoard> onSelectBoard;
+
+  /// 이 게시판의 작성 화면으로 가는 액션. 시안은 주요 액션을 페이지 헤더
+  /// 우측에 두고 FAB 을 쓰지 않는다.
+  final VoidCallback? onCompose;
 
   @override
   Widget build(BuildContext context) {
-    final compact = context.windowClass == DpWindowClass.compact;
     return DpPageHeader(
       title: board.label,
       description: board.description,
-      titleMenuTooltip: '게시판 바꾸기',
-      titleMenu: [
-        if (compact)
-          for (final b in kCommunityBoards)
-            (
-              label: b.label,
-              selected: b == board,
-              onSelect: () => onSelectBoard(b),
-            ),
+      actions: [
+        // 시안 `.btn.p` 는 글자만이다(아이콘 없음).
+        if (onCompose != null)
+          FilledButton(onPressed: onCompose, child: Text(board.composeLabel)),
       ],
     );
   }
 }
 
 /// 게시판별 빈 상태.
+///
+/// **작성 액션을 갖지 않는다.** 페이지 헤더의 작성 버튼이 빈 목록에서도 보이고,
+/// 같은 라벨의 버튼이 둘이면 스크린리더가 둘을 구분할 수 없다(P3 이월 과제).
 class CommunityBoardEmpty extends StatelessWidget {
-  const CommunityBoardEmpty({
-    super.key,
-    required this.board,
-    required this.onCompose,
-  });
+  const CommunityBoardEmpty({super.key, required this.board});
 
   final CommunityBoard board;
-  final VoidCallback onCompose;
 
   @override
-  Widget build(BuildContext context) => DpEmpty(
-    icon: DpIcons.community,
-    title: board.emptyTitle,
-    message: board.emptyMessage,
-    actionLabel: board.composeLabel,
-    onAction: onCompose,
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: DpSpacing.xl),
+    child: DpEmpty(
+      icon: DpIcons.community,
+      title: board.emptyTitle,
+      message: board.emptyMessage,
+    ),
   );
-}
-
-/// 행 강조색. 한 페이지의 행은 모두 같은 게시판이라 게시판 색은 정보가 없다 —
-/// 상태가 있는 Q/A 만 해결 여부를 알리고(배지 문구와 함께), 나머지는 쓰지 않는다.
-Color? communityRowAccent(
-  DpColors c, {
-  required String boardType,
-  required bool solved,
-}) => boardType == 'QNA' ? (solved ? c.success : c.primary) : null;
-
-/// 목록 한 행. 해결 배지·집계를 [DpListRow] 로 그린다.
-class CommunityPostRow extends StatelessWidget {
-  const CommunityPostRow({super.key, required this.post, required this.onTap});
-
-  final CommunityPostSummary post;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.dpColors;
-    final isQna = post.boardType == 'QNA';
-    return DpListRow(
-      accentColor: communityRowAccent(
-        c,
-        boardType: post.boardType,
-        solved: post.solved,
-      ),
-      title: post.title,
-      preview: post.excerpt.isEmpty ? null : post.excerpt,
-      badges: [
-        if (isQna && post.solved) CommunityBadgeChip('✓ 해결됨', tone: c.success),
-      ],
-      trailing: Text(
-        '${isQna ? '답변' : '댓글'} ${post.replyCount} · 추천 ${post.upvoteCount}',
-        style: TextStyle(color: c.textSecondary, fontSize: 12),
-      ),
-      onTap: onTap,
-    );
-  }
 }
 
 /// 목록 정렬 메뉴. 검색 결과(관련도 순)에는 적용되지 않아 그때는 비활성이다.
@@ -273,31 +339,4 @@ class _CommunitySortMenuState extends State<CommunitySortMenu> {
       ),
     ),
   );
-}
-
-/// 해결 여부 배지. 목록 행과 검색 결과 행이 같은 모양을 쓴다.
-class CommunityBadgeChip extends StatelessWidget {
-  const CommunityBadgeChip(this.text, {super.key, this.tone});
-
-  final String text;
-  final Color? tone;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.dpColors;
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: DpSpacing.xs,
-        vertical: 2,
-      ),
-      decoration: BoxDecoration(
-        color: c.border,
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(fontSize: 11, color: tone ?? c.textSecondary),
-      ),
-    );
-  }
 }

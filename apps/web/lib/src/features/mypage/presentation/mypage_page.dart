@@ -133,127 +133,194 @@ class _BodyState extends ConsumerState<_Body> {
     final st = widget.state;
     final p = st.profile;
     final mentorAccess = ref.watch(mentorAccessControllerProvider);
-
-    Widget card(Widget child) => Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: DpSpacing.md),
-      padding: const EdgeInsets.all(DpSpacing.lg),
-      decoration: BoxDecoration(
-        color: c.surface,
-        border: Border.all(color: c.border),
-        borderRadius: BorderRadius.circular(DpRadius.card),
-      ),
-      child: child,
-    );
+    final trackLabel = trackLabels[p.targetTrack];
+    final goalLabel = _goalLabels[p.learningGoal];
+    // 값은 오늘 화면(`today_panels.dart`)과 같은 `DashboardSummary` 를 쓴다.
+    // **문구는 다르다** — 그 화면은 키-값으로 「연속 학습 / N일」을 그리고,
+    // 여기 배지는 시안 `.prof` 의 `7일 연속` 형태로 합성한다. 요청은 늘지
+    // 않는다 — `MyPageLoaded` 가 이미 `dashboard` 를 들고 있다.
+    final summary = st.dashboard;
+    final badgeLabels = <String>[
+      ...?summary?.badges,
+      if (summary != null && summary.streakDays > 0)
+        '${summary.streakDays}일 연속',
+    ];
 
     return SliverPadding(
-      padding: const EdgeInsets.all(DpSpacing.lg),
-      sliver: SliverList.list(
-        children: [
-          // 프로필 헤더(avatar 또는 기본 아이콘)
-          card(
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 32,
-                  backgroundImage: p.avatar != null
-                      ? NetworkImage(p.avatar!)
-                      : null,
-                  child: p.avatar == null
-                      ? const Icon(Icons.account_circle, size: 48)
-                      : null,
-                ),
-                const SizedBox(width: DpSpacing.md),
-                Expanded(
-                  child: Text(
-                    p.avatar == null ? '프로필 사진 없음' : '프로필 사진',
-                    style: text.bodyMedium?.copyWith(color: c.textSecondary),
+      // 좌우 패딩은 셸이 준다 — 화면은 위아래만 준다.
+      padding: const EdgeInsets.symmetric(vertical: DpSpacing.md),
+      sliver: SliverToBoxAdapter(
+        child: DpCols(
+          main: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 시안 `.prof` — 패널이 아니다(배경·테두리 없음). 아바타 + 소개 + 배지.
+              Row(
+                key: const ValueKey('mypage-prof'),
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CircleAvatar(
+                    radius: 32,
+                    backgroundImage: p.avatar != null
+                        ? NetworkImage(p.avatar!)
+                        : null,
+                    child: p.avatar == null
+                        ? const Icon(Icons.account_circle, size: 48)
+                        : null,
                   ),
-                ),
-              ],
-            ),
-          ),
-          // 프로필 편집 폼
-          card(
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('프로필 편집', style: text.titleMedium),
-                const SizedBox(height: DpSpacing.md),
-                TextField(
-                  controller: _bio,
-                  maxLines: 3,
-                  maxLength: 500,
-                  decoration: const InputDecoration(labelText: '자기소개'),
-                ),
-                const SizedBox(height: DpSpacing.sm),
-                DropdownButtonFormField<String>(
-                  initialValue: _learningGoal,
-                  decoration: const InputDecoration(labelText: '학습 목표'),
-                  items: [
-                    for (final e in _goalLabels.entries)
-                      DropdownMenuItem(value: e.key, child: Text(e.value)),
+                  const SizedBox(width: DpSpacing.lg),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          (p.bio?.isNotEmpty ?? false) ? p.bio! : '소개가 아직 없어요',
+                          key: const ValueKey('mypage-prof-bio'),
+                          // 편집 폼의 maxLength 가 500 이다 — 줄 수를 묶지 않으면
+                          // 긴 소개가 머리에서 아래 폼을 밀어낸다.
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: text.titleMedium?.copyWith(
+                            color: (p.bio?.isNotEmpty ?? false)
+                                ? c.textPrimary
+                                : c.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: DpSpacing.xs),
+                        // `CircleAvatar` 에는 시맨틱스 라벨이 없다 — 이 문구가
+                        // 없으면 사진 유무를 알 방법이 사라진다.
+                        Text(
+                          p.avatar == null ? '프로필 사진 없음' : '프로필 사진',
+                          style: text.bodySmall?.copyWith(
+                            color: c.textSecondary,
+                          ),
+                        ),
+                        if (badgeLabels.isNotEmpty) ...[
+                          const SizedBox(height: DpSpacing.sm),
+                          Wrap(
+                            key: const ValueKey('mypage-prof-badges'),
+                            spacing: DpSpacing.sm,
+                            runSpacing: DpSpacing.sm,
+                            children: [
+                              for (final b in badgeLabels) DpTag(label: b),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: DpSpacing.xl),
+              DpPanel(
+                title: const DpPanelTitle('프로필 편집'),
+                padding: const EdgeInsets.all(DpSpacing.lg),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: _bio,
+                      maxLines: 3,
+                      maxLength: 500,
+                      decoration: const InputDecoration(labelText: '자기소개'),
+                    ),
+                    const SizedBox(height: DpSpacing.sm),
+                    DropdownButtonFormField<String>(
+                      initialValue: _learningGoal,
+                      decoration: const InputDecoration(labelText: '학습 목표'),
+                      items: [
+                        for (final e in _goalLabels.entries)
+                          DropdownMenuItem(value: e.key, child: Text(e.value)),
+                      ],
+                      onChanged: (v) => setState(() => _learningGoal = v),
+                    ),
+                    const SizedBox(height: DpSpacing.sm),
+                    DropdownButtonFormField<String>(
+                      initialValue: _targetTrack,
+                      decoration: const InputDecoration(labelText: '목표 트랙'),
+                      items: [
+                        for (final e in trackLabels.entries)
+                          DropdownMenuItem(value: e.key, child: Text(e.value)),
+                      ],
+                      onChanged: (v) => setState(() => _targetTrack = v),
+                    ),
+                    const SizedBox(height: DpSpacing.sm),
+                    TextField(
+                      controller: _years,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: '경력(년)'),
+                    ),
+                    const SizedBox(height: DpSpacing.md),
+                    FilledButton(
+                      onPressed: st.saving ? null : _save,
+                      child: Text(st.saving ? '저장 중...' : '저장'),
+                    ),
                   ],
-                  onChanged: (v) => setState(() => _learningGoal = v),
                 ),
-                const SizedBox(height: DpSpacing.sm),
-                DropdownButtonFormField<String>(
-                  initialValue: _targetTrack,
-                  decoration: const InputDecoration(labelText: '목표 트랙'),
-                  items: [
-                    for (final e in trackLabels.entries)
-                      DropdownMenuItem(value: e.key, child: Text(e.value)),
+              ),
+              const SizedBox(height: DpSpacing.lg),
+              // 활동은 집계 두 줄이다 — 시안의 활동 표를 만들 목록 데이터가 없다.
+              DpPanel(
+                title: const DpPanelTitle('활동'),
+                padding: const EdgeInsets.all(DpSpacing.lg),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (st.dashboard != null)
+                      Text('완료한 콘텐츠 ${st.dashboard!.completedContentCount}개')
+                    else
+                      Text(
+                        '학습 활동을 불러오지 못했습니다',
+                        style: text.bodySmall?.copyWith(color: c.textSecondary),
+                      ),
+                    const SizedBox(height: DpSpacing.xs),
+                    if (st.activity != null)
+                      Text(
+                        '작성한 질문 ${st.activity!.questionCount} · 답변 ${st.activity!.answerCount}',
+                      )
+                    else
+                      Text(
+                        '커뮤니티 활동을 불러오지 못했습니다',
+                        style: text.bodySmall?.copyWith(color: c.textSecondary),
+                      ),
                   ],
-                  onChanged: (v) => setState(() => _targetTrack = v),
                 ),
-                const SizedBox(height: DpSpacing.sm),
-                TextField(
-                  controller: _years,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: '경력(년)'),
-                ),
-                const SizedBox(height: DpSpacing.md),
-                FilledButton(
-                  onPressed: st.saving ? null : _save,
-                  child: Text(st.saving ? '저장 중...' : '저장'),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-          // 활동 요약(부분실패 내성)
-          card(
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('활동', style: text.titleMedium),
-                const SizedBox(height: DpSpacing.sm),
-                if (st.dashboard != null)
-                  Text('완료한 콘텐츠 ${st.dashboard!.completedContentCount}개')
-                else
-                  Text(
-                    '학습 활동을 불러오지 못했습니다',
-                    style: text.bodySmall?.copyWith(color: c.textSecondary),
+          side: DpSide(
+            children: [
+              if (trackLabel != null ||
+                  goalLabel != null ||
+                  p.experienceYears != null)
+                DpPanel(
+                  key: const ValueKey('mypage-profile-kv'),
+                  title: const DpPanelTitle('프로필'),
+                  // 시안 사이드 `.kv`: 목표 트랙 · 목표 · 경력(년).
+                  //
+                  // **남은 divergence**: 시안의 마이페이지에는 편집 폼이 없다
+                  // (헤더의 `프로필 편집` 버튼으로 빠진다). 이 화면은 편집을
+                  // 인라인으로 두므로 같은 세 값이 아래 「프로필 편집」 패널에도
+                  // 나온다. 편집을 별도 라우트로 빼는 것은 S3-P5 범위 밖이다.
+                  child: DpKeyValues(
+                    entries: [
+                      if (trackLabel != null)
+                        (key: '목표 트랙', value: Text(trackLabel)),
+                      if (goalLabel != null)
+                        (key: '목표', value: Text(goalLabel)),
+                      if (p.experienceYears != null)
+                        (key: '경력(년)', value: Text('${p.experienceYears}')),
+                    ],
                   ),
-                const SizedBox(height: DpSpacing.xs),
-                if (st.activity != null)
-                  Text(
-                    '작성한 질문 ${st.activity!.questionCount} · 답변 ${st.activity!.answerCount}',
-                  )
-                else
-                  Text(
-                    '커뮤니티 활동을 불러오지 못했습니다',
-                    style: text.bodySmall?.copyWith(color: c.textSecondary),
-                  ),
-              ],
-            ),
-          ),
-          card(
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('AI 멘토 초대', style: text.titleMedium),
-                const SizedBox(height: DpSpacing.sm),
-                switch (mentorAccess) {
+                ),
+              DpPanel(
+                title: const DpPanelTitle('AI 멘토 초대'),
+                padding: const EdgeInsets.all(DpSpacing.lg),
+                child: switch (mentorAccess) {
                   MentorAccessLoading() => const Text('초대 상태를 확인하는 중입니다.'),
                   MentorAccessFailed() => const Text('초대 상태를 불러오지 못했습니다.'),
                   MentorAccessReady(:final isActive) => Text(
@@ -262,23 +329,22 @@ class _BodyState extends ConsumerState<_Body> {
                         : '초대 대기 중입니다. 담당자가 확인 후 초대 일정을 이메일로 안내해 드립니다.',
                   ),
                 },
-              ],
-            ),
-          ),
-          // 설정 진입
-          card(
-            Material(
-              color: Colors.transparent,
-              child: ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.settings_outlined),
-                title: const Text('설정'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => context.go('/settings'),
               ),
-            ),
+              DpPanel(
+                child: DpRowLine(
+                  label: const Text('설정'),
+                  description: const Text('알림·동의·계정을 관리합니다.'),
+                  trailing: DpLink.inline(
+                    text: '열기',
+                    semanticsLabel: '설정 열기',
+                    onTap: () => context.go('/settings'),
+                  ),
+                  last: true,
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

@@ -23,12 +23,17 @@ void main() {
           '${AppTokens.standard.contentMaxWidth.toInt()}px',
       '--dp-layout-readable-max':
           '${AppTokens.standard.readableMaxWidth.toInt()}px',
+      '--dp-layout-header-height':
+          '${AppTokens.standard.headerHeight.toInt()}px',
       '--dp-layout-rail': '${AppTokens.standard.railWidth.toInt()}px',
       '--dp-layout-rail-collapsed':
           '${AppTokens.standard.railCollapsedWidth.toInt()}px',
       for (final entry in breakpoints.entries)
         '--dp-breakpoint-${entry.key}': '${entry.value.toInt()}px',
     };
+    expect(layout['--dp-layout-content-max'], '1120px');
+    expect(layout['--dp-layout-header-height'], '56px');
+    expect(light['--dp-token-manifest-version'], '"2.0.0"');
 
     final buffer = StringBuffer()
       ..writeln(

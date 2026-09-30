@@ -70,12 +70,91 @@ void _wideView(WidgetTester tester) {
 }
 
 void main() {
+  testWidgets('질문 작성: 폼 폭이 readableMaxWidth(760) 를 넘지 않는다', (tester) async {
+    _wideView(tester);
+    final c = ProviderContainer(
+      overrides: [
+        similarQuestionsProvider.overrideWithValue((q) async => const []),
+        questionCreateProvider.overrideWithValue(
+          ({required title, required bodyMd, required tags}) async =>
+              _created(99),
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+    await tester.pumpWidget(_host(c));
+    await tester.pumpAndSettle();
+
+    // 시안 `write` 는 `.narrow{max-width:760px;margin-inline:0}` 한 열이다.
+    final title = tester.getRect(
+      find.byKey(const ValueKey('question-title-field')),
+    );
+    expect(title.width, lessThanOrEqualTo(760));
+    // 좌측 정렬이다 — 셸 거터가 0 인 테스트 호스트에서는 왼쪽 끝에서 시작한다.
+    expect(title.left, 0);
+  });
+
+  testWidgets('질문 작성: Material Card 를 쓰지 않는다', (tester) async {
+    _wideView(tester);
+    final c = ProviderContainer(
+      overrides: [
+        similarQuestionsProvider.overrideWithValue(
+          (q) async => [
+            const SimilarQuestion(questionId: 2, title: '유사 질문 예시'),
+          ],
+        ),
+        questionCreateProvider.overrideWithValue(
+          ({required title, required bodyMd, required tags}) async =>
+              _created(99),
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+    await tester.pumpWidget(_host(c));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField).first, 'async');
+    await tester.pump(const Duration(milliseconds: 450));
+    await tester.pumpAndSettle();
+
+    expect(find.text('비슷한 질문'), findsOneWidget);
+    expect(find.byType(Card), findsNothing);
+    expect(find.byType(DpPanel), findsWidgets);
+  });
+
+  testWidgets('질문 작성: 390px 에서 폼이 가로로 넘치지 않는다', (tester) async {
+    tester.view.physicalSize = const Size(390, 2600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final c = ProviderContainer(
+      overrides: [
+        similarQuestionsProvider.overrideWithValue((q) async => const []),
+        questionCreateProvider.overrideWithValue(
+          ({required title, required bodyMd, required tags}) async =>
+              _created(99),
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+    await tester.pumpWidget(_host(c));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(
+      tester.getRect(find.byKey(const ValueKey('question-title-field'))).width,
+      lessThanOrEqualTo(390),
+    );
+  });
+
   testWidgets('제목 입력(디바운스) 시 유사질문 패널을 안내한다', (tester) async {
     _wideView(tester);
     final c = ProviderContainer(
       overrides: [
         similarQuestionsProvider.overrideWithValue(
-          (q) async => [const SimilarQuestion(questionId: 2, title: '비슷한 질문')],
+          (q) async => [
+            const SimilarQuestion(questionId: 2, title: '유사 질문 예시'),
+          ],
         ),
         questionCreateProvider.overrideWithValue(
           ({required title, required bodyMd, required tags}) async =>
@@ -91,8 +170,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 450)); // 디바운스 발화
     await tester.pumpAndSettle();
 
-    expect(find.text('💡 비슷한 질문'), findsOneWidget);
     expect(find.text('비슷한 질문'), findsOneWidget);
+    expect(find.text('유사 질문 예시'), findsOneWidget);
     expect(
       tester.widget<DpPageHeader>(find.byType(DpPageHeader)).title,
       '질문하기',
@@ -291,7 +370,9 @@ void main() {
     final c = ProviderContainer(
       overrides: [
         similarQuestionsProvider.overrideWithValue(
-          (q) async => [const SimilarQuestion(questionId: 2, title: '비슷한 질문')],
+          (q) async => [
+            const SimilarQuestion(questionId: 2, title: '유사 질문 예시'),
+          ],
         ),
         questionCreateProvider.overrideWithValue(
           ({required title, required bodyMd, required tags}) async =>
@@ -310,7 +391,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 450)); // 디바운스 발화
     await tester.pumpAndSettle();
 
-    expect(find.text('💡 비슷한 질문'), findsOneWidget); // 패널이 실제로 삽입됐는지
+    expect(find.text('비슷한 질문'), findsOneWidget); // 패널이 실제로 삽입됐는지
     final after = tester.state(find.byType(QuillEditor));
 
     // 재생성되면 IME 연결이 끊겨 "Range start N is out of text of length M" assertion 발생
@@ -326,7 +407,9 @@ void main() {
     final c = ProviderContainer(
       overrides: [
         similarQuestionsProvider.overrideWithValue(
-          (q) async => [const SimilarQuestion(questionId: 2, title: '비슷한 질문')],
+          (q) async => [
+            const SimilarQuestion(questionId: 2, title: '유사 질문 예시'),
+          ],
         ),
         questionCreateProvider.overrideWithValue(
           ({required title, required bodyMd, required tags}) async =>
@@ -346,7 +429,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 450));
     await tester.pumpAndSettle();
 
-    expect(find.text('💡 비슷한 질문'), findsOneWidget); // 패널이 실제로 삽입됐는지 먼저 확인
+    expect(find.text('비슷한 질문'), findsOneWidget); // 패널이 실제로 삽입됐는지 먼저 확인
     final after = tester
         .widget<QuillEditor>(find.byType(QuillEditor))
         .focusNode;

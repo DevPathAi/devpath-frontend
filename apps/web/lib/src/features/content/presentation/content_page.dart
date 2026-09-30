@@ -14,6 +14,7 @@ import '../application/content_controller.dart';
 import '../application/content_progress_tracker.dart';
 import '../application/mission_content_controller.dart';
 import '../state/content_state.dart';
+import 'content_panels.dart';
 import '../../dashboard/application/dashboard_controller.dart';
 import '../../dashboard/application/current_mission_controller.dart';
 import '../../mission/state/mission_workspace_key.dart';
@@ -262,46 +263,72 @@ class _ContentPageState extends ConsumerState<ContentPage>
             )
           else if (content != null)
             SliverPadding(
-              padding: const EdgeInsets.all(DpSpacing.lg),
+              // 좌우 패딩은 셸이 준다. 상하만 남긴다.
+              padding: const EdgeInsets.symmetric(vertical: DpSpacing.lg),
               sliver: SliverToBoxAdapter(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (inlineLoadFailure != null) ...[
-                      _InlineContentError(
-                        message: inlineLoadFailure,
-                        actionLabel: '콘텐츠 다시 불러오기',
-                        onRetry: _posting ? null : _loadContent,
-                      ),
-                      const SizedBox(height: DpSpacing.md),
+                // 시안 `.cols` — 본문은 `.prose`(760), 사이드는 진행률·현재
+                // 미션. `_headerKey` 가 붙은 위 sliver 는 건드리지 않는다:
+                // `_scrollPct` 가 그 박스 높이를 재서 진행률을 보정한다.
+                child: DpCols(
+                  main: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (inlineLoadFailure != null) ...[
+                        _InlineContentError(
+                          message: inlineLoadFailure,
+                          actionLabel: '콘텐츠 다시 불러오기',
+                          onRetry: _posting ? null : _loadContent,
+                        ),
+                        const SizedBox(height: DpSpacing.md),
+                      ],
+                      if (progressFailure != null) ...[
+                        _InlineContentError(
+                          message: progressFailure,
+                          actionLabel: '진행률 저장 다시 시도',
+                          onRetry:
+                              _posting ||
+                                  (missionState?.progressSubmitting ?? false)
+                              ? null
+                              : _retryFailedProgress,
+                        ),
+                        const SizedBox(height: DpSpacing.md),
+                      ],
+                      WebContentProjection(content: content),
+                      if (workspaceKey != null) ...[
+                        const SizedBox(height: DpSpacing.xl),
+                        DpNextActionBand(
+                          actionId: 'open-contextual-sandbox',
+                          label: '실습 시작',
+                          expectedOutcome: '현재 미션 맥락으로 코드 실습을 시작합니다',
+                          state: DpNextActionState.ready,
+                          onPressed: (_) {
+                            _maybeFlushProgress(force: true);
+                            context.push(workspaceKey.sandboxLocation);
+                          },
+                        ),
+                      ],
                     ],
-                    if (progressFailure != null) ...[
-                      _InlineContentError(
-                        message: progressFailure,
-                        actionLabel: '진행률 저장 다시 시도',
-                        onRetry:
-                            _posting ||
-                                (missionState?.progressSubmitting ?? false)
-                            ? null
-                            : _retryFailedProgress,
-                      ),
-                      const SizedBox(height: DpSpacing.md),
-                    ],
-                    WebContentProjection(content: content),
-                    if (workspaceKey != null) ...[
-                      const SizedBox(height: DpSpacing.xl),
-                      DpNextActionBand(
-                        actionId: 'open-contextual-sandbox',
-                        label: '실습 시작',
-                        expectedOutcome: '현재 미션 맥락으로 코드 실습을 시작합니다',
-                        state: DpNextActionState.ready,
-                        onPressed: (_) {
-                          _maybeFlushProgress(force: true);
-                          context.push(workspaceKey.sandboxLocation);
+                  ),
+                  side: DpSide(
+                    children: [
+                      ContentProgressPanel(content: content),
+                      ContentMissionPanel(
+                        mission: currentMissionState?.mission,
+                        currentTaskId: workspaceKey?.taskId,
+                        onOpenTask: (task) {
+                          final contentId = task.contentId;
+                          final taskId = task.taskId;
+                          if (contentId == null || taskId == null) return;
+                          context.push(
+                            MissionWorkspaceKey(
+                              taskId: taskId,
+                              contentId: contentId,
+                            ).contentLocation,
+                          );
                         },
                       ),
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -664,8 +691,6 @@ class WebContentProjection extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
     final colors = context.dpColors;
-    final progress = content.progress;
-    final percent = (progress.scrollPct * 100).round().clamp(0, 100);
     final meta = [
       if (content.estimatedMinutes != null) '${content.estimatedMinutes}분',
       if (content.bloomLevel != null) content.bloomLevel!,
@@ -674,7 +699,11 @@ class WebContentProjection extends StatelessWidget {
 
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 840),
+        // 시안 `.prose{max-width:760px}` = `readableMaxWidth`. 840 은 토큰과
+        // 어긋난 리터럴이었다.
+        constraints: BoxConstraints(
+          maxWidth: context.appTokens.readableMaxWidth,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -685,28 +714,17 @@ class WebContentProjection extends StatelessWidget {
                 meta.join(' · '),
                 style: text.bodySmall?.copyWith(color: colors.textSecondary),
               ),
-            const SizedBox(height: DpSpacing.md),
-            Row(
-              children: [
-                Expanded(
-                  child: LinearProgressIndicator(
-                    value: progress.scrollPct.clamp(0, 1).toDouble(),
-                  ),
-                ),
-                const SizedBox(width: DpSpacing.sm),
-                Text(
-                  progress.completed ? '완료' : '$percent% 진행',
-                  style: text.labelMedium,
-                ),
-              ],
-            ),
+            // 진행률 바는 사이드 `ContentProgressPanel` 이 맡는다 — 시안은
+            // 진행률을 `.side` 에 둔다.
             if (content.conceptTags.isNotEmpty) ...[
               const SizedBox(height: DpSpacing.md),
               Wrap(
                 spacing: DpSpacing.xs,
                 runSpacing: DpSpacing.xs,
                 children: [
-                  for (final tag in content.conceptTags) Chip(label: Text(tag)),
+                  // Material `Chip` 은 P2 에서 폰트 폭주의 원인이었다
+                  // (`ChipThemeData.labelStyle` 이 앱 폰트를 대체한다).
+                  for (final tag in content.conceptTags) DpTag(label: tag),
                 ],
               ),
             ],

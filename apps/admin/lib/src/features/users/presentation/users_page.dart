@@ -77,6 +77,7 @@ class _S extends ConsumerState<AdminUsersPage> {
       body: Column(
         children: [
           DpPageHeader(
+            gutter: true,
             // 제목은 kAdminDestinations가 유일한 출처다(admin_shell.dart).
             title: adminHeaderTitleFor('/users'),
             description: '가입 승인과 제재를 처리합니다',

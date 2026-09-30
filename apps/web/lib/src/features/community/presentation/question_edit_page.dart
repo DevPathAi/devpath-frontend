@@ -1,9 +1,11 @@
+import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../application/qna_detail_controller.dart';
 import '../state/qna_detail_state.dart';
 import 'question_create_page.dart';
+import '../../support/presentation/supportable_error.dart';
 
 /// 질문 편집 진입점 — 상세를 먼저 불러 초기값을 확정한 뒤 작성 화면을 편집 모드로 띄운다.
 ///
@@ -38,13 +40,24 @@ class _QuestionEditPageState extends ConsumerState<QuestionEditPage> {
         initialTitle: detail.title,
         initialBodyMd: detail.bodyMd,
       ),
+      // 웹 셸에는 AppBar 가 없다 — 글 수정 껍데기와 같은 문법이다.
       QnaFailed(:final message) => Scaffold(
-        appBar: AppBar(title: const Text('질문 수정')),
-        body: Center(child: Text(message)),
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const DpPageHeader(title: '질문 수정'),
+            Expanded(
+              child: SupportableError(
+                message: message,
+                onRetry: () => ref
+                    .read(qnaDetailControllerProvider.notifier)
+                    .load(widget.postId),
+              ),
+            ),
+          ],
+        ),
       ),
-      QnaLoading() => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      ),
+      QnaLoading() => const Scaffold(body: DpLoading(label: '질문을 불러오는 중')),
     };
   }
 }

@@ -109,12 +109,81 @@ void main() {
     await tester.pump();
 
     expect(find.byType(AppBar), findsNothing);
-    final header = tester.widget<DpPageHeader>(find.byType(DpPageHeader));
-    expect(header.title, '베타 대기');
-    expect(header.description, '승인되면 알려드립니다');
+    // 시안 `beta` 로 옮기면서 좌측 정렬 페이지 헤더를 버렸다 — 태그 + 중앙 제목이
+    // 그 자리를 대신한다(폭·정렬 단언은 아래 「중앙 narrow 760」 테스트에 있다).
+    expect(find.byType(DpPageHeader), findsNothing);
+    expect(find.widgetWithText(DpTag, '베타 대기'), findsOneWidget);
+    expect(find.text('승인되면 알려드립니다'), findsOneWidget);
     // F4 회귀 가드: brandRow(context) 호출을 지워도 위 단언들은 깨지지
     // 않는다 — 셸 밖 화면의 유일한 제품 정체성 표시이므로 존재를 직접
     // 단언한다(brand_row.dart의 key로, find.text보다 견고하다).
     expect(find.byKey(const ValueKey('brand-row')), findsOneWidget);
+  });
+
+  testWidgets('베타 대기: 시안 beta — 중앙 narrow 760, 페이지 헤더 대신 태그+제목', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final api = _StatusApiClient([
+      {'status': 'PENDING'},
+    ]);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          apiClientProvider.overrideWithValue(api),
+          oauthLauncherProvider.overrideWithValue(_CapturingLauncher()),
+          appConfigProvider.overrideWithValue(
+            const AppConfig(baseUrl: 'http://x', useMock: false),
+          ),
+        ],
+        child: MaterialApp(
+          theme: DpTheme.light(),
+          home: const BetaPendingPage(),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    // 시안 `beta` 는 중앙 정렬이라 좌측 정렬 페이지 헤더와 맞지 않는다.
+    expect(find.byType(DpPageHeader), findsNothing);
+    expect(find.widgetWithText(DpTag, '베타 대기'), findsOneWidget);
+    expect(find.text('승인되면 알려드립니다'), findsOneWidget);
+
+    final box = tester.widget<ConstrainedBox>(
+      find.byKey(const ValueKey('beta-narrow')),
+    );
+    expect(box.constraints.maxWidth, 760);
+  });
+
+  testWidgets('베타 대기: 시안 .narrow.center — 내용이 세로 중앙에 온다', (tester) async {
+    tester.view.physicalSize = const Size(1280, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final api = _StatusApiClient([
+      {'status': 'PENDING'},
+    ]);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          apiClientProvider.overrideWithValue(api),
+          oauthLauncherProvider.overrideWithValue(_CapturingLauncher()),
+          appConfigProvider.overrideWithValue(
+            const AppConfig(baseUrl: 'http://x', useMock: false),
+          ),
+        ],
+        child: MaterialApp(
+          theme: DpTheme.light(),
+          home: const BetaPendingPage(),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final block = tester.getRect(find.byKey(const ValueKey('beta-narrow')));
+    expect(block.center.dy, closeTo(1200 / 2, 80));
   });
 }

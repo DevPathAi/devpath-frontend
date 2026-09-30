@@ -33,19 +33,31 @@ class DashboardBody extends StatelessWidget {
     includeAd: true,
   );
 
-  /// Today 아래에 표시하는 보조 지표. legacy CTA와 광고는 제외한다.
+  /// Today 의 `.side` 칼럼(시안 `today`). 폭 판단은 `DpCols` 가 하므로 여기서
+  /// 열 수를 세지 않는다.
+  ///
+  /// KPI 카드(`연속 학습`·`완료 콘텐츠`)·도넛(`전체 진행률`)·배지 스트립의
+  /// **데이터는 사라지지 않았다** — `TodayProgressPanel` 이 같은 숫자를 키-값으로
+  /// 맡는다. 같은 숫자를 한 화면에 두 번 그리지 않기 위한 분담이라 여기서는
+  /// 차트만 남는다.
+  ///
+  /// 옛 코드는 가용 폭 440 미만에서 추세를 숨겼다. 새 사이드 칼럼은 본문 1120 의
+  /// 1/3(≈373px)이라 그 게이트를 남기면 **데스크톱에서도** 추세가 사라진다 —
+  /// 게이트를 걷어내고 좁은 폭에서도 남긴다(차트가 폭에 맞춰 줄어든다).
   static Widget supportingContent(
     BuildContext context,
     DashboardSummary summary, {
     Key? key,
-  }) => _content(
-    context,
-    summary,
+  }) => DpSide(
     key: key,
-    includeLegacyHero: false,
-    includeAd: false,
+    children: [
+      WeeklyActivityCard(activity: summary.weeklyActivity),
+      ProgressTrendCard(history: summary.progressHistory),
+    ],
   );
 
+  /// flag OFF(legacy) 경로의 Bento 본문. 운영 경로가 아니므로 `.cols` 로 옮기지
+  /// 않고 면 문법만 `DpPanel` 로 바꿨다(그림자 제거).
   static Widget _content(
     BuildContext context,
     DashboardSummary summary, {
@@ -65,7 +77,6 @@ class DashboardBody extends StatelessWidget {
             : width < 840
             ? 2
             : 4; // 4열 Bento
-        final showTrend = width >= _trendMinWidth;
         final maxW = context.appTokens.contentMaxWidth;
 
         // 셀 폭 배분(cross열 기준): CTA는 넓게, KPI는 1열, 도넛/배지는 폭별 조정.
@@ -89,13 +100,6 @@ class DashboardBody extends StatelessWidget {
             _progressDonutTile(summary, donutSpan),
             _weeklyActivityTile(summary, donutSpan),
             _progressTrendTile(summary, donutSpan),
-          ] else ...[
-            // Today 보조 맥락: 이번 주 진행 근거 → 추세 → KPI. 도넛(헤더 진행과 중복)과
-            // 배지(장식)는 Today 에서 제외하고, compact 는 주간 활동과 스트릭만 남긴다.
-            _weeklyActivityTile(summary, donutSpan),
-            if (showTrend) _progressTrendTile(summary, donutSpan),
-            _streakTile(summary),
-            if (cross >= 2) _completedContentTile(summary),
           ],
           if (includeLegacyHero && summary.badges.isNotEmpty)
             StaggeredGridTile.fit(
@@ -124,9 +128,6 @@ class DashboardBody extends StatelessWidget {
     );
   }
 }
-
-/// 추세 차트를 보일 최소 가용 폭. compact(≤400) 는 숨기고 2열 레일(≈480) 은 보인다.
-const double _trendMinWidth = 440;
 
 StaggeredGridTile _streakTile(DashboardSummary summary) =>
     StaggeredGridTile.fit(
@@ -167,25 +168,9 @@ StaggeredGridTile _progressTrendTile(DashboardSummary summary, int span) =>
       child: ProgressTrendCard(history: summary.progressHistory),
     );
 
-Widget _panel(BuildContext context, Widget child) {
-  final c = context.dpColors;
-  return Container(
-    padding: const EdgeInsets.all(DpSpacing.xl),
-    decoration: BoxDecoration(
-      color: c.surface,
-      border: Border.all(color: c.border),
-      borderRadius: BorderRadius.circular(context.appTokens.panelRadius),
-      boxShadow: [
-        BoxShadow(
-          color: c.textPrimary.withValues(alpha: 0.035),
-          blurRadius: 24,
-          offset: const Offset(0, 8),
-        ),
-      ],
-    ),
-    child: child,
-  );
-}
+/// 시안의 면 구분은 1px 테두리 한 겹뿐이다 — 그림자를 쓰지 않는다.
+Widget _panel(BuildContext context, Widget child) =>
+    DpPanel(padding: const EdgeInsets.all(DpSpacing.xl), child: child);
 
 class _HeroCta extends StatelessWidget {
   const _HeroCta({required this.title});

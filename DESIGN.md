@@ -29,11 +29,14 @@ Leva v2의 프라이머리는 **인디고·슬레이트**다. 차가운 중립 �
 
 32개 토큰 전부가 `DpColors`(`packages/dp_design/lib/src/theme/dp_colors.dart`)의 단일 클래스에 있으며,
 이 문서의 값은 그 코드에서 그대로 옮긴 것이다(코드가 SSoT, 이 표는 사본).
-`DpSemanticTokenManifest`(`dp_semantic_tokens.dart`) v1.1.0은 Flutter name, CSS custom property,
+`DpSemanticTokenManifest`(`dp_semantic_tokens.dart`) v2.0.0은 Flutter name, CSS custom property,
 light/dark 값, allowed usage와 default/hover/pressed/focus/selected/disabled/error mapping을 공개한다.
 값이 바뀌면 `version`도 올린다 — v1.1.0(2026-09-17)은 9/13 mobile-first 개편으로 바뀐 값(인디고 팔레트,
-반경 999/12/18/12/20, headline-small·title-large, 레이아웃 폭 1360/760/280/80)을 계약 버전에 반영한 것으로
-이름·구조 변경은 없다. 랜딩 mirror(`devpath-home-page/assets/tokens.css`)는 이 버전을 따라 맞춘다.
+반경 999/12/18/12/20, headline-small·title-large, 레이아웃 폭 1360/760/280/80)을 이름·구조 변경 없이
+반영한 것이고, **v2.0.0(2026-09-24, S3-P1)** 은 웹 문법 전환이라 major 다: 반경 4/6/8/6/12 · 밀도 토큰
+3종(`--dp-density-control-height`·`-row-padding`·`-min-target`) 신설 · 레이아웃 폭 1120/760 과 헤더 높이 56 ·
+다크 레일 색 6종 `rail*` → `header*`(값 불변). 랜딩 mirror(`devpath-home-page/assets/tokens.css`)는
+이 버전을 따라 맞춘다.
 
 **면 (Surface) — 3단계**
 | 토큰 | 라이트 | 다크 | 용도 |
@@ -151,25 +154,47 @@ Material 3 타입 스케일(Pretendard 적용):
 | titleSmall | 14/20 (w600) | 카드 소제목 |
 | labelMedium | 12/16 (w600) | 칩·뱃지 |
 
-> 학습·문서 읽기 본문은 `bodyLarge` 16px을 기본으로 하고 18px까지 허용한다. 메타는 `bodySmall` 13px,
+> 학습·문서 읽기 본문은 `bodyLarge` 16px을 기본으로 하고 18px까지 허용한다. 보조 정보는 `bodySmall` 13px,
 > 11px `labelSmall`은 짧은 UI 레이블에만 쓰며 모든 읽어야 하는 텍스트는 대비 ≥4.5:1을 유지한다.
+> **단, 시안의 `.meta`(12px)는 아래 「웹 문법(S3)의 파생 스타일」이 우선한다** — 이 줄은 S3 이전의
+> 앱 문법 기준이고, 웹 화면의 `.meta` 는 `bodySmall` 이 아니라 `context.dpMeta` 다.
+
+> **웹 문법(S3)의 파생 스타일.** 시안은 `.meta`(12px)·`.ex`(13px)·`.steps li`(13px)·`.chk p`(13px)
+> 에서 `font-size` 만 덮고 `line-height` 는 `body{line-height:1.6}` 을 그대로 물려받는다. 그 자리들은
+> 위 표의 슬롯을 고르는 것이 아니라 **본문에서 크기만 줄인 것**이다. 그래서 `context.dpMeta`(12 / 1.6)와
+> `context.dpBody(<크기>)` 를 쓴다(`dp_design` 의 `DpDerivedTextX`). 화면에 `TextStyle(fontSize: …)`
+> 리터럴을 두지 않는다 — 흩어지면 시안과 대조할 수 없다(S3-P5 가 `apps/web` 의 14곳을 걷었다).
+>
+> 한 줄로 끝나는 상태·태그·표 머리는 계속 `labelMedium` 이다(`DpStatusText`·`DpTag`).
+> **미결 divergence**: 그 `labelMedium`(12 / 16)과 `bodySmall`(13 / 20)은 시안의 1.6(각 19.2 · 20.8)보다
+> 좁다. 어느 쪽으로 통일하든 시맨틱 토큰 계약(현 2.0.0)의 버전을 올려야 하므로 S3-P5 는 사실만 적고 값을
+> 바꾸지 않았다.
 
 ## 3. 간격 · 라운드 · 고도
 
 - **간격(8pt 그리드)**: `4 · 8 · 12 · 16 · 24 · 32 · 48`. 컴포넌트 내부 패딩 12~16, 섹션 간 16~24.
-- **라운드**: 칩 `999` · 버튼 `12` · 카드/패널 `18` · 입력 `12` · 다이얼로그 `20`.
+- **라운드(계약 2.0.0, 웹 문법)**: 칩 `4` · 버튼 `6` · 카드/패널/드롭다운 `8` · 입력 `6` · 다이얼로그/시트 `12`. (2026-09-19 스펙 §5.3 — 999/12/18/12/20 의 모바일 문법에서 옮김.)
+- **밀도(계약 2.0.0)**: 컨트롤 높이 `30` · 표 행 세로 여백 `8` · 최소 포인터 타깃 `24`(`DpDensity`). 버튼·입력·세그먼트·아이콘 버튼은 `DpTheme` 이 이 값을 강제한다(세그먼트는 자체 하한 때문에 `VisualDensity.compact` 로 32px).
 - **고도/그림자**: 장식용 그림자 금지(APP UI). 보더(`border` 토큰) 우선, 그림자는 오버레이(드롭다운·다이얼로그·시트)에만.
 
 **레이아웃 토큰(`AppTokens` — 밝기 무관)**
 | 토큰 | 값 | 용도 |
 |---|---|---|
-| `contentMaxWidth` | 1360 | Large 본문 최대 폭 |
+| `contentMaxWidth` | 1120 | 본문 최대 폭(항상 중앙 정렬) |
 | `readableMaxWidth` | 760 | 문서·상세 읽기 폭 |
-| `railWidth` | 280 | 확장 rail 폭 |
-| `railCollapsedWidth` | 80 | Medium 접힘 rail 폭 |
-| `panelRadius` | 18 | 패널 반경(=카드) |
+| `headerHeight` | 56 | 상단 헤더 높이(P2 `DpWebShell`) |
+| `railWidth` | 280 | admin 레일 폭(web 은 P2 에서 헤더로) |
+| `railCollapsedWidth` | 80 | admin 접힘 레일 폭 |
+| `panelRadius` | 8 | 패널 반경(=카드) |
 
-> 소비: `context.appTokens`. 최대폭 제약은 `DpMaxWidth`, 상태 스타일은 `DpStateStyle`, 클릭 카드 베이스는 `DpInteractiveCard`, 텍스트 선택은 `DpSelectable`, 스크롤바는 `DpScrollbar`. (UI/UX 고도화 로드맵 Phase 0 산출.)
+> 소비: `context.appTokens`. 최대폭 제약은 `DpMaxWidth`, 상태 스타일은 `DpStateStyle`, 텍스트 선택은 `DpSelectable`, 스크롤바는 `DpScrollbar`. (UI/UX 고도화 로드맵 Phase 0 산출.)
+>
+> **웹 문법(S3)**: 면은 `DpPanel`(표면 + 1px 테두리 + 반경 8)이 담당하고 클릭 카드 베이스는 쓰지 않는다
+> — S3-P3 가 카드 나열을 구분선 행(`DpListRow`·`DpRowLine`·`DpListLines`)과 표(`DpWebTable`)로 바꿨고,
+> `DpInteractiveCard` 는 프로덕션 소비처가 **0곳**이다(S3-P5 실측 — 위젯 정의와 그 테스트만 남았다).
+> `DpPanel` 은 안쪽에 `Material(type: transparency)` 를 스스로 둬 `ListTile`·`InkWell` 의 잉크가 패널
+> 경계 안에서 일어나게 한다(S3-P5). 8pt 스케일에 없는 시안 치수는 `DpWebDensity` 에 이름으로 둔다 —
+> 행 세로 패딩 10(`.rowline`·`.chk`·`.list li`) · 키-값 간격 6(`.kv`) · 단계 세로 패딩 6(`.steps li`).
 
 ## 4. 아이콘
 
@@ -179,22 +204,33 @@ Material 3 타입 스케일(Pretendard 적용):
 
 ## 5. 반응형 (Material 3 window size class)
 
-| 클래스 | 폭 | web 셸 | SBX(Sandbox) |
+| 클래스 | 폭 | web 셸 (S3-P2) | SBX(Sandbox) |
 |---|---|---|---|
-| Compact | <600 | 플로팅 하단 내비 + 64px 상단 브랜드 바 | 1-페인 탭 전환(에디터/실행/리뷰) |
-| Medium | 600–839 | 플로팅 하단 내비 또는 레일(접힘) | 1-페인 탭 전환 |
-| Expanded | 840–1239 | 좌측 내비 레일 | 2-페인(에디터 | 리뷰), 로그 접이식 |
-| Large | ≥1240 | 좌측 내비 레일(넓은 본문) | 3-페인(에디터 | 실행로그 | 리뷰) |
+| Compact | <600 | 상단 헤더(56px) + 햄버거 인라인 메뉴 + 1열 본문 + 푸터 | 1-페인 탭 전환(에디터/실행/리뷰) |
+| Medium | 600–839 | 720 미만은 햄버거, 이상은 주 메뉴 노출. 본문 1열 | 1-페인 탭 전환 |
+| Expanded | 840–1239 | 상단 헤더 주 메뉴 + 중앙 본문(최대 1120) | 2-페인(에디터 | 리뷰), 로그 접이식 |
+| Large | ≥1240 | 같음(본문이 1120 에서 멈추고 좌우 여백이 는다) | 3-페인(에디터 | 실행로그 | 리뷰) |
+
+> web 셸의 폭 경계는 **720**(시안 `@container (max-width:720px)`)이라 위 표의 Material 경계와 다르다.
+> `apps/admin` 은 계속 Material 경계로 레일/하단 내비를 쓴다.
 
 - **SBX 규칙**: 데스크톱(≥1024)=3-페인, 모바일웹(<1024)=상단 세그먼트 탭으로 1-페인씩 전환. Monaco는 web 전용 유지(터치 편집 제약 명시). "3열을 그대로 축소" 금지.
 - "모바일은 스택" 금지 — 각 뷰포트는 의도적 레이아웃 전환.
 - 하단 내비는 시스템 `NavigationBar`를 직접 쓰지 않고 `DpMobileNavigation`이 소유한다. 비내비 경로에서는
-  선택 상태를 억지로 표시하지 않으며, 안전영역과 44px 이상 터치 타깃을 유지한다.
+  선택 상태를 억지로 표시하지 않으며, 안전영역과 §6 의 최소 타깃을 유지한다. — **`apps/admin` 전용이다.**
+  `apps/web` 은 S3-P2 부터 폭과 무관하게 하단 내비를 쓰지 않는다.
+- **본문 2열(`DpCols`)의 경계는 840**(= Expanded 의 시작)이다. 시안의 컨테이너 질의는
+  720(`@container (max-width:720px)`)이지만 그 한 규칙이 `.cols`(2:1 분할)와 `.login`(1.1:0.9 대등
+  분할)을 함께 묶고 있고, 2:1 에서는 720 에서 사이드가 약 220px 로 눌려 패널 제목조차 줄바꿈한다.
+  시안 갤러리는 1440·390 두 폭만 보여 720~839 는 시각 검토된 적이 없으므로, 검토되지 않은 구간에서는
+  더 보수적인 경계를 택했다. 셸의 720(햄버거 ↔ 주 메뉴)과는 성격이 다른 경계다.
+  (S3-P5 사용자 결정 2026-09-28. 코드: `packages/dp_design/lib/src/layout/dp_cols.dart`.)
 
 ## 6. 접근성 베이스라인 (필수)
 
 - **대비**: 본문/링크 텍스트 ≥4.5:1(`primary`를 텍스트로 쓰지 않고 `primaryText`/`primaryTextStrong` 사용), 큰 텍스트·UI 컴포넌트 ≥3:1.
-- **터치 타깃**: ≥44×44 (하단탭·아이콘 버튼·칩).
+- **포인터 타깃(계약 2.0.0)**: ≥24×24 — WCAG 2.2 AA 2.5.8. 24 미만인 타깃은 인접 타깃과의 간격(≥8px)으로 예외 조건을 만족시킨다. 컨트롤 표준 높이는 30(`DpDensity.controlHeight`). 2026-09-19 스펙 §5.4-1 의 사용자 결정으로 44×44 터치 기준에서 옮겼다; browser-ux 러너 `MIN_TARGET` 과 같은 값이다.
+- **인접 타깃 간격(계약 2.0.0에서 바뀐 것)**: 테마는 각 타깃의 **크기**만 보장하고 타깃 **사이 간격은 보장하지 않는다**. `tapTargetSize: MaterialTapTargetSize.shrinkWrap` 으로 바뀌면서 버튼이 받던 암묵적 패딩(48px 박스)이 사라졌으므로, 아이콘 버튼을 나란히 놓는 셸·화면이 최소 `DpSpacing.xs`(4) 간격을 **직접** 준다. WCAG 2.2 AA 2.5.8 은 24×24 이상이면 간격 없이도 충족되지만(즉 위반은 아니다), 390px 폭에서 오조작을 부른다. 이 책임은 S3-P2(셸)·P3(공용 위젯)의 몫이며 `dp_chrome_bar` 의 인라인 액션이 첫 대상이다.
 - **키보드**: 전체 포커스 순서·가시 포커스 링(2px `primaryText`)·skip-to-content. **Monaco는 포커스 트랩 → `Esc`로 에디터 탈출** 명시.
 - **스크린리더**: 시맨틱 랜드마크(`nav`/`main`/`complementary`), `lang="ko"`. **SSE 실시간 업데이트는 `aria-live="polite"` 영역**(경로생성 단계·실행로그·멘토 스트리밍)에서 고지. 로딩 `aria-busy`, 에러 즉시 announce.
 - **상태 전달**: 색만으로 의미 전달 금지(텍스트 레이블 병행).
@@ -236,7 +272,18 @@ Primary action hover는 `primary` 위에 `onPrimary` 8% overlay를 합성한 같
 
 ## 9. 셸 구조
 
-화면마다 따로 만들던 `AppBar`를 **잉크 레일 + 크롬바 + 페이지 헤더** 3층 셸로 통일한다
+**web 과 admin 은 서로 다른 셸을 쓴다(S3-P2).**
+
+| 앱 | 셸 | 구성 |
+|---|---|---|
+| `apps/web` | `DpWebShell` | `DpWebHeader`(56px, 어두운 면, 주 메뉴 + 커뮤니티 드롭다운 + 검색 트리거 + 계정 메뉴; 720px 미만은 햄버거 인라인 메뉴) · 본문(`contentMaxWidth` 1120 중앙 정렬, 맨 위에 `DpBreadcrumb`) · `DpWebFooter` |
+| `apps/admin` | `DpAppShell` | `DpNavRail` + `DpChromeBar` + (compact) `DpMobileNavigation` — 아래 3종 표 그대로 |
+
+- **새 메뉴는 `MenuAnchor` 를 직접 쓰지 않는다.** `DpMenuButton` 을 쓴다 — 웹에서 Escape 가 먹지 않고 DOM focus 가 body 로 빠지는 함정을 이미 해결한 판이다(2026-09-17 CI 실측).
+- **web 의 브레드크럼은 본문 상단이다.** 크롬바 안 브레드크럼은 admin 것이다.
+- **web 의 푸터는 셸 하단에 고정된다**(사용자 결정 2026-09-26). 시안은 내용 끝에 붙지만 화면마다 자기 스크롤뷰를 가져서 같은 거동은 P4 의 일이다.
+
+아래는 `apps/admin` 이 쓰는 3층 셸이다. 화면마다 따로 만들던 `AppBar`를 **잉크 레일 + 크롬바 + 페이지 헤더** 3층 셸로 통일한다
 (`DpAppShell`, `packages/dp_design/lib/src/shell/dp_app_shell.dart`). **화면은 `Scaffold.appBar`를
 지정하지 않는다** — 제목·브레드크럼·검색·계정 메뉴는 전부 셸이 공급한다.
 
@@ -245,7 +292,27 @@ Primary action hover는 `primary` 위에 `onPrimary` 8% overlay를 합성한 같
 |---|---|---|
 | `DpNavRail` | 좌측 고정 | 목적지 내비게이션. Expanded(256px)/Collapsed(72px) 두 상태, 브랜드·계정 메뉴 슬롯 |
 | `DpChromeBar` | 상단(46px) | 브레드크럼 + 검색 트리거 + 화면별 액션 슬롯 |
-| `DpPageHeader` | 본문 최상단 | 화면 제목(`headlineSmall`)·설명·1차 액션·필터 슬롯 |
+| `DpPageHeader` | 본문 최상단 | 화면 제목(`headlineSmall`)·설명·1차 액션·필터 슬롯. **제목 메뉴는 없다**(S3-P3에서 제거 — 게시판 이동은 셸 헤더만 맡는다) |
+
+**웹 문법 프리미티브(S3-P3, `apps/web`)** — 시안의 「구분선 목록·패널」 문법을 위젯으로 고정한 것들이다.
+카드 나열을 쓰지 않는다: 면 구분은 `DpPanel`의 테두리 한 겹, 항목 구분은 1px 가로선뿐이다.
+
+| 컴포넌트 | 시안 | 책임 |
+|---|---|---|
+| `DpPanel` | `.panel` | 표면 + 1px 테두리 + 반경 8, 선택적 제목행(12×16 + 하단 구분선). 웹 화면에서 Material `Card`를 대신한다. 그림자 없음 |
+| `DpWebTable` | `<table>` | 헤더행(12/600 `textFaint`) + 행 하단 구분선 + hover 배경 + 숫자 칼럼(우측·등폭·nowrap) + `minWidth` 미만에서 표만 가로 스크롤. **admin의 `DpDataTable`(data_table_2, 세로 테두리)과 다른 위젯이다** |
+| `DpListRow` | 표 한 행의 축약형 | 뱃지행 → 제목 → 부제, 우측 메타. 8×16 여백 + 하단 구분선 + hover 배경. **카드도 좌측 상태 표시선도 없다**(S3-P3에서 제거) |
+| `DpListLines` | `.list` | 사이드 패널의 짧은 목록. 항목 10×16, 마지막을 뺀 항목에 구분선 |
+| `DpRowLine` | `.rowline` | 설정·동의 행. 좌 라벨(600)+설명(13 보조색), 우 컨트롤. 좁으면 `Wrap`이 컨트롤을 아랫줄로 내린다 |
+| `DpKeyValues` | `.kv` | 요약 키-값. 좌 키(보조색), 우 값(우측 정렬·600·등폭 숫자) |
+| `DpLink` | `.ttl`·`.lk` | `title`(평소 본문색 600·밑줄 없음, hover에서 강조색+밑줄)과 `inline`(항상 강조색+밑줄). 키보드로 도달·활성화되며 포커스 시 2px 외곽선 |
+| `DpStatusText` | `.st` | 상태 문구 3색(`done`=success·`idle`=textSecondary·`current`=primaryTextStrong), 12/600. 기호(✓·●)는 호출부가 문자열에 넣는다 |
+
+- **행 제스처는 시맨틱스에서 뺀다**(`DpWebTable`·`DpListRow`). 빼지 않으면 그 노드가 셀·제목·메타
+  조각을 흡수해 행 전체가 한 덩어리로 읽힌다(실측 2026-09-27). 행 클릭은 포인터용 보조 수단이고,
+  접근성 컨트롤은 제목의 `DpLink`가 담당한다 — 시안의 표도 행이 아니라 제목 `a.ttl`만 링크다.
+- **상태는 색이 아니라 글로 낸다.** `DpListRow`의 좌측 색 막대를 없앤 자리는 `DpStatusText`와 배지가
+  대신한다(색만으로 의미를 전달하지 않는다).
 
 - **레일 섹션 그룹**: `DpNavRail.destinations`는 평면 `List<DpDestination>`이다. 별도 그룹 구조를
   두지 않고, **연속으로 같은 `section` 값을 가진 항목끼리** 렌더 시점에 묶어 레이블을 붙인다

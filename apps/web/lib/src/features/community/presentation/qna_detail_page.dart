@@ -13,6 +13,7 @@ import 'lcs_context.dart';
 import 'widgets/content_menu_button.dart';
 import 'widgets/content_tombstone.dart';
 import '../../support/presentation/supportable_error.dart';
+import 'qna_related_panel.dart';
 
 class QnaDetailPage extends ConsumerStatefulWidget {
   const QnaDetailPage({super.key, required this.postId});
@@ -103,86 +104,103 @@ class _Loaded extends ConsumerWidget {
 
     // 페이지의 `CustomScrollView`에 직접 실리는 **sliver**를 반환한다 —
     // 여기서 `ListView`를 쓰면 중첩 스크롤이 되어 헤더가 밀려나지 않는다.
+    // 시안 `detail` 은 `.cols`(본문 | 관련 질문·태그 사이드)다. 좌우 패딩은 셸이
+    // 준다. 사이드에 태그를 함께 두는 이유: 관련 질문은 없을 수 있지만 태그는
+    // 거의 항상 있어, 사이드가 빈칸으로 남아 본문만 2/3 로 좁히는 것을 막는다.
     return SliverPadding(
-      padding: const EdgeInsets.all(DpSpacing.lg),
-      sliver: SliverList.list(
-        children: [
-          Row(
+      padding: const EdgeInsets.symmetric(vertical: DpSpacing.lg),
+      sliver: SliverToBoxAdapter(
+        child: DpCols(
+          main: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (detail.solved)
-                Padding(
-                  padding: const EdgeInsets.only(right: DpSpacing.xs),
-                  child: Icon(DpIcons.stepDone, color: c.success),
-                ),
-              Expanded(
-                child: Text(
-                  detail.title,
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
+              Row(
+                children: [
+                  if (detail.solved)
+                    Padding(
+                      padding: const EdgeInsets.only(right: DpSpacing.xs),
+                      child: Icon(DpIcons.stepDone, color: c.success),
+                    ),
+                  Expanded(
+                    child: Text(
+                      detail.title,
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                  ),
+                  ContentMenuButton(
+                    kind: ContentKind.post,
+                    targetId: detail.id,
+                    authorId: detail.authorId,
+                    currentUserId: _currentUserId(ref),
+                    onEdit: () => context.go('/community/${detail.id}/edit'),
+                    onDeleted: () => context.go('/community'),
+                  ),
+                ],
               ),
-              ContentMenuButton(
-                kind: ContentKind.post,
-                targetId: detail.id,
-                authorId: detail.authorId,
-                currentUserId: _currentUserId(ref),
-                onEdit: () => context.go('/community/${detail.id}/edit'),
-                onDeleted: () => context.go('/community'),
+              const SizedBox(height: DpSpacing.sm),
+              _VoteBar(
+                upvotes: detail.upvoteCount,
+                downvotes: detail.downvoteCount,
+                enabled: !submitting,
+                onVote: (v) =>
+                    notifier.vote(CommunityVoteTarget.post, detail.id, v),
+              ),
+              const SizedBox(height: DpSpacing.md),
+              DpMarkdown(data: detail.bodyMd),
+              const SizedBox(height: DpSpacing.sm),
+              LcsAnswererPanel(questionId: detail.id),
+              const Divider(height: DpSpacing.xl),
+              Text(
+                '답변 ${detail.answers.length}',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: DpSpacing.sm),
+              for (final a in detail.answers)
+                _AnswerCard(
+                  answer: a,
+                  questionSolved: detail.solved,
+                  submitting: submitting,
+                  currentUserId: _currentUserId(ref),
+                  onVote: (v) =>
+                      notifier.vote(CommunityVoteTarget.answer, a.id, v),
+                  onAccept: () => notifier.accept(a.id),
+                  onSave: (body) => notifier.updateAnswer(a.id, body),
+                  // 삭제는 메뉴 버튼(컨트롤러 밖)에서 끝난다 — 완료 시점엔 싱글턴 컨트롤러가
+                  // 이미 다른 질문일 수 있으므로, 보고 있을 때만 재조회한다.
+                  onChanged: () => notifier.refreshIfShowing(detail.id),
+                ),
+              const SizedBox(height: DpSpacing.lg),
+              _AnswerComposer(
+                controller: answerCtrl,
+                submitting: submitting,
+                onSubmit: () {
+                  final body = answerCtrl.text.trim();
+                  if (body.isEmpty) return;
+                  notifier.submitAnswer(body);
+                  answerCtrl.clear();
+                },
               ),
             ],
           ),
-          const SizedBox(height: DpSpacing.sm),
-          _VoteBar(
-            upvotes: detail.upvoteCount,
-            downvotes: detail.downvoteCount,
-            enabled: !submitting,
-            onVote: (v) =>
-                notifier.vote(CommunityVoteTarget.post, detail.id, v),
+          side: DpSide(
+            children: [
+              QnaRelatedPanel(questionId: detail.id, title: detail.title),
+              if (detail.tags.isNotEmpty)
+                DpPanel(
+                  title: const DpPanelTitle('태그'),
+                  padding: const EdgeInsets.all(DpSpacing.lg),
+                  child: Wrap(
+                    spacing: DpSpacing.xs,
+                    runSpacing: DpSpacing.xs,
+                    // DpTag 가 tag* 토큰의 유일한 배선 지점이다(3-A 스펙 §7.2).
+                    children: [
+                      for (final t in detail.tags) DpTag(label: '#$t'),
+                    ],
+                  ),
+                ),
+            ],
           ),
-          const SizedBox(height: DpSpacing.md),
-          DpMarkdown(data: detail.bodyMd),
-          const SizedBox(height: DpSpacing.sm),
-          LcsAnswererPanel(questionId: detail.id),
-          if (detail.tags.isNotEmpty) ...[
-            const SizedBox(height: DpSpacing.md),
-            Wrap(
-              spacing: DpSpacing.xs,
-              // 게시글 상세와 같은 요소이므로 같은 배선을 쓴다 — DpTag가 tag* 토큰의
-              // 유일한 배선 지점이다(3-A 스펙 §7.2). 조사 단계에서 이 한 곳이 누락돼
-              // 형제 화면끼리 태그 칩 색이 갈려 있었다.
-              children: [for (final t in detail.tags) DpTag(label: '#$t')],
-            ),
-          ],
-          const Divider(height: DpSpacing.xl),
-          Text(
-            '답변 ${detail.answers.length}',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: DpSpacing.sm),
-          for (final a in detail.answers)
-            _AnswerCard(
-              answer: a,
-              questionSolved: detail.solved,
-              submitting: submitting,
-              currentUserId: _currentUserId(ref),
-              onVote: (v) => notifier.vote(CommunityVoteTarget.answer, a.id, v),
-              onAccept: () => notifier.accept(a.id),
-              onSave: (body) => notifier.updateAnswer(a.id, body),
-              // 삭제는 메뉴 버튼(컨트롤러 밖)에서 끝난다 — 완료 시점엔 싱글턴 컨트롤러가
-              // 이미 다른 질문일 수 있으므로, 보고 있을 때만 재조회한다.
-              onChanged: () => notifier.refreshIfShowing(detail.id),
-            ),
-          const SizedBox(height: DpSpacing.lg),
-          _AnswerComposer(
-            controller: answerCtrl,
-            submitting: submitting,
-            onSubmit: () {
-              final body = answerCtrl.text.trim();
-              if (body.isEmpty) return;
-              notifier.submitAnswer(body);
-              answerCtrl.clear();
-            },
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -243,7 +261,10 @@ class _AnswerCardState extends State<_AnswerCard> {
     final answer = widget.answer;
     if (answer.deleted) return const ContentTombstone();
     final c = context.dpColors;
-    return Card(
+    // 시안 `.ans` 는 상단 구분선을 가진 블록이지만, 이 카드 안에서 **인라인
+    // 수정**(`TextField`)이 열린다 — 구분선만 두면 수정 중인 답변의 경계가
+    // 사라진다. 그래서 `DpPanel`(면)로 간다.
+    return DpPanel(
       child: Padding(
         padding: const EdgeInsets.all(DpSpacing.md),
         child: Column(
@@ -262,12 +283,10 @@ class _AnswerCardState extends State<_AnswerCard> {
                       borderRadius: BorderRadius.circular(DpSpacing.sm),
                     ),
                     child: Text(
-                      '🤖 AI 초안',
-                      style: TextStyle(
-                        color: c.primaryText,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
-                      ),
+                      'AI 초안',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.labelMedium!.copyWith(color: c.primaryText),
                     ),
                   ),
                 if (answer.accepted) ...[
@@ -276,11 +295,9 @@ class _AnswerCardState extends State<_AnswerCard> {
                   const SizedBox(width: 2),
                   Text(
                     '채택됨',
-                    style: TextStyle(
-                      color: c.success,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12,
-                    ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.labelMedium!.copyWith(color: c.success),
                   ),
                 ],
                 const Spacer(),

@@ -1,8 +1,10 @@
+import 'package:dp_design/dp_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../application/post_detail_controller.dart';
 import '../state/post_detail_state.dart';
+import '../../support/presentation/supportable_error.dart';
 import 'post_create_page.dart';
 
 /// 글 편집 진입점 — 상세를 먼저 불러 초기값을 확정한 뒤 작성 화면을 편집 모드로 띄운다.
@@ -39,11 +41,26 @@ class _PostEditPageState extends ConsumerState<PostEditPage> {
         initialTitle: detail.title,
         initialBodyMd: detail.bodyMd,
       ),
+      // 웹 셸에는 AppBar 가 없다 — 화면 제목은 `DpPageHeader` 가 맡고, 오류는
+      // 레포 표준 `SupportableError`(문의 연결·재시도)를 쓴다. 이 두 파일이
+      // 앱 전체에서 유일하게 `AppBar` 를 쓰고 있었다.
       PostDetailPhase.failed => Scaffold(
-        appBar: AppBar(title: const Text('글 수정')),
-        body: Center(child: Text(s.error ?? '불러오지 못했어요')),
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const DpPageHeader(title: '글 수정'),
+            Expanded(
+              child: SupportableError(
+                message: s.error ?? '불러오지 못했어요',
+                onRetry: () => ref
+                    .read(postDetailControllerProvider(widget.postId).notifier)
+                    .load(),
+              ),
+            ),
+          ],
+        ),
       ),
-      _ => const Scaffold(body: Center(child: CircularProgressIndicator())),
+      _ => const Scaffold(body: DpLoading(label: '글을 불러오는 중')),
     };
   }
 }

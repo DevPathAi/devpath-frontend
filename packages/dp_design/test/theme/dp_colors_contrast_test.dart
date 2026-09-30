@@ -19,6 +19,7 @@ double contrast(Color a, Color b) {
 
 void main() {
   // 스펙 §8: 17조합 × 라이트·다크 = 34건. 미달 0건이 확인된 값이다.
+  // P4 Task 13 에서 `DpSteps` 의 accentSoft 위 2조합을 더했다(라이트·다크 각 2건).
   // 토큰 값을 바꿀 때 이 테스트가 회귀를 막는다.
   for (final (label, p) in [('라이트', DpColors.light), ('다크', DpColors.dark)]) {
     group('$label 대비', () {
@@ -42,6 +43,30 @@ void main() {
         );
       });
 
+      test('DpSteps 단계: 현재는 accentSoft 위, 비현재는 surface 위 4.5:1', () {
+        // `DpSteps` 는 현재 단계를 accentSoft 배경 + primaryTextStrong 으로,
+        // 나머지는 **배경을 칠하지 않아** 패널의 surface 위 textSecondary 가 된다
+        // (`dp_steps.dart` 의 `color: current ? accentSoft : null`). 실재하지 않는
+        // 조합을 재면 토큰을 바꿀 때 계약을 못 지킨다. P3 의 textFaint 사고처럼
+        // 한쪽 테마만 보면 미달을 놓치므로 두 테마에서 잰다.
+        expect(
+          contrast(p.primaryTextStrong, p.accentSoft),
+          greaterThanOrEqualTo(4.5),
+        );
+        expect(contrast(p.textSecondary, p.surface), greaterThanOrEqualTo(4.5));
+      });
+
+      test('DpNextActionBand: 비활성 이유는 accentSoft 위 textSecondary 4.5:1', () {
+        // 밴드 배경이 시안 `.next{background:var(--soft)}` 를 따라 accentSoft 가
+        // 되면서 `disabledReason`(textSecondary)이 그 위에 놓인다. 앞 단계에서
+        // 「실재하지 않는 조합」이라 뺐던 것이 이제 실재한다 — 같은 원칙으로
+        // 되돌린다. 한쪽 테마만 보면 미달을 놓치므로 두 테마에서 잰다.
+        expect(
+          contrast(p.textSecondary, p.accentSoft),
+          greaterThanOrEqualTo(4.5),
+        );
+      });
+
       test('★채움 위 텍스트 4.5:1 — 다크는 onPrimary 가 어두운 색이다', () {
         // 밝은 인디고 채움 위에는 어두운 전경이 필요하다. 이 단언이 그 반전을 지킨다.
         expect(contrast(p.onPrimary, p.primary), greaterThanOrEqualTo(4.5));
@@ -53,17 +78,32 @@ void main() {
         expect(contrast(p.danger, p.surface), greaterThanOrEqualTo(4.5));
       });
 
-      test('사이드바 대비 — railBg 위 목적지·섹션 레이블 4.5:1', () {
-        expect(contrast(p.railText, p.railBg), greaterThanOrEqualTo(4.5));
-        expect(contrast(p.railMuted, p.railBg), greaterThanOrEqualTo(4.5));
-        // railFaint(섹션 레이블)는 2026-08-05 Task 12에서 3:1→4.5:1로 상향.
-        // 기존 값(라이트 #7D766C·다크 #6B655D)이 텍스트 기준 미달이라 밝게 조정했다.
-        expect(contrast(p.railFaint, p.railBg), greaterThanOrEqualTo(4.5));
-      });
+      test(
+        '어두운 헤더 대비 — headerBg 위 메뉴 항목·섹션 레이블 4.5:1 (rail* 승계, 스펙 §5.4-2)',
+        () {
+          expect(contrast(p.headerText, p.headerBg), greaterThanOrEqualTo(4.5));
+          expect(
+            contrast(p.headerMuted, p.headerBg),
+            greaterThanOrEqualTo(4.5),
+          );
+          // headerFaint(섹션 레이블)는 2026-08-05 Task 12에서 3:1→4.5:1로 상향.
+          // 기존 값(라이트 #7D766C·다크 #6B655D)이 텍스트 기준 미달이라 밝게 조정했다.
+          expect(
+            contrast(p.headerFaint, p.headerBg),
+            greaterThanOrEqualTo(4.5),
+          );
+        },
+      );
 
-      test('사이드바 대비 — railActive 위 목적지 라벨 4.5:1', () {
-        expect(contrast(p.railText, p.railActive), greaterThanOrEqualTo(4.5));
-        expect(contrast(p.railMuted, p.railActive), greaterThanOrEqualTo(4.5));
+      test('어두운 헤더 대비 — headerActive(hover/활성 면) 위 메뉴 라벨 4.5:1', () {
+        expect(
+          contrast(p.headerText, p.headerActive),
+          greaterThanOrEqualTo(4.5),
+        );
+        expect(
+          contrast(p.headerMuted, p.headerActive),
+          greaterThanOrEqualTo(4.5),
+        );
       });
 
       test('faint·태그', () {

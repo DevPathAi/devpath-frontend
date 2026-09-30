@@ -1,6 +1,6 @@
 import 'package:flutter/widgets.dart';
 
-/// 간격(8pt 그리드)·라운드·모션. DESIGN.md §3·§7.
+/// 간격(8pt 그리드)·라운드·밀도·모션. DESIGN.md §3·§6·§7.
 abstract final class DpSpacing {
   static const double xs = 4;
   static const double sm = 8;
@@ -11,12 +11,27 @@ abstract final class DpSpacing {
   static const double xxxl = 48;
 }
 
+/// 반경 — 웹 문법(계약 2.0.0, 스펙 2026-09-19 §5.3 + 시안 `--r-chip/--r-btn/--r-card`).
+/// 칩·태그 4, 버튼·입력 6, 카드·패널·드롭다운 8, 다이얼로그·시트 12.
 abstract final class DpRadius {
-  static const double chip = 999;
-  static const double button = 12;
-  static const double card = 18;
-  static const double input = 12;
-  static const double dialog = 20;
+  static const double chip = 4;
+  static const double button = 6;
+  static const double card = 8;
+  static const double input = 6;
+  static const double dialog = 12;
+}
+
+/// 포인터 밀도(계약 2.0.0, 스펙 2026-09-19 §5.4-1 — 사용자 결정 "촘촘").
+/// 컨트롤(버튼·입력·세그먼트·헤더 항목) 높이 30, 표 행 세로 여백 8,
+/// 최소 포인터 타깃 24 = WCAG 2.2 AA 2.5.8. 24 미만인 타깃은 인접 타깃과의
+/// 간격으로 예외 조건을 만족시켜야 한다(browser-ux 러너 `MIN_TARGET` 과 같은 값).
+///
+/// 구분선 행(시안 `.rowline`·`.chk`·`.list li`)의 세로 패딩은 10 이라 이 스케일에
+/// 없다 — [DpWebDensity.rowVerticalPadding] 을 쓴다. [rowPadding](8)은 표 행이다.
+abstract final class DpDensity {
+  static const double controlHeight = 30;
+  static const double rowPadding = 8;
+  static const double minTarget = 24;
 }
 
 abstract final class DpDurations {
@@ -36,4 +51,23 @@ abstract final class DpMotion {
         MediaQuery.maybeOf(context)?.disableAnimations ?? false;
     return reduceMotion ? Duration.zero : duration;
   }
+}
+
+/// 시안의 웹 문법이 쓰는 비(非)8pt 치수. 8pt 스케일(`DpSpacing`)에 없는 값이라
+/// 여기에 이름을 두고 출처를 적는다 — 리터럴로 흩어지면 시안과 대조할 수 없다.
+///
+/// [DpDensity] 와 구분한다: 그쪽은 컨트롤 높이·**표** 행 여백(8)·최소 타깃이고
+/// 시맨틱 토큰 계약 2.0.0 의 CSS 투영 대상(`--dp-density-*`)이다. 이 클래스는
+/// **그 투영 대상이 아니다** — 구분선 행의 치수를 코드에서만 공유한다.
+abstract final class DpWebDensity {
+  /// 구분선 행의 세로 패딩. 시안 `.chk`·`.rowline`·`.list li` = `padding:10px 16px`.
+  static const double rowVerticalPadding = 10;
+
+  /// 키-값 목록의 행 간격. 시안 `.kv{gap:6px 16px}`.
+  static const double keyValueGap = 6;
+
+  /// 진행 단계 표시의 세로 패딩. 시안 `.steps li{padding:6px 12px}`.
+  /// [keyValueGap] 과 값이 같지만 출처가 달라 따로 둔다 — 시안에서 한쪽이
+  /// 바뀌어도 다른 쪽이 따라 움직이면 안 된다.
+  static const double stepVerticalPadding = 6;
 }

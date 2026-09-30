@@ -33,6 +33,7 @@ class ReportsPage extends ConsumerWidget {
         slivers: [
           SliverToBoxAdapter(
             child: DpPageHeader(
+              gutter: true,
               // 제목은 kAdminDestinations가 유일한 출처다(admin_shell.dart).
               title: adminHeaderTitleFor('/reports'),
               description: '커뮤니티 신고를 검토하고 판정합니다',

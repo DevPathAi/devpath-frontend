@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  group('DpSemanticTokenManifest v1', () {
+  group('DpSemanticTokenManifest v2 (2.0.0 — web grammar)', () {
     test('manifest schema/version and CSS names are stable and unique', () {
       expect(DpSemanticTokenManifest.schema, 'leva.semantic-tokens');
-      expect(DpSemanticTokenManifest.version, '1.1.0');
+      expect(DpSemanticTokenManifest.version, '2.0.0');
 
       final tokens = DpSemanticTokenManifest.tokens;
       expect(tokens, isNotEmpty);
@@ -75,29 +75,29 @@ void main() {
           DpColors.light.textFaint,
           DpColors.dark.textFaint,
         ),
-        DpSemanticColorRole.railBg: (
-          DpColors.light.railBg,
-          DpColors.dark.railBg,
+        DpSemanticColorRole.headerBg: (
+          DpColors.light.headerBg,
+          DpColors.dark.headerBg,
         ),
-        DpSemanticColorRole.railText: (
-          DpColors.light.railText,
-          DpColors.dark.railText,
+        DpSemanticColorRole.headerText: (
+          DpColors.light.headerText,
+          DpColors.dark.headerText,
         ),
-        DpSemanticColorRole.railMuted: (
-          DpColors.light.railMuted,
-          DpColors.dark.railMuted,
+        DpSemanticColorRole.headerMuted: (
+          DpColors.light.headerMuted,
+          DpColors.dark.headerMuted,
         ),
-        DpSemanticColorRole.railFaint: (
-          DpColors.light.railFaint,
-          DpColors.dark.railFaint,
+        DpSemanticColorRole.headerFaint: (
+          DpColors.light.headerFaint,
+          DpColors.dark.headerFaint,
         ),
-        DpSemanticColorRole.railActive: (
-          DpColors.light.railActive,
-          DpColors.dark.railActive,
+        DpSemanticColorRole.headerActive: (
+          DpColors.light.headerActive,
+          DpColors.dark.headerActive,
         ),
-        DpSemanticColorRole.railBorder: (
-          DpColors.light.railBorder,
-          DpColors.dark.railBorder,
+        DpSemanticColorRole.headerBorder: (
+          DpColors.light.headerBorder,
+          DpColors.dark.headerBorder,
         ),
         DpSemanticColorRole.success: (
           DpColors.light.success,
@@ -167,7 +167,7 @@ void main() {
     });
 
     test(
-      'spacing, radius, duration and typography values stay source-mapped',
+      'spacing, radius, density, duration and typography values stay source-mapped',
       () {
         expect(
           DpSemanticTokenManifest.spacing
@@ -191,6 +191,35 @@ void main() {
               .lightValue,
           DpRadius.card,
         );
+        expect(
+          DpSemanticTokenManifest.radii
+              .map((token) => token.lightValue)
+              .toList(),
+          [
+            DpRadius.chip,
+            DpRadius.button,
+            DpRadius.card,
+            DpRadius.input,
+            DpRadius.dialog,
+          ],
+        );
+        expect(
+          DpSemanticTokenManifest.density
+              .map((token) => (token.cssCustomProperty, token.lightValue))
+              .toList(),
+          [
+            ('--dp-density-control-height', DpDensity.controlHeight),
+            ('--dp-density-row-padding', DpDensity.rowPadding),
+            ('--dp-density-min-target', DpDensity.minTarget),
+          ],
+        );
+        for (final token in DpSemanticTokenManifest.density) {
+          expect(token.kind, DpSemanticTokenKind.density);
+          expect(token.allowedUsages, {
+            DpSemanticTokenUsage.interactionDensity,
+          });
+          expect(DpSemanticTokenManifest.tokens, contains(token));
+        }
         expect(
           DpSemanticTokenManifest.durations
               .firstWhere(
@@ -247,12 +276,21 @@ void main() {
           Brightness.dark,
         );
 
-        expect(light['--dp-token-manifest-version'], '"1.1.0"');
+        expect(light['--dp-token-manifest-version'], '"2.0.0"');
         expect(light['--dp-color-primary'], '#5653E7');
         expect(dark['--dp-color-primary'], '#9B99FF');
+        expect(light['--dp-color-header-bg'], '#11131B');
+        expect(dark['--dp-color-header-bg'], '#090B10');
+        expect(light['--dp-color-rail-bg'], isNull);
         expect(light['--dp-space-lg'], '16px');
-        expect(light['--dp-radius-chip'], '999px');
-        expect(light['--dp-radius-panel'], '18px');
+        expect(light['--dp-radius-chip'], '4px');
+        expect(light['--dp-radius-button'], '6px');
+        expect(light['--dp-radius-panel'], '8px');
+        expect(light['--dp-radius-input'], '6px');
+        expect(light['--dp-radius-dialog'], '12px');
+        expect(light['--dp-density-control-height'], '30px');
+        expect(light['--dp-density-row-padding'], '8px');
+        expect(light['--dp-density-min-target'], '24px');
         expect(light['--dp-layout-content-max'], isNull);
         expect(light['--dp-state-focus-ring'], '#4338CA');
         expect(dark['--dp-state-focus-ring'], '#B9B8FF');

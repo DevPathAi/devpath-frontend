@@ -202,7 +202,10 @@ void main() {
     final segLeft = tester.getTopLeft(find.byType(SegmentedButton<int>)).dx;
     final headerLeft = tester.getTopLeft(find.text('실습 샌드박스')).dx;
     expect(segLeft, headerLeft, reason: '세그먼트가 페이지 헤더의 좌측선과 어긋난다');
-    expect(segLeft, DpSpacing.xl, reason: '좌측선은 medium 헤더 패딩 값(xl=24)이다');
+    // 절대값을 못 박지 않는다 — 거터의 주인이 화면에서 셸로 옮겨갔고(S3-P2·P4),
+    // 이 테스트의 계약은 「헤더와 같은 좌측선」이지 특정 픽셀이 아니다.
+    // 셸 없이 띄우는 이 테스트에서는 둘 다 0 이고, 운영에서는 셸의 거터가 둘을
+    // 함께 밀어 준다.
   });
 
   // P3/D1 반영: 1024–1239 2페인 로그 접이 토글 — 접으면 LOG 페인 트리에서 제거.

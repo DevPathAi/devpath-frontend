@@ -52,6 +52,43 @@ void main() {
     expect(tester.widget<DpPageHeader>(find.byType(DpPageHeader)).title, '게시글');
   });
 
+  testWidgets('글 상세: 본문이 readableMaxWidth(760) 를 넘지 않는다', (tester) async {
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final c = ProviderContainer(
+      overrides: [
+        postDetailFetchProvider.overrideWithValue((id) async => _detail()),
+      ],
+    );
+    addTearDown(c.dispose);
+    await tester.pumpWidget(_host(c));
+    await tester.pumpAndSettle();
+
+    // 시안 `post` 는 `.narrow{max-width:760px}` 한 열이다.
+    expect(
+      tester.getSize(find.byType(DpMarkdown)).width,
+      lessThanOrEqualTo(760),
+    );
+  });
+
+  testWidgets('글 상세: Material Card 를 쓰지 않는다', (tester) async {
+    final c = ProviderContainer(
+      overrides: [
+        postDetailFetchProvider.overrideWithValue(
+          (id) async => _detail(comments: [_comment(100, '댓글 본문')]),
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+    await tester.pumpWidget(_host(c));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Card), findsNothing);
+    expect(find.byType(DpPanel), findsWidgets);
+  });
+
   testWidgets('댓글 등록: 작성 시 commentCreate 호출 후 재조회', (tester) async {
     var fetchCalls = 0;
     String? seenBody;

@@ -17,6 +17,9 @@ import 'dp_rail_brand.dart';
 /// [account]가 있을 때 렌더된다(셋 다 없을 때만 렌더하지 않는다).
 /// [account]는 폭에 따라 레일 하단 또는 크롬바 우측으로 간다 —
 /// 앱은 한 벌만 만들고 배치는 셸이 정한다.
+///
+/// `apps/web` 은 S3-P2 부터 이 셸을 쓰지 않는다(`DpWebShell`). 지금 소비처는
+/// `apps/admin` 뿐이므로 web 전용이던 compact 목적지 축약은 제거했다.
 class DpAppShell extends StatelessWidget {
   const DpAppShell({
     super.key,
@@ -24,9 +27,6 @@ class DpAppShell extends StatelessWidget {
     required this.selectedIndex,
     required this.onSelect,
     required this.body,
-    this.compactDestinations,
-    this.compactSelectedIndex,
-    this.onCompactSelect,
     this.brand,
     this.account,
     this.breadcrumb = const [],
@@ -40,16 +40,10 @@ class DpAppShell extends StatelessWidget {
 
   final List<DpDestination> destinations;
 
-  /// compact 폭에서만 사용할 축약 목적지. 데스크톱 정보 구조를 그대로
-  /// 하단 바에 밀어 넣지 않고, 모바일의 핵심 목적지 수를 유지할 때 쓴다.
-  final List<DpDestination>? compactDestinations;
-
   /// null이면 어떤 목적지도 활성 표시하지 않는다. compact의 [NavigationBar]는
   /// non-null `int`만 받으므로(Flutter 3.44) 그 분기에서만 0으로 클램프한다.
   final int? selectedIndex;
   final ValueChanged<int> onSelect;
-  final int? compactSelectedIndex;
-  final ValueChanged<int>? onCompactSelect;
   final Widget body;
   final DpRailBrand? brand;
   final Widget? account;
@@ -66,9 +60,24 @@ class DpAppShell extends StatelessWidget {
     final wc = context.windowClass;
     final compact = wc == DpWindowClass.compact;
 
+    // 본문을 시맨틱 경계로 감싼다. `apps/admin` 의 본문은 `ShellRoute` 가 넘겨
+    // 주는 **중첩 Navigator** 이고, `ModalRoute` 는 언제나 `ModalBarrier` 를 함께
+    // 올린다(`modal_barrier.dart`: `BlockSemantics(...)`). 그 차단은 **먼저
+    // 그려진 형제**의 시맨틱스를 없애는데, 이 셸은 레일도 크롬바도 본문보다 먼저
+    // 그려지므로 감싸지 않으면 **둘 다** 사라지고 본문만 남는다(`DpWebShell` 은
+    // 푸터가 본문 뒤라 살아남지만 여기는 살아남는 형제가 없다). 차단은 시맨틱
+    // 경계에서 멈춘다(`rendering/object.dart`:
+    // `if (…isSemanticBoundary) return false;`). 루트 Navigator 로 뜨는 진짜
+    // 모달은 셸 전체보다 뒤에 그려지므로 여전히 정상으로 가린다.
+    final bounded = Semantics(
+      container: true,
+      explicitChildNodes: true,
+      child: body,
+    );
+
     final content = (constrainBodyAtLarge && wc == DpWindowClass.large)
-        ? DpMaxWidth(child: body)
-        : body;
+        ? DpMaxWidth(child: bounded)
+        : bounded;
 
     // 크롬바에 실제로 전달될 게 있을 때만 렌더한다. account는 compact에서만
     // 크롬바로 가므로(그 외엔 레일로 간다) 그 경우만 여기 포함한다 — 안 그러면
@@ -96,15 +105,12 @@ class DpAppShell extends StatelessWidget {
     );
 
     if (compact) {
-      final usesCompactDestinations = compactDestinations != null;
       return Scaffold(
         body: main,
         bottomNavigationBar: DpMobileNavigation(
-          destinations: compactDestinations ?? destinations,
-          selectedIndex: usesCompactDestinations
-              ? compactSelectedIndex
-              : selectedIndex,
-          onSelect: onCompactSelect ?? onSelect,
+          destinations: destinations,
+          selectedIndex: selectedIndex,
+          onSelect: onSelect,
         ),
       );
     }

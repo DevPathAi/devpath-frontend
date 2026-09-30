@@ -73,7 +73,7 @@ void main() {
 
     expect(find.text('async 질문'), findsOneWidget);
     expect(find.textContaining('본문입니다'), findsWidgets);
-    expect(find.text('🤖 AI 초안'), findsOneWidget); // AI 뱃지
+    expect(find.text('AI 초안'), findsOneWidget); // AI 뱃지
     expect(find.text('채택됨'), findsOneWidget); // 채택된 답변
     // 이미 solved → 채택 버튼 없음
     expect(find.widgetWithText(TextButton, '채택'), findsNothing);
@@ -84,6 +84,61 @@ void main() {
   // Material Chip으로 남아 **형제 화면끼리 태그 칩 색이 갈려 있었다**(스펙 §7.1의
   // 배선 후보 조사에서 이 한 곳이 누락됐다). DpTag가 tag* 토큰의 유일한 배선
   // 지점이라는 선언을 실제로 성립시킨다 — Chip으로 되돌리면 red다.
+  testWidgets('질문 상세: .cols 2열(본문 | 관련 질문·태그)을 그린다', (tester) async {
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final c = ProviderContainer(
+      overrides: [
+        qnaDetailFetchProvider.overrideWithValue(
+          (id) async => _detail(answers: [_ans(1)], tags: const ['async']),
+        ),
+        lcsByQuestionProvider.overrideWithValue((qid) async => null),
+        similarQuestionsProvider.overrideWithValue(
+          (q) async => const [SimilarQuestion(questionId: 2, title: '다른 질문')],
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+    await tester.pumpWidget(_host(c));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(DpCols), findsOneWidget);
+    expect(find.byType(Card), findsNothing);
+    expect(find.text('관련 질문'), findsOneWidget);
+    expect(find.text('다른 질문'), findsOneWidget);
+    // 태그는 사이드 패널로 옮겨졌다 — 같은 태그를 두 번 그리지 않는다.
+    expect(find.text('태그'), findsOneWidget);
+    expect(find.text('#async'), findsOneWidget);
+  });
+
+  testWidgets('질문 상세: 390px 에서 본문 → 사이드 한 열이 된다', (tester) async {
+    tester.view.physicalSize = const Size(390, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final c = ProviderContainer(
+      overrides: [
+        qnaDetailFetchProvider.overrideWithValue(
+          (id) async => _detail(answers: [_ans(1)], tags: const ['async']),
+        ),
+        lcsByQuestionProvider.overrideWithValue((qid) async => null),
+        similarQuestionsProvider.overrideWithValue(
+          (q) async => const [SimilarQuestion(questionId: 2, title: '다른 질문')],
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+    await tester.pumpWidget(_host(c));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    final body = tester.getRect(find.byType(DpMarkdown).first);
+    final side = tester.getRect(find.text('관련 질문'));
+    expect(side.top, greaterThan(body.top));
+  });
+
   testWidgets('태그는 DpTag로 렌더된다 (게시글 상세와 같은 배선)', (tester) async {
     final c = ProviderContainer(
       overrides: [
@@ -185,7 +240,7 @@ void main() {
     await tester.pumpWidget(_host(c));
     await tester.pumpAndSettle();
 
-    expect(find.text('📚 작성자 학습 맥락'), findsOneWidget);
+    expect(find.text('작성자 학습 맥락'), findsOneWidget);
     expect(find.text('현재 콘텐츠'), findsOneWidget); // content 키 → 라벨 칩
   });
 
@@ -202,7 +257,7 @@ void main() {
     await tester.pumpWidget(_host(c));
     await tester.pumpAndSettle();
 
-    expect(find.text('📚 작성자 학습 맥락'), findsNothing);
+    expect(find.text('작성자 학습 맥락'), findsNothing);
   });
 
   // 아래 두 건은 sliver 전환(Task 11)이 만든 로딩·실패 분기를 잠근다. 전환 전에는

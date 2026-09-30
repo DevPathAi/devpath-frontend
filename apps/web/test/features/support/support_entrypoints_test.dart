@@ -38,11 +38,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // 기존 명령 팔레트 진입점이 살아 있다(회귀 방지). Task 6에서 DpChromeBar로
-    // 배선을 옮긴 뒤로는 비compact 폭에서 검색 진입점이 툴팁 버튼이 아니라
-    // DpChromeBar의 내장 검색 상자(key: chrome-search)로 렌더된다.
-    expect(find.byKey(const ValueKey('chrome-search')), findsOneWidget);
-    // 새 제보 버튼이 추가됐다.
-    expect(find.byTooltip('오류 신고·문의'), findsOneWidget);
+    // 기존 명령 팔레트 진입점이 살아 있다(회귀 방지). S3-P2 에서 셸이 상단 헤더로
+    // 바뀐 뒤로는 비compact 폭에서 검색 진입점이 헤더의 검색 상자로 렌더된다.
+    expect(find.byKey(const ValueKey('web-header-search')), findsOneWidget);
+    // 오류 신고·문의는 크롬바 액션이 아니라 푸터 링크다(시안 .ft).
+    expect(find.text('오류 신고·문의'), findsOneWidget);
   });
 }
