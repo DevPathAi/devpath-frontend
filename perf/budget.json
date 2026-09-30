@@ -7,7 +7,7 @@
   "transfer_regression_pct_max": 5,
   "transfer_regression_min_bytes": 4096,
   "notes": [
-    "CanvasKit 은 <canvas> 에 그리므로 브라우저 LCP 후보가 없을 수 있다. lcp_ms 가 null 이면 ready_ms(첫 상호작용 가능 시점)를 같은 임계로 판정한다.",
+    "CanvasKit 은 <canvas> 에 그리므로 브라우저 LCP 후보가 없을 수 있다. 그래서 lcp_ms 와 ready_ms(첫 상호작용 가능 시점)를 **각각** 같은 임계로 판정한다 — 「lcp 가 있으면 ready 를 보지 않는다」였던 옛 규칙은 2026-09-17 부트 스플래시(c482b54)가 모든 행에 LCP 후보를 만든 뒤 ready 검사를 통째로 죽였다(S3-P5 실측: 모바일 cold ready 21.5초가 절대 예산에서 사라졌다).",
     "전송량 회귀는 perf/baseline.json 의 같은 route·profile·phase 행 대비 total 과 js+canvaskit_or_wasm 각각 +5% 초과 시 실패. 단 절대 증가가 transfer_regression_min_bytes(4 KB) 이하이면 회귀로 보지 않는다 — warm 전송은 13 KB 뿐이라 퍼센트만으로는 1 KB 변화도 잡힌다(2026-09-17 PR #217 실측).",
     "enforce_absolute=false: 첫 기준선(2026-09-17, cold 총 22MB·모바일 FCP 수십 초)이 절대 예산 밖이라 절대 임계는 경고로만 기록한다. 전송량 회귀(+5%)는 즉시 강제. 예산 안으로 들어오면 true 로 바꾼다."
   ],

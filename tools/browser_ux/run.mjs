@@ -4,7 +4,7 @@
 // deep link · 새로고침 · back/forward · 키보드 순회 · focus 복귀 · overflow ·
 // 24px 타깃(WCAG 2.2 AA 2.5.8, 계약 2.0.0) · reduced-motion · axe 를 검증한다. 외부 네트워크 요청은 차단하고 기록한다.
 //
-// 사용: node run.mjs --dist=<build/web> --out=<report.json> [--built-from=<sha>] [--only=<id,id>]
+// 사용: node run.mjs --dist=<build/web> --out=<report.json> [--built-from=<sha>] [--only=<id,id>] [--routes=/a,/b]
 import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -12,6 +12,12 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { SCHEMA_VERSION, summarize, validateReport } from './report.mjs';
+import {
+  axeFailures,
+  externalRequestFailure,
+  routesOf,
+  staleWaiverFailures,
+} from './routes.mjs';
 import { serve } from './serve.mjs';
 
 const require = createRequire(import.meta.url);
@@ -19,22 +25,10 @@ const { chromium } = require('playwright');
 const here = dirname(fileURLToPath(import.meta.url));
 
 export const WIDTHS = [390, 768, 1024, 1440];
-export const ROUTES = [
-  '/dashboard',
-  '/path',
-  '/community',
-  '/community?board=QNA',
-  '/community?board=FEEDBACK',
-  '/mentor',
-  '/sandbox',
-  '/content/future-async-await',
-];
 const HEIGHT = 900;
 const MIN_TARGET = 24; // = DpDensity.minTarget (packages/dp_design/lib/src/theme/dp_spacing.dart)
 const AXE_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'best-practice'];
 const READY_TIMEOUT_MS = 20000;
-/// 한 컨텍스트가 내는 외부(루프백 밖) 요청의 상한. 정상은 3~8건이다.
-const MAX_EXTERNAL_REQUESTS = 40;
 
 function parseArgs(argv) {
   const options = {};
@@ -43,7 +37,7 @@ function parseArgs(argv) {
     if (match) options[match[1]] = match[2];
   }
   if (!options.dist || !options.out) {
-    throw new Error('usage: node run.mjs --dist=<build/web> --out=<report.json> [--built-from=<sha>] [--only=<ids>]');
+    throw new Error('usage: node run.mjs --dist=<build/web> --out=<report.json> [--built-from=<sha>] [--only=<ids>] [--routes=/a,/b]');
   }
   return options;
 }
@@ -136,20 +130,62 @@ async function overflow(page) {
   }));
 }
 
-async function smallTargets(page) {
+/// 24px 미만 포인터 타깃. **한 번 재고 끝내면 안 된다** — Flutter 는 스크롤
+/// 폴드에 잘린 위젯의 시맨틱스 노드를 *잘린* rect 로 내므로, 화면 아래로 반쯤
+/// 내려간 컨트롤이 작은 타깃으로 오보된다(S3-P5 실측: `/settings` 390x900 에서
+/// 「로그아웃」이 80x8, 같은 y 에서 뷰포트만 2400 으로 높이면 80x30).
+///
+/// `scrollIntoViewIfNeeded()` 로는 안 된다 — 시맨틱스 노드는 절대 배치된
+/// 오버레이라 그 호출이 실측상 아무것도 하지 않는다(80x8 그대로). 실제 Flutter
+/// 스크롤 뷰를 굴리는 것은 **휠**이다. 그래서 작아 보이는 후보만 골라 화면 가운데로
+/// 굴려 다시 잰다. 이 오보는 러너에 처음부터 있었고, 옛 ROUTES(8항목)에는 폴드에
+/// 걸리는 버튼이 없어 S3-P5 가 /settings·/mypage 를 넣을 때까지 드러나지 않았다.
+async function smallTargets(page, viewportHeight) {
   const buttons = page.getByRole('button');
   const count = await buttons.count();
   const offenders = [];
+  const middle = Math.round(viewportHeight / 2);
   for (let index = 0; index < count; index += 1) {
-    const button = buttons.nth(index);
-    const box = await button.boundingBox();
-    if (!box) continue;
-    if (Math.min(box.width, box.height) < MIN_TARGET) {
-      offenders.push({
-        label: (await button.getAttribute('aria-label')) ?? (await button.textContent())?.trim() ?? '',
-        width: Math.round(box.width),
-        height: Math.round(box.height),
-      });
+    // **인덱스 로케이터로 스크롤을 건너 재측정하면 안 된다.** Flutter 는 렌더된
+    // 위젯에만 시맨틱스 노드를 내므로 휠이 `flt-semantics` 노드를 더하고 지운다 —
+    // 스크롤 뒤의 `nth(index)` 는 다른 요소일 수 있다. 후보를 요소 핸들로 붙잡고
+    // 라벨은 **굴리기 전에** 읽는다.
+    const handle = await buttons.nth(index).elementHandle();
+    if (!handle) continue;
+    try {
+      const box = await handle.boundingBox();
+      if (!box) continue;
+      if (Math.min(box.width, box.height) >= MIN_TARGET) continue;
+
+      const label =
+        (await handle.getAttribute('aria-label')) ??
+        (await handle.textContent())?.trim() ??
+        '';
+
+      const viewport = page.viewportSize();
+      await page.mouse.move(Math.round((viewport?.width ?? 390) / 2), middle);
+      await page.mouse.wheel(0, Math.round(box.y - middle));
+      await page.waitForTimeout(300);
+      const scrolled = await handle.boundingBox();
+      // 되돌려 다음 후보가 같은 기준에서 시작하게 한다.
+      await page.mouse.wheel(0, -viewportHeight * 20);
+      await page.waitForTimeout(200);
+
+      // 굴렸는데 움직이지 않았으면(중첩 스크롤러가 휠을 먹었거나 이미 다 보였다)
+      // 두 번째 측정을 믿을 근거가 없다. 첫 측정을 그대로 보고하고 그 사실을 적는다 —
+      // 조용히 통과시키면 진짜 작은 타깃이 사라진다.
+      const moved = scrolled != null && Math.abs(scrolled.y - box.y) > 1;
+      const measured = moved ? scrolled : box;
+      if (Math.min(measured.width, measured.height) < MIN_TARGET) {
+        offenders.push({
+          label,
+          width: Math.round(measured.width),
+          height: Math.round(measured.height),
+          ...(moved ? {} : { unscrolled: true }),
+        });
+      }
+    } finally {
+      await handle.dispose();
     }
   }
   return offenders;
@@ -197,6 +233,7 @@ export async function run(options) {
   const dist = resolve(options.dist);
   const builtFrom = options['built-from'] ?? gitSha();
   const only = options.only ? new Set(options.only.split(',')) : null;
+  const sweepRoutes = routesOf(options);
   const expectations = JSON.parse(await readFile(resolve(here, 'expectations.json'), 'utf8'));
   const server = await serve(dist);
   const browser = await chromium.launch();
@@ -387,7 +424,8 @@ export async function run(options) {
             try {
               const failures = [];
               const routes = {};
-              for (const route of ROUTES) {
+              for (const route of sweepRoutes) {
+                const externalBefore = external.length;
                 // goto 안의 ready() 는 networkidle 을 기다린다. 여기서 그냥 던지면
                 // "어느 라우트에서" "브라우저가 무엇을 불평하며" 안 가라앉았는지가
                 // 통째로 사라진다(2026-09-26 실측: 390x200% 가 이 자리에서 30초 타임아웃).
@@ -396,10 +434,14 @@ export async function run(options) {
                 } catch (error) {
                   const first = String(error).split(String.fromCharCode(10))[0];
                   failures.push(`${route} did not settle: ${first}`);
-                  break;
+                  // **break 하지 않는다.** 첫 실패에서 멈추면 뒤 라우트를 이 실행에서
+                  // 아예 재지 못한다 — CI 1차(36649266533)가 `/community/1` 에서 멈춰
+                  // 새로 게이트에 넣은 8화면 중 5화면을 한 폭에서도 재지 못했다.
+                  // 라우트마다 goto 가 새 문서를 열므로 이어가도 상태가 섞이지 않는다.
+                  continue;
                 }
                 const size = await overflow(page);
-                const targets = width === 390 && textScale === 100 ? await smallTargets(page) : [];
+                const targets = width === 390 && textScale === 100 ? await smallTargets(page, HEIGHT) : [];
                 routes[route] = {
                   location: location(page),
                   ...size,
@@ -415,11 +457,18 @@ export async function run(options) {
                 // 하고, 실패한 다운로드는 재시도 금지 목록에 들어가지 않아
                 // 레이아웃마다 다시 나간다(2026-09-26: `ChipThemeData.labelStyle`
                 // 의 fontFamily 누락으로 390x200% `/content` 에서 230건 넘게).
-                // 정상값은 컨텍스트당 3~8건이다.
-                if (external.length > MAX_EXTERNAL_REQUESTS) {
-                  failures.push(`${route} external requests ${external.length} > ${MAX_EXTERNAL_REQUESTS} (font fallback retry storm?)`);
-                  break;
-                }
+                // 판정은 컨텍스트 총합이 아니라 **이 라우트가 같은 URL 을 몇 번
+                // 다시 불렀는지**로 한다. 폭주는 총량이 아니라 반복이고, 정상적인 첫
+                // 폰트 로딩은 서로 다른 청크를 한 번씩 받는다
+                // (routes.mjs `externalRequestFailure` 의 주석에 실측이 있다).
+                const budgetProblem = externalRequestFailure({
+                  route,
+                  added: external.slice(externalBefore),
+                  total: external.length,
+                  routeCount: sweepRoutes.length,
+                });
+                // 여기서도 break 하지 않는다 — 위 `did not settle` 과 같은 이유다.
+                if (budgetProblem) failures.push(budgetProblem);
               }
               return {
                 routes,
@@ -476,19 +525,35 @@ export async function run(options) {
 
     // 8. axe (390 light / 1240 dark).
     if (wants('axe')) {
-      for (const [width, colorScheme] of [[390, 'light'], [1240, 'dark']]) {
+      const axeWidths = [[390, 'light'], [1240, 'dark']];
+      // 라우트별로 **어느 폭에서든** 발생한 규칙을 모은다. 낡은 유보 판정을 폭마다
+      // 하면 1240 에서만 나는 규칙이 390 에서 하드 실패가 된다 — 전 폭을 다 돈
+      // 뒤 마지막 시나리오에서 한 번만 판정한다.
+      const axeSeen = new Map();
+      for (const [index, [width, colorScheme]] of axeWidths.entries()) {
+        const isLastWidth = index === axeWidths.length - 1;
         await scenario(scenarios, { id: 'axe', width, text_scale: 100, reduced_motion: false }, async () => {
           const { context, page } = await openPage(browser, server.base, { width, colorScheme });
           try {
             const failures = [];
             const routes = {};
-            for (const route of ROUTES) {
-              await goto(page, server.base, route);
+            for (const route of sweepRoutes) {
+              try {
+                await goto(page, server.base, route);
+              } catch (error) {
+                // 오버플로 순회와 같은 이유로 이어간다 — 한 라우트가 안 가라앉아도
+                // 나머지 라우트의 axe 결과는 이 실행에서 받아야 한다.
+                const first = String(error).split(String.fromCharCode(10))[0];
+                failures.push(`${route} did not settle: ${first}`);
+                continue;
+              }
               const violations = await axeScan(page);
               routes[route] = violations;
-              const blocking = violations.filter((item) => ['critical', 'serious'].includes(item.impact));
-              if (blocking.length) failures.push(`${route} ${blocking.map((item) => item.id).join(',')}`);
+              // 판정은 routes.mjs 가 한다 — 심각도 기준과 유보 목록을 한곳에 두고
+              // 단위 테스트로 고정하기 위해서다.
+              failures.push(...axeFailures({ route, violations, seen: axeSeen }));
             }
+            if (isLastWidth) failures.push(...staleWaiverFailures(axeSeen));
             return { color_scheme: colorScheme, routes, failures };
           } finally {
             await context.close();

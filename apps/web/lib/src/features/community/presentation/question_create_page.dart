@@ -243,7 +243,7 @@ class _QuestionCreatePageState extends ConsumerState<QuestionCreatePage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  '💡 비슷한 질문',
+                                  '비슷한 질문',
                                   style: TextStyle(
                                     color: c.textSecondary,
                                     fontWeight: FontWeight.w600,

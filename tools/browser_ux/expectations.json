@@ -1,12 +1,14 @@
 {
   "schema_version": "leva.browser-ux.expectations.v1",
-  "recorded_from": "ff4a886611a7d6445b9c7b8b3625c0893ed5cbc4",
+  "recorded_from": "13d81c949599b8b531d1c7bc9b95c82f3f29321c",
   "notes": [
     "community_desktop: /community 1440px 에서 Tab 순서(첫 8 정지). CI 36212413896(S3-P2 상단 헤더 셸) 실측.",
     "S3-P2 로 바뀐 것: 푸터 링크 4개가 순회에 새로 들어왔다. 화면 안 순서(검색·최신순·글 작성·행)는 DpWebShell 이 DpAppShell 의 WidgetOrderTraversalPolicy 를 승계해 develop 과 같다.",
     "헤더는 순회에 들어오지 않는다 — 레일이 빠져 있던 것과 같은 라우트 FocusScope 경계 문제이고 docs/community-information-architecture/handoff.md §9.6-5 에 있다.",
     "러너는 14번 Tab 을 눌러 앞 N 개만 비교한다. 마지막 정지가 반복되는 꼬리는 develop 실측(35932928056)에도 똑같이 있다 — 이 셸이 만든 것이 아니다.",
     "S3-P4b 로 바뀐 것: 목록 행의 탭 정지가 「제목 + 집계 한 덩어리」에서 **제목 링크 하나**로 줄었다. 카드 나열(DpListRow)이 표(DpWebTable)가 되면서 답변·추천이 각자 숫자 칼럼이 됐고, 그 셀들은 포커스 대상이 아니다 — 접근성 컨트롤은 제목의 DpLink.title 하나다. 정지 개수와 순서는 그대로다. CI 36319166732(PR #237) 실측.",
+    "S3-P5 로 바뀐 것: **없다** — 순회는 그대로다. 게이트 라우트를 8항목에서 16항목으로 넓히고 mock 프로필 guest·consent 를 신설했지만, keyboard-traversal 은 ROUTES 를 읽지 않고 /community 1440px 을 고정으로 방문한다(run.mjs 의 그 시나리오만 자체 라우트를 쓴다). 12·13px 리터럴을 파생 스타일로 옮긴 것도 포커스 대상을 바꾸지 않는다. CI 36649266533(PR #240) 실측에서 첫 8 정지가 이 값과 일치했다. 앞선 갱신이 recorded_from 을 S3-P2 커밋(ff4a886)에 남겨 둔 것도 함께 고쳤다 — PR #237 이 값과 notes 만 옮겼다.",
+    "recorded_from 은 그 측정이 이뤄진 **브랜치 커밋**이다. 같은 PR 의 뒤 커밋(픽토그래픽 이모지 제거 · perf 기준선 교체)은 /community 의 포커스 순서를 건드리지 않는다 — 이모지는 /community/1·/community/new 에만 있었고 기준선은 데이터 파일이다.",
     "갱신은 실측 후 PR 리뷰 승인으로만 한다."
   ],
   "keyboard_traversal": {

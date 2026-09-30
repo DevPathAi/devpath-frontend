@@ -283,12 +283,10 @@ class _AnswerCardState extends State<_AnswerCard> {
                       borderRadius: BorderRadius.circular(DpSpacing.sm),
                     ),
                     child: Text(
-                      '🤖 AI 초안',
-                      style: TextStyle(
-                        color: c.primaryText,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
-                      ),
+                      'AI 초안',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.labelMedium!.copyWith(color: c.primaryText),
                     ),
                   ),
                 if (answer.accepted) ...[
@@ -297,11 +295,9 @@ class _AnswerCardState extends State<_AnswerCard> {
                   const SizedBox(width: 2),
                   Text(
                     '채택됨',
-                    style: TextStyle(
-                      color: c.success,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12,
-                    ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.labelMedium!.copyWith(color: c.success),
                   ),
                 ],
                 const Spacer(),

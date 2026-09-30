@@ -68,3 +68,24 @@ abstract final class DpTypography {
     );
   }
 }
+
+/// 시안의 보조 문구 스타일을 **토큰 계약에서 파생**해 쓴다.
+///
+/// [DpTypography.textTheme] 의 슬롯은 시맨틱 토큰 계약 2.0.0 의 CSS 투영 대상이라
+/// 버전 없이 값을 바꿀 수 없다. 그리고 시안의 `.meta`(12px)·`.ex`(13px)·
+/// `.steps li`(13px) 는 `font-size` 만 덮고 `line-height` 는 `body{line-height:1.6}`
+/// 을 그대로 물려받는다 — 즉 슬롯을 고르는 문제가 아니라 **본문 스타일에서 크기만
+/// 줄이는** 문제다. 여기서 파생하면 계약을 건드리지 않고 시안과 1:1 로 대조할 수 있고,
+/// 화면마다 `TextStyle(fontSize: 12)` 리터럴이 흩어지는 것도 막는다.
+extension DpDerivedTextX on BuildContext {
+  /// 시안 `.meta` — 12px 보조 문구. 행간은 본문(1.6)을 잇는다.
+  ///
+  /// 한 줄 상태·태그·표 머리는 `labelMedium`(12 / 16)이고 **이것과 다르다.**
+  /// 시안에서 `.st`·`.tag`·`th` 는 `white-space:nowrap` 이거나 한 줄이라 행간이
+  /// 드러나지 않지만, 여러 줄로 흐르는 보조 문구는 드러난다.
+  TextStyle get dpMeta => dpBody(12);
+
+  /// 본문 토큰에서 크기만 바꾼 스타일. 시안이 `font-size` 만 덮는 자리에 쓴다.
+  TextStyle dpBody(double fontSize) =>
+      Theme.of(this).textTheme.bodyMedium!.copyWith(fontSize: fontSize);
+}

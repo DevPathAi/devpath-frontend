@@ -32,6 +32,11 @@ String? _agreedAtLabel(String? raw) {
 }
 
 /// 설정 화면: 동의 관리(철회)·알림 설정·로그아웃·계정 삭제.
+/// 행 라벨과 스위치의 시맨틱 라벨이 같은 문자열을 쓰도록 한곳에 둔다 —
+/// 갈라지면 스크린리더가 읽는 이름과 눈에 보이는 이름이 달라진다.
+const String _reminderLabel = '학습 리마인더';
+const String _weeklyEmailLabel = '주간 리포트 이메일';
+
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
 
@@ -106,20 +111,31 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      // 스위치에는 자기 행의 이름을 시맨틱 라벨로 준다. 없으면
+                      // 스크린리더가 "켜짐"만 읽고 무엇이 켜졌는지 말하지 못한다
+                      // (axe aria-toggle-field-name, serious — S3-P5 가 /settings 를
+                      // browser-ux 에 넣으면서 처음 잡혔다). 시안도 설정 화면의 각
+                      // 입력에 aria-label 을 준다.
                       DpRowLine(
-                        label: const Text('학습 리마인더'),
+                        label: const Text(_reminderLabel),
                         description: const Text('선호 시간대에 학습 알림을 받아요.'),
-                        trailing: Switch(
-                          value: prefs.reminderEnabled,
-                          onChanged: notifier.setReminder,
+                        trailing: Semantics(
+                          label: _reminderLabel,
+                          child: Switch(
+                            value: prefs.reminderEnabled,
+                            onChanged: notifier.setReminder,
+                          ),
                         ),
                       ),
                       DpRowLine(
-                        label: const Text('주간 리포트 이메일'),
+                        label: const Text(_weeklyEmailLabel),
                         description: const Text('한 주 학습 요약을 이메일로 받아요.'),
-                        trailing: Switch(
-                          value: prefs.weeklyReportEmailEnabled,
-                          onChanged: notifier.setWeeklyEmail,
+                        trailing: Semantics(
+                          label: _weeklyEmailLabel,
+                          child: Switch(
+                            value: prefs.weeklyReportEmailEnabled,
+                            onChanged: notifier.setWeeklyEmail,
+                          ),
                         ),
                         last: true,
                       ),
@@ -205,13 +221,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       trailing: meta.required
           ? Icon(DpIcons.stepDone, color: context.dpColors.success)
           // 선택 동의: 현재 동의된 항목만 철회 가능(재동의는 후속).
-          : Switch(
-              value: agreed,
-              onChanged: agreed
-                  ? (v) {
-                      if (!v) notifier.revokeConsent(type);
-                    }
-                  : null,
+          : Semantics(
+              label: meta.label,
+              child: Switch(
+                value: agreed,
+                onChanged: agreed
+                    ? (v) {
+                        if (!v) notifier.revokeConsent(type);
+                      }
+                    : null,
+              ),
             ),
       last: last,
     );

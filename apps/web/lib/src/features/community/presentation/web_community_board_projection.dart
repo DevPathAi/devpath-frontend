@@ -207,7 +207,7 @@ Widget _titleCell({
       if (preview != null) ...[
         const SizedBox(height: DpSpacing.xs),
         DefaultTextStyle.merge(
-          style: TextStyle(fontSize: 13, color: c.textSecondary),
+          style: context.dpBody(13).copyWith(color: c.textSecondary),
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           child: preview,

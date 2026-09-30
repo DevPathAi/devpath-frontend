@@ -65,4 +65,9 @@ abstract final class DpWebDensity {
 
   /// 키-값 목록의 행 간격. 시안 `.kv{gap:6px 16px}`.
   static const double keyValueGap = 6;
+
+  /// 진행 단계 표시의 세로 패딩. 시안 `.steps li{padding:6px 12px}`.
+  /// [keyValueGap] 과 값이 같지만 출처가 달라 따로 둔다 — 시안에서 한쪽이
+  /// 바뀌어도 다른 쪽이 따라 움직이면 안 된다.
+  static const double stepVerticalPadding = 6;
 }

@@ -99,7 +99,7 @@ class _LcsContextCardState extends ConsumerState<LcsContextCard> {
           title: const Text('내 학습 맥락 첨부'),
           subtitle: Text(
             '현재 학습 상태를 답변자에게 보여줘 더 정확한 답을 받아요.',
-            style: TextStyle(color: c.textSecondary, fontSize: 12),
+            style: context.dpMeta.copyWith(color: c.textSecondary),
           ),
           value: _on,
           onChanged: widget.enabled ? _toggle : null,
@@ -109,7 +109,7 @@ class _LcsContextCardState extends ConsumerState<LcsContextCard> {
             padding: const EdgeInsets.only(top: DpSpacing.xs),
             child: Text(
               '맥락을 불러오지 못했어요: $_error',
-              style: TextStyle(color: c.textSecondary, fontSize: 12),
+              style: context.dpMeta.copyWith(color: c.textSecondary),
             ),
           ),
         if (_on && _loading)
@@ -149,7 +149,7 @@ class _LcsContextCardState extends ConsumerState<LcsContextCard> {
             if (d.fieldsAvailable.isEmpty)
               Text(
                 '첨부할 학습 맥락이 아직 없어요.',
-                style: TextStyle(color: c.textSecondary, fontSize: 12),
+                style: context.dpMeta.copyWith(color: c.textSecondary),
               )
             else
               Wrap(
@@ -212,7 +212,10 @@ class LcsAnswererPanel extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '📚 작성자 학습 맥락',
+              // 픽토그래픽 이모지 금지 — 번들 폰트에 없어 Noto Color Emoji 폴백을 부르고,
+              // 차단되면 레이아웃마다 재시도해 browser-ux 의 networkidle 이 오지 않는다
+              // (DESIGN.md §4 · test/app/no_pictographic_emoji_test.dart).
+              '작성자 학습 맥락',
               style: TextStyle(
                 color: c.primaryText,
                 fontWeight: FontWeight.w600,

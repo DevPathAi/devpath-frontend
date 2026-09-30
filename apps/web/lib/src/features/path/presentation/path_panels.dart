@@ -104,7 +104,7 @@ class PathWeeksPanel extends StatelessWidget {
         const SizedBox(height: 2),
         Text(
           milestone.expectedOutcome,
-          style: TextStyle(fontSize: 12, color: c.textSecondary),
+          style: context.dpMeta.copyWith(color: c.textSecondary),
         ),
       ],
     );

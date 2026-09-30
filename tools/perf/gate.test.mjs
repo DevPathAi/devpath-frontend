@@ -50,10 +50,28 @@ test('gate: 절대 임계(INP·CLS·ready) 초과는 기준선과 무관하게 �
   assert.equal(violations.length, 3);
 });
 
-test('gate: lcp 가 있으면 lcp 를, 없으면 ready 를 판정한다', () => {
+test('gate: lcp 가 있어도 ready 를 함께 판정한다', () => {
+  // 옛 계약은 「lcp 가 있으면 lcp 를, 없으면 ready 를」였다. 그러면 페인트 후보가
+  // 하나 생기는 순간 ready 검사가 죽는다 — 2026-09-17 의 부트 스플래시(c482b54)가
+  // 정확히 그 일을 했다. 그 뒤 20행 전부 lcp 가 붙어(44~228 ms) 21.5초짜리 모바일
+  // 첫 상호작용 시점이 절대 예산에 보이지 않게 됐다. 스플래시는 LCP 후보일 뿐
+  // 화면이 쓸 수 있게 된 시점이 아니다 — 둘은 따로 봐야 한다.
   const baseline = report([row()]);
   const withLcp = report([row({ p75: { fcp_ms: 800, ready_ms: 3000, lcp_ms: 2000, inp_ms: 80, cls: 0.02 } })]);
-  assert.deepEqual(evaluate(withLcp, baseline, budget), []);
+  const violations = evaluate(withLcp, baseline, budget);
+  assert.equal(violations.length, 1);
+  assert.match(violations[0], /ready_ms 3000 > 2500/);
+
+  // lcp 가 없을 때의 거동은 그대로다.
+  const noLcp = report([row({ p75: { fcp_ms: 800, ready_ms: 3000, lcp_ms: null, inp_ms: 80, cls: 0.02 } })]);
+  assert.match(evaluate(noLcp, baseline, budget)[0], /ready_ms 3000 > 2500/);
+
+  // 둘 다 넘으면 둘 다 보고한다.
+  const both = report([row({ p75: { fcp_ms: 800, ready_ms: 3000, lcp_ms: 2600, inp_ms: 80, cls: 0.02 } })]);
+  const two = evaluate(both, baseline, budget);
+  assert.equal(two.length, 2);
+  assert.ok(two.some((v) => /lcp_ms/.test(v)));
+  assert.ok(two.some((v) => /ready_ms/.test(v)));
 });
 
 test('gate: 기준선에 없는 행은 회귀 비교 없이 절대 임계만 본다', () => {

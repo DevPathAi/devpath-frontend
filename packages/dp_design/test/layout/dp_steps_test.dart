@@ -67,6 +67,20 @@ void main() {
     // 640: compact(<600)를 넘겨 가로 배치로 두면서, 세 단계를 나란히 놓으면
     // 한 칸이 약 213px 이라 긴 라벨이 두 줄이 되는 폭이다.
 
+    // 「줄바꿈했다」를 절대값에 걸면 글자 크기를 줄이는 순간 판별력을 잃는다
+    // (한 줄 + 패딩도 그 값을 넘는다). 같은 폭에서 한 줄 높이를 먼저 재 둔다.
+    await tester.pumpWidget(
+      _host(
+        const Align(
+          alignment: Alignment.topCenter,
+          child: DpSteps(labels: ['가', '나', '다'], currentIndex: 0),
+        ),
+      ),
+    );
+    final singleLine = tester
+        .getSize(find.byKey(const ValueKey('dp-step-1')))
+        .height;
+
     await tester.pumpWidget(
       _host(
         const Align(
@@ -83,8 +97,36 @@ void main() {
       for (var i = 0; i < 3; i++)
         tester.getSize(find.byKey(ValueKey('dp-step-$i'))).height,
     ];
-    expect(heights[1], greaterThan(24), reason: '긴 라벨이 실제로 줄바꿈해야 판별력이 생긴다');
+    expect(
+      heights[1],
+      greaterThan(singleLine),
+      reason: '긴 라벨이 실제로 줄바꿈해야 판별력이 생긴다',
+    );
     expect(heights[0], heights[1]);
     expect(heights[2], heights[1]);
+  });
+
+  // 시안 `.steps li{padding:6px 12px;font-size:13px}`. 8pt 스케일에 6 이 없어
+  // DpWebDensity 에 이름을 둔다(DpSpacing.xs=4 는 시안 값이 아니다).
+  testWidgets('단계는 시안의 13px 글자와 세로 패딩 6 을 쓴다', (tester) async {
+    _size(tester, const Size(1280, 800));
+    await tester.pumpWidget(
+      _host(
+        const Align(
+          alignment: Alignment.topCenter,
+          child: DpSteps(labels: ['가', '나', '다'], currentIndex: 0),
+        ),
+      ),
+    );
+
+    expect(tester.widget<Text>(find.text('가')).style!.fontSize, 13);
+    expect(DpWebDensity.stepVerticalPadding, 6);
+
+    final stepHeight = tester
+        .getSize(find.byKey(const ValueKey('dp-step-0')))
+        .height;
+    final textHeight = tester.getSize(find.text('가')).height;
+    // 상수를 양쪽에 쓰면 어떤 값이어도 성립한다 — 시안 값을 그대로 적는다.
+    expect(stepHeight - textHeight, 12, reason: '시안의 세로 패딩 6 이 위아래로');
   });
 }
