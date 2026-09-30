@@ -12,7 +12,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { SCHEMA_VERSION, summarize, validateReport } from './report.mjs';
-import { routesOf } from './routes.mjs';
+import { axeFailures, externalRequestFailure, routesOf } from './routes.mjs';
 import { serve } from './serve.mjs';
 
 const require = createRequire(import.meta.url);
@@ -24,8 +24,6 @@ const HEIGHT = 900;
 const MIN_TARGET = 24; // = DpDensity.minTarget (packages/dp_design/lib/src/theme/dp_spacing.dart)
 const AXE_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'best-practice'];
 const READY_TIMEOUT_MS = 20000;
-/// 한 컨텍스트가 내는 외부(루프백 밖) 요청의 상한. 정상은 3~8건이다.
-const MAX_EXTERNAL_REQUESTS = 40;
 
 function parseArgs(argv) {
   const options = {};
@@ -127,13 +125,35 @@ async function overflow(page) {
   }));
 }
 
-async function smallTargets(page) {
+/// 24px 미만 포인터 타깃. **한 번 재고 끝내면 안 된다** — Flutter 는 스크롤
+/// 폴드에 잘린 위젯의 시맨틱스 노드를 *잘린* rect 로 내므로, 화면 아래로 반쯤
+/// 내려간 컨트롤이 작은 타깃으로 오보된다(S3-P5 실측: `/settings` 390x900 에서
+/// 「로그아웃」이 80x8, 같은 y 에서 뷰포트만 2400 으로 높이면 80x30).
+///
+/// `scrollIntoViewIfNeeded()` 로는 안 된다 — 시맨틱스 노드는 절대 배치된
+/// 오버레이라 그 호출이 실측상 아무것도 하지 않는다(80x8 그대로). 실제 Flutter
+/// 스크롤 뷰를 굴리는 것은 **휠**이다. 그래서 작아 보이는 후보만 골라 화면 가운데로
+/// 굴려 다시 잰다. 이 오보는 러너에 처음부터 있었고, 옛 ROUTES(8항목)에는 폴드에
+/// 걸리는 버튼이 없어 S3-P5 가 /settings·/mypage 를 넣을 때까지 드러나지 않았다.
+async function smallTargets(page, viewportHeight) {
   const buttons = page.getByRole('button');
   const count = await buttons.count();
   const offenders = [];
+  const middle = Math.round(viewportHeight / 2);
   for (let index = 0; index < count; index += 1) {
     const button = buttons.nth(index);
-    const box = await button.boundingBox();
+    let box = await button.boundingBox();
+    if (!box) continue;
+    if (Math.min(box.width, box.height) >= MIN_TARGET) continue;
+
+    const viewport = page.viewportSize();
+    await page.mouse.move(Math.round((viewport?.width ?? 390) / 2), middle);
+    await page.mouse.wheel(0, Math.round(box.y - middle));
+    await page.waitForTimeout(300);
+    box = await button.boundingBox();
+    // 되돌려 다음 후보가 같은 기준에서 시작하게 한다.
+    await page.mouse.wheel(0, -viewportHeight * 20);
+    await page.waitForTimeout(200);
     if (!box) continue;
     if (Math.min(box.width, box.height) < MIN_TARGET) {
       offenders.push({
@@ -380,6 +400,7 @@ export async function run(options) {
               const failures = [];
               const routes = {};
               for (const route of sweepRoutes) {
+                const externalBefore = external.length;
                 // goto 안의 ready() 는 networkidle 을 기다린다. 여기서 그냥 던지면
                 // "어느 라우트에서" "브라우저가 무엇을 불평하며" 안 가라앉았는지가
                 // 통째로 사라진다(2026-09-26 실측: 390x200% 가 이 자리에서 30초 타임아웃).
@@ -391,7 +412,7 @@ export async function run(options) {
                   break;
                 }
                 const size = await overflow(page);
-                const targets = width === 390 && textScale === 100 ? await smallTargets(page) : [];
+                const targets = width === 390 && textScale === 100 ? await smallTargets(page, HEIGHT) : [];
                 routes[route] = {
                   location: location(page),
                   ...size,
@@ -407,9 +428,17 @@ export async function run(options) {
                 // 하고, 실패한 다운로드는 재시도 금지 목록에 들어가지 않아
                 // 레이아웃마다 다시 나간다(2026-09-26: `ChipThemeData.labelStyle`
                 // 의 fontFamily 누락으로 390x200% `/content` 에서 230건 넘게).
-                // 정상값은 컨텍스트당 3~8건이다.
-                if (external.length > MAX_EXTERNAL_REQUESTS) {
-                  failures.push(`${route} external requests ${external.length} > ${MAX_EXTERNAL_REQUESTS} (font fallback retry storm?)`);
+                // 판정은 컨텍스트 총합이 아니라 **이 라우트의 증가분**으로 한다 —
+                // 총합에 고정 상한을 두면 라우트를 늘리는 것만으로 붉어진다
+                // (routes.mjs `externalRequestFailure` 의 주석에 실측이 있다).
+                const budgetProblem = externalRequestFailure({
+                  route,
+                  delta: external.length - externalBefore,
+                  total: external.length,
+                  routeCount: sweepRoutes.length,
+                });
+                if (budgetProblem) {
+                  failures.push(budgetProblem);
                   break;
                 }
               }
@@ -478,8 +507,9 @@ export async function run(options) {
               await goto(page, server.base, route);
               const violations = await axeScan(page);
               routes[route] = violations;
-              const blocking = violations.filter((item) => ['critical', 'serious'].includes(item.impact));
-              if (blocking.length) failures.push(`${route} ${blocking.map((item) => item.id).join(',')}`);
+              // 판정은 routes.mjs 가 한다 — 심각도 기준과 유보 목록(그리고 낡은
+              // 유보의 실패 처리)을 한곳에 두고 단위 테스트로 고정하기 위해서다.
+              failures.push(...axeFailures({ route, violations }));
             }
             return { color_scheme: colorScheme, routes, failures };
           } finally {

@@ -6,7 +6,7 @@ import { test } from 'node:test';
 
 import { serve } from './serve.mjs';
 import { validateReport, summarize } from './report.mjs';
-import { ROUTES, routesOf } from './routes.mjs';
+import { ROUTES, routesOf, externalRequestFailure, axeFailures, AXE_WAIVERS } from './routes.mjs';
 
 test('serve: 존재하는 파일은 그대로, 미존재 경로는 index.html(SPA fallback), feed 는 stub', async () => {
   const dist = await mkdtemp(join(tmpdir(), 'bux-dist-'));
@@ -87,5 +87,90 @@ test('ROUTES 는 onboarded 빌드가 돌려보내는 라우트를 담지 않는�
   // apps/web/test/app/gate_redirect_test.dart 의 「온보딩 라우트는 전부 돌려보낸다」와 짝이다.
   for (const route of ['/login', '/consent', '/diagnostic', '/beta-pending', '/auth/callback']) {
     assert.ok(!ROUTES.includes(route), route);
+  }
+});
+
+test('externalRequestFailure: 폭주는 한 라우트의 증가분으로 잡는다', () => {
+  // 2026-09-26 실측: /content 한 화면에서 230건 넘게, 심할 때 695건.
+  assert.match(
+    externalRequestFailure({ route: '/content', delta: 230, total: 240, routeCount: 16 }),
+    /\/content .*\+230/,
+  );
+});
+
+test('externalRequestFailure: 라우트를 늘린 산술 증가는 실패가 아니다', () => {
+  // S3-P5 실측: 라우트당 고정 2건(광고 스크립트 + 업데이트 피드)이라 16라우트면
+  // 32건이 정상이고, 폰트 청크를 처음 받는 라우트가 12건을 더한다. 옛 게이트는
+  // 컨텍스트 총합 40 을 넘겨 42 에서 붉어졌다 — 그것이 게이트의 결함이었다.
+  assert.equal(
+    externalRequestFailure({ route: '/community/new/post', delta: 2, total: 42, routeCount: 16 }),
+    null,
+  );
+  assert.equal(
+    externalRequestFailure({ route: '/sandbox', delta: 12, total: 24, routeCount: 16 }),
+    null,
+  );
+});
+
+test('externalRequestFailure: 총합도 라우트 수에 비례해 지킨다', () => {
+  // 모든 라우트가 조금씩 더 부르는 느린 증가는 증가분만으로는 안 잡힌다.
+  assert.equal(externalRequestFailure({ route: '/x', delta: 8, total: 128, routeCount: 16 }), null);
+  assert.match(
+    externalRequestFailure({ route: '/x', delta: 8, total: 129, routeCount: 16 }),
+    /total 129/,
+  );
+});
+
+const serious = (id) => ({ id, impact: 'serious', nodes: 3, help: id });
+
+test('axeFailures: critical·serious 만 막고 minor·moderate 는 통과한다', () => {
+  assert.deepEqual(
+    axeFailures({
+      route: '/dashboard',
+      violations: [{ id: 'region', impact: 'moderate', nodes: 46, help: 'r' }],
+    }),
+    [],
+  );
+  assert.deepEqual(
+    axeFailures({ route: '/dashboard', violations: [serious('color-contrast')] }),
+    ['/dashboard color-contrast'],
+  );
+});
+
+test('axeFailures: 유보한 규칙은 그 라우트에서만 통과한다', () => {
+  const waived = AXE_WAIVERS[0];
+  const route = waived.routes[0];
+  const rule = waived.rules[0];
+  assert.deepEqual(
+    axeFailures({ route, violations: waived.rules.map(serious) }),
+    [],
+  );
+  // 같은 규칙이라도 유보 목록에 없는 라우트에서는 막는다.
+  assert.deepEqual(
+    axeFailures({ route: '/dashboard', violations: [serious(rule)] }),
+    ['/dashboard ' + rule],
+  );
+});
+
+test('axeFailures: 유보가 낡으면 그 자체를 실패로 보고한다', () => {
+  // 고쳐진 뒤에도 예외가 남으면 다음 회귀를 가린다.
+  const waived = AXE_WAIVERS[0];
+  const route = waived.routes[0];
+  const failures = axeFailures({ route, violations: [] });
+  assert.equal(failures.length, waived.rules.length);
+  for (const rule of waived.rules) {
+    assert.ok(
+      failures.some((f) => f.includes(rule) && /stale/.test(f)),
+      rule,
+    );
+  }
+});
+
+test('axeFailures: 유보 항목은 이유와 후속 과제를 적어 둔다', () => {
+  for (const w of AXE_WAIVERS) {
+    assert.ok(w.routes.length > 0);
+    assert.ok(w.rules.length > 0);
+    assert.ok(w.why && w.why.length > 20, 'why');
+    assert.ok(w.followUp && w.followUp.length > 20, 'followUp');
   }
 });
