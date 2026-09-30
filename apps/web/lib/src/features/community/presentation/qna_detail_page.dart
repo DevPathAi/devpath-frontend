@@ -283,7 +283,7 @@ class _AnswerCardState extends State<_AnswerCard> {
                       borderRadius: BorderRadius.circular(DpSpacing.sm),
                     ),
                     child: Text(
-                      '🤖 AI 초안',
+                      'AI 초안',
                       style: Theme.of(
                         context,
                       ).textTheme.labelMedium!.copyWith(color: c.primaryText),

@@ -212,7 +212,10 @@ class LcsAnswererPanel extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '📚 작성자 학습 맥락',
+              // 픽토그래픽 이모지 금지 — 번들 폰트에 없어 Noto Color Emoji 폴백을 부르고,
+              // 차단되면 레이아웃마다 재시도해 browser-ux 의 networkidle 이 오지 않는다
+              // (DESIGN.md §4 · test/app/no_pictographic_emoji_test.dart).
+              '작성자 학습 맥락',
               style: TextStyle(
                 color: c.primaryText,
                 fontWeight: FontWeight.w600,

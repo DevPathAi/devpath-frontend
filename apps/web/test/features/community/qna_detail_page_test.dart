@@ -73,7 +73,7 @@ void main() {
 
     expect(find.text('async 질문'), findsOneWidget);
     expect(find.textContaining('본문입니다'), findsWidgets);
-    expect(find.text('🤖 AI 초안'), findsOneWidget); // AI 뱃지
+    expect(find.text('AI 초안'), findsOneWidget); // AI 뱃지
     expect(find.text('채택됨'), findsOneWidget); // 채택된 답변
     // 이미 solved → 채택 버튼 없음
     expect(find.widgetWithText(TextButton, '채택'), findsNothing);
@@ -240,7 +240,7 @@ void main() {
     await tester.pumpWidget(_host(c));
     await tester.pumpAndSettle();
 
-    expect(find.text('📚 작성자 학습 맥락'), findsOneWidget);
+    expect(find.text('작성자 학습 맥락'), findsOneWidget);
     expect(find.text('현재 콘텐츠'), findsOneWidget); // content 키 → 라벨 칩
   });
 
@@ -257,7 +257,7 @@ void main() {
     await tester.pumpWidget(_host(c));
     await tester.pumpAndSettle();
 
-    expect(find.text('📚 작성자 학습 맥락'), findsNothing);
+    expect(find.text('작성자 학습 맥락'), findsNothing);
   });
 
   // 아래 두 건은 sliver 전환(Task 11)이 만든 로딩·실패 분기를 잠근다. 전환 전에는
