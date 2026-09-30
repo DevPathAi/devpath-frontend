@@ -1,6 +1,6 @@
 {
   "schema_version": "leva.perf-measure.v1",
-  "built_from": "10f8a5b059d2323999cb878a0788014f37f0e700",
+  "built_from": "13d81c949599b8b531d1c7bc9b95c82f3f29321c",
   "renderer": "canvaskit",
   "conditions": {
     "locale": "ko-KR",

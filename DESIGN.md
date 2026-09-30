@@ -154,8 +154,10 @@ Material 3 타입 스케일(Pretendard 적용):
 | titleSmall | 14/20 (w600) | 카드 소제목 |
 | labelMedium | 12/16 (w600) | 칩·뱃지 |
 
-> 학습·문서 읽기 본문은 `bodyLarge` 16px을 기본으로 하고 18px까지 허용한다. 메타는 `bodySmall` 13px,
+> 학습·문서 읽기 본문은 `bodyLarge` 16px을 기본으로 하고 18px까지 허용한다. 보조 정보는 `bodySmall` 13px,
 > 11px `labelSmall`은 짧은 UI 레이블에만 쓰며 모든 읽어야 하는 텍스트는 대비 ≥4.5:1을 유지한다.
+> **단, 시안의 `.meta`(12px)는 아래 「웹 문법(S3)의 파생 스타일」이 우선한다** — 이 줄은 S3 이전의
+> 앱 문법 기준이고, 웹 화면의 `.meta` 는 `bodySmall` 이 아니라 `context.dpMeta` 다.
 
 > **웹 문법(S3)의 파생 스타일.** 시안은 `.meta`(12px)·`.ex`(13px)·`.steps li`(13px)·`.chk p`(13px)
 > 에서 `font-size` 만 덮고 `line-height` 는 `body{line-height:1.6}` 을 그대로 물려받는다. 그 자리들은

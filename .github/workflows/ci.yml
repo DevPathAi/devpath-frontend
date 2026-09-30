@@ -848,6 +848,10 @@ jobs:
   # 그 표를 고정한다). 그래서 프로필별로 따로 빌드해 라우트 순회 시나리오만 돌린다 —
   # 같은 ROUTES 에 적으면 리다이렉트 대상 화면을 두 번 재는 테스트가 된다.
   browser-ux-onboarding:
+    # 표시 이름을 **프로필만**으로 고정한다. 기본값(모든 matrix 키)을 쓰면 체크 이름에
+    # 라우트 목록이 들어가, 라우트를 한 줄 고치는 순간 체크 이름이 바뀐다 — 필수 체크로
+    # 등록해 두면 그 등록이 조용히 안 맞게 되고 붉은 잡이 머지를 막지 못한다.
+    name: browser-ux-onboarding (${{ matrix.profile }})
     runs-on: ubuntu-24.04
     env:
       RENDERER_IMAGE: mcr.microsoft.com/playwright:v1.55.0-noble@sha256:ffc33305f7b4b04057ae4a0caa70aad4fde87454fb403a1a22e7f931707dfcf9
@@ -877,15 +881,25 @@ jobs:
       - name: Build mock web release for ${{ matrix.profile }}
         shell: bash
         working-directory: apps/web
+        env:
+          PROFILE: ${{ matrix.profile }}
         run: |
           set -euo pipefail
-          flutter build web --release --no-pub --no-web-resources-cdn             --dart-define=USE_MOCK=true             --dart-define=MISSION_SPINE_ENABLED=true             --dart-define=MOCK_PROFILE=${{ matrix.profile }}             --dart-define=HOME_BASE_URL=http://127.0.0.1:1
+          flutter build web --release --no-pub --no-web-resources-cdn \
+            --dart-define=USE_MOCK=true \
+            --dart-define=MISSION_SPINE_ENABLED=true \
+            --dart-define=MOCK_PROFILE="${PROFILE}" \
+            --dart-define=HOME_BASE_URL=http://127.0.0.1:1
       - name: Install pinned runner dependencies
         shell: bash
         run: |
           set -euo pipefail
           docker pull --platform linux/amd64 "${RENDERER_IMAGE}"
-          docker run --rm --platform linux/amd64             -v "${GITHUB_WORKSPACE}:/work"             -w /work/tools/browser_ux             "${RENDERER_IMAGE}"             npm ci --ignore-scripts --no-audit --no-fund
+          docker run --rm --platform linux/amd64 \
+            -v "${GITHUB_WORKSPACE}:/work" \
+            -w /work/tools/browser_ux \
+            "${RENDERER_IMAGE}" \
+            npm ci --ignore-scripts --no-audit --no-fund
       - name: Run route sweep without network
         shell: bash
         env:
@@ -893,7 +907,16 @@ jobs:
           PROFILE: ${{ matrix.profile }}
         run: |
           set -euo pipefail
-          docker run --rm --platform linux/amd64 --network none --ipc=host             -v "${GITHUB_WORKSPACE}:/work"             -w /work/tools/browser_ux             "${RENDERER_IMAGE}"             node run.mjs               --dist=/work/apps/web/build/web               --out="/work/evidence/browser-ux/${PROFILE}.json"               --routes="${SWEEP_ROUTES}"               --only=axe,overflow-and-targets               --built-from="${GITHUB_SHA}"
+          docker run --rm --platform linux/amd64 --network none --ipc=host \
+            -v "${GITHUB_WORKSPACE}:/work" \
+            -w /work/tools/browser_ux \
+            "${RENDERER_IMAGE}" \
+            node run.mjs \
+              --dist=/work/apps/web/build/web \
+              --out="/work/evidence/browser-ux/${PROFILE}.json" \
+              --routes="${SWEEP_ROUTES}" \
+              --only=axe,overflow-and-targets \
+              --built-from="${GITHUB_SHA}"
       - name: Preserve route sweep report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

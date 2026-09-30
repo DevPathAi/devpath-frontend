@@ -23,10 +23,26 @@ export function evaluate(current, baseline, budget, { warnings = [] } = {}) {
   for (const row of current.routes ?? []) {
     const id = key(row);
     const { p75, transfer_bytes: bytes } = row;
-    // 절대 임계: LCP 가 있으면 LCP, 없으면 ready(첫 상호작용 가능 시점).
-    if (p75.lcp_ms !== null && p75.lcp_ms !== undefined) {
-      if (p75.lcp_ms > budget.lcp_ms_max) absolute.push(`${id} lcp_ms ${p75.lcp_ms} > ${budget.lcp_ms_max}`);
-    } else if (p75.ready_ms !== null && p75.ready_ms !== undefined && p75.ready_ms > budget.ready_ms_max) {
+    // 절대 임계: LCP 와 ready(첫 상호작용 가능 시점)를 **각각** 본다.
+    //
+    // 옛 코드는 「LCP 가 있으면 LCP, 없으면 ready」였다. 그러면 페인트 후보가 하나
+    // 생기는 순간 ready 검사가 죽는다 — 2026-09-17 의 부트 스플래시(c482b54)가
+    // 정확히 그 일을 했다(S3-P5 실측: 그 전 기준선은 20행 전부 lcp_ms 가 null 이라
+    // ready 21.5초가 잡혔는데, 그 뒤 전부 44~228 ms 의 lcp 가 붙어 같은 21.5초가
+    // 절대 예산에서 사라졌다). 스플래시는 LCP 후보일 뿐 화면이 쓸 수 있게 된
+    // 시점이 아니다.
+    if (
+      p75.lcp_ms !== null &&
+      p75.lcp_ms !== undefined &&
+      p75.lcp_ms > budget.lcp_ms_max
+    ) {
+      absolute.push(`${id} lcp_ms ${p75.lcp_ms} > ${budget.lcp_ms_max}`);
+    }
+    if (
+      p75.ready_ms !== null &&
+      p75.ready_ms !== undefined &&
+      p75.ready_ms > budget.ready_ms_max
+    ) {
       absolute.push(`${id} ready_ms ${p75.ready_ms} > ${budget.ready_ms_max}`);
     }
     if (p75.inp_ms !== null && p75.inp_ms !== undefined && p75.inp_ms > budget.inp_ms_max) {

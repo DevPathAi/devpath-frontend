@@ -126,10 +126,7 @@ void main() {
         .getSize(find.byKey(const ValueKey('dp-step-0')))
         .height;
     final textHeight = tester.getSize(find.text('가')).height;
-    expect(
-      stepHeight - textHeight,
-      DpWebDensity.stepVerticalPadding * 2,
-      reason: '세로 패딩이 위아래로 한 번씩',
-    );
+    // 상수를 양쪽에 쓰면 어떤 값이어도 성립한다 — 시안 값을 그대로 적는다.
+    expect(stepHeight - textHeight, 12, reason: '시안의 세로 패딩 6 이 위아래로');
   });
 }

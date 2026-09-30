@@ -12,7 +12,12 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { SCHEMA_VERSION, summarize, validateReport } from './report.mjs';
-import { axeFailures, externalRequestFailure, routesOf } from './routes.mjs';
+import {
+  axeFailures,
+  externalRequestFailure,
+  routesOf,
+  staleWaiverFailures,
+} from './routes.mjs';
 import { serve } from './serve.mjs';
 
 const require = createRequire(import.meta.url);
@@ -141,26 +146,46 @@ async function smallTargets(page, viewportHeight) {
   const offenders = [];
   const middle = Math.round(viewportHeight / 2);
   for (let index = 0; index < count; index += 1) {
-    const button = buttons.nth(index);
-    let box = await button.boundingBox();
-    if (!box) continue;
-    if (Math.min(box.width, box.height) >= MIN_TARGET) continue;
+    // **인덱스 로케이터로 스크롤을 건너 재측정하면 안 된다.** Flutter 는 렌더된
+    // 위젯에만 시맨틱스 노드를 내므로 휠이 `flt-semantics` 노드를 더하고 지운다 —
+    // 스크롤 뒤의 `nth(index)` 는 다른 요소일 수 있다. 후보를 요소 핸들로 붙잡고
+    // 라벨은 **굴리기 전에** 읽는다.
+    const handle = await buttons.nth(index).elementHandle();
+    if (!handle) continue;
+    try {
+      const box = await handle.boundingBox();
+      if (!box) continue;
+      if (Math.min(box.width, box.height) >= MIN_TARGET) continue;
 
-    const viewport = page.viewportSize();
-    await page.mouse.move(Math.round((viewport?.width ?? 390) / 2), middle);
-    await page.mouse.wheel(0, Math.round(box.y - middle));
-    await page.waitForTimeout(300);
-    box = await button.boundingBox();
-    // 되돌려 다음 후보가 같은 기준에서 시작하게 한다.
-    await page.mouse.wheel(0, -viewportHeight * 20);
-    await page.waitForTimeout(200);
-    if (!box) continue;
-    if (Math.min(box.width, box.height) < MIN_TARGET) {
-      offenders.push({
-        label: (await button.getAttribute('aria-label')) ?? (await button.textContent())?.trim() ?? '',
-        width: Math.round(box.width),
-        height: Math.round(box.height),
-      });
+      const label =
+        (await handle.getAttribute('aria-label')) ??
+        (await handle.textContent())?.trim() ??
+        '';
+
+      const viewport = page.viewportSize();
+      await page.mouse.move(Math.round((viewport?.width ?? 390) / 2), middle);
+      await page.mouse.wheel(0, Math.round(box.y - middle));
+      await page.waitForTimeout(300);
+      const scrolled = await handle.boundingBox();
+      // 되돌려 다음 후보가 같은 기준에서 시작하게 한다.
+      await page.mouse.wheel(0, -viewportHeight * 20);
+      await page.waitForTimeout(200);
+
+      // 굴렸는데 움직이지 않았으면(중첩 스크롤러가 휠을 먹었거나 이미 다 보였다)
+      // 두 번째 측정을 믿을 근거가 없다. 첫 측정을 그대로 보고하고 그 사실을 적는다 —
+      // 조용히 통과시키면 진짜 작은 타깃이 사라진다.
+      const moved = scrolled != null && Math.abs(scrolled.y - box.y) > 1;
+      const measured = moved ? scrolled : box;
+      if (Math.min(measured.width, measured.height) < MIN_TARGET) {
+        offenders.push({
+          label,
+          width: Math.round(measured.width),
+          height: Math.round(measured.height),
+          ...(moved ? {} : { unscrolled: true }),
+        });
+      }
+    } finally {
+      await handle.dispose();
     }
   }
   return offenders;
@@ -409,7 +434,11 @@ export async function run(options) {
                 } catch (error) {
                   const first = String(error).split(String.fromCharCode(10))[0];
                   failures.push(`${route} did not settle: ${first}`);
-                  break;
+                  // **break 하지 않는다.** 첫 실패에서 멈추면 뒤 라우트를 이 실행에서
+                  // 아예 재지 못한다 — CI 1차(36649266533)가 `/community/1` 에서 멈춰
+                  // 새로 게이트에 넣은 8화면 중 5화면을 한 폭에서도 재지 못했다.
+                  // 라우트마다 goto 가 새 문서를 열므로 이어가도 상태가 섞이지 않는다.
+                  continue;
                 }
                 const size = await overflow(page);
                 const targets = width === 390 && textScale === 100 ? await smallTargets(page, HEIGHT) : [];
@@ -428,19 +457,18 @@ export async function run(options) {
                 // 하고, 실패한 다운로드는 재시도 금지 목록에 들어가지 않아
                 // 레이아웃마다 다시 나간다(2026-09-26: `ChipThemeData.labelStyle`
                 // 의 fontFamily 누락으로 390x200% `/content` 에서 230건 넘게).
-                // 판정은 컨텍스트 총합이 아니라 **이 라우트의 증가분**으로 한다 —
-                // 총합에 고정 상한을 두면 라우트를 늘리는 것만으로 붉어진다
+                // 판정은 컨텍스트 총합이 아니라 **이 라우트가 같은 URL 을 몇 번
+                // 다시 불렀는지**로 한다. 폭주는 총량이 아니라 반복이고, 정상적인 첫
+                // 폰트 로딩은 서로 다른 청크를 한 번씩 받는다
                 // (routes.mjs `externalRequestFailure` 의 주석에 실측이 있다).
                 const budgetProblem = externalRequestFailure({
                   route,
-                  delta: external.length - externalBefore,
+                  added: external.slice(externalBefore),
                   total: external.length,
                   routeCount: sweepRoutes.length,
                 });
-                if (budgetProblem) {
-                  failures.push(budgetProblem);
-                  break;
-                }
+                // 여기서도 break 하지 않는다 — 위 `did not settle` 과 같은 이유다.
+                if (budgetProblem) failures.push(budgetProblem);
               }
               return {
                 routes,
@@ -497,20 +525,35 @@ export async function run(options) {
 
     // 8. axe (390 light / 1240 dark).
     if (wants('axe')) {
-      for (const [width, colorScheme] of [[390, 'light'], [1240, 'dark']]) {
+      const axeWidths = [[390, 'light'], [1240, 'dark']];
+      // 라우트별로 **어느 폭에서든** 발생한 규칙을 모은다. 낡은 유보 판정을 폭마다
+      // 하면 1240 에서만 나는 규칙이 390 에서 하드 실패가 된다 — 전 폭을 다 돈
+      // 뒤 마지막 시나리오에서 한 번만 판정한다.
+      const axeSeen = new Map();
+      for (const [index, [width, colorScheme]] of axeWidths.entries()) {
+        const isLastWidth = index === axeWidths.length - 1;
         await scenario(scenarios, { id: 'axe', width, text_scale: 100, reduced_motion: false }, async () => {
           const { context, page } = await openPage(browser, server.base, { width, colorScheme });
           try {
             const failures = [];
             const routes = {};
             for (const route of sweepRoutes) {
-              await goto(page, server.base, route);
+              try {
+                await goto(page, server.base, route);
+              } catch (error) {
+                // 오버플로 순회와 같은 이유로 이어간다 — 한 라우트가 안 가라앉아도
+                // 나머지 라우트의 axe 결과는 이 실행에서 받아야 한다.
+                const first = String(error).split(String.fromCharCode(10))[0];
+                failures.push(`${route} did not settle: ${first}`);
+                continue;
+              }
               const violations = await axeScan(page);
               routes[route] = violations;
-              // 판정은 routes.mjs 가 한다 — 심각도 기준과 유보 목록(그리고 낡은
-              // 유보의 실패 처리)을 한곳에 두고 단위 테스트로 고정하기 위해서다.
-              failures.push(...axeFailures({ route, violations }));
+              // 판정은 routes.mjs 가 한다 — 심각도 기준과 유보 목록을 한곳에 두고
+              // 단위 테스트로 고정하기 위해서다.
+              failures.push(...axeFailures({ route, violations, seen: axeSeen }));
             }
+            if (isLastWidth) failures.push(...staleWaiverFailures(axeSeen));
             return { color_scheme: colorScheme, routes, failures };
           } finally {
             await context.close();
