@@ -61,6 +61,74 @@ void main() {
     expect(find.byKey(const ValueKey('web-header-burger')), findsNothing);
   });
 
+  // 좌우 정렬 계약(2026-10-01 사용자 지적). 1920 폭 실화면에서 주 메뉴 항목이
+  // 헤더 전체로 흩어지고(항목마다 균등 몫을 통째로 차지) 검색·계정 오른쪽에는
+  // 빈 띠가 남아 있었다. 계약은 둘뿐이다 — **브랜드+주 메뉴는 왼쪽에 모이고,
+  // 검색+계정은 오른쪽 끝에 붙는다.** 간격은 전부 토큰 산술로 못박는다.
+  testWidgets('넓은 폭: 브랜드·주 메뉴는 왼쪽에 모이고 검색·계정은 오른쪽 끝에 붙는다', (tester) async {
+    _setWidth(tester, 1920);
+    await tester.pumpWidget(_host(selectedId: '/dashboard'));
+
+    final bar = tester.getRect(find.byKey(const ValueKey('web-header-bar')));
+    final brand = tester.getRect(find.text('Leva'));
+    final today = tester.getRect(find.text('오늘'));
+    final path = tester.getRect(find.text('학습 경로'));
+    final community = tester.getRect(find.text('커뮤니티'));
+
+    // 브랜드 → 첫 항목: 그룹 간격(xl) + 항목 좌측 패딩(md).
+    expect(
+      today.left - brand.right,
+      closeTo(DpSpacing.xl + DpSpacing.md, 1),
+      reason: '주 메뉴가 브랜드에 이어 붙지 않고 멀어졌다',
+    );
+
+    // 항목 사이: 앞 항목 우측 패딩(md) + 항목 간격(xs) + 뒤 항목 좌측 패딩(md).
+    const navGap = DpSpacing.md * 2 + DpSpacing.xs;
+    expect(
+      path.left - today.right,
+      closeTo(navGap, 1),
+      reason: '주 메뉴 항목이 남는 폭을 나눠 가지며 흩어졌다',
+    );
+    expect(community.left - path.right, closeTo(navGap, 1));
+
+    // 현재 항목 밑줄은 라벨 폭 + 좌우 패딩이다 — 균등 몫 전체가 아니다.
+    expect(
+      tester
+          .getRect(find.byKey(const ValueKey('web-header-current-/dashboard')))
+          .width,
+      closeTo(today.width + DpSpacing.md * 2, 1),
+      reason: '밑줄이 라벨이 아니라 항목이 차지한 폭 전체에 그려졌다',
+    );
+
+    // 우측 그룹은 바의 수평 패딩(xl)에 붙는다 — 남는 폭은 전부 주 메뉴 쪽이
+    // 흡수해야 한다(Row 끝에 남으면 우측 정렬이 깨진다).
+    expect(
+      bar.right -
+          tester
+              .getRect(find.byKey(const ValueKey('web-header-account')))
+              .right,
+      closeTo(DpSpacing.xl, 1),
+      reason: '계정 버튼이 오른쪽 끝에 붙지 않았다',
+    );
+  });
+
+  // 우측 그룹을 non-flex 로 둔 대가. 비(非)compact 하한인 720 에서도 넘치지
+  // 않아야 한다 — 넘치면 clipBehavior 기본값(Clip.none) 때문에 드롭다운이
+  // 검색 상자 위에 겹쳐 그려진다.
+  testWidgets('720(비compact 하한): 헤더가 오버플로하지 않는다', (tester) async {
+    _setWidth(tester, 720);
+    await tester.pumpWidget(_host());
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('720 · 텍스트 200% 에서 헤더가 오버플로하지 않는다', (tester) async {
+    _setWidth(tester, 720);
+    await tester.pumpWidget(_host(textScale: 2.0));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('헤더 높이는 계약의 headerHeight(56)다', (tester) async {
     _setWidth(tester, 1240);
     await tester.pumpWidget(_host());
