@@ -98,12 +98,19 @@ class _DpWebHeaderState extends State<DpWebHeader> {
           _burger(context, c),
         ] else ...[
           const SizedBox(width: DpSpacing.xl),
-          // 720~839 구간은 자리가 빠듯하다. 주 메뉴와 검색이 **둘 다** 줄어들 수
-          // 있어야 한다 — 고정 폭이면 RenderFlex 가 넘치고, clipBehavior 기본값이
-          // Clip.none 이라 드롭다운이 검색 상자 위에 겹쳐 그려진다(실측 720 → 67px).
+          // 좌우 정렬(2026-10-01). 남는 폭을 흡수하는 flex 자식은 **주 메뉴
+          // 하나뿐**이어야 한다. 예전에는 검색도 `Flexible` 이었는데, 그쪽은
+          // loose fit 이라 제 몫(절반)보다 적게 쓰고 그 잔여가 재분배되지 않은 채
+          // Row 끝에 남았다 — 1920 폭·항목 4개에서 계정 오른쪽에 670px 빈 띠가
+          // 생겼다(실측; 1440 에서는 430px)
+          // (`DpChromeBar` 가 같은 이유로 좌측 그룹을 Expanded 하나로 묶었다).
+          // 이제 검색은 non-flex 다: 폭은 `_search` 의 maxWidth(200) 로 결정되고
+          // 줄어들지 않는다. 720~839 구간이 빠듯해 "검색도 줄어야 한다"고 봤던
+          // 판단은 주 메뉴가 Expanded 안에서 줄어드는 것으로 충분하다 — 비compact
+          // 하한 720 에서(텍스트 200% 포함) 오버플로가 없음을 테스트로 못박았다.
           Expanded(child: _nav(context, c)),
           const SizedBox(width: DpSpacing.sm),
-          Flexible(child: _search(context, c)),
+          _search(context, c),
           const SizedBox(width: DpSpacing.sm),
           _account(context, c),
         ],
@@ -176,13 +183,23 @@ class _DpWebHeaderState extends State<DpWebHeader> {
                   ),
                 )
               : null,
-          alignment: Alignment.center,
-          child: DefaultTextStyle.merge(
-            style: TextStyle(
-              color: current ? c.headerText : c.headerMuted,
-              fontWeight: FontWeight.w500,
+          // `Container.alignment` 은 쓰지 않는다 — 그게 만드는 Align 에는
+          // widthFactor 가 없어 **제약의 최대 폭까지 확장**한다(폭이 bounded 면
+          // shrinkWrapWidth=false). 항목이 `Flexible` 이라 균등 몫을 통째로
+          // 차지했고, 라벨이 그 한가운데로 밀려 1920 폭·항목 4개에서 라벨 사이가
+          // 28 이어야 할 자리에 161.7px 벌어졌다(실측). 현재 항목 밑줄도 라벨
+          // (28.5)이 아니라 몫 전체(207.6)에 그려졌다.
+          // `Center(widthFactor: 1)` 로 폭은 내용에 맞추고 세로 중앙 정렬만 남긴다
+          // (높이는 바깥 height 제약이 tight 로 주므로 heightFactor 는 없다).
+          child: Center(
+            widthFactor: 1,
+            child: DefaultTextStyle.merge(
+              style: TextStyle(
+                color: current ? c.headerText : c.headerMuted,
+                fontWeight: FontWeight.w500,
+              ),
+              child: child,
             ),
-            child: child,
           ),
         ),
       ),
