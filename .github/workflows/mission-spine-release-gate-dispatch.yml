@@ -16,23 +16,45 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - name: Dispatch ET13 baseline approval as GitHub Actions automation
+      - name: Dispatch release-ready ET13 evidence as GitHub Actions automation
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh api \
             --method POST \
-            "repos/${GITHUB_REPOSITORY}/actions/workflows/et13-baseline-approval.yml/dispatches" \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/et13-evidence.yml/dispatches" \
             --input - <<'JSON'
           {
             "ref": "main",
             "inputs": {
               "release_id": "ms-20261003-ai-fallback-retry-budget",
-              "raw_run_id": "37112627137",
-              "raw_run_attempt": "1",
-              "raw_artifact_id": "11270965962",
-              "raw_artifact_digest": "sha256:cd8e266d23c153bc5cd8f29ad8bbbaf5b808351900a8270802c4b71424e12ab9",
-              "raw_workflow_sha256": "71ba5845635677793d97d1b30d01a7ad58fed2e8ca2e2e9cc1a437f89b7d323e"
+              "candidate_run_id": "37117483543",
+              "candidate_run_attempt": "1",
+              "candidate_artifact_id": "11272196381",
+              "candidate_spec_sha256": "c23f3b8e1c1dfceb8c87e347a192c94b706d33c968624cd8dce06126ef94a3e1",
+              "baseline_run_id": "37113362836",
+              "baseline_run_attempt": "1",
+              "baseline_artifact_id": "11271468059"
+            }
+          }
+          JSON
+
+      - name: Dispatch manual AT evidence as GitHub Actions automation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api \
+            --method POST \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/mission-spine-manual-at-evidence.yml/dispatches" \
+            --input - <<'JSON'
+          {
+            "ref": "main",
+            "inputs": {
+              "release_id": "ms-20261003-ai-fallback-retry-budget",
+              "candidate_run_id": "37117483543",
+              "candidate_run_attempt": "1",
+              "candidate_artifact_id": "11272196381",
+              "candidate_spec_sha256": "c23f3b8e1c1dfceb8c87e347a192c94b706d33c968624cd8dce06126ef94a3e1"
             }
           }
           JSON
