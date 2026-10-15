@@ -14,8 +14,16 @@ import '../state/auth_state.dart';
 ///
 /// 시안 `login` — `.login{grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);
 /// gap:48px}`. 좌측은 `.flow` 목록 3항목, 우측은 `.panel.signin` 이다.
+///
+/// [intent] 는 `/login?intent=…` 쿼리 값이다. 랜딩의 「AI 멘토 초대 신청」이
+/// [loginIntentInvite] 로 오면 패널이 초대 대기 명단을 안내한다(점검 A-1).
+/// 랜딩 「AI 멘토 초대 신청」 버튼이 붙이는 `intent` 쿼리 값.
+const loginIntentInvite = 'invite';
+
 class LoginPage extends ConsumerWidget {
-  const LoginPage({super.key});
+  const LoginPage({super.key, this.intent});
+
+  final String? intent;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -32,6 +40,7 @@ class LoginPage extends ConsumerWidget {
     final access = auth is AuthLoading
         ? const _LoginSessionCheck()
         : _LoginAccessPanel(
+            invite: intent == loginIntentInvite,
             error: error,
             useMock: useMock,
             onGithub: () => useMock
@@ -131,9 +140,9 @@ class _LoginStory extends StatelessWidget {
   const _LoginStory();
 
   static const _flow = <({String title, String body})>[
-    (title: '맞춤 학습 경로', body: '15문항 진단과 GitHub 분석으로 12주 계획을 만듭니다.'),
-    (title: '실시간 AI 멘토', body: '지금 보고 있는 과제의 맥락으로 답합니다.'),
-    (title: '성장 기록', body: '완료한 과제와 연속 학습이 쌓입니다.'),
+    (title: '진단', body: '15문항으로 무엇을 알고 무엇이 비었는지 확인합니다.'),
+    (title: '12주 학습 경로', body: '진단 결과로 주차별 미션과 완료 조건을 만듭니다.'),
+    (title: 'AI 멘토 (순차 초대)', body: '학습 주제·진도·직전 오류를 질문에 자동으로 붙입니다.'),
   ];
 
   @override
@@ -146,7 +155,7 @@ class _LoginStory extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          'LEARN · BUILD · GROW',
+          '사수 없는 0~3년차 개발자의 첫 AI 사수',
           style: text.labelMedium?.copyWith(
             color: c.primaryTextStrong,
             letterSpacing: 1.2,
@@ -155,7 +164,7 @@ class _LoginStory extends StatelessWidget {
         ),
         const SizedBox(height: DpSpacing.sm),
         Text(
-          '오늘 할 일을 선명하게, 성장은 매일 이어지게.',
+          '내 상황을 처음부터 다시 설명하지 않아도 됩니다.',
           style: text.headlineMedium?.copyWith(color: c.textPrimary),
         ),
         const SizedBox(height: DpSpacing.md),
@@ -220,12 +229,14 @@ class _LoginSessionCheck extends StatelessWidget {
 /// 폭은 `.login` 그리드가 정한다 — 480 고정 제약을 두지 않는다.
 class _LoginAccessPanel extends StatelessWidget {
   const _LoginAccessPanel({
+    required this.invite,
     required this.error,
     required this.useMock,
     required this.onGithub,
     required this.onGoogle,
   });
 
+  final bool invite;
   final String? error;
   final bool useMock;
   final VoidCallback onGithub;
@@ -242,10 +253,15 @@ class _LoginAccessPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('다시 만나서 반가워요', style: text.titleLarge),
+          // 신규·기존 사용자가 함께 쓰는 화면이라 재방문 인사를 두지 않는다.
+          Text(invite ? 'AI 멘토 초대 신청' : '로그인', style: text.titleLarge),
           const SizedBox(height: DpSpacing.sm),
           Text(
-            '계정을 연결하고 오늘의 학습 흐름을 이어가세요.',
+            // 로그인하면 platform-svc 가 초대 대기(WAITLISTED) 행을 만든다
+            // (ensureForLogin). 승인 메일은 보내는 곳이 없어 약속하지 않는다.
+            invite
+                ? '로그인하면 초대 대기 명단에 등록됩니다. 초대되면 AI 멘토를 바로 쓸 수 있습니다.'
+                : '계정을 연결하고 학습을 이어가세요.',
             style: text.bodyMedium?.copyWith(color: c.textSecondary),
           ),
           const SizedBox(height: DpSpacing.lg),
@@ -266,7 +282,7 @@ class _LoginAccessPanel extends StatelessWidget {
           ),
           const SizedBox(height: DpSpacing.xl),
           Text(
-            '계속하면 Leva의 이용약관과 개인정보 처리방침에 동의하게 됩니다.',
+            '계속하면 레바의 이용약관과 개인정보 처리방침에 동의하게 됩니다.',
             textAlign: TextAlign.center,
             style: text.bodySmall?.copyWith(color: c.textSecondary),
           ),
