@@ -6,6 +6,7 @@ import '../../mentor/application/mentor_invite_handoff.dart';
 import '../../mentor/data/mentor_access_source.dart';
 import '../state/auth_state.dart';
 import 'oauth_launcher.dart';
+import 'session_hint.dart';
 
 /// OAuth 로그인/로그아웃. login()은 OAuth 리다이렉트, bootstrapFromCallback()은
 /// OAuth 콜백 후 세션 복원, bootstrapSession()은 앱 시작 시 자동 세션 복원.
@@ -28,6 +29,7 @@ class AuthController extends Notifier<AuthState> {
 
   ApiClient get _client => ref.read(apiClientProvider);
   TokenStore get _store => ref.read(tokenStoreProvider);
+  SessionHintStore get _hints => ref.read(sessionHintStoreProvider);
 
   /// GitHub OAuth 흐름 시작: 브라우저를 gateway OAuth 엔드포인트로 리다이렉트.
   /// 실제 리다이렉트는 [oauthLauncherProvider]에 위임(테스트에서 Fake로 교체 가능).
@@ -45,6 +47,12 @@ class AuthController extends Notifier<AuthState> {
   Future<void> bootstrapSession() {
     // 이미 인증 완료된 상태면 재실행 방지(예: bootstrapFromCallback 이후 재진입).
     if (state is AuthAuthenticated) return Future.value();
+    // 이 브라우저가 세션 없음을 확인해 뒀으면 refresh 를 부르지 않는다 — 비로그인
+    // 방문마다 401 이 콘솔 오류로 남았다(점검 A-6). 진행 중인 복원은 그대로 따른다.
+    if (_sessionBootstrap == null && _hints.read() == SessionHint.absent) {
+      state = const AuthUnauthenticated();
+      return Future.value();
+    }
     return _bootstrap(includeApiError: false);
   }
 
@@ -80,9 +88,12 @@ class AuthController extends Notifier<AuthState> {
       state = AuthAuthenticated(
         User.fromJson((data['user'] as Map).cast<String, dynamic>()),
       );
+      _hints.write(SessionHint.present);
       _identifyAuthenticatedUser();
     } on ApiException catch (error) {
       if (!ref.mounted) return;
+      // 401 만 세션 없음이다. 5xx·429 등은 세션 유무를 알려 주지 않는다.
+      if (error.status == 401) _hints.write(SessionHint.absent);
       state = AuthUnauthenticated(
         error: includeApiError || _callbackFailureDetailsRequested
             ? error.message
@@ -156,6 +167,7 @@ class AuthController extends Notifier<AuthState> {
 
   Future<void> logout() async {
     await _store.clear();
+    _hints.write(SessionHint.absent);
     try {
       ref.read(mentorInviteHandoffStoreProvider).clear();
     } catch (_) {
