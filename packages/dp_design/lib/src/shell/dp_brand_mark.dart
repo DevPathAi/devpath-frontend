@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../icons/dp_icons.dart';
 import '../theme/dp_colors.dart';
 
-/// 앱 셸과 인증 화면에서 공유하는 Leva 심볼.
+/// 앱 셸과 인증 화면에서 공유하는 레바 심볼.
 /// 단색 사각형 대신 경로를 뜻하는 기호와 깊이 있는 인디고 면을 결합한다.
 class DpBrandMark extends StatelessWidget {
   const DpBrandMark({super.key, this.size = 32});
@@ -15,7 +15,7 @@ class DpBrandMark extends StatelessWidget {
     final c = context.dpColors;
     return Semantics(
       image: true,
-      label: 'Leva',
+      label: '레바',
       child: Container(
         key: const ValueKey('leva-brand-mark'),
         width: size,

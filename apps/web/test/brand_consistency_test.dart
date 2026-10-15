@@ -42,16 +42,53 @@ void main() {
   // 브랜드 표기 규칙(2026-10-15 사용자 결정): 한국어 화면의 워드마크·제목은 「레바」,
   // 영문 병기가 필요한 첫 등장만 「레바(Leva)」. 영문 단독 워드마크 'Leva' 가
   // 앱 코드로 되돌아오지 않게 막는다(점검 B-1 — 탭 제목·헤더 로고가 Leva 였다).
+  // ★첫 판은 `lib` 만 봐서 공용 로고의 스크린리더 라벨(dp_design)과 관리자 앱
+  // 워드마크가 'Leva' 로 남았다★ — 위 DevPath 검사와 같은 범위를 본다.
   test('앱 코드에 영문 단독 워드마크 Leva 가 없다', () {
     final offenders = <String>[];
     final wordmark = RegExp(r'''['"]Leva['"]''');
-    for (final file in Directory(
-      'lib',
-    ).listSync(recursive: true).whereType<File>()) {
-      if (!file.path.endsWith('.dart')) continue;
+    for (final dir in dartDirs) {
+      for (final file in dir.listSync(recursive: true).whereType<File>()) {
+        if (!file.path.endsWith('.dart')) continue;
+        final lines = file.readAsLinesSync();
+        for (var i = 0; i < lines.length; i++) {
+          if (wordmark.hasMatch(lines[i])) {
+            offenders.add('${file.path}:${i + 1}  ${lines[i].trim()}');
+          }
+        }
+      }
+    }
+    expect(offenders, isEmpty, reason: offenders.join('\n'));
+  });
+
+  // 같은 규칙의 다른 얼굴: 한국어 문구 안에 영문 브랜드를 쓰는 것(관리자 앱의
+  // 「Leva 관리자」·「Leva 운영 콘솔」이 남아 있었다). Leva 바로 뒤에 한글이 오면
+  // 한국어 문장 속 브랜드이므로 「레바」여야 한다. 「레바(Leva)」 병기는 걸리지 않는다.
+  final koreanContextLeva = RegExp(r'Leva\s?[가-힣]');
+
+  test('한국어 문구 안에 영문 브랜드 Leva 를 쓰지 않는다', () {
+    final offenders = <String>[];
+    final dartLiteralLeva = RegExp(r'''['"][^'"]*Leva\s?[가-힣][^'"]*['"]''');
+    for (final dir in dartDirs) {
+      for (final file in dir.listSync(recursive: true).whereType<File>()) {
+        if (!file.path.endsWith('.dart')) continue;
+        final lines = file.readAsLinesSync();
+        for (var i = 0; i < lines.length; i++) {
+          if (dartLiteralLeva.hasMatch(lines[i])) {
+            offenders.add('${file.path}:${i + 1}  ${lines[i].trim()}');
+          }
+        }
+      }
+    }
+    for (final file in [
+      File('web/manifest.json'),
+      File('web/index.html'),
+      File('../admin/web/manifest.json'),
+      File('../admin/web/index.html'),
+    ].where((f) => f.existsSync())) {
       final lines = file.readAsLinesSync();
       for (var i = 0; i < lines.length; i++) {
-        if (wordmark.hasMatch(lines[i])) {
+        if (koreanContextLeva.hasMatch(lines[i])) {
           offenders.add('${file.path}:${i + 1}  ${lines[i].trim()}');
         }
       }
