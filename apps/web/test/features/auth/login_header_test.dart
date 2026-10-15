@@ -36,7 +36,8 @@ void main() {
       // 자체를 직접 단언한다(find.text보다 brandRow 위젯 유무에 견고하다 —
       // F4, 4화면 전부 이 형태로 통일).
       expect(find.byKey(const ValueKey('brand-row')), findsOneWidget);
-      expect(find.text('Leva'), findsOneWidget);
+      // 브랜드 표기 규칙(2026-10-15): 화면의 한국어 워드마크는 「레바」.
+      expect(find.text('레바'), findsOneWidget);
     },
   );
 
