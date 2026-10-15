@@ -36,7 +36,7 @@ void main() {
       _app(const AdminLoginPage(), const AdminUnauthed(error: '인증 실패')),
     );
 
-    expect(find.text('Leva'), findsOneWidget);
+    expect(find.text('레바'), findsOneWidget);
     expect(find.text('운영 콘솔'), findsOneWidget);
     expect(find.text('관리자 로그인'), findsOneWidget);
     expect(
@@ -67,7 +67,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('Leva'), findsOneWidget);
+    expect(find.text('레바'), findsOneWidget);
     expect(find.text('관리자 세션 확인 중'), findsOneWidget);
     expect(find.byType(DpLoading), findsOneWidget);
 
@@ -76,7 +76,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('Leva'), findsOneWidget);
+    expect(find.text('레바'), findsOneWidget);
     expect(find.text('이 계정으로는 접근할 수 없어요'), findsOneWidget);
     expect(find.text('다른 계정으로 로그인'), findsOneWidget);
   });

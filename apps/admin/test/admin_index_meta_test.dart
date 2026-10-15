@@ -13,11 +13,11 @@ void main() {
     });
 
     test('브랜드 제목을 쓴다', () {
-      expect(html, contains('<title>Leva 관리자</title>'));
+      expect(html, contains('<title>레바 관리자</title>'));
     });
 
     test('무엇을 위한 화면인지 설명한다', () {
-      expect(html, contains('Leva 서비스 운영을 위한 관리자 도구입니다.'));
+      expect(html, contains('레바(Leva) 서비스 운영을 위한 관리자 도구입니다.'));
     });
 
     test('검색 색인을 막는다', () {

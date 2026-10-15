@@ -25,7 +25,7 @@ void _setWidth(WidgetTester tester, double w) {
 Widget _host() => MaterialApp(
   theme: DpTheme.light(),
   home: DpWebShell(
-    brand: DpRailBrand(mark: const DpBrandMark(size: 24), wordmark: 'Leva'),
+    brand: DpRailBrand(mark: const DpBrandMark(size: 24), wordmark: '레바'),
     items: const [DpWebNavItem(id: '/dashboard', label: '오늘')],
     selectedId: '/dashboard',
     onSelect: (_) {},
@@ -60,7 +60,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.bySemanticsLabel('오늘'), findsWidgets);
-    expect(find.bySemanticsLabel('Leva'), findsWidgets);
+    expect(find.bySemanticsLabel('레바'), findsWidgets);
     handle.dispose();
   });
 

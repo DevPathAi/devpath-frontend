@@ -43,14 +43,14 @@ class AdminAccessFrame extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Semantics(
-                            label: 'Leva 운영 콘솔',
+                            label: '레바 운영 콘솔',
                             child: ExcludeSemantics(
                               child: Wrap(
                                 spacing: DpSpacing.xs,
                                 runSpacing: DpSpacing.xs,
                                 crossAxisAlignment: WrapCrossAlignment.end,
                                 children: [
-                                  Text('Leva', style: text.headlineSmall),
+                                  Text('레바', style: text.headlineSmall),
                                   Text('운영 콘솔', style: text.labelLarge),
                                 ],
                               ),

@@ -36,7 +36,7 @@ Widget _host({
         ),
   home: Scaffold(
     body: DpWebHeader(
-      brand: DpRailBrand(mark: const DpBrandMark(size: 24), wordmark: 'Leva'),
+      brand: DpRailBrand(mark: const DpBrandMark(size: 24), wordmark: '레바'),
       items: _items,
       selectedId: selectedId,
       onSelect: onSelect ?? (_) {},
@@ -70,7 +70,7 @@ void main() {
     await tester.pumpWidget(_host(selectedId: '/dashboard'));
 
     final bar = tester.getRect(find.byKey(const ValueKey('web-header-bar')));
-    final brand = tester.getRect(find.text('Leva'));
+    final brand = tester.getRect(find.text('레바'));
     final today = tester.getRect(find.text('오늘'));
     final path = tester.getRect(find.text('학습 경로'));
     final community = tester.getRect(find.text('커뮤니티'));
