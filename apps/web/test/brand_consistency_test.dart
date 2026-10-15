@@ -39,6 +39,26 @@ void main() {
     expect(offenders, isEmpty, reason: offenders.join('\n'));
   });
 
+  // 브랜드 표기 규칙(2026-10-15 사용자 결정): 한국어 화면의 워드마크·제목은 「레바」,
+  // 영문 병기가 필요한 첫 등장만 「레바(Leva)」. 영문 단독 워드마크 'Leva' 가
+  // 앱 코드로 되돌아오지 않게 막는다(점검 B-1 — 탭 제목·헤더 로고가 Leva 였다).
+  test('앱 코드에 영문 단독 워드마크 Leva 가 없다', () {
+    final offenders = <String>[];
+    final wordmark = RegExp(r'''['"]Leva['"]''');
+    for (final file in Directory(
+      'lib',
+    ).listSync(recursive: true).whereType<File>()) {
+      if (!file.path.endsWith('.dart')) continue;
+      final lines = file.readAsLinesSync();
+      for (var i = 0; i < lines.length; i++) {
+        if (wordmark.hasMatch(lines[i])) {
+          offenders.add('${file.path}:${i + 1}  ${lines[i].trim()}');
+        }
+      }
+    }
+    expect(offenders, isEmpty, reason: offenders.join('\n'));
+  });
+
   // web/ 아래는 브라우저와 OS가 직접 읽는다. manifest 의 name 은 홈 화면에
   // 추가했을 때의 앱 이름이고, index.html 의 메타는 링크 미리보기에 쓰인다.
   // 여기는 코드 식별자가 아니라 전부 사용자에게 보이는 값이므로 대소문자를

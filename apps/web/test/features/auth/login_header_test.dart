@@ -29,14 +29,15 @@ void main() {
       // 시안 `.panel.signin` 은 h3 + 설명 + 버튼 둘이다 — 페이지 헤더가 아니다.
       expect(find.byType(DpPageHeader), findsNothing);
       expect(find.byKey(const ValueKey('login-access-panel')), findsOneWidget);
-      expect(find.text('다시 만나서 반가워요'), findsOneWidget);
+      expect(find.text('로그인'), findsOneWidget);
       expect(find.byTooltip('테마 전환'), findsOneWidget);
       // T3: brandRow(context) 호출 자체를 지워도 byTooltip 단언은 깨지지 않는다
       // (버튼이 brandRow 밖으로 옮겨져도 통과한다) — brandRow의 key로 호출
       // 자체를 직접 단언한다(find.text보다 brandRow 위젯 유무에 견고하다 —
       // F4, 4화면 전부 이 형태로 통일).
       expect(find.byKey(const ValueKey('brand-row')), findsOneWidget);
-      expect(find.text('Leva'), findsOneWidget);
+      // 브랜드 표기 규칙(2026-10-15): 화면의 한국어 워드마크는 「레바」.
+      expect(find.text('레바'), findsOneWidget);
     },
   );
 
@@ -52,9 +53,9 @@ void main() {
 
     expect(find.byKey(const ValueKey('login-story')), findsOneWidget);
     expect(find.byKey(const ValueKey('login-access-panel')), findsOneWidget);
-    expect(find.text('오늘 할 일을 선명하게, 성장은 매일 이어지게.'), findsOneWidget);
+    expect(find.text('내 상황을 처음부터 다시 설명하지 않아도 됩니다.'), findsOneWidget);
     expect(
-      tester.getTopLeft(find.text('다시 만나서 반가워요')).dx,
+      tester.getTopLeft(find.text('로그인')).dx,
       closeTo(tester.getTopLeft(find.byType(FilledButton)).dx, 0.1),
     );
   });

@@ -18,11 +18,13 @@ Widget brandRow(BuildContext context, {List<Widget> actions = const []}) {
       children: [
         const DpBrandMark(size: 32),
         const SizedBox(width: DpSpacing.sm),
-        // Flexible로 감싼다 — Spacer(Expanded)와 같은 Row의 non-flex 자식은
-        // 무한 주축 제약으로 측정되어 ellipsis가 발동하지 않고 오버플로한다.
-        Flexible(
+        // Expanded 하나로 남는 폭을 전부 받는다 — non-flex 자식은 무한 주축 제약으로
+        // 측정되어 ellipsis가 발동하지 않고 오버플로한다. Flexible(loose)+Spacer 로
+        // 두면 둘이 폭을 반씩 나눠 워드마크가 안 쓴 몫이 액션 뒤에 남는다
+        // (운영 1280px 에서 테마 토글이 694px 지점에 떴다, 2026-10-15).
+        Expanded(
           child: Text(
-            'Leva',
+            '레바',
             overflow: TextOverflow.ellipsis,
             style: text.titleMedium?.copyWith(
               color: c.textPrimary,
@@ -31,7 +33,6 @@ Widget brandRow(BuildContext context, {List<Widget> actions = const []}) {
             ),
           ),
         ),
-        const Spacer(),
         ...actions,
       ],
     ),

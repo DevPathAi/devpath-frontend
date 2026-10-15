@@ -362,7 +362,7 @@ class _DiagnosticOutcomes extends StatelessWidget {
     child: DpKeyValues(
       entries: [
         (key: '현재 레벨', value: Text('1~5 단계')),
-        (key: '진단 신뢰도', value: Text('응답 일관성으로 계산한 %')),
+        (key: '진단 신뢰도', value: Text('0~100%')),
         (key: '맞춤 학습 경로', value: Text('12주 주차 계획')),
       ],
     ),

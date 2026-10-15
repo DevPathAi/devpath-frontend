@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:devpath_web/src/analytics/journey_analytics.dart';
 import 'package:devpath_web/src/features/auth/application/auth_controller.dart';
 import 'package:devpath_web/src/features/auth/application/oauth_launcher.dart';
+import 'package:devpath_web/src/features/auth/application/session_hint.dart';
 import 'package:devpath_web/src/features/auth/state/auth_state.dart';
 import 'package:devpath_web/src/providers/api_providers.dart';
 import 'package:dio/dio.dart';
@@ -498,5 +499,108 @@ void main() {
 
     expect(analytics.identified, ['101']);
     expect(analytics.resetCount, 1);
+  });
+
+  // -------------------------------------------------------------------------
+  // 점검 A-6(2026-10-11): 비로그인 방문자가 앱을 열 때마다 POST /auth/refresh 가
+  // 401 로 콘솔 오류를 남겼다. refresh 쿠키는 HttpOnly 라 JS 가 볼 수 없으므로,
+  // 이 브라우저가 마지막으로 확인한 결과(SessionHint)로 시작 복원을 건너뛴다.
+  // -------------------------------------------------------------------------
+  group('세션 힌트(시작 복원 생략)', () {
+    ProviderContainer containerWith(
+      _MockRefreshAdapter adapter,
+      MemorySessionHintStore hints,
+    ) => ProviderContainer(
+      overrides: [
+        apiClientProvider.overrideWith((ref) {
+          final client = ApiClient.create(
+            const ApiConfig(baseUrl: 'http://test.local'),
+          );
+          client.dio.httpClientAdapter = adapter;
+          return client;
+        }),
+        sessionHintStoreProvider.overrideWithValue(hints),
+      ],
+    );
+
+    test('세션 없음으로 기억하면 시작 시 refresh 를 부르지 않는다', () async {
+      final adapter = _MockRefreshAdapter(statusCode: 401);
+      final hints = MemorySessionHintStore(SessionHint.absent);
+      final container = containerWith(adapter, hints);
+      addTearDown(container.dispose);
+
+      await container.read(authControllerProvider.notifier).bootstrapSession();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(adapter.calls, 0);
+      expect(
+        container.read(authControllerProvider),
+        isA<AuthUnauthenticated>(),
+      );
+    });
+
+    // 배포 전부터 로그인해 있던 사용자는 힌트가 없다 — 강제 로그아웃되면 안 된다.
+    test('힌트가 없으면 예전처럼 refresh 하고 401 이면 세션 없음으로 기억한다', () async {
+      final adapter = _MockRefreshAdapter(statusCode: 401);
+      final hints = MemorySessionHintStore();
+      final container = containerWith(adapter, hints);
+      addTearDown(container.dispose);
+
+      await container.read(authControllerProvider.notifier).bootstrapSession();
+
+      expect(adapter.calls, 1);
+      expect(hints.read(), SessionHint.absent);
+    });
+
+    test('refresh 가 성공하면 세션 있음으로 기억한다', () async {
+      final adapter = _MockRefreshAdapter();
+      final hints = MemorySessionHintStore();
+      final container = containerWith(adapter, hints);
+      addTearDown(container.dispose);
+
+      await container.read(authControllerProvider.notifier).bootstrapSession();
+
+      expect(container.read(authControllerProvider), isA<AuthAuthenticated>());
+      expect(hints.read(), SessionHint.present);
+    });
+
+    test('세션 없음으로 기억해도 OAuth 콜백은 항상 refresh 한다', () async {
+      final adapter = _MockRefreshAdapter();
+      final hints = MemorySessionHintStore(SessionHint.absent);
+      final container = containerWith(adapter, hints);
+      addTearDown(container.dispose);
+
+      await container
+          .read(authControllerProvider.notifier)
+          .bootstrapFromCallback();
+
+      expect(adapter.calls, 1);
+      expect(container.read(authControllerProvider), isA<AuthAuthenticated>());
+      expect(hints.read(), SessionHint.present);
+    });
+
+    test('서버 오류(5xx)는 세션 유무를 알려 주지 않으므로 힌트를 바꾸지 않는다', () async {
+      final adapter = _MockRefreshAdapter(statusCode: 503);
+      final hints = MemorySessionHintStore(SessionHint.present);
+      final container = containerWith(adapter, hints);
+      addTearDown(container.dispose);
+
+      await container.read(authControllerProvider.notifier).bootstrapSession();
+
+      expect(hints.read(), SessionHint.present);
+    });
+
+    test('로그아웃하면 세션 없음으로 기억한다', () async {
+      final adapter = _MockRefreshAdapter();
+      final hints = MemorySessionHintStore();
+      final container = containerWith(adapter, hints);
+      addTearDown(container.dispose);
+      final controller = container.read(authControllerProvider.notifier);
+      await controller.bootstrapSession();
+
+      await controller.logout();
+
+      expect(hints.read(), SessionHint.absent);
+    });
   });
 }

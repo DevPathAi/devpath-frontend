@@ -318,7 +318,7 @@ void main() {
 
     final finder = find.descendant(
       of: find.byType(DpWebHeader),
-      matching: find.text('Leva'),
+      matching: find.text('레바'),
     );
     expect(
       effectiveTextColor(tester, finder),
@@ -338,7 +338,7 @@ void main() {
 
     final finder = find.descendant(
       of: find.byType(DpWebHeader),
-      matching: find.text('Leva'),
+      matching: find.text('레바'),
     );
     expect(effectiveTextColor(tester, finder), DpColors.dark.headerText);
   });
