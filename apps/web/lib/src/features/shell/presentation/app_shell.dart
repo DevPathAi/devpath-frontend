@@ -279,7 +279,7 @@ class AppShellView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DpWebShell(
-      brand: DpRailBrand(mark: const DpBrandMark(size: 24), wordmark: 'Leva'),
+      brand: DpRailBrand(mark: const DpBrandMark(size: 24), wordmark: '레바'),
       items: kWebNavItems,
       selectedId: webNavSelectedIdFor(location),
       onSelect: (id) =>

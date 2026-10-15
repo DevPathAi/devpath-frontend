@@ -11,7 +11,7 @@ void _setWidth(WidgetTester tester, double w) {
 Widget _host({List<DpCrumb> breadcrumb = const []}) => MaterialApp(
   theme: DpTheme.light(),
   home: DpWebShell(
-    brand: DpRailBrand(mark: const DpBrandMark(size: 24), wordmark: 'Leva'),
+    brand: DpRailBrand(mark: const DpBrandMark(size: 24), wordmark: '레바'),
     items: const [DpWebNavItem(id: '/dashboard', label: '오늘')],
     selectedId: '/dashboard',
     onSelect: (_) {},
@@ -150,7 +150,7 @@ void main() {
           .label,
       '메뉴',
     );
-    expect(find.bySemanticsLabel('Leva'), findsWidgets);
+    expect(find.bySemanticsLabel('레바'), findsWidgets);
     handle.dispose();
   });
 }
@@ -158,7 +158,7 @@ void main() {
 Widget _hostFullNav() => MaterialApp(
   theme: DpTheme.light(),
   home: DpWebShell(
-    brand: DpRailBrand(mark: const DpBrandMark(size: 24), wordmark: 'Leva'),
+    brand: DpRailBrand(mark: const DpBrandMark(size: 24), wordmark: '레바'),
     items: const [
       DpWebNavItem(id: '/dashboard', label: '오늘'),
       DpWebNavItem(id: '/path', label: '학습 경로'),

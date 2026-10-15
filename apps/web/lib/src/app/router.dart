@@ -242,7 +242,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       return destination;
     },
     routes: [
-      GoRoute(path: '/login', builder: (_, _) => const LoginPage()),
+      GoRoute(
+        path: '/login',
+        builder: (_, state) =>
+            LoginPage(intent: state.uri.queryParameters['intent']),
+      ),
       GoRoute(
         path: '/beta-pending',
         builder: (_, _) => const BetaPendingPage(),

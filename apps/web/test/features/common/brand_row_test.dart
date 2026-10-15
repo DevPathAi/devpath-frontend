@@ -32,4 +32,56 @@ void main() {
 
     expect(tester.takeException(), isNull);
   });
+
+  // 운영 실측(2026-10-15, 1280px): 테마 토글이 오른쪽 끝이 아니라 694px 지점에 있었다.
+  // 워드마크를 감싼 `Flexible`(loose)과 `Spacer` 가 남는 폭을 반씩 나눠 가져,
+  // 워드마크가 쓰지 않은 몫이 액션 **뒤**에 남았다.
+  for (final width in [390.0, 1280.0, 1920.0]) {
+    testWidgets('${width.toInt()}px 에서 액션이 오른쪽 끝에 붙는다', (tester) async {
+      await tester.pumpWidget(_actionHost(tester, width));
+
+      final action = tester.getRect(
+        find.byKey(const ValueKey('brand-row-action')),
+      );
+      expect(action.right, closeTo(width - DpSpacing.lg, 0.5));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('워드마크는 로고 바로 옆에서 시작한다', (tester) async {
+    await tester.pumpWidget(_actionHost(tester, 1280));
+
+    final mark = tester.getRect(find.byType(DpBrandMark));
+    final wordmark = tester.getRect(find.text('레바'));
+    expect(wordmark.left, closeTo(mark.right + DpSpacing.sm, 0.5));
+  });
+}
+
+/// 화면들처럼 폭 전체로 늘어난 Column 안에 놓는다(로그인은 stretch Column).
+Widget _actionHost(WidgetTester tester, double width) {
+  tester.view.physicalSize = Size(width, 800);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+  return MaterialApp(
+    theme: DpTheme.light(),
+    home: Scaffold(
+      body: Builder(
+        builder: (context) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            brandRow(
+              context,
+              actions: [
+                IconButton(
+                  key: const ValueKey('brand-row-action'),
+                  icon: const Icon(Icons.dark_mode),
+                  onPressed: () {},
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }

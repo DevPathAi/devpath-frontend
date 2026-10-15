@@ -245,6 +245,25 @@ void main() {
     );
   });
 
+  // 점검 A-5(2026-10-11): 「응답 일관성으로 계산한 %」가 값 칸 폭을 넘어 「%」만
+  // 다음 줄로 떨어졌다(데스크톱·모바일 모두). 같은 패널의 「1~5 단계」와 같은 형식으로 줄인다.
+  for (final width in [390.0, 1280.0]) {
+    testWidgets('결과 미리보기 값은 ${width.toInt()}px 에서 한 줄에 들어간다', (tester) async {
+      tester.view.physicalSize = Size(width, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final controller = _FixedDiagnosticController(const DiagnosticState());
+      await tester.pumpWidget(_host(controller));
+      await tester.pump();
+
+      expect(find.text('응답 일관성으로 계산한 %'), findsNothing);
+      // 테스트 폰트는 한글을 1em 정사각형으로 그려 실제보다 넓다. 「12주 주차 계획」은
+      // 운영 390px 실측에서 한 줄이지만 테스트 폰트에서는 넘친다 — 명세 대상만 본다.
+      final oneLine = tester.getSize(find.text('1~5 단계')).height;
+      expect(tester.getSize(find.text('0~100%')).height, closeTo(oneLine, 0.5));
+    });
+  }
+
   testWidgets('390px에서 트랙 입력과 안내 문구가 화면 안에 머문다', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
